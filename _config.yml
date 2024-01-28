@@ -30,9 +30,6 @@ twitter_username: mindadeepam
 github_username:  mindadeepam
 domain: "mindadeepam.github.io"
 # Build settings
-theme: minima
-plugins:
-  - jekyll-feed
 
 markdown: kramdown
 highlighter: rouge
