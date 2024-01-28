@@ -31,21 +31,21 @@ github_username:  mindadeepam
 domain: "mindadeepam.github.io"
 # Build settings
 
-theme: minima
 
 
 markdown: kramdown
 highlighter: rouge
-excerpt_separator: <!--more-->
+theme: minima
 gems:
   - jekyll-feed
-exclude:
-  - Gemfile
-  - Gemfile.lock
-kramdown:
-  input: GFM
-  auto_ids: true
-  syntax_highlighter: rouge
+# excerpt_separator: <!--more-->
+# exclude:
+#   - Gemfile
+#   - Gemfile.lock
+# kramdown:
+#   input: GFM
+#   auto_ids: true
+#   syntax_highlighter: rouge
 
 # Exclude from processing.
 # The following items will not be processed, by default.
