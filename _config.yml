@@ -36,7 +36,7 @@ domain: "mindadeepam.github.io"
 markdown: kramdown
 highlighter: rouge
 theme: minima
-gems:
+plugins:
   - jekyll-feed
 # excerpt_separator: <!--more-->
 # exclude:
