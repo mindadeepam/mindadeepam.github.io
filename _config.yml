@@ -31,6 +31,9 @@ github_username:  mindadeepam
 domain: "mindadeepam.github.io"
 # Build settings
 
+theme: minima
+
+
 markdown: kramdown
 highlighter: rouge
 excerpt_separator: <!--more-->
