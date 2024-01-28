@@ -10,4 +10,3 @@ My name is Deepam Minda and I am a data scientist / engineer interested in probl
 - [my linkedin](https://www.linkedin.com/in/mindadeepam/) 
 - [my twitter](https://twitter.com/mindadeepam)
 - [my medium](https://mindadeepam.medium.com/)
-
