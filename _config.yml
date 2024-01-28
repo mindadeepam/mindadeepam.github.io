@@ -18,10 +18,10 @@
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
 
-title: My writing
+title: Deepam Minda Blog
 email: mindadeepam99@gmail.com
 description: >- # this means to ignore newlines until "baseurl:"
-  Learning by writing
+  Learning via writing and debugging
   
   
 baseurl: "" # the subpath of your site, e.g. /blog
@@ -32,20 +32,12 @@ domain: "mindadeepam.github.io"
 # Build settings
 
 
-
 markdown: kramdown
 highlighter: rouge
 theme: minima
 plugins:
   - jekyll-feed
-# excerpt_separator: <!--more-->
-# exclude:
-#   - Gemfile
-#   - Gemfile.lock
-# kramdown:
-#   input: GFM
-#   auto_ids: true
-#   syntax_highlighter: rouge
+
 
 # Exclude from processing.
 # The following items will not be processed, by default.
