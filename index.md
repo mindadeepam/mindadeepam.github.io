@@ -4,3 +4,5 @@
 
 layout: home
 ---
+
+Welcome to my blog. I aim to write down some learnings everynow and then here. 1st blog coming soon!!
