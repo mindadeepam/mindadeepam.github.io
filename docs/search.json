@@ -4,21 +4,7 @@
     "href": "about.html",
     "title": "About",
     "section": "",
-    "text": "Hi Y’all. My name is Deepam Minda and this is my"
-  },
-  {
-    "objectID": "posts/welcome/index.html",
-    "href": "posts/welcome/index.html",
-    "title": "Welcome To My Blog",
-    "section": "",
-    "text": "This is the first post in a Quarto blog. Welcome!\n\nSince this post doesn’t specify an explicit image, the first image in the post will be used in the listing page of posts."
-  },
-  {
-    "objectID": "posts/post-with-code/index.html",
-    "href": "posts/post-with-code/index.html",
-    "title": "Post With Code",
-    "section": "",
-    "text": "This is a post with executable code."
+    "text": "Hi Y’all. My name is Deepam Minda and this is my website. I want to be writing a lot more, blogs, TILs, whatever. Im a data scientist myself so naturally the content here would also mostly be around it. I hope you learn something new here. Feel free to share your thoughts or hit me up.\nCheers!"
   },
   {
     "objectID": "posts/few-shot-learning/prototype_networks.html",
@@ -81,6 +67,6 @@
     "href": "index.html",
     "title": "Deepam Minda blogs",
     "section": "",
-    "text": "Post With Code\n\n\n\n\n\n\nnews\n\n\ncode\n\n\nanalysis\n\n\n\n\n\n\n\n\n\nJul 14, 2024\n\n\nHarlow Malloc\n\n\n\n\n\n\n\n\n\n\n\n\nWelcome To My Blog\n\n\n\n\n\n\nnews\n\n\n\n\n\n\n\n\n\nJul 11, 2024\n\n\nTristan O’Malley\n\n\n\n\n\n\n\n\n\n\n\n\nFew Shot learning: Classify using few examples!\n\n\n\n\n\n\nclassification\n\n\nfew-shot learning\n\n\nnlp\n\n\n\n\n\n\n\n\n\nSep 12, 2023\n\n\nDeepam Minda\n\n\n\n\n\n\nNo matching items"
+    "text": "Few Shot learning: Classify using few examples!\n\n\n\n\n\n\nclassification\n\n\nfew-shot learning\n\n\nnlp\n\n\n\n\n\n\n\n\n\nSep 12, 2023\n\n\nDeepam Minda\n\n\n\n\n\n\nNo matching items"
   }
 ]
