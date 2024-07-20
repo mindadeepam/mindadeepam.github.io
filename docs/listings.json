@@ -2,6 +2,7 @@
   {
     "listing": "/index.html",
     "items": [
+      "/posts/smol-models/1_initial_experiments.html",
       "/posts/few-shot-learning/prototype_networks.html"
     ]
   }
