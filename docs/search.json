@@ -7,13 +7,6 @@
     "text": "Hi Y’all. My name is Deepam Minda and this is my website. I want to be writing a lot more, blogs, TILs, whatever. Im a data scientist myself so naturally the content here would also mostly be around it. I hope you learn something new here. Feel free to share your thoughts or hit me up.\nCheers!"
   },
   {
-    "objectID": "posts/smol-models/1_initial_experiments.html",
-    "href": "posts/smol-models/1_initial_experiments.html",
-    "title": "deepamminda",
-    "section": "",
-    "text": "---\ntitle: \"Smol Models\"\nauthor: Deepam Minda\n# date: \"Sep 12, 2023\"\n# categories: [classification, few-shot learning, nlp]\n# image: \"cover.jpeg\"\nformat:\n  html:\n    toc: true\n    toc-depth: 3\n    html-math-method: katex\n    css: ../../styles.css\n    code-fold: true\nexecute:\n  warning: false\ndraft: true\n---\n\n\n# def find_sum\n\ns = \"0\"\ns.count('0')\ncounts_of_01s = [(0,0)]\ncounts_of_01s.extend([(s[:i+1].count('0'), s[:i+1].count('1')) for i in range(len(s))])\ncounts_of_01s\n\n[(0, 0), (1, 0)]\n\n\n\n\n\ns.count('0')\ncounts_of_01s = [(0,0)]\ncounts_of_01s.extend([(s[:i+1].count('0'), s[:i+1].count('1')) for i in range(len(s))])\ncounts_of_01s\n\nans=0\nsubstrings = set()\nfor i in range(len(s)):\n    for j in range(i, len(s)):\n        print(f\"i:{i}, j:{j}\")\n        if i==j: \n            ans+=1\n            continue\n\n        subs = s[i:j+1]\n        if subs==\"\": continue\n        if subs in substrings:\n        \n            continue\n        \n        substrings.add(subs)\n        count_of_0s, count_of_1s = abs(counts_of_01s[i][0]-counts_of_01s[j+1][0]), abs(counts_of_01s[i][1]-counts_of_01s[j+1][1])\n        if (count_of_0s == count_of_1s):\n            ans+=2\n        else:\n            ans+=1\n        # print(f\"ans {ans}\")\nprint(ans)\n    \n\n\ni:0, j:0\n1"
-  },
-  {
     "objectID": "posts/few-shot-learning/prototype_networks.html",
     "href": "posts/few-shot-learning/prototype_networks.html",
     "title": "Few Shot learning: Classify using few examples!",
