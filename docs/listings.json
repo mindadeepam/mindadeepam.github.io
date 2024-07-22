@@ -2,8 +2,7 @@
   {
     "listing": "/index.html",
     "items": [
-      "/posts/rnns/01_rnns_from_scratch.html",
-      "/posts/few-shot-learning/prototype_networks.html"
+      "/posts/rnns/01_rnns_from_scratch.html"
     ]
   }
 ]
