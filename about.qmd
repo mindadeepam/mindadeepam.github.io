@@ -1,0 +1,25 @@
+---
+title: "About Me"
+image: profile.jpg
+about:
+  template: jolla
+  links:
+    - icon: twitter
+      text: Twitter
+      href: https://x.com/mindadeepam
+    - icon: linkedin
+      text: LinkedIn
+      href: https://www.linkedin.com/in/mindadeepam/
+    - icon: github
+      text: Github
+      href: https://github.com/mindadeepam
+
+---
+ 
+Hi Y'all. My name is Deepam Minda and this is my website. I want to be writing a lot more blogs, TILs, etc about various things that interest me. I'm interested in topics like AI, llms, and to an extent, tech in general. 
+
+I am a data scientist/ML engineer at [Farmart](https://www.farmart.co/) by profession. I graduated from Delhi Technological University, Delhi, India. Apart from this, I also ocassionally dabble with a bit of guitar, and like everyone sane, music in general.
+
+I am always inspired and fascinated by excellent blogs maintained by people online where they share all sorts of cool stuff. I hope you learn something new here. Feel free to share your thoughts or hit me up.
+
+Cheers!
