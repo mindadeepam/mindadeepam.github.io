@@ -14,7 +14,7 @@
   </url>
   <url>
     <loc>https://www.deepamminda.com/posts/cnns/00_cnn_basics.html</loc>
-    <lastmod>2024-07-30T20:11:27.053Z</lastmod>
+    <lastmod>2024-07-30T20:16:11.336Z</lastmod>
   </url>
   <url>
     <loc>https://www.deepamminda.com/posts/rnns/01_rnns_from_scratch.html</loc>
@@ -23,5 +23,9 @@
   <url>
     <loc>https://www.deepamminda.com/about.html</loc>
     <lastmod>2024-07-30T20:08:36.700Z</lastmod>
+  </url>
+  <url>
+    <loc>https://www.deepamminda.com/posts/rnns/01_rnns_basics.html</loc>
+    <lastmod>2024-07-30T20:26:29.751Z</lastmod>
   </url>
 </urlset>

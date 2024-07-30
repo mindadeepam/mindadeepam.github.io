@@ -2,7 +2,7 @@
   {
     "listing": "/blog.html",
     "items": [
-      "/posts/rnns/01_rnns_from_scratch.html",
+      "/posts/rnns/01_rnns_basics.html",
       "/posts/few-shot-learning/prototype_networks.html",
       "/posts/cnns/00_cnn_basics.html"
     ]

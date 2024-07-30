@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.53">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Deepam Minda">
+<meta name="dcterms.date" content="2024-07-20">
+
+<title>Language Modelling with RNNs – deepamminda</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script><script src="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.js"></script>
+  <script>document.addEventListener("DOMContentLoaded", function () {
+ var mathElements = document.getElementsByClassName("math");
+ var macros = [];
+ for (var i = 0; i < mathElements.length; i++) {
+  var texText = mathElements[i].firstChild;
+  if (mathElements[i].tagName == "SPAN") {
+   katex.render(texText.data, mathElements[i], {
+    displayMode: mathElements[i].classList.contains('display'),
+    throwOnError: false,
+    macros: macros,
+    fleqn: false
+   });
+}}});
+  </script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.css">
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">deepamminda</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html"> 
+<span class="menu-text">About Me</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../blog.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/mindadeepam"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/mindadeepam"> <i class="bi bi-twitter" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">Language Modelling with RNNs</h1>
+                                <div class="quarto-categories">
+                <div class="quarto-category">rnns</div>
+                <div class="quarto-category">nlp</div>
+                <div class="quarto-category">seq-to-seq</div>
+                <div class="quarto-category">langauge-modelling</div>
+              </div>
+                  </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      <div>
+      <div class="quarto-title-meta-heading">Author</div>
+      <div class="quarto-title-meta-contents">
+               <p>Deepam Minda </p>
+            </div>
+    </div>
+      
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">July 20, 2024</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#import-data-and-process-it" id="toc-import-data-and-process-it" class="nav-link" data-scroll-target="#import-data-and-process-it">Import data and process it</a></li>
+  <li><a href="#rnns" id="toc-rnns" class="nav-link" data-scroll-target="#rnns">RNNs</a>
+  <ul class="collapse">
+  <li><a href="#understanding-rnns" id="toc-understanding-rnns" class="nav-link" data-scroll-target="#understanding-rnns">Understanding RNNs</a></li>
+  </ul></li>
+  <li><a href="#language-modelling" id="toc-language-modelling" class="nav-link" data-scroll-target="#language-modelling">Language Modelling</a>
+  <ul class="collapse">
+  <li><a href="#how-exactly-can-we-generate-text-though" id="toc-how-exactly-can-we-generate-text-though" class="nav-link" data-scroll-target="#how-exactly-can-we-generate-text-though">How exactly can we generate text though?</a></li>
+  <li><a href="#during-training" id="toc-during-training" class="nav-link" data-scroll-target="#during-training">During Training</a></li>
+  <li><a href="#the-model" id="toc-the-model" class="nav-link" data-scroll-target="#the-model">The model</a></li>
+  <li><a href="#training-loop" id="toc-training-loop" class="nav-link" data-scroll-target="#training-loop">Training loop</a></li>
+  </ul></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+<section id="introduction" class="level1">
+<h1>Introduction</h1>
+<p>The only reason you would be hearing RNNs right now is probably when <a href="https://arxiv.org/pdf/2405.04517">xLSTMs</a> were released in May, 2024. Apart from this they have pretty much taken a back seat to watch transformers revolutionalize NLP and the entire field of AI in general.</p>
+<p>But one would do well to remember how we got here, and RNNs played a massive role in bringing us here. So in this blog post I’m going to build a small RNN model and we’ll try to train it to generate text.</p>
+</section>
+<section id="import-data-and-process-it" class="level1">
+<h1>Import data and process it</h1>
+<div id="cell-4" class="cell" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch.nn <span class="im">as</span> nn</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np </span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> tqdm <span class="im">import</span> tqdm</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Let us load a text dataset. I downloaded a few mystery books and concatenated their raw text to make the dataset. Follow <a href="https://github.com/mindadeepam/mindadeepam.github.io/blob/posts/posts/rnns/corpus.txt">this</a> link to get the text file.</p>
+<div id="cell-6" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>dataset_path <span class="op">=</span> <span class="st">"/Users/deepamminda/Downloads/corpus.txt"</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(dataset_path, <span class="st">'r'</span>) <span class="im">as</span> f:</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> f.read()</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"the size of data: </span><span class="sc">{</span><span class="bu">len</span>(data)<span class="sc">}</span><span class="ss"> characters"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>the size of data: 3062155 characters</code></pre>
+</div>
+</div>
+<p>Lets have a look at some of the text we have.</p>
+<div id="cell-8" class="cell" data-execution_count="7">
+<details class="code-fold">
+<summary>show code</summary>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Sample data chunk:</span><span class="ch">\n</span><span class="ss">'</span><span class="sc">{</span>data[<span class="dv">1500</span>:<span class="dv">2500</span>]<span class="sc">}</span><span class="ss">'"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Sample data chunk:
+'n one of his own high-power lenses, would not
+be more disturbing than a strong emotion in a nature such as his. And
+yet there was but one woman to him, and that woman was the late Irene
+Adler, of dubious and questionable memory.
+
+I had seen little of Holmes lately. My marriage had drifted us away
+from each other. My own complete happiness, and the home-centred
+interests which rise up around the man who first finds himself master
+of his own establishment, were sufficient to absorb all my attention,
+while Holmes, who loathed every form of society with his whole Bohemian
+soul, remained in our lodgings in Baker Street, buried among his old
+books, and alternating from week to week between cocaine and ambition,
+the drowsiness of the drug, and the fierce energy of his own keen
+nature. He was still, as ever, deeply attracted by the study of crime,
+and occupied his immense faculties and extraordinary powers of
+observation in following out those clues, and clearing up those
+mysteries which had b'</code></pre>
+</div>
+</div>
+<p>Lets split the data into train and test (80-20)</p>
+<div id="cell-10" class="cell" data-execution_count="8">
+<details class="code-fold">
+<summary>show code</summary>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>train_size <span class="op">=</span> <span class="bu">int</span>(<span class="bu">len</span>(data) <span class="op">*</span> <span class="fl">0.8</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>train_data, test_data <span class="op">=</span> data[:train_size], data[train_size:]</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"train_size: </span><span class="sc">{</span><span class="bu">len</span>(train_data)<span class="sc">}</span><span class="ss">, test_size: </span><span class="sc">{</span><span class="bu">len</span>(test_data)<span class="sc">}</span><span class="ss">  (in number of tokens)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>train_size: 2449724, test_size: 612431  (in number of tokens)</code></pre>
+</div>
+</div>
+<p>Now let us encode the text to numerical data that our model can understand. Encoding the data generally means tokenization and then encoding. To keep it super simple, we’ll just use individual characters as tokens.</p>
+<p>Nowadays however, subword <a href="(https://huggingface.co/docs/transformers/main/en/tokenizer_summary)">tokenization algorithms</a> like Byte-Pair Encoding are the norm. But let us not get caught up in those for now.</p>
+<div id="cell-12" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Define the vocabulary and special tokens</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>vocab <span class="op">=</span> <span class="bu">list</span>(<span class="bu">set</span>(train_data<span class="op">+</span><span class="st">"12345678910qwertyuioplkjhgfdsamnbvcxz~!@#$%^&amp;*()_+`-=[];'./,</span><span class="sc">{}</span><span class="ch">\"</span><span class="st">:?&gt;&lt;\|"</span>))</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>PAD_TOKEN <span class="op">=</span> <span class="st">'&lt;pad&gt;'</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>special_tokens <span class="op">=</span> [PAD_TOKEN]</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>MAX_SEQ_LEN <span class="op">=</span> <span class="dv">32</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>vocab <span class="op">=</span> [<span class="op">*</span>special_tokens, <span class="op">*</span>vocab]</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Create mappings for encoding and decoding</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>decode_mapping <span class="op">=</span> <span class="bu">dict</span>(<span class="bu">enumerate</span>(vocab))</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>encode_mapping <span class="op">=</span> {v:k <span class="cf">for</span> k,v <span class="kw">in</span> decode_mapping.items()}</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Define encoding and decoding functions</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>encode <span class="op">=</span> <span class="kw">lambda</span> text: [encode_mapping[char] <span class="cf">for</span> char <span class="kw">in</span> text]</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>decode <span class="op">=</span> <span class="kw">lambda</span> text: [decode_mapping[char] <span class="cf">for</span> char <span class="kw">in</span> text]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now we can do a simple sanity check by encoding a text and decoding it. we should get the original string back.</p>
+<div id="cell-14" class="cell" data-execution_count="11">
+<details class="code-fold">
+<summary>show code</summary>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>text <span class="op">=</span> <span class="st">"hey there"</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>encoded_text <span class="op">=</span> encode(text)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"original text: </span><span class="sc">{</span>text<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"tokenized text: </span><span class="sc">{</span><span class="bu">list</span>(text)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f'encoded text: </span><span class="sc">{</span>encoded_text<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"decoded back:</span><span class="sc">{</span>decode(encoded_text)<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>original text: hey there
+tokenized text: ['h', 'e', 'y', ' ', 't', 'h', 'e', 'r', 'e']
+encoded text: [104, 81, 106, 37, 89, 104, 81, 8, 81]
+decoded back:['h', 'e', 'y', ' ', 't', 'h', 'e', 'r', 'e']</code></pre>
+</div>
+</div>
+<p>Now we need functions that will do this for batches of texts rather than single text. When dealing with batches, there are a few extra considerations: - You would typically want your batches to contain texts which are of same length, so that matrix/tensor operations can be performed. Hence we need to truncate longer sentences and pad shorter sentences to a fixed length.</p>
+<p>For simplicity let us also define a function that will fetch us a random batch of data from our training set.</p>
+<div id="cell-18" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_data(data, batch_size<span class="op">=</span><span class="dv">16</span>, seq_len<span class="op">=</span><span class="dv">256</span>):</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co">    Retrieves input and target data for training a recurrent neural network (RNN).</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="co">        data (list): The input data.</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="co">        batch_size (int, optional): The number of sequences in each batch. Defaults to 16.</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="co">        seq_len (int, optional): The length of each sequence. Defaults to 256.</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a><span class="co">    Returns:</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a><span class="co">        tuple: A tuple containing the input and target data tensors.</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a><span class="co">            - inputs (torch.Tensor): The input data tensor.</span></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a><span class="co">            - targets (torch.Tensor): The target data tensor.</span></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>    <span class="bu">buffer</span> <span class="op">=</span> <span class="dv">1000</span></span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>    l <span class="op">=</span> <span class="bu">len</span>(data)</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> np.random.randint(<span class="dv">0</span>, l <span class="op">-</span> <span class="bu">buffer</span>, size<span class="op">=</span>batch_size)</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>    end <span class="op">=</span> start <span class="op">+</span> seq_len</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>    texts <span class="op">=</span> [data[s:e] <span class="cf">for</span> s, e <span class="kw">in</span> <span class="bu">zip</span>(start, end)]</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>    encoded_texts <span class="op">=</span> encode_arr(texts, max_seq_len<span class="op">=</span>seq_len <span class="op">+</span> <span class="dv">1</span>)</span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>    targets <span class="op">=</span> encoded_texts[:, <span class="dv">1</span>:]</span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>    inputs <span class="op">=</span> encoded_texts[:, :<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>    targets <span class="op">=</span> torch.tensor(targets, dtype<span class="op">=</span>torch.<span class="bu">long</span>)</span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>    inputs <span class="op">=</span> torch.tensor(inputs, dtype<span class="op">=</span>torch.<span class="bu">long</span>)</span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> inputs, targets</span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="cell-19" class="cell" data-execution_count="14">
+<details class="code-fold">
+<summary>show code</summary>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>x, y <span class="op">=</span> get_data(train_data, <span class="dv">4</span>, <span class="dv">23</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"target is just x shifted one token to the left!"</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"x[0]: </span><span class="sc">{</span>x[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">,</span><span class="ch">\n</span><span class="ss">y[0] </span><span class="sc">{</span>y[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>target is just x shifted one token to the left!
+x[0]: tensor([  0,  81,   8, 112,  37,  49,  21,  37,  31,  37,  47,  31,  79,  37,
+        100, 104,  49,  37,  97,  96,  37,  96,  89]),
+y[0] tensor([ 81,   8, 112,  37,  49,  21,  37,  31,  37,  47,  31,  79,  37, 100,
+        104,  49,  37,  97,  96,  37,  96,  89,   8])</code></pre>
+</div>
+</div>
+</section>
+<section id="rnns" class="level1">
+<h1>RNNs</h1>
+<p>Now before modelling, let us look at a RNN layer and understand its input and outputs. Each RNN layer has the following basic archtecture:</p>
+<div id="fig-unrolled-rnn" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-unrolled-rnn-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="rnn_unrolled.png" style="width:70.0%" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-unrolled-rnn-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: unrolled RNN
+</figcaption>
+</figure>
+</div>
+<section id="understanding-rnns" class="level2">
+<h2 class="anchored" data-anchor-id="understanding-rnns">Understanding RNNs</h2>
+<p>RNNs have 2 matrices, one (<span class="math inline">W_{xh}</span>) that maps input tokens to hidden_vector size and another (<span class="math inline">W_{hh}</span>) that maps from hidden_vector to hidden_vector. You’ll see how these are used in a minute.</p>
+<p>Let us first look at input-output shapes for an RNN layer. We initially had a batch of text-tokens. Lets assume batch size of 4 and max_seq_len of 32. Hence the shape of input is (4,32).</p>
+<p>Now for each token, we encode it to a number and then map it to a vector (which we generally call an embedding). Hence each token is now represented by a vector of fixed-shape, and lets call this embedding_dimension and set it to 10. (This can also be done by classical methods like one-hot encoding, ngram-models)</p>
+<p>The shape of our input batch is now (batch_size, max_seq_len, emb_dim), ie (4,32,10).</p>
+<p>Now let us peek into the matrix multiplications inside a RNN layer. Firstly, lets us recall that for a linear layer, this is the matrix equation:</p>
+<p><span class="math inline">z (N, n_{out}) = \sigma(x (N, n_{in}) * W_x^T (n_{in}, n_{out}) + b (N))</span></p>
+<p>where ,</p>
+<ul>
+<li>input-features = <span class="math inline">n_{in}</span></li>
+<li>output-features = <span class="math inline">n_{out}</span></li>
+<li>batch-size = <span class="math inline">N</span></li>
+</ul>
+<p>In a linear layer, each token/feature is attended to by a different weight in the weight matrix and no information is shared among the sequence tokens. But when processing “sequences” we obviously want the model to remember stuff from previous tokens for the current token, right?</p>
+<p>Hence RNNs maintain a hidden_vector for each token, that takes as input the current token and the hidden_vector from the previous token’s output.</p>
+<p>So for the <span class="math inline">t</span>’th token,</p>
+<p><span class="math inline">h_t (N, h)= x_t (N, n_{in}) * W_{xh}^T (n_{in}, h) + h_{t-1} (N, h) * W_{hh}^T (h, h) + biases</span></p>
+<p>where</p>
+<ul>
+<li>input-features = <span class="math inline">n_{in}</span></li>
+<li>hidden-size = <span class="math inline">h</span></li>
+<li>batch-size = <span class="math inline">N</span></li>
+<li>sequence-length = <span class="math inline">s</span></li>
+</ul>
+<p>As you’ll notice since each token depends on previous tokens output, we cannot process this parallelly and have to iteratively calculate the output for each token. Also note we generally refer to the different tokens in a sequence as different timesteps, ie token at timestep t is <span class="math inline">x_t</span>.</p>
+<p>Hence for a complete batch, inputs are:</p>
+<ul>
+<li><span class="math inline">X</span> of shape <span class="math inline">(N, s, n_{in})</span></li>
+<li><span class="math inline">h_0</span> of shape <span class="math inline">(N, h)</span> (this is optional, if not given most libraries will initiate a <span class="math inline">h_0</span> of all zeros or random numbers)</li>
+</ul>
+<p>And outputs are:</p>
+<ul>
+<li>hidden states of all timesteps, ie <span class="math inline">H</span> of shape <span class="math inline">(N, s, h)</span></li>
+<li>last_hidden_state ie <span class="math inline">h_n</span> of shape <span class="math inline">(N, h)</span></li>
+</ul>
+<p>Note: sometimes you will see outputs of rnn fed into a linear layer like so,</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>outputs, h_n <span class="op">=</span> <span class="va">self</span>.rnn(x)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>y <span class="op">=</span> <span class="va">self</span>.fc(outputs[:,<span class="op">-</span><span class="dv">1</span>,:])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Here <code>h_n</code> and <code>outputs[:,-1,:]</code> are the same thing. They both represent the last hidden state for the entire batch. (to make shapes equal use <code>h_n.squeeze()</code>)</p>
+<p>Lets verify the above by passing inputs to an rnn layer.</p>
+<div id="cell-22" class="cell" data-execution_count="19">
+<details class="code-fold">
+<summary>show code</summary>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>emb_dim <span class="op">=</span> <span class="dv">128</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>hidden_size <span class="op">=</span> <span class="dv">128</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>batch_size <span class="op">=</span> <span class="dv">8</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>max_seq_len <span class="op">=</span> <span class="dv">32</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"batch_size: </span><span class="sc">{</span>batch_size<span class="sc">}</span><span class="ss">, hidden_size: </span><span class="sc">{</span>hidden_size<span class="sc">}</span><span class="ss">, max_seq_len: </span><span class="sc">{</span>max_seq_len<span class="sc">}</span><span class="ss">, emb_dim: </span><span class="sc">{</span>emb_dim<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>X,y <span class="op">=</span> get_data(train_data, seq_len<span class="op">=</span>max_seq_len, batch_size<span class="op">=</span>batch_size)</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"shape of initial input -&gt; </span><span class="sc">{</span>X<span class="sc">.</span>shape<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>emb_layer <span class="op">=</span> nn.Embedding(num_embeddings<span class="op">=</span><span class="bu">len</span>(vocab), embedding_dim<span class="op">=</span>emb_dim)</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>rnn_layer <span class="op">=</span> nn.RNN(input_size<span class="op">=</span>emb_dim, hidden_size<span class="op">=</span>hidden_size, batch_first<span class="op">=</span><span class="va">True</span>, bidirectional<span class="op">=</span><span class="va">False</span>, num_layers<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> emb_layer(X)</span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"post embedding; shape of input to RNN layer -&gt; </span><span class="sc">{</span>X<span class="sc">.</span>shape<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>h_0 <span class="op">=</span> torch.randn(<span class="dv">1</span>, batch_size, hidden_size)</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>outputs <span class="op">=</span> rnn_layer(X, h_0)</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"RNN output shapes -&gt; </span><span class="sc">{</span>outputs[<span class="dv">0</span>]<span class="sc">.</span>shape<span class="sc">}</span><span class="ss">, </span><span class="sc">{</span>[outputs[<span class="dv">1</span>][i].shape <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(outputs[<span class="dv">1</span>]))]<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>batch_size: 8, hidden_size: 128, max_seq_len: 32, emb_dim: 128
+shape of initial input -&gt; torch.Size([8, 32])
+post embedding; shape of input to RNN layer -&gt; torch.Size([8, 32, 128])
+RNN output shapes -&gt; torch.Size([8, 32, 128]), [torch.Size([8, 128])]</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="language-modelling" class="level1">
+<h1>Language Modelling</h1>
+<p>Now let us build a model and train it. For starters we’ll just use a <a href="https://pytorch.org/docs/stable/generated/torch.nn.RNN.html#torch.nn.RNN">torch.nn.RNN</a> layer to build the model and train it. Once we get the entire training and testing pipeline complete, we can come back and build the model from scratch.</p>
+<section id="how-exactly-can-we-generate-text-though" class="level3">
+<h3 class="anchored" data-anchor-id="how-exactly-can-we-generate-text-though">How exactly can we generate text though?</h3>
+<p>We know we can get hidden states of the entire sequence as outputs from a rnn layer, but each hidden state <span class="math inline">h_t</span> has ponly seen information till timestep <span class="math inline">t</span>. What we can do is this:</p>
+<ul>
+<li>only use the last hidden state and feed it to a linear layer with output shape equal to size of vocabulary.</li>
+<li>if softmax is applied on top of the linear layer’s output, it turns raw logits into the probabilities for different tokens in our vocab. This can be done outside the forward function too.</li>
+</ul>
+<p>Now each input sequence gives us one output token ie <span class="math inline">y_{t+1}</span>. then we can take the sequence from <span class="math inline">1</span> to <span class="math inline">t+1</span> and generate token <span class="math inline">y_{t+2}</span>.</p>
+</section>
+<section id="during-training" class="level3">
+<h3 class="anchored" data-anchor-id="during-training">During Training</h3>
+<p>To maximize training we can use all hidden state outputs instead of the last one. Because why wouldnt we want the model to learn from all its outputs!</p>
+<ul>
+<li>output of rnn layer of shape <span class="math inline">(N, s, h)</span> is fed into a linear layer of shape <span class="math inline">(h, vocab\_size)</span> to get <span class="math inline">(N,s,vocab\_size)</span> outputs. then we can pass them via softmax and apply cross-entropy loss on all of them and backpropagate through the model.</li>
+<li>since at token level we now have <span class="math inline">N*s</span> tokens on which we will calculate loss, its simpler to flatten the targets and generated logits before passing to cross-entropy loss.</li>
+</ul>
+<p>Note: Had it been a classification task, we could just pass last hidden_state, <span class="math inline">h_n</span> to a linear layer with output size equal to number of classes.</p>
+</section>
+<section id="the-model" class="level2">
+<h2 class="anchored" data-anchor-id="the-model">The model</h2>
+<div id="cell-25" class="cell" data-execution_count="55">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># calculate size of model parameters</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> count_parameters(model):</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">sum</span>(p.numel() <span class="cf">for</span> p <span class="kw">in</span> model.parameters() <span class="cf">if</span> p.requires_grad)</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Rnn_model(nn.Module):</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, embedding_size, max_seq_len, hidden_size, num_layers<span class="op">=</span><span class="dv">1</span>, vocab_size<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>        <span class="co">"""</span></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a><span class="co">        Initializes the Rnn_model class.</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a><span class="co">        Args:</span></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a><span class="co">            embedding_size (int): The size of the embedding dimension.</span></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a><span class="co">            max_seq_len (int): The maximum sequence length.</span></span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a><span class="co">            hidden_size (int): The size of the hidden state dimension.</span></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a><span class="co">            num_layers (int, optional): The number of recurrent layers. Defaults to 1.</span></span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a><span class="co">            vocab_size (int, optional): The size of the vocabulary. Defaults to None.</span></span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a><span class="co">        """</span></span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>(Rnn_model, <span class="va">self</span>).<span class="fu">__init__</span>()</span>
+<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.max_seq_len <span class="op">=</span> max_seq_len</span>
+<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.vocab_size <span class="op">=</span> <span class="bu">len</span>(vocab) <span class="cf">if</span> vocab_size <span class="kw">is</span> <span class="va">None</span> <span class="cf">else</span> vocab_size</span>
+<span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.embedding <span class="op">=</span> nn.Embedding(num_embeddings<span class="op">=</span><span class="va">self</span>.vocab_size, embedding_dim<span class="op">=</span>embedding_size)</span>
+<span id="cb17-24"><a href="#cb17-24" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.rnn <span class="op">=</span> nn.LSTM(input_size<span class="op">=</span>embedding_size, hidden_size<span class="op">=</span>hidden_size, batch_first<span class="op">=</span><span class="va">True</span>, num_layers<span class="op">=</span>num_layers)</span>
+<span id="cb17-25"><a href="#cb17-25" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.fc <span class="op">=</span> nn.Linear(hidden_size, <span class="bu">len</span>(vocab))</span>
+<span id="cb17-26"><a href="#cb17-26" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.softmax <span class="op">=</span> nn.Softmax(dim<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb17-27"><a href="#cb17-27" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.criterion <span class="op">=</span> nn.CrossEntropyLoss(ignore_index<span class="op">=</span><span class="dv">0</span>)  <span class="co"># ignore pad token</span></span>
+<span id="cb17-28"><a href="#cb17-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-29"><a href="#cb17-29" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, x, targets<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb17-30"><a href="#cb17-30" aria-hidden="true" tabindex="-1"></a>        <span class="co">""" </span></span>
+<span id="cb17-31"><a href="#cb17-31" aria-hidden="true" tabindex="-1"></a><span class="co">        a forward pas thorugh the model.</span></span>
+<span id="cb17-32"><a href="#cb17-32" aria-hidden="true" tabindex="-1"></a><span class="co">        x: input torch tensor (B,T,S)</span></span>
+<span id="cb17-33"><a href="#cb17-33" aria-hidden="true" tabindex="-1"></a><span class="co">        targets: input targets (B,T,S)</span></span>
+<span id="cb17-34"><a href="#cb17-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-35"><a href="#cb17-35" aria-hidden="true" tabindex="-1"></a><span class="co">        Returns</span></span>
+<span id="cb17-36"><a href="#cb17-36" aria-hidden="true" tabindex="-1"></a><span class="co">        (model output logits, loss)</span></span>
+<span id="cb17-37"><a href="#cb17-37" aria-hidden="true" tabindex="-1"></a><span class="co">        """</span></span>
+<span id="cb17-38"><a href="#cb17-38" aria-hidden="true" tabindex="-1"></a>        x <span class="op">=</span> x[:, <span class="op">-</span><span class="va">self</span>.max_seq_len:]</span>
+<span id="cb17-39"><a href="#cb17-39" aria-hidden="true" tabindex="-1"></a>        x <span class="op">=</span> <span class="va">self</span>.embedding(x)</span>
+<span id="cb17-40"><a href="#cb17-40" aria-hidden="true" tabindex="-1"></a>        H, h_n <span class="op">=</span> <span class="va">self</span>.rnn(x)</span>
+<span id="cb17-41"><a href="#cb17-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-42"><a href="#cb17-42" aria-hidden="true" tabindex="-1"></a>        <span class="co"># y = self.fc(H[:,-1,:])</span></span>
+<span id="cb17-43"><a href="#cb17-43" aria-hidden="true" tabindex="-1"></a>        y <span class="op">=</span> <span class="va">self</span>.fc(H)</span>
+<span id="cb17-44"><a href="#cb17-44" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb17-45"><a href="#cb17-45" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> targets <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb17-46"><a href="#cb17-46" aria-hidden="true" tabindex="-1"></a>            B, T, V <span class="op">=</span> y.shape</span>
+<span id="cb17-47"><a href="#cb17-47" aria-hidden="true" tabindex="-1"></a>            loss <span class="op">=</span> <span class="va">self</span>.criterion(y.view(B<span class="op">*</span>T, V), targets.view(<span class="op">-</span><span class="dv">1</span>))</span>
+<span id="cb17-48"><a href="#cb17-48" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>: loss<span class="op">=</span><span class="va">None</span></span>
+<span id="cb17-49"><a href="#cb17-49" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb17-50"><a href="#cb17-50" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> y, loss</span>
+<span id="cb17-51"><a href="#cb17-51" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb17-52"><a href="#cb17-52" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb17-53"><a href="#cb17-53" aria-hidden="true" tabindex="-1"></a>    <span class="at">@torch.no_grad</span></span>
+<span id="cb17-54"><a href="#cb17-54" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> generate(<span class="va">self</span>, input_text, max_len<span class="op">=</span><span class="dv">32</span>, device<span class="op">=</span><span class="st">'cpu'</span>):</span>
+<span id="cb17-55"><a href="#cb17-55" aria-hidden="true" tabindex="-1"></a>        <span class="co">""" </span></span>
+<span id="cb17-56"><a href="#cb17-56" aria-hidden="true" tabindex="-1"></a><span class="co">        input_text: a string or list of strings to generate text using the model.</span></span>
+<span id="cb17-57"><a href="#cb17-57" aria-hidden="true" tabindex="-1"></a><span class="co">        max_len: model will generate maximum of max_len tokens.</span></span>
+<span id="cb17-58"><a href="#cb17-58" aria-hidden="true" tabindex="-1"></a><span class="co">        """</span></span>
+<span id="cb17-59"><a href="#cb17-59" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb17-60"><a href="#cb17-60" aria-hidden="true" tabindex="-1"></a>        encoded_tokens <span class="op">=</span> torch.tensor(encode_arr([input_text], max_seq_len<span class="op">=</span><span class="dv">32</span>))</span>
+<span id="cb17-61"><a href="#cb17-61" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> encoded_tokens.ndim <span class="op">==</span> <span class="dv">1</span>:</span>
+<span id="cb17-62"><a href="#cb17-62" aria-hidden="true" tabindex="-1"></a>            encoded_tokens <span class="op">=</span> encoded_tokens.unsqueeze(<span class="dv">0</span>)</span>
+<span id="cb17-63"><a href="#cb17-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-64"><a href="#cb17-64" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span> <span class="op">=</span> <span class="va">self</span>.to(device)</span>
+<span id="cb17-65"><a href="#cb17-65" aria-hidden="true" tabindex="-1"></a>        encoded_tokens <span class="op">=</span> encoded_tokens.to(device)</span>
+<span id="cb17-66"><a href="#cb17-66" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(max_len):</span>
+<span id="cb17-67"><a href="#cb17-67" aria-hidden="true" tabindex="-1"></a>            <span class="co"># only keep the most recent seq_len sized numbers.</span></span>
+<span id="cb17-68"><a href="#cb17-68" aria-hidden="true" tabindex="-1"></a>            outputs, _ <span class="op">=</span> <span class="va">self</span>(encoded_tokens[:, <span class="op">-</span><span class="va">self</span>.max_seq_len:])</span>
+<span id="cb17-69"><a href="#cb17-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-70"><a href="#cb17-70" aria-hidden="true" tabindex="-1"></a>            <span class="co"># last output token</span></span>
+<span id="cb17-71"><a href="#cb17-71" aria-hidden="true" tabindex="-1"></a>            outputs <span class="op">=</span> outputs[:, <span class="op">-</span><span class="dv">1</span>, :]</span>
+<span id="cb17-72"><a href="#cb17-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-73"><a href="#cb17-73" aria-hidden="true" tabindex="-1"></a>            <span class="co"># get pribabilities from logits</span></span>
+<span id="cb17-74"><a href="#cb17-74" aria-hidden="true" tabindex="-1"></a>            next_token_probs <span class="op">=</span> nn.functional.softmax(outputs, dim<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb17-75"><a href="#cb17-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-76"><a href="#cb17-76" aria-hidden="true" tabindex="-1"></a>            <span class="co"># sample indices from it using a multinomial distribution</span></span>
+<span id="cb17-77"><a href="#cb17-77" aria-hidden="true" tabindex="-1"></a>            next_tokens <span class="op">=</span> torch.multinomial(next_token_probs, <span class="dv">1</span>)</span>
+<span id="cb17-78"><a href="#cb17-78" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-79"><a href="#cb17-79" aria-hidden="true" tabindex="-1"></a>            <span class="co"># concat prediction to original text</span></span>
+<span id="cb17-80"><a href="#cb17-80" aria-hidden="true" tabindex="-1"></a>            encoded_tokens <span class="op">=</span> torch.concat((encoded_tokens, next_tokens), axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb17-81"><a href="#cb17-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-82"><a href="#cb17-82" aria-hidden="true" tabindex="-1"></a>        decoded_texts <span class="op">=</span> decode_arr(encoded_tokens)</span>
+<span id="cb17-83"><a href="#cb17-83" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">len</span>(decoded_texts)<span class="op">==</span><span class="dv">1</span>:</span>
+<span id="cb17-84"><a href="#cb17-84" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> decoded_texts[<span class="dv">0</span>] <span class="co">#.replace("&lt;pad&gt;", "") </span></span>
+<span id="cb17-85"><a href="#cb17-85" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>: </span>
+<span id="cb17-86"><a href="#cb17-86" aria-hidden="true" tabindex="-1"></a>            <span class="co"># return [text.replace("&lt;pad&gt;", "") for text in decoded_texts]</span></span>
+<span id="cb17-87"><a href="#cb17-87" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> decoded_texts</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="training-loop" class="level2">
+<h2 class="anchored" data-anchor-id="training-loop">Training loop</h2>
+<p>Now I’ll define a basic training loop to train this model, and we’ll generate text every 1k steps to see the model learn right before us! Im also using tensorboard to log and view my runs. IMO its the best way to visualize loss curves and debug model behavior.</p>
+<div id="cell-27" class="cell" data-execution_count="72">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torch.utils.tensorboard <span class="im">import</span> SummaryWriter</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>writer <span class="op">=</span> SummaryWriter(<span class="st">'./runs/with_gradients/'</span>)</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>NUM_STEPS <span class="op">=</span> <span class="dv">10000</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>MAX_SEQ_LEN <span class="op">=</span> <span class="dv">32</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>BATCH_SIZE <span class="op">=</span> <span class="dv">32</span></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>EMBEDDING_SIZE <span class="op">=</span> <span class="dv">256</span></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>HIDDEN_SIZE <span class="op">=</span> <span class="dv">256</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>NUM_LAYERS <span class="op">=</span> <span class="dv">2</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>LR <span class="op">=</span> <span class="fl">0.001</span> </span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>LOG_EVERY <span class="op">=</span> <span class="dv">200</span></span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>GENERATE_EVERY <span class="op">=</span> <span class="dv">1000</span></span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>device <span class="op">=</span> torch.device(<span class="st">"mps"</span> <span class="cf">if</span> torch.backends.mps.is_built() <span class="cf">else</span> <span class="st">"cpu"</span>)</span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> Rnn_model(embedding_size<span class="op">=</span>EMBEDDING_SIZE, max_seq_len<span class="op">=</span>MAX_SEQ_LEN, hidden_size<span class="op">=</span>HIDDEN_SIZE, num_layers<span class="op">=</span>NUM_LAYERS)</span>
+<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"paramter count of the model: </span><span class="sc">{</span>count_parameters(model)<span class="sc">}</span><span class="ss">, data_size: </span><span class="sc">{</span><span class="bu">len</span>(train_data)<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a>optimizer <span class="op">=</span> torch.optim.Adam(model.parameters(), lr<span class="op">=</span>LR)</span>
+<span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a>losses <span class="op">=</span> []</span>
+<span id="cb18-20"><a href="#cb18-20" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> (<span class="bu">range</span>(NUM_STEPS)):</span>
+<span id="cb18-21"><a href="#cb18-21" aria-hidden="true" tabindex="-1"></a>    optimizer.zero_grad()</span>
+<span id="cb18-22"><a href="#cb18-22" aria-hidden="true" tabindex="-1"></a>    x, y <span class="op">=</span> get_data(train_data, BATCH_SIZE, MAX_SEQ_LEN)</span>
+<span id="cb18-23"><a href="#cb18-23" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb18-24"><a href="#cb18-24" aria-hidden="true" tabindex="-1"></a>    model.to(device)</span>
+<span id="cb18-25"><a href="#cb18-25" aria-hidden="true" tabindex="-1"></a>    x, y <span class="op">=</span> x.to(device), y.to(device)</span>
+<span id="cb18-26"><a href="#cb18-26" aria-hidden="true" tabindex="-1"></a>    outputs, loss <span class="op">=</span> model(x, y)</span>
+<span id="cb18-27"><a href="#cb18-27" aria-hidden="true" tabindex="-1"></a>    loss.backward()</span>
+<span id="cb18-28"><a href="#cb18-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-29"><a href="#cb18-29" aria-hidden="true" tabindex="-1"></a>    <span class="co"># clip gradients</span></span>
+<span id="cb18-30"><a href="#cb18-30" aria-hidden="true" tabindex="-1"></a>    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm<span class="op">=</span><span class="fl">1.0</span>)</span>
+<span id="cb18-31"><a href="#cb18-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-32"><a href="#cb18-32" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Log gradients before the optimization step</span></span>
+<span id="cb18-33"><a href="#cb18-33" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> name, param <span class="kw">in</span> model.named_parameters():</span>
+<span id="cb18-34"><a href="#cb18-34" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> param.grad <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb18-35"><a href="#cb18-35" aria-hidden="true" tabindex="-1"></a>            writer.add_histogram(<span class="ss">f'gradients/</span><span class="sc">{</span>name<span class="sc">}</span><span class="ss">'</span>, param.grad, i)</span>
+<span id="cb18-36"><a href="#cb18-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-37"><a href="#cb18-37" aria-hidden="true" tabindex="-1"></a>    optimizer.step()</span>
+<span id="cb18-38"><a href="#cb18-38" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> i<span class="op">%</span>LOG_EVERY<span class="op">==</span><span class="dv">0</span>:</span>
+<span id="cb18-39"><a href="#cb18-39" aria-hidden="true" tabindex="-1"></a>        losses.append(loss)</span>
+<span id="cb18-40"><a href="#cb18-40" aria-hidden="true" tabindex="-1"></a>        <span class="co"># print(loss.item())</span></span>
+<span id="cb18-41"><a href="#cb18-41" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb18-42"><a href="#cb18-42" aria-hidden="true" tabindex="-1"></a>    writer.add_scalar(<span class="st">'Loss/train'</span>, loss.item(), i)</span>
+<span id="cb18-43"><a href="#cb18-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-44"><a href="#cb18-44" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb18-45"><a href="#cb18-45" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> i<span class="op">%</span>GENERATE_EVERY<span class="op">==</span><span class="dv">0</span> <span class="kw">or</span> i<span class="op">==</span>NUM_STEPS<span class="op">-</span><span class="dv">1</span>:</span>
+<span id="cb18-46"><a href="#cb18-46" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"after </span><span class="sc">{</span>i<span class="sc">}</span><span class="ss"> steps: "</span>)</span>
+<span id="cb18-47"><a href="#cb18-47" aria-hidden="true" tabindex="-1"></a>        prompt <span class="op">=</span> <span class="st">'but I told him clearly, that if'</span></span>
+<span id="cb18-48"><a href="#cb18-48" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"prompt is: </span><span class="sc">{</span>prompt<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb18-49"><a href="#cb18-49" aria-hidden="true" tabindex="-1"></a>        gen_text <span class="op">=</span> model.generate(prompt, max_len<span class="op">=</span><span class="dv">128</span>)</span>
+<span id="cb18-50"><a href="#cb18-50" aria-hidden="true" tabindex="-1"></a>        gen_text <span class="op">=</span> gen_text.replace(<span class="st">"&lt;pad&gt;"</span>, <span class="st">""</span>)</span>
+<span id="cb18-51"><a href="#cb18-51" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">text generated by model: </span><span class="ch">\n</span><span class="sc">{</span>gen_text<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb18-52"><a href="#cb18-52" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">'-'</span><span class="op">*</span><span class="dv">75</span>)</span>
+<span id="cb18-53"><a href="#cb18-53" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb18-54"><a href="#cb18-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-55"><a href="#cb18-55" aria-hidden="true" tabindex="-1"></a>writer.close()</span>
+<span id="cb18-56"><a href="#cb18-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-57"><a href="#cb18-57" aria-hidden="true" tabindex="-1"></a>losses <span class="op">=</span> [loss.cpu().detach().numpy().item() <span class="cf">for</span> loss <span class="kw">in</span> losses] </span>
+<span id="cb18-58"><a href="#cb18-58" aria-hidden="true" tabindex="-1"></a><span class="co"># print(losses[::3])</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>paramter count of the model: 1114232, data_size: 2449724
+
+after 0 steps: 
+prompt is: but I told him clearly, that if
+
+text generated by model: 
+but I told him clearly, that ifâDaL—WX2m‘;D3æJqèup½’VDnJi^Rjje(lSïVcCrgWmMQSXA9W9`_Fî+E5l&amp;1sVq\6]=^fê—&gt;804àâ!yñêI・y=6&amp;l,{$Oû.1—u*$9‘KM!Oñ-cW’MéñhB~M.j6r{}xl
+
+---------------------------------------------------------------------------
+after 1000 steps: 
+prompt is: but I told him clearly, that if
+
+text generated by model: 
+but I told him clearly, that if
+Twen tracked of him grivel-napregred whotain one come,
+in hy midge withoush, which shoulquould before so speeded the feet in th
+
+---------------------------------------------------------------------------
+after 2000 steps: 
+prompt is: but I told him clearly, that if
+
+text generated by model: 
+but I told him clearly, that if still come, but I don’t know. Mc! So yester I shall five onnestible, “that peired, want and
+asfected to his harded has
+Farching
+
+---------------------------------------------------------------------------
+after 3000 steps: 
+prompt is: but I told him clearly, that if
+
+text generated by model: 
+but I told him clearly, that ifner, for sheep there indobless.
+And Holmes
+when we start the once.”
+
+“Thanks between rouse vrisings of as one of
+firied presing,
+
+---------------------------------------------------------------------------
+after 4000 steps: 
+prompt is: but I told him clearly, that if
+
+text generated by model: 
+but I told him clearly, that if you had a explain and after we like it. He is every are that the main that in a valued her this example in our myselture for th
+
+---------------------------------------------------------------------------
+after 5000 steps: 
+prompt is: but I told him clearly, that if
+
+text generated by model: 
+but I told him clearly, that if yim you have helpered befored. Therest name It
+famousore, that he sat three
+      it, and he said that we met him earsh back in
+
+---------------------------------------------------------------------------
+after 6000 steps: 
+prompt is: but I told him clearly, that if
+
+text generated by model: 
+but I told him clearly, that if I can
+started which he came many way heir imperiable takely room. A now,
+      “What was only fancy,” he was a gentleman concei
+
+---------------------------------------------------------------------------
+after 7000 steps: 
+prompt is: but I told him clearly, that if
+
+text generated by model: 
+but I told him clearly, that if your mistaken, and yet use_ the
+Close of Baskerville, is obvious fashions and left your
+brusticion of the longly seat from this
+
+---------------------------------------------------------------------------
+after 8000 steps: 
+prompt is: but I told him clearly, that if
+
+text generated by model: 
+but I told him clearly, that if I’d fain the
+others.”
+
+“How made you, Watson, he was demilent? With past as another? One enemal with fift me out and was art vi
+
+---------------------------------------------------------------------------
+after 9000 steps: 
+prompt is: but I told him clearly, that if
+
+text generated by model: 
+but I told him clearly, that if I do follow made the owns
+behind these common understand that is I, and they may not cast
+occurred to suggest we idea?”
+
+“Not r
+
+---------------------------------------------------------------------------
+after 9999 steps: 
+prompt is: but I told him clearly, that if
+
+text generated by model: 
+but I told him clearly, that if if I was able faintled back in the hand, air which had
+dirmanscoctors way. That’s close.
+
+“Does_ gone. I recond feare, and that
+
+---------------------------------------------------------------------------
+[4.787812232971191, 1.8653450012207031, 1.7018814086914062, 1.655837059020996, 1.5209026336669922, 1.5495105981826782, 1.5696816444396973, 1.560757040977478, 1.5683640241622925, 1.4509146213531494, 1.4306949377059937, 1.4603841304779053, 1.3696606159210205, 1.5044567584991455, 1.3786689043045044, 1.3815288543701172, 1.3697071075439453]</code></pre>
+</div>
+</div>
+<div id="cell-28" class="cell" data-execution_count="73">
+<details class="code-fold">
+<summary>show code</summary>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co"># plot losses</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>plt.plot(losses)</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"Training Loss"</span>)</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">"Steps"</span>)</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">"Loss"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-display" data-execution_count="73">
+<pre><code>Text(0, 0.5, 'Loss')</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_rnns_basics_files/figure-html/cell-15-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The results certainly improve over the iterations, and its clearly visible that the model is learning to generate text. By scaling the model and training for longer, we can get better results.</p>
+<p>Thank you for reading this and I hope you found it useful. The next time I update this blog post, I’ll be adding the following:</p>
+<ul>
+<li>Evaluation on test set (metrics like perplexity).</li>
+<li>Implementing RNN, LSTM and GRU from scratch.</li>
+</ul>
+<p>Byee :)</p>
+<!---
+- sqitching from SGD to adam instantly gives boost (2.8 vs under 2)
+- tripling the data gave no gains on 50k basic rnn model!
+- 300k characters seems enough to generate coherent text, why not happening here?
+    - lets try a few things, take small corpus (2-3mil chars), <1 million param model and use techiques like grad-clipping, mps on mac local(faster), and see if we can get it to generate coherent text.
+    - mps reduces training-time by more than half.
+    - grad clipping doesnt seem to affect quality on inspection of generated text.
+
+- logging to tensorboard to keep track of experiments and to visualize gradients too. (X-ray vision)
+-->
+<!---
+#### 100k rnn model - 3million chars: ~1.5 loss, kinda starts to form words
+outputs:
+1. hey there handsome what death which are a discroose.”
+2. I recall went small-boy’s Louded spoke. T
+
+
+#### 100k rnn model - 12million chars: ~1.6 loss, similar 
+1. hey there handsome what
+to on?”
+
+Midams: I lady of
+quiked in her put intented to the burgent wonder the risons of the saw
+      four spikely. To belled
+2. I recall Katerinoad and sure
+conforty, unsole only geitute and, and it stigged refundled as a
+  was abserved. Every tran at you.”
+
+THO"Ci
+
+#### 330k lstm model - 12million chars: ~ 1.52 loss, 
+1. hey there handsome what?” are that indid of nebvense of the Samiskamen theory instance Loins, fry committed, or suggested fagreedingly.
+
+Judge Stannaph
+2. I recall are that any quality shall, as the man
+been unknight, in his
+closkered. The common as though sad so'll he had she askoccite
+    
+#### 1million lstm model - 3million chars: ~1.4 loss, 10k steps 
+paramter count of the model: 1114232, 3million chars  
+
+text generated by model after 0 steps of training but I told him clearly, that ifVOS£QY^DêX£véF LD[sœPyZê$t½’sXz<nf#t0|%çIw<à’"n・ê+r^êi?\fZâEl@K
+Yu%@3VâZJ}_}$B` àl・à$rï:hàNBbZ0j½~6#û8vàC/[Vn$KRéüylyhê|.ûî&EJ2I
+
+
+text generated by model after 1000 steps of training but I told him clearly, that if the bet’s of the
+      yecraiuply that deen-tated for langent
+pasts with! I was a tedeter.”
+       I at, encurned. A, my dook a
+
+
+text generated by model after 2000 steps of training but I told him clearly, that if he reabsa deed some
+seard us a heard his nevriept took’h myself and come against is need of Eaker, and terrised a clearly enoye
+
+
+text generated by model after 3000 steps of training but I told him clearly, that if Right
+then, who roronian had monting that I must settating you passion. Fut us contain him thion. Amy taken
+and to sympent-litt
+
+
+text generated by model after 4000 steps of training but I told him clearly, that if ears whet a
+your smalls friend
+      so.”
+
+“And you? Scotling us in the ensetate on the stappered. “A stors, but which I work w
+
+
+text generated by model after 5000 steps of training but I told him clearly, that if be whose give anches was for me to his many
+wears the anyone? The back down of brought than answered, sir; “Sudden horror and c
+
+
+text generated by model after 6000 steps of training but I told him clearly, that if he had telegreas.”
+
+“Why I knew I have been examed.”
+
+“Certails, he spetter lodge oppon the next opportmend in I. I skined it, 
+
+
+text generated by model after 7000 steps of training but I told him clearly, that if the Dark, sharp_ and that
+their repaudance with us a fearer with a largue down, “but the live night, Murch-Starter reading upon
+
+
+text generated by model after 8000 steps of training but I told him clearly, that if you will
+opens but I year?” said he. “That is near that shifted as into the canner life came.—This warning
+friend that I had ca
+
+
+text generated by model after 9000 steps of training but I told him clearly, that if I trauntion, that they are note too vellering keep of
+their part, and there was help being upon us the whole was snicks when?”
+-->
+</section>
+</section>
+<section id="references" class="level1">
+<h1>References</h1>
+<ol type="1">
+<li><a href="https://karpathy.github.io/2015/05/21/rnn-effectiveness/">OG blog by Karpathy</a></li>
+<li><a href="https://pytorch.org/docs/stable/generated/torch.nn.RNN.html#torch.nn.RNN">RNN torch documentation</a></li>
+</ol>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/www\.deepamminda\.com");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
