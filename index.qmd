@@ -16,6 +16,6 @@ about:
 
 ---
  
-Hi Y'all. My name is Deepam Minda and this is my website. I want to be writing a lot more blogs, TILs, etc about various things that interest me. I'm interested in topics like AI, llms, and to an extent, tech in general. I hope you learn something new here. Feel free to share your thoughts or hit me up.
+Hi Y'all. My name is Deepam Minda and this is my website. I'll be writing a lot more blogs, TILs, etc about various things that interest me. I'm interested in topics like AI, llms, and tech in general.  I hope you learn something new here. Feel free to share your thoughts or hit me up.
 
 Cheers!
