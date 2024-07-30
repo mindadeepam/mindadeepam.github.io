@@ -244,7 +244,8 @@ window.Quarto = {
   <li><a href="#a-simple-cnn-architecture" id="toc-a-simple-cnn-architecture" class="nav-link" data-scroll-target="#a-simple-cnn-architecture">A Simple CNN architecture</a></li>
   <li><a href="#cnn-characteristics" id="toc-cnn-characteristics" class="nav-link" data-scroll-target="#cnn-characteristics">CNN characteristics</a></li>
   <li><a href="#lets-train-a-model-yaar" id="toc-lets-train-a-model-yaar" class="nav-link" data-scroll-target="#lets-train-a-model-yaar">Lets train a model yaar</a></li>
-  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#concluding" id="toc-concluding" class="nav-link" data-scroll-target="#concluding">Concluding</a></li>
+  <li><a href="#references-and-further-reading" id="toc-references-and-further-reading" class="nav-link" data-scroll-target="#references-and-further-reading">References and Further Reading</a></li>
   </ul>
 </nav>
     </div>
@@ -271,7 +272,7 @@ window.Quarto = {
 <li><strong>Summation</strong>: The results of these multiplications are summed to get a single value, which is placed in the output function.</li>
 </ol>
 <p>For a 1d array this might look like this:</p>
-<div id="cell-3" class="cell" data-execution_count="1">
+<div id="cell-3" class="cell" data-execution_count="25">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np </span>
@@ -283,7 +284,7 @@ window.Quarto = {
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"g: </span><span class="sc">{</span>g<span class="sc">}</span><span class="ss">"</span>)</span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>window_size <span class="op">=</span> g.shape[<span class="dv">0</span>]</span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> []</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">slice_of_f * g[::-1]: "</span>)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">Steps in convolution, slide inverted g over f in a loop </span><span class="ch">\n</span><span class="st">slice_of_f * g[::-1]: "</span>)</span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> idx, i <span class="kw">in</span> <span class="bu">enumerate</span>(<span class="bu">range</span>(<span class="bu">len</span>(f)<span class="op">-</span>window_size<span class="op">+</span><span class="dv">1</span>)):</span>
 <span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    slice_of_f <span class="op">=</span> f[i:i<span class="op">+</span>window_size]</span>
 <span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>idx<span class="sc">}</span><span class="ss">. sum(</span><span class="sc">{</span>slice_of_f<span class="sc">}</span><span class="ss"> * </span><span class="sc">{</span>g[::<span class="op">-</span><span class="dv">1</span>]<span class="sc">}</span><span class="ss">) = sum(</span><span class="sc">{</span>slice_of_f <span class="op">*</span> g[::<span class="op">-</span><span class="dv">1</span>]<span class="sc">}</span><span class="ss">) = </span><span class="sc">{</span>np<span class="sc">.</span><span class="bu">sum</span>(slice_of_f <span class="op">*</span> g[::<span class="op">-</span><span class="dv">1</span>])<span class="sc">}</span><span class="ss">"</span>)</span>
@@ -296,6 +297,7 @@ window.Quarto = {
 <pre><code>f: [ 1  2  3 -1 10 -4]
 g: [ 1  0 -1]
 
+Steps in convolution, slide inverted g over f in a loop 
 slice_of_f * g[::-1]: 
 0. sum([1 2 3] * [-1  0  1]) = sum([-1  0  3]) = 2
 1. sum([ 2  3 -1] * [-1  0  1]) = sum([-2  0 -1]) = -3
@@ -389,7 +391,7 @@ Which is the same as the result of scipy.convolve2d:
 <p>With that out of the way lets back up for a second and remember our old friends feed forward networks. What is the problem with using feed forward networks to process images? As it turns out, quite a few things:</p>
 <ol type="1">
 <li><p>Feed forward networks do not share information between different data points in the network. For example if X = [0,1,2,3] is a vector of input to the network, all the interactions between weights happen independently for each data point in one sample of data. This works fine for tabular features of some data, because they actually are not dependent on their spatial postion wrt each other. The model will learn the same if you shuffle all columns of a dataset. <br><br>But images pixels are a different type of data. They are inherently very locally dependent. If you look at a single pixel, it is very likely to be highly correlated with its neighboring pixels. Hence our network should process atleast patches of images at a time.</p></li>
-<li><p>Earlier when classical image processing methods were being used, many a times hand-made “filters” were used to extract features from images. In CNNs, we learn these filters! and we learn a lot of them. So think of each layer in this CNN as having a lot of these filters which are learned during network.</p></li>
+<li><p>Earlier when classical image processing methods were being used, many a times hand-made “filters” were used to extract features from images. In CNNs, we learn these filters! and we learn a lot of them. So think of each layer in this CNN as having a lot of these filters which are learned during network. We’ll soon visualize what concepts they learn.</p></li>
 <li><p>Another concept that helps is parameter sharing. We could in thoery have different set of filters for different patches in the image, but this would shoot up the parameter count of our model. So in a single layer, we use a single set of filters for all patches in the image.</p></li>
 </ol>
 <p>Lets get into the tensor shapes now.</p>
@@ -476,6 +478,7 @@ Figure&nbsp;1: visualizing activation maps in cnns. From the paper ‘Visualizin
 <blockquote class="blockquote">
 <p>the below code is all generated by claude-sonnet-3.5, bcuz its kinda boring to train a toy model on a toy dataset, that too for classification. dont worry though, ill soon be back with a more interesting vision problem to get our hands dirty.</p>
 </blockquote>
+<p>Training itself is pretty straightforward. We split the data into train-test, and then train the model for a few epochs. We use the Adam optimizer and CrossEntropyLoss as the loss function. The outputs of the model are bare logits, which the loss functions accepts with targets. A learning rate of 0.001 is used for the optimizer. In the end we test on the test set, and print the accuracy.</p>
 <div id="cell-12" class="cell" data-execution_count="22">
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch.nn <span class="im">as</span> nn</span>
@@ -612,7 +615,7 @@ Epoch [5/5], Loss: 0.2185</code></pre>
 </div>
 </div>
 <p>Neat!! Now let’s visualize some of the predictions.</p>
-<div id="cell-14" class="cell" data-execution_count="16">
+<div id="cell-14" class="cell" data-execution_count="26">
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>class_names <span class="op">=</span> [<span class="st">'T-shirt/top'</span>, <span class="st">'Trouser'</span>, <span class="st">'Pullover'</span>, <span class="st">'Dress'</span>, <span class="st">'Coat'</span>, </span>
@@ -644,18 +647,68 @@ Epoch [5/5], Loss: 0.2185</code></pre>
 </div>
 </div>
 </div>
-<hr>
+<p>Now let us visualize the confisuion matrix to exactly see how the model is doing.</p>
+<div id="cell-16" class="cell" data-execution_count="30">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># see the confusion matrix</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> confusion_matrix</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Collect predictions and true labels</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>y_true, y_pred <span class="op">=</span> [], []</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>model.<span class="bu">eval</span>()</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> torch.no_grad():</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> data, targets <span class="kw">in</span> test_loader:</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>        data, targets <span class="op">=</span> data.to(device), targets.to(device)</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>        outputs <span class="op">=</span> model(data)</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>        _, predicted <span class="op">=</span> torch.<span class="bu">max</span>(outputs.data, <span class="dv">1</span>)</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>        y_true.extend(targets.cpu().numpy())</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>        y_pred.extend(predicted.cpu().numpy())</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Create and plot confusion matrix</span></span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>cm <span class="op">=</span> confusion_matrix(y_true, y_pred)</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>plt.imshow(cm, interpolation<span class="op">=</span><span class="st">'nearest'</span>, cmap<span class="op">=</span><span class="st">"Pastel1"</span>)</span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">'Confusion Matrix'</span>)</span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>plt.colorbar()</span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>tick_marks <span class="op">=</span> <span class="bu">range</span>(<span class="bu">len</span>(class_names))</span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>plt.xticks(tick_marks, class_names, rotation<span class="op">=</span><span class="dv">45</span>)</span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a>plt.yticks(tick_marks, class_names)</span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">'Predicted'</span>)</span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">'True'</span>)</span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a><span class="co"># Add text annotations</span></span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(cm.shape[<span class="dv">0</span>]):</span>
+<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(cm.shape[<span class="dv">1</span>]):</span>
+<span id="cb13-31"><a href="#cb13-31" aria-hidden="true" tabindex="-1"></a>        plt.text(j, i, <span class="bu">str</span>(cm[i, j]), ha<span class="op">=</span><span class="st">"center"</span>, va<span class="op">=</span><span class="st">"center"</span>)</span>
+<span id="cb13-32"><a href="#cb13-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-33"><a href="#cb13-33" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb13-34"><a href="#cb13-34" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="00_cnn_basics_files/figure-html/cell-7-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We can see that the model is particularly confused in the “Tshirt” &amp; “Shirt” class (less than 70% accuracy) and most confident in “Trouser”, “Sneaker”, “Bag” and “Ankle boot” (greater than 95% accuracy)</p>
+</section>
+<section id="concluding" class="level2">
+<h2 class="anchored" data-anchor-id="concluding">Concluding</h2>
 <p>I hope you clearly understand the core CNN fundamental architecture. This is just the base that’ll act as a foundation for more interesting architectures as we go on. Until then, see you in the next one!</p>
 <p>Byeee :)</p>
 </section>
-<section id="references" class="level2">
-<h2 class="anchored" data-anchor-id="references">References</h2>
+<section id="references-and-further-reading" class="level2">
+<h2 class="anchored" data-anchor-id="references-and-further-reading">References and Further Reading</h2>
 <ul>
 <li>sebastian raschka course material <a href="https://sebastianraschka.com/blog/2021/dl-course.html#l13-introduction-to-convolutional-neural-networks">here</a></li>
 <li>CS231N Cnn notes <a href="https://cs231n.github.io/convolutional-networks/#case">here</a>. Great intuition and more detail about the shapes, local connectivity, spatial arrangement, and loads of other stuff.</li>
-<li>arc folder where i maintain things related to CNNs <a href="https://arc.net/folder/08A8A6B3-0E12-4F25-A3B2-B3B956068848">here</a></li>
 <li>beginner friendly article on Medium (its a great blog-series for ML) <a href="https://medium.com/@ageitgey/machine-learning-is-fun-part-3-deep-learning-and-convolutional-neural-networks-f40359318721">here</a></li>
 <li>Visualizing and Understanding Convolutional Networks. 2014 paper <a href="https://arxiv.org/pdf/1311.2901">here</a></li>
+<li>Find out some of the modifications made on this basic architecture. This is recommended further reading. <a href="https://towardsdatascience.com/10-papers-you-should-read-to-understand-image-classification-in-the-deep-learning-era-4b9d792f45a7">here</a></li>
 </ul>
 
 
