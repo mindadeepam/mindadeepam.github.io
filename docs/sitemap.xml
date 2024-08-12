@@ -2,30 +2,34 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://www.deepamminda.com/blog.html</loc>
-    <lastmod>2024-07-23T09:59:20.820Z</lastmod>
+    <lastmod>2024-08-12T22:01:20.240Z</lastmod>
   </url>
   <url>
-    <loc>https://www.deepamminda.com/index.html</loc>
-    <lastmod>2024-07-30T20:08:46.317Z</lastmod>
-  </url>
-  <url>
-    <loc>https://www.deepamminda.com/posts/cnns/01_resnet.html</loc>
-    <lastmod>2024-08-08T17:52:51.913Z</lastmod>
-  </url>
-  <url>
-    <loc>https://www.deepamminda.com/posts/few-shot-learning/prototype_networks.html</loc>
-    <lastmod>2024-08-08T17:53:20.945Z</lastmod>
-  </url>
-  <url>
-    <loc>https://www.deepamminda.com/posts/cnns/00_cnn_basics.html</loc>
-    <lastmod>2024-08-08T17:51:55.792Z</lastmod>
+    <loc>https://www.deepamminda.com/about.html</loc>
+    <lastmod>2024-07-30T20:08:36.700Z</lastmod>
   </url>
   <url>
     <loc>https://www.deepamminda.com/posts/rnns/01_rnns_basics.html</loc>
     <lastmod>2024-08-08T17:53:06.701Z</lastmod>
   </url>
   <url>
-    <loc>https://www.deepamminda.com/about.html</loc>
-    <lastmod>2024-07-30T20:08:36.700Z</lastmod>
+    <loc>https://www.deepamminda.com/posts/cnns/00_cnn_basics.html</loc>
+    <lastmod>2024-08-10T16:57:09.749Z</lastmod>
+  </url>
+  <url>
+    <loc>https://www.deepamminda.com/posts/few-shot-learning/prototype_networks.html</loc>
+    <lastmod>2024-08-08T17:53:20.945Z</lastmod>
+  </url>
+  <url>
+    <loc>https://www.deepamminda.com/posts/cnns/01_resnet.html</loc>
+    <lastmod>2024-08-10T17:41:36.092Z</lastmod>
+  </url>
+  <url>
+    <loc>https://www.deepamminda.com/index.html</loc>
+    <lastmod>2024-07-30T20:08:46.317Z</lastmod>
+  </url>
+  <url>
+    <loc>https://www.deepamminda.com/links.html</loc>
+    <lastmod>2024-08-12T22:06:03.653Z</lastmod>
   </url>
 </urlset>

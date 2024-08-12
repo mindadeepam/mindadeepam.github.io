@@ -1013,7 +1013,7 @@ font-style: inherit;">3</span>,IMG_SIZE,IMG_SIZE))</span></code></pre></div>
 </div>
 <p>This brings our model size down to a much more manageble 12million parameters from the original ~140 million parameters.</p>
 <p>For training we’ll use the Adam optimizer and learing rate of 0.001. We’ll also use the CrossEntropyLoss as the loss function as this is a classification task.</p>
-<div id="cell-17" class="cell">
+<div id="cell-16" class="cell">
 <div class="sourceCode cell-code" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> torch</span>
@@ -1666,33 +1666,15 @@ font-style: inherit;">=</span> data.to(device), target.to(device)</span>
 <span id="cb8-132">        output <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> model(data)</span>
-<span id="cb8-133">        <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># print(len(target), len(output))</span></span>
-<span id="cb8-134">        <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># print(target, output)</span></span>
-<span id="cb8-135">        <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># print("Output shape:", output.shape)</span></span>
-<span id="cb8-136">        <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># print("Target shape:", target.shape)</span></span>
-<span id="cb8-137">        <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># print("Output:", output)</span></span>
-<span id="cb8-138">        <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># print("Target:", target)</span></span>
-<span id="cb8-139">        loss <span class="op" style="color: #5E5E5E;
+<span id="cb8-133">        loss <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> criterion(output, target)</span>
-<span id="cb8-140">        loss.backward()</span>
-<span id="cb8-141">        optimizer.step()</span>
-<span id="cb8-142">        train_loss <span class="op" style="color: #5E5E5E;
+<span id="cb8-134">        loss.backward()</span>
+<span id="cb8-135">        optimizer.step()</span>
+<span id="cb8-136">        train_loss <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">+=</span> loss.item()</span>
-<span id="cb8-143">        pred <span class="op" style="color: #5E5E5E;
+<span id="cb8-137">        pred <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> output.argmax(dim<span class="op" style="color: #5E5E5E;
 background-color: null;
@@ -1703,12 +1685,12 @@ background-color: null;
 font-style: inherit;">=</span><span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">True</span>)</span>
-<span id="cb8-144">        train_correct <span class="op" style="color: #5E5E5E;
+<span id="cb8-138">        train_correct <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">+=</span> pred.eq(target.view_as(pred)).<span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">sum</span>().item()</span>
-<span id="cb8-145">        <span class="bu" style="color: null;
+<span id="cb8-139">        <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
@@ -1721,18 +1703,18 @@ background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"</span>)</span>
-<span id="cb8-146">        writer.add_scalar(<span class="st" style="color: #20794D;
+<span id="cb8-140">        writer.add_scalar(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'Loss/train_step'</span>, loss.item())</span>
-<span id="cb8-147">        <span class="co" style="color: #5E5E5E;
+<span id="cb8-141">        <span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># writer.add_scalar('Loss/val', val_loss, epoch)</span></span>
-<span id="cb8-148">    train_loss <span class="op" style="color: #5E5E5E;
+<span id="cb8-142">    train_loss <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">/=</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">len</span>(train_loader)</span>
-<span id="cb8-149">    train_accuracy <span class="op" style="color: #5E5E5E;
+<span id="cb8-143">    train_accuracy <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
 background-color: null;
@@ -1743,18 +1725,18 @@ background-color: null;
 font-style: inherit;">/</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">len</span>(train_loader.dataset)</span>
-<span id="cb8-150"></span>
-<span id="cb8-151">    <span class="co" style="color: #5E5E5E;
+<span id="cb8-144"></span>
+<span id="cb8-145">    <span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># Validation</span></span>
-<span id="cb8-152">    model.<span class="bu" style="color: null;
+<span id="cb8-146">    model.<span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">eval</span>()</span>
-<span id="cb8-153">    <span class="cf" style="color: #003B4F;
+<span id="cb8-147">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">with</span> torch.no_grad():</span>
-<span id="cb8-154">        <span class="cf" style="color: #003B4F;
+<span id="cb8-148">        <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">for</span> data, target <span class="kw" style="color: #003B4F;
@@ -1781,19 +1763,19 @@ background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;"> - Validation"</span>):</span>
-<span id="cb8-155">            data, target <span class="op" style="color: #5E5E5E;
+<span id="cb8-149">            data, target <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> data.to(device), target.to(device)</span>
-<span id="cb8-156">            output <span class="op" style="color: #5E5E5E;
+<span id="cb8-150">            output <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> model(data)</span>
-<span id="cb8-157">            loss <span class="op" style="color: #5E5E5E;
+<span id="cb8-151">            loss <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> criterion(output, target)</span>
-<span id="cb8-158">            val_loss <span class="op" style="color: #5E5E5E;
+<span id="cb8-152">            val_loss <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">+=</span> loss.item()</span>
-<span id="cb8-159">            pred <span class="op" style="color: #5E5E5E;
+<span id="cb8-153">            pred <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> output.argmax(dim<span class="op" style="color: #5E5E5E;
 background-color: null;
@@ -1804,15 +1786,15 @@ background-color: null;
 font-style: inherit;">=</span><span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">True</span>)</span>
-<span id="cb8-160">            writer.add_scalar(<span class="st" style="color: #20794D;
+<span id="cb8-154">            writer.add_scalar(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'Loss/val_step'</span>, loss.item())</span>
-<span id="cb8-161">            val_correct <span class="op" style="color: #5E5E5E;
+<span id="cb8-155">            val_correct <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">+=</span> pred.eq(target.view_as(pred)).<span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">sum</span>().item()</span>
-<span id="cb8-162">            <span class="bu" style="color: null;
+<span id="cb8-156">            <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
@@ -1825,12 +1807,12 @@ background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"</span>)</span>
-<span id="cb8-163">    val_loss <span class="op" style="color: #5E5E5E;
+<span id="cb8-157">    val_loss <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">/=</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">len</span>(val_loader)</span>
-<span id="cb8-164">    val_accuracy <span class="op" style="color: #5E5E5E;
+<span id="cb8-158">    val_accuracy <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
 background-color: null;
@@ -1841,24 +1823,24 @@ background-color: null;
 font-style: inherit;">/</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">len</span>(val_loader.dataset)</span>
-<span id="cb8-165"></span>
-<span id="cb8-166">    <span class="co" style="color: #5E5E5E;
+<span id="cb8-159"></span>
+<span id="cb8-160">    <span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># Log to TensorBoard</span></span>
-<span id="cb8-167">    writer.add_scalar(<span class="st" style="color: #20794D;
+<span id="cb8-161">    writer.add_scalar(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'Loss/train'</span>, train_loss, epoch)</span>
-<span id="cb8-168">    writer.add_scalar(<span class="st" style="color: #20794D;
+<span id="cb8-162">    writer.add_scalar(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'Loss/val'</span>, val_loss, epoch)</span>
-<span id="cb8-169">    writer.add_scalar(<span class="st" style="color: #20794D;
+<span id="cb8-163">    writer.add_scalar(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'Accuracy/train'</span>, train_accuracy, epoch)</span>
-<span id="cb8-170">    writer.add_scalar(<span class="st" style="color: #20794D;
+<span id="cb8-164">    writer.add_scalar(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">'Accuracy/val'</span>, val_accuracy, epoch)</span>
-<span id="cb8-171"></span>
-<span id="cb8-172">    <span class="bu" style="color: null;
+<span id="cb8-165"></span>
+<span id="cb8-166">    <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
@@ -1879,7 +1861,7 @@ background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">:'</span>)</span>
-<span id="cb8-173">    <span class="bu" style="color: null;
+<span id="cb8-167">    <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
@@ -1896,7 +1878,7 @@ background-color: null;
 font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">%'</span>)</span>
-<span id="cb8-174">    <span class="bu" style="color: null;
+<span id="cb8-168">    <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
@@ -1913,11 +1895,11 @@ background-color: null;
 font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">%'</span>)</span>
-<span id="cb8-175"></span>
-<span id="cb8-176"><span class="co" style="color: #5E5E5E;
+<span id="cb8-169"></span>
+<span id="cb8-170"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># Training loop</span></span>
-<span id="cb8-177"><span class="cf" style="color: #003B4F;
+<span id="cb8-171"><span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">for</span> epoch <span class="kw" style="color: #003B4F;
@@ -1926,18 +1908,736 @@ font-weight: bold;
 font-style: inherit;">in</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">range</span>(NUM_EPOCHS):</span>
-<span id="cb8-178">    train_and_validate(epoch)</span>
-<span id="cb8-179"></span>
-<span id="cb8-180">writer.close()</span>
-<span id="cb8-181"><span class="bu" style="color: null;
+<span id="cb8-172">    train_and_validate(epoch)</span>
+<span id="cb8-173"></span>
+<span id="cb8-174">writer.close()</span>
+<span id="cb8-175"><span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"Training completed!"</span>)</span></code></pre></div>
 </div>
+<ul>
+<li>Running vgg11 on colab gives us a score of ~28% accuracy on the validation set in 20 epochs, while training loss and val loss both were kind of still decreasing.</li>
+</ul>
+<div id="cell-18" class="cell">
+<div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> matplotlib.pyplot <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> plt</span>
+<span id="cb9-2"></span>
+<span id="cb9-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> plot_params_and_grads(model, n<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>):</span>
+<span id="cb9-4">    grad_values <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [(name, param.grad.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">abs</span>().cpu().detach().numpy())</span>
+<span id="cb9-5">                   <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> name, param <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> model.named_parameters()</span>
+<span id="cb9-6">                   <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> param.grad <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">is</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>]</span>
+<span id="cb9-7">    </span>
+<span id="cb9-8">    <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> plot_grads(grad_values, title_prefix):</span>
+<span id="cb9-9">        num_plots <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">min</span>(n, <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(grad_values))</span>
+<span id="cb9-10">        fig, axes <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> plt.subplots(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, num_plots, figsize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> num_plots, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>))</span>
+<span id="cb9-11">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> num_plots <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>:</span>
+<span id="cb9-12">            axes <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [axes]  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Ensure axes is iterable if only one plot</span></span>
+<span id="cb9-13"></span>
+<span id="cb9-14">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> idx <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(num_plots):</span>
+<span id="cb9-15">            name, grad <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> grad_values[idx]</span>
+<span id="cb9-16">            axes[idx].hist(grad.flatten(), bins<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>)</span>
+<span id="cb9-17">            axes[idx].set_title(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f'</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>title_prefix<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> Layer </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>name<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'</span>)</span>
+<span id="cb9-18">            axes[idx].set_xlabel(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Gradient Magnitude'</span>)</span>
+<span id="cb9-19">            axes[idx].set_ylabel(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Frequency'</span>)</span>
+<span id="cb9-20">        </span>
+<span id="cb9-21">        plt.tight_layout()</span>
+<span id="cb9-22">        plt.show()</span>
+<span id="cb9-23"></span>
+<span id="cb9-24">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Plot first n parameters</span></span>
+<span id="cb9-25">    plot_grads(grad_values[:n], title_prefix<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'First'</span>)</span>
+<span id="cb9-26"></span>
+<span id="cb9-27">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Plot last n parameters</span></span>
+<span id="cb9-28">    plot_grads(grad_values[<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>n:], title_prefix<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'Last'</span>)</span>
+<span id="cb9-29"></span>
+<span id="cb9-30"></span>
+<span id="cb9-31">plot_params_and_grads(model, n<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>)</span></code></pre></div>
+</div>
+<ul>
+<li><p>Scaling to vgg_16:</p>
+<pre><code>  suprisingly model isnt learning at all. loss not going down. upon inspection of gradients we find that while training vgg_199 there are practically no gradients.
 
-
+  Also note that grads start even when loss isnt decreasing at the first few steps.</code></pre>
+<p>Look at the the below figures:</p>
+<p>### VGG-11 <img src="https://www.deepamminda.com/posts/cnns/vgg_11_final_layer_grads.png" id="fig-vgg_11_final_layer_grads" style="width:100.0%" alt="‘VGG-11 Final Layer Gradients’"></p>
+<div id="fig-vgg_11_first_layers_grad_plot" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-vgg_11_first_layers_grad_plot-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://www.deepamminda.com/posts/cnns/vgg_11_first_layers_grad_plot.png" style="width:100.0%" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-vgg_11_first_layers_grad_plot-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: “VGG-11 First Layers Gradient Plot”
+</figcaption>
+</figure>
+</div>
+<p>### VGG-16 <img src="https://www.deepamminda.com/posts/cnns/vgg_16_final_layers_grad.png" id="fig-vgg_16_final_layers_grad" style="width:100.0%" alt="“VGG-16 Final Layers Gradients”"></p>
+<div id="fig-vgg_16_first_layers_grad_plot_vanishing-grads" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-vgg_16_first_layers_grad_plot_vanishing-grads-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://www.deepamminda.com/posts/cnns/vgg_16_first_layers_grad_plot_vanishing-grads.png" style="width:100.0%" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-vgg_16_first_layers_grad_plot_vanishing-grads-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: “VGG-16 First Layers Gradient Plot”(Vanishing Gradients)
+</figcaption>
+</figure>
+</div></li>
+<li><p>Does removing bottlenecked maxpool before fc layers help?: No, it doesnt. :(</p></li>
+<li><p>what about vgg13? being clser to the 11 variant this doesnt experience vanishing gradients.</p></li>
+</ul>
+<p>This is esssentialy the central limitations that still remain after going very deep. Depth is not enough, we need better ways to allow gradients to be propagated through these deep networks.</p>
+<section id="computational-considerations" class="level3">
+<h3 class="anchored" data-anchor-id="computational-considerations">computational considerations</h3>
+<p>A usual Conv2d layer has a computation complexity of <img src="https://latex.codecogs.com/png.latex?O(H_%7Bin%7D*W_%7Bin%7D*k%5E2*C_%7Bin%7D*C_%7Bout%7D)">. Derivation:</p>
+<ul>
+<li>number of output cells = <img src="https://latex.codecogs.com/png.latex?H_%7Bout%7D*W_%7Bout%7D*C_%7Bout%7D"></li>
+<li>computation required to compute each output cell = <img src="https://latex.codecogs.com/png.latex?k%5E2*C_%7Bin%7D"></li>
+<li>number of ops<br>
+-&gt; number of output cells * computation required to compute each output cell<br>
+-&gt; <img src="https://latex.codecogs.com/png.latex?H_%7Bout%7D*W_%7Bout%7D*k%5E2*C_%7Bin%7D*C_%7Bout%7D"></li>
+</ul>
 </section>
+</section>
+</section>
+<section id="inception" class="level1">
+<h1>Inception</h1>
+<p>VGGs large networks deal with issues of overfitting and increased computation. After it focus shifted to making the networks more compute efficient. Aiming to solve these issues by introducing extra sparsity in the network, the Inception model was proposed.</p>
+<div id="cell-22" class="cell" data-execution_count="136">
+<div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">class</span> NaiveInceptionBlock(nn.Module):</span>
+<span id="cb11-2">    <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">__init__</span>(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>, in_channels, out_channels):</span>
+<span id="cb11-3">        <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">super</span>(NaiveInceptionBlock, <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>).<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">__init__</span>()</span>
+<span id="cb11-4">        <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.conv1x1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> nn.Conv2d(in_channels, out_channels, kernel_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, stride<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, padding<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb11-5">        <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.conv3x3 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> nn.Conv2d(in_channels, out_channels, kernel_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>, stride<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, padding<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span>
+<span id="cb11-6">        <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.conv5x5 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> nn.Conv2d(in_channels, out_channels, kernel_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>, stride<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, padding<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>) <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># padding to make sure h,w remains same</span></span>
+<span id="cb11-7">        <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.maxpool <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> nn.MaxPool2d(kernel_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>, stride<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, padding<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span>
+<span id="cb11-8">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># self.conv2 = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0)</span></span>
+<span id="cb11-9"></span>
+<span id="cb11-10">    <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> forward(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>, x):</span>
+<span id="cb11-11">        out1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.conv1x1(x)</span>
+<span id="cb11-12">        out2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.conv3x3(x)</span>
+<span id="cb11-13">        out3 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.conv5x5(x)</span>
+<span id="cb11-14">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># out4 = self.maxpool(x)</span></span>
+<span id="cb11-15">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> torch.cat([out1, out2, out3], dim<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span>
+<span id="cb11-16">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># return [out1, out2, out3, out4]</span></span>
+<span id="cb11-17"></span>
+<span id="cb11-18"></span>
+<span id="cb11-19"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">class</span> InceptionBlock(nn.Module):</span>
+<span id="cb11-20">    <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">__init__</span>(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>, in_channels, out_channels_1, out_channels_3, out_channels_5, out_channels_dim_red_3, out_channels_dim_red_5, pool_proj_dim):</span>
+<span id="cb11-21">        <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">super</span>(InceptionBlock, <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>).<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">__init__</span>()</span>
+<span id="cb11-22">        <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.conv1x1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ConvReLU(in_channels, out_channels_1, kernel_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, stride<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, padding<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb11-23">        </span>
+<span id="cb11-24">        <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.dim_reduction_3x3 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ConvReLU(in_channels, out_channels_dim_red_3, kernel_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, stride<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, padding<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb11-25">        <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.conv3x3 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ConvReLU(out_channels_dim_red_3, out_channels_3, kernel_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>, stride<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, padding<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span>
+<span id="cb11-26">        </span>
+<span id="cb11-27">        <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.dim_reduction_5x5 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ConvReLU(in_channels, out_channels_dim_red_5, kernel_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, stride<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, padding<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb11-28">        <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.conv5x5 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ConvReLU(out_channels_dim_red_5, out_channels_5, kernel_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>, stride<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, padding<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb11-29">        </span>
+<span id="cb11-30">        <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.maxpool <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> nn.MaxPool2d(kernel_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>, stride<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, padding<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span>
+<span id="cb11-31">        <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.pool_proj <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ConvReLU(in_channels, pool_proj_dim, kernel_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, stride<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, padding<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb11-32"></span>
+<span id="cb11-33">    <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> forward(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>, x):</span>
+<span id="cb11-34">        out1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.conv1x1(x)</span>
+<span id="cb11-35">        </span>
+<span id="cb11-36">        out2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.dim_reduction_3x3(x)</span>
+<span id="cb11-37">        out2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.conv3x3(out2)</span>
+<span id="cb11-38">        </span>
+<span id="cb11-39">        out3 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.dim_reduction_5x5(x)</span>
+<span id="cb11-40">        out3 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.conv5x5(out3)</span>
+<span id="cb11-41">        </span>
+<span id="cb11-42">        out4 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.maxpool(x)</span>
+<span id="cb11-43">        out4 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.pool_proj(out4)</span>
+<span id="cb11-44">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># return [out1, out2, out3, out4]</span></span>
+<span id="cb11-45">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> torch.cat([out1, out2, out3, out4], dim<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)</span></code></pre></div>
+</div>
+<div id="cell-23" class="cell" data-execution_count="140">
+<div class="sourceCode cell-code" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1">inp <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> torch.rand(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">64</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">64</span>) <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># some intermediate layer output</span></span>
+<span id="cb12-2"></span>
+<span id="cb12-3">block <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> NaiveInceptionBlock(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">64</span>)</span>
+<span id="cb12-4">out <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> block(inp)</span>
+<span id="cb12-5"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(out.shape)</span>
+<span id="cb12-6"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(summary(NaiveInceptionBlock(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">64</span>), input_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">64</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">64</span>)))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>torch.Size([1, 192, 64, 64])
+==========================================================================================
+Layer (type:depth-idx)                   Output Shape              Param #
+==========================================================================================
+NaiveInceptionBlock                      [64, 192, 64]             --
+├─Conv2d: 1-1                            [64, 64, 64]              16,448
+├─Conv2d: 1-2                            [64, 64, 64]              147,520
+├─Conv2d: 1-3                            [64, 64, 64]              409,664
+==========================================================================================
+Total params: 573,632
+Trainable params: 573,632
+Non-trainable params: 0
+Total mult-adds (G): 2.35
+==========================================================================================
+Input size (MB): 4.19
+Forward/backward pass size (MB): 6.29
+Params size (MB): 2.29
+Estimated Total Size (MB): 12.78
+==========================================================================================</code></pre>
+</div>
+</div>
+<div id="cell-24" class="cell" data-execution_count="129">
+<div class="sourceCode cell-code" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1">conv_block <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ConvReLU(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">192</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>)</span>
+<span id="cb14-2">out <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> conv_block(inp)</span>
+<span id="cb14-3"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(out.shape)</span>
+<span id="cb14-4"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(summary(conv_block, input_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">64</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">64</span>)))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>torch.Size([1, 192, 64, 64])
+==========================================================================================
+Layer (type:depth-idx)                   Output Shape              Param #
+==========================================================================================
+ConvReLU                                 [192, 64, 64]             --
+├─Conv2d: 1-1                            [192, 64, 64]             442,560
+├─ReLU: 1-2                              [192, 64, 64]             --
+==========================================================================================
+Total params: 442,560
+Trainable params: 442,560
+Non-trainable params: 0
+Total mult-adds (G): 5.44
+==========================================================================================
+Input size (MB): 4.19
+Forward/backward pass size (MB): 6.29
+Params size (MB): 1.77
+Estimated Total Size (MB): 12.26
+==========================================================================================</code></pre>
+</div>
+</div>
+<div id="cell-25" class="cell" data-execution_count="147">
+<div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1">out_channels <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">192</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">//</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span></span>
+<span id="cb16-2">block <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> InceptionBlock(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>, out_channels, out_channels, out_channels, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">64</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">32</span>, out_channels)</span>
+<span id="cb16-3">out <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> block(inp)</span>
+<span id="cb16-4"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(out.shape)</span>
+<span id="cb16-5"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(summary(block, input_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">224</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">224</span>)))</span></code></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>torch.Size([1, 192, 64, 64])
+==========================================================================================
+Layer (type:depth-idx)                   Output Shape              Param #
+==========================================================================================
+InceptionBlock                           [48, 896, 224]            --
+├─ConvReLU: 1-1                          [48, 224, 224]            --
+│    └─Conv2d: 2-1                       [48, 224, 224]            12,336
+├─ConvReLU: 1-10                         --                        (recursive)
+│    └─ReLU: 2-2                         [48, 224, 224]            --
+├─ConvReLU: 1-3                          [64, 224, 224]            --
+│    └─Conv2d: 2-3                       [64, 224, 224]            16,448
+├─ConvReLU: 1-10                         --                        (recursive)
+│    └─ReLU: 2-4                         [64, 224, 224]            --
+├─ConvReLU: 1-5                          [48, 224, 224]            --
+│    └─Conv2d: 2-5                       [48, 224, 224]            27,696
+├─ConvReLU: 1-10                         --                        (recursive)
+│    └─ReLU: 2-6                         [48, 224, 224]            --
+├─ConvReLU: 1-7                          [32, 224, 224]            --
+│    └─Conv2d: 2-7                       [32, 224, 224]            8,224
+├─ConvReLU: 1-10                         --                        (recursive)
+│    └─ReLU: 2-8                         [32, 224, 224]            --
+├─ConvReLU: 1-9                          [48, 224, 224]            --
+│    └─Conv2d: 2-9                       [48, 224, 224]            38,448
+├─ConvReLU: 1-10                         --                        (recursive)
+│    └─ReLU: 2-10                        [48, 224, 224]            --
+├─MaxPool2d: 1-11                        [256, 224, 224]           --
+├─ConvReLU: 1-12                         [48, 224, 224]            --
+│    └─Conv2d: 2-11                      [48, 224, 224]            12,336
+│    └─ReLU: 2-12                        [48, 224, 224]            --
+==========================================================================================
+Total params: 115,488
+Trainable params: 115,488
+Non-trainable params: 0
+Total mult-adds (G): 1.27
+==========================================================================================
+Input size (MB): 51.38
+Forward/backward pass size (MB): 115.61
+Params size (MB): 0.46
+Estimated Total Size (MB): 167.45
+==========================================================================================</code></pre>
+</div>
+</div>
+
+
 </section>
 
  ]]></description>
@@ -1957,11 +2657,11 @@ font-style: inherit;">"Training completed!"</span>)</span></code></pre></div>
 
 
 <p>Welcome to the land of vision in deep learning. Gone are the days you need to look at 10 types of thresholding and 20 types of data pre-processing and apply a logistic classifier on the outputs of a cnn feature extractor. These days you can just load a pretrained model and watch a decaying training and validation loss and feel good about yourself.</p>
-<p>Turns out, this doesnt last long though. You eventually get around to understand what these models actually are because you need to! And when it comes to vision, you surely cannot leave out CNNs. Sure its all transformers nowadays but CNNs or convolutional neural networks were essentially the first deep learning models to make a significant impact in the field of computer vision and most would agree started the whole deep learning wave in the modern era. AlexNet, VGG, resnets would be considered the pioneer models in this field.</p>
+<p>Turns out, this comfort doesnt last long. You eventually get around to understand what these models actually are because you need to! And when it comes to vision, you surely cannot leave out CNNs. Sure its all transformers nowadays but CNNs or convolutional neural networks were essentially the first deep learning models to make a significant impact in the field of computer vision and most would agree started the whole deep learning wave in the modern era. AlexNet, VGG, resnets would be considered the pioneer models in this field.</p>
 <p>Now you might ask: All this sounds interesting Deepam, but what the hell is a convolution? Let us understand convolutions and build a simple CNN model from scratch.</p>
 <p>The pre-requisites for this post are:</p>
 <ul>
-<li>Basic understanding of python and numpy.</li>
+<li>Basic understanding of python, numpy and torch.</li>
 <li>Basic understanding of neural networks and feed forward networks.</li>
 </ul>
 <section id="convolutions" class="level2">
@@ -1982,13 +2682,16 @@ font-style: inherit;">"Training completed!"</span>)</span></code></pre></div>
 <p>This process can be extended to 2D (for images) or higher dimensions, where the kernel slides over the input in all dimensions.</p>
 <p>For a 1d array this might look like this:</p>
 <div id="cell-4" class="cell" data-execution_count="61">
-<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"></span>
+<span id="cb1-2"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> numpy <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">as</span> np </span>
-<span id="cb1-2"></span>
-<span id="cb1-3">f <span class="op" style="color: #5E5E5E;
+<span id="cb1-3"></span>
+<span id="cb1-4">f <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> np.array([<span class="dv" style="color: #AD0000;
 background-color: null;
@@ -2007,7 +2710,7 @@ background-color: null;
 font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">4</span>])</span>
-<span id="cb1-4">g <span class="op" style="color: #5E5E5E;
+<span id="cb1-5">g <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> np.array([<span class="dv" style="color: #AD0000;
 background-color: null;
@@ -2018,7 +2721,7 @@ background-color: null;
 font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">1</span>])</span>
-<span id="cb1-5">inverted_g <span class="op" style="color: #5E5E5E;
+<span id="cb1-6">inverted_g <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> g[::<span class="op" style="color: #5E5E5E;
 background-color: null;
@@ -2027,8 +2730,8 @@ background-color: null;
 font-style: inherit;">1</span>]  <span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># {-1 0 1}</span></span>
-<span id="cb1-6"></span>
-<span id="cb1-7"><span class="bu" style="color: null;
+<span id="cb1-7"></span>
+<span id="cb1-8"><span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
@@ -2039,7 +2742,7 @@ background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"</span>)</span>
-<span id="cb1-8"><span class="bu" style="color: null;
+<span id="cb1-9"><span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
@@ -2050,7 +2753,7 @@ background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"</span>)</span>
-<span id="cb1-9"><span class="bu" style="color: null;
+<span id="cb1-10"><span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
@@ -2061,17 +2764,17 @@ background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"</span>)</span>
-<span id="cb1-10"></span>
-<span id="cb1-11">window_size <span class="op" style="color: #5E5E5E;
+<span id="cb1-11"></span>
+<span id="cb1-12">window_size <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> g.shape[<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">0</span>]</span>
-<span id="cb1-12">result <span class="op" style="color: #5E5E5E;
+<span id="cb1-13">result <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> []</span>
-<span id="cb1-13"></span>
-<span id="cb1-14"><span class="bu" style="color: null;
+<span id="cb1-14"></span>
+<span id="cb1-15"><span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
 background-color: null;
@@ -2084,7 +2787,7 @@ background-color: null;
 font-style: inherit;">\n</span><span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"</span>)</span>
-<span id="cb1-15"><span class="cf" style="color: #003B4F;
+<span id="cb1-16"><span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">for</span> idx, i <span class="kw" style="color: #003B4F;
@@ -2103,12 +2806,12 @@ background-color: null;
 font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">1</span>)):</span>
-<span id="cb1-16">    slice_of_f <span class="op" style="color: #5E5E5E;
+<span id="cb1-17">    slice_of_f <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> f[i:i<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">+</span>window_size]</span>
-<span id="cb1-17">    <span class="bu" style="color: null;
+<span id="cb1-18">    <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
@@ -2157,7 +2860,7 @@ background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"</span>)</span>
-<span id="cb1-18">    <span class="bu" style="color: null;
+<span id="cb1-19">    <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
@@ -2192,12 +2895,12 @@ background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"</span>)</span>
-<span id="cb1-19">    result.append(np.<span class="bu" style="color: null;
+<span id="cb1-20">    result.append(np.<span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">sum</span>(slice_of_f <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">*</span> inverted_g))</span>
-<span id="cb1-20">    <span class="bu" style="color: null;
+<span id="cb1-21">    <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
@@ -2220,22 +2923,19 @@ background-color: null;
 font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"</span>)</span>
-<span id="cb1-21"></span>
-<span id="cb1-22"><span class="bu" style="color: null;
+<span id="cb1-22"></span>
+<span id="cb1-23"><span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
-font-style: inherit;">f"</span><span class="ch" style="color: #20794D;
-background-color: null;
-font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">final result of (f*g): </span><span class="sc" style="color: #5E5E5E;
+font-style: inherit;">f"final result of (f*g): </span><span class="sc" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">{</span>result<span class="sc" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"</span>)</span></code></pre></div>
+</details>
 <div class="cell-output cell-output-stdout">
 <pre><code>f: [ 1  2  3 -1 10 -4]
 g: [ 1  0 -1]
@@ -2285,6 +2985,8 @@ final result of (f*g): [2, -3, 7, -3]</code></pre>
 </ul></li>
 </ol>
 <div id="cell-6" class="cell" data-execution_count="74">
+<details class="code-fold">
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">f <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> np.array([<span class="dv" style="color: #AD0000;
@@ -2316,6 +3018,28 @@ font-style: inherit;">3</span>])</span>
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
+font-style: inherit;">f"f: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>f<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb3-5"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"g (kernel): </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>g<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb3-6"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
 font-style: inherit;">f"Valid Convolution: </span><span class="sc" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">{</span>np<span class="sc" style="color: #5E5E5E;
@@ -2329,7 +3053,7 @@ background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"</span>)</span>
-<span id="cb3-5"><span class="bu" style="color: null;
+<span id="cb3-7"><span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
@@ -2346,7 +3070,7 @@ background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"</span>)</span>
-<span id="cb3-6"><span class="bu" style="color: null;
+<span id="cb3-8"><span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
@@ -2363,6 +3087,7 @@ background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"</span>)</span></code></pre></div>
+</details>
 <div class="cell-output cell-output-stdout">
 <pre><code>Valid Convolution: [5 8]
 Same Convolution: [2 2 5 8 5]
@@ -2746,10 +3471,10 @@ final result:
 <li>Feed the processed features into a classifier such as SVM, Random Forest, or a simple neural network</li>
 </ol>
 <p>This approach, while effective for certain tasks, had limitations: - Handcrafted features might not capture all relevant information - The process was often computationally expensive - Feature engineering required domain expertise</p>
-<p>CNNs addressed these issues by learning the filters automatically during training, leading to more effective and adaptable vision models.</p>
+<p>CNNs addressed these issues by learning the filters automatically during training, leading to more effective and adaptable vision models. Let us look at all the important components of a CNN in the next section.</p>
 </section>
-<section id="convolutional-neural-networks-cnnsconvnets" class="level2">
-<h2 class="anchored" data-anchor-id="convolutional-neural-networks-cnnsconvnets">Convolutional neural networks (CNNs/Convnets)</h2>
+<section id="convolutional-layer" class="level2">
+<h2 class="anchored" data-anchor-id="convolutional-layer">Convolutional layer</h2>
 <p>We now understand why handcrafted fatures are hard to come up with. Lets back up for a second and remember our old friends feed forward (FF) networks. What is the problem with using feed forward networks to process images? Specifically why dont we just give the FF network the raw pixels and let it learn?</p>
 <p>As it turns out, there are quite a few things:</p>
 <p>Suppose we have a (224,224,3) sized input-image. Thats a total of 150528 data-points. suppose i want to have a output vector of length 1000 (classifier with 1k classes), this gives me a total of roughly 150k * 1k = 150 million parameters, where we have 1k parameters for each input pixel! That is a LOTT of parameters.</p>
@@ -2766,34 +3491,52 @@ This works fine for tabular features of some data, because they actually are not
 2. Earlier when classical image processing methods were being used, many a times hand-made "filters" were used to extract features from images. In CNNs, we learn these filters! and we learn a lot of them. So think of each layer in this CNN as having a lot of these filters which are learned during network. We'll soon visualize what concepts they learn.
 
 3. Another concept that helps is parameter sharing. We could in thoery have different set of filters for different patches in the image, but this would shoot up the parameter count of our model. So in a single layer, we use a single set of filters for all patches in the image. -->
-<div id="cell-12" class="cell" data-execution_count="54">
+<div id="cell-12" class="cell" data-execution_count="92">
+<details class="code-fold">
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> torchinfo </span>
-<span id="cb9-2"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> torch.nn <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">as</span> nn</span>
-<span id="cb9-3"></span>
-<span id="cb9-4">model <span class="op" style="color: #5E5E5E;
+<span id="cb9-2"></span>
+<span id="cb9-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> get_total_params(model):</span>
+<span id="cb9-4">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sum</span>(p.numel() <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> p <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> model.parameters())</span>
+<span id="cb9-5"></span>
+<span id="cb9-6">model <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> nn.Linear(<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">150528</span>, <span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">1000</span>)</span>
-<span id="cb9-5"><span class="bu" style="color: null;
+<span id="cb9-7"><span class="bu" style="color: null;
 background-color: null;
-font-style: inherit;">print</span>(torchinfo.summary(model, input_size<span class="op" style="color: #5E5E5E;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+font-style: inherit;">f"Total params in a linear layer of shape (150528, 1000): </span><span class="sc" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+font-style: inherit;">{</span>get_total_params(model)<span class="sc" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">150528</span>)))</span>
-<span id="cb9-6"></span>
-<span id="cb9-7">model <span class="op" style="color: #5E5E5E;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb9-8"></span>
+<span id="cb9-9">model <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> nn.Conv2d(<span class="dv" style="color: #AD0000;
 background-color: null;
@@ -2812,50 +3555,21 @@ background-color: null;
 font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">1</span>)</span>
-<span id="cb9-8"><span class="bu" style="color: null;
+<span id="cb9-10"><span class="bu" style="color: null;
 background-color: null;
-font-style: inherit;">print</span>(torchinfo.summary(model, input_size<span class="op" style="color: #5E5E5E;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
-font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+font-style: inherit;">f"Total params in a conv layer with kernel size (3,3) and 64 filters: </span><span class="sc" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+font-style: inherit;">{</span>get_total_params(model)<span class="sc" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">3</span>, <span class="dv" style="color: #AD0000;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
-font-style: inherit;">224</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">224</span>)))</span></code></pre></div>
+font-style: inherit;">"</span>)</span></code></pre></div>
+</details>
 <div class="cell-output cell-output-stdout">
-<pre><code>==========================================================================================
-Layer (type:depth-idx)                   Output Shape              Param #
-==========================================================================================
-Linear                                   [1, 1000]                 150,529,000
-==========================================================================================
-Total params: 150,529,000
-Trainable params: 150,529,000
-Non-trainable params: 0
-Total mult-adds (M): 150.53
-==========================================================================================
-Input size (MB): 0.60
-Forward/backward pass size (MB): 0.01
-Params size (MB): 602.12
-Estimated Total Size (MB): 602.73
-==========================================================================================
-==========================================================================================
-Layer (type:depth-idx)                   Output Shape              Param #
-==========================================================================================
-Conv2d                                   [1, 64, 224, 224]         1,792
-==========================================================================================
-Total params: 1,792
-Trainable params: 1,792
-Non-trainable params: 0
-Total mult-adds (M): 89.92
-==========================================================================================
-Input size (MB): 0.60
-Forward/backward pass size (MB): 25.69
-Params size (MB): 0.01
-Estimated Total Size (MB): 26.30
-==========================================================================================</code></pre>
+<pre><code>Total params in a linear layer of shape (150528, 1000): 150529000
+Total params in a conv layer with kernel size (3,3) and 64 filters: 1792</code></pre>
 </div>
 </div>
 <p>Let us visualize the shapes of the input and output of a convolutional layer. (ignoring batch dimension for simplicity)</p>
@@ -2879,7 +3593,7 @@ Estimated Total Size (MB): 26.30
 <li>Stacking these for all <img src="https://latex.codecogs.com/png.latex?C_%7Bout%7D"> filters gives us <img src="https://latex.codecogs.com/png.latex?(H_%7Bout%7D,%20W_%7Bout%7D,%20C_%7Bout%7D)"></li>
 </ul></li>
 </ol>
-<p>Key Parameters: - Stride (<img src="https://latex.codecogs.com/png.latex?S">): How many pixels we move the filter each step, if stride is 1, the filter moves 1 pixel inat a time. Doubling the stride will reduce output size by half. - Padding (<img src="https://latex.codecogs.com/png.latex?P">): Extra zeros added around the input image edges. Image can be padded with other values too. padding is done on both sides of the height and width dimensions.</p>
+<p>Key Parameters: - Stride (<img src="https://latex.codecogs.com/png.latex?S">): How many pixels we move the filter each step, if stride is 1, the filter moves 1 pixel inat a time. Doubling the stride will reduce output size by half. - Padding (<img src="https://latex.codecogs.com/png.latex?P">): Extra zeros added around the input image edges. Image can be padded with other values too. padding is done on both sides of the height and width dimensions. - Dilation (<img src="https://latex.codecogs.com/png.latex?D">): a parameter that controls the stride of elements in the window. default=1.</p>
 <p>Output Size Formula:</p>
 <ul>
 <li><img src="https://latex.codecogs.com/png.latex?H_%7Bout%7D%20=%20(H_%7Bin%7D%20-%20k%20+%202P)%20/%20S%20+%201"></li>
@@ -2917,6 +3631,8 @@ Estimated Total Size (MB): 26.30
 <p>The entire operation is the same as the convolutional layer except instead of convolving <img src="https://latex.codecogs.com/png.latex?f"> with a filter <img src="https://latex.codecogs.com/png.latex?g"> of size <img src="https://latex.codecogs.com/png.latex?(k,k,%20C_%7Bin%7D)">, we take the max/mean of <img src="https://latex.codecogs.com/png.latex?f"> for each patch of size <img src="https://latex.codecogs.com/png.latex?(k,k,%20C_%7Bin%7D)">.</p>
 <p>Let’s look at an example of max pooling, which is the most common type of pooling:</p>
 <div id="cell-15" class="cell" data-execution_count="81">
+<details class="code-fold">
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># Input feature map</span></span>
@@ -2969,29 +3685,41 @@ font-style: inherit;"># Max pooling with 2x2 filter and stride 2</span></span>
 <span id="cb11-10"><span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">def</span> max_pool_2x2(<span class="bu" style="color: null;
+font-style: inherit;">def</span> max_pool(<span class="bu" style="color: null;
 background-color: null;
-font-style: inherit;">input</span>):</span>
+font-style: inherit;">input</span>, filter_size, stride):</span>
 <span id="cb11-11">    height, width <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">input</span>.shape</span>
-<span id="cb11-12">    output_height, output_width <span class="op" style="color: #5E5E5E;
+<span id="cb11-12">    output_height <span class="op" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">=</span> height <span class="op" style="color: #5E5E5E;
+font-style: inherit;">=</span> (height <span class="op" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">//</span> <span class="dv" style="color: #AD0000;
+font-style: inherit;">-</span> filter_size) <span class="op" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">2</span>, width <span class="op" style="color: #5E5E5E;
+font-style: inherit;">//</span> stride <span class="op" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">//</span> <span class="dv" style="color: #AD0000;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
 background-color: null;
-font-style: inherit;">2</span></span>
-<span id="cb11-13">    output <span class="op" style="color: #5E5E5E;
+font-style: inherit;">1</span></span>
+<span id="cb11-13">    output_width <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (width <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> filter_size) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">//</span> stride <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span></span>
+<span id="cb11-14">    output <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> np.zeros((output_height, output_width))</span>
-<span id="cb11-14">    <span class="cf" style="color: #003B4F;
+<span id="cb11-15">    </span>
+<span id="cb11-16">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
@@ -3000,7 +3728,7 @@ font-weight: bold;
 font-style: inherit;">in</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">range</span>(output_height):</span>
-<span id="cb11-15">        <span class="cf" style="color: #003B4F;
+<span id="cb11-17">        <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">for</span> j <span class="kw" style="color: #003B4F;
@@ -3009,58 +3737,56 @@ font-weight: bold;
 font-style: inherit;">in</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">range</span>(output_width):</span>
-<span id="cb11-16">            output[i, j] <span class="op" style="color: #5E5E5E;
+<span id="cb11-18">            start_i <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> i <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> stride</span>
+<span id="cb11-19">            start_j <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> j <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> stride</span>
+<span id="cb11-20">            window <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">input</span>[start_i:start_i<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span>filter_size, start_j:start_j<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span>filter_size]</span>
+<span id="cb11-21">            output[i, j] <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> np.<span class="bu" style="color: null;
 background-color: null;
-font-style: inherit;">max</span>(<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">input</span>[<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>i:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>i<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>, <span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>j:<span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">*</span>j<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">+</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">2</span>])</span>
-<span id="cb11-17">    <span class="cf" style="color: #003B4F;
+font-style: inherit;">max</span>(window)</span>
+<span id="cb11-22">    </span>
+<span id="cb11-23">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">return</span> output</span>
-<span id="cb11-18"></span>
-<span id="cb11-19">result <span class="op" style="color: #5E5E5E;
+<span id="cb11-24"></span>
+<span id="cb11-25">result <span class="op" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">=</span> max_pool_2x2(<span class="bu" style="color: null;
+font-style: inherit;">=</span> max_pool(<span class="bu" style="color: null;
 background-color: null;
-font-style: inherit;">input</span>)</span>
-<span id="cb11-20"><span class="bu" style="color: null;
+font-style: inherit;">input</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)</span>
+<span id="cb11-26"><span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"Input:"</span>)</span>
-<span id="cb11-21"><span class="bu" style="color: null;
+<span id="cb11-27"><span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">input</span>)</span>
-<span id="cb11-22"><span class="bu" style="color: null;
+<span id="cb11-28"><span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
 background-color: null;
@@ -3069,23 +3795,24 @@ background-color: null;
 font-style: inherit;">\n</span><span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">After 2x2 Max Pooling:"</span>)</span>
-<span id="cb11-23"><span class="bu" style="color: null;
+<span id="cb11-29"><span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">f"""Result: </span></span>
-<span id="cb11-24"><span class="ss" style="color: #20794D;
+<span id="cb11-30"><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">[[ max(f[0:2, 0:2]) max(f[0:2, 2:4])]</span></span>
-<span id="cb11-25"><span class="ss" style="color: #20794D;
+<span id="cb11-31"><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;"> [ max(f[2:4, 0:2]) max(f[2:4, 2:4])]]</span></span>
-<span id="cb11-26"><span class="ss" style="color: #20794D;
+<span id="cb11-32"><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"""</span>)</span>
-<span id="cb11-27"><span class="bu" style="color: null;
+<span id="cb11-33"><span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">print</span>(result)</span></code></pre></div>
+</details>
 <div class="cell-output cell-output-stdout">
 <pre><code>Input:
 [[1 3 2 1]
@@ -3102,16 +3829,15 @@ Result:
  [8. 9.]]</code></pre>
 </div>
 </div>
-<p>As you can see, max pooling takes the maximum value in each 2x2 region, effectively reducing the spatial dimensions of the feature map while retaining the most prominent features.</p>
+<p>As you can see, max pooling takes the maximum value in each 2x2 region, effectively reducing the spatial dimensions of the feature map while retaining the most prominent features. Generally a stride of 2 is used, which means that pooling results in half the resolution as the input (h,w).</p>
 </section>
 <section id="activation-layer" class="level3">
 <h3 class="anchored" data-anchor-id="activation-layer">Activation layer</h3>
 <p>Activations used are sigmoid, ReLu, and tanh. Since VGGs and deeper networks use ReLu, it is common to see ReLu used in CNNs. This is because ReLu partially solves the vanishing gradient problem, which is a common problem in deep networks. Read more about this <a href="https://stats.stackexchange.com/a/240491">here</a>.</p>
 <p>But what the ReLU layer does is very simple, it applies max(0, x) to each element in the input. Effectively, it zeros out negative values, and leaves positive values unchanged.</p>
 </section>
-</section>
-<section id="other-jargon" class="level2">
-<h2 class="anchored" data-anchor-id="other-jargon">Other jargon</h2>
+<section id="other-jargon" class="level3">
+<h3 class="anchored" data-anchor-id="other-jargon">Other jargon</h3>
 <p>Before we dive into training a model, let’s review some important jargon related to CNNs:</p>
 <ul>
 <li>filters: also called kernels. they are learnable parameters in a convolutional layer. Each filter is a small matrix (usually 3x3 or 5x5) that slides over the input image to detect specific features. The values in these filters are updated during training to learn important features for the task at hand.</li>
@@ -3120,6 +3846,40 @@ Result:
 <li>depth: refers to the number of channels.</li>
 <li>receptive field: the area of the input that a given filter is able to see at a time is called the receptive field.</li>
 </ul>
+<!-- ## CNNs from scratch!
+ 
+Let us implement a CNN from scratch. 
+
+Starting with the Convolutional layer.
+
+```python
+import torch 
+
+class ConvLayer:
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding):
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.weights = torch.randn(out_channels, in_channels, kernel_size, kernel_size)
+        self.biases = torch.zeros(out_channels)
+
+    def forward(self, x):
+        if x.ndim != 4:
+            raise ValueError("Input tensor must have 4 dimensions: (batch_size, in_channels, height, width)")
+        if x.shape[1] != self.in_channels:
+            raise ValueError(f"Expected input shape to have {self.in_channels} channels, but got {x.shape[1]}")
+'''
+# broadcast weights across batch, and then perform conv operation
+# conv operation
+    # apply padding
+    start with a patch  of k sized kernel and do element wise operation in 2 nested loops (across H and W)
+    
+    B*C*H*W * 
+'''
+``` -->
+</section>
 </section>
 <section id="a-simple-cnn-architecture" class="level2">
 <h2 class="anchored" data-anchor-id="a-simple-cnn-architecture">A Simple CNN architecture</h2>
@@ -3156,7 +3916,7 @@ Figure&nbsp;1: visualizing activation maps in cnns. From the paper ‘Visualizin
 <p>the below code is all generated by claude-sonnet-3.5, bcuz its kinda boring to train a toy model on a toy dataset, that too for classification. dont worry though, ill soon be back with a more interesting vision problem to get our hands dirty.</p>
 </blockquote>
 <p>Training itself is pretty straightforward. We split the data into train-test, and then train the model for a few epochs. We use the Adam optimizer and CrossEntropyLoss as the loss function. The outputs of the model are bare logits, which the loss functions accepts with targets. A learning rate of 0.001 is used for the optimizer. In the end we test on the test set, and print the accuracy.</p>
-<div id="cell-21" class="cell" data-execution_count="22">
+<div id="cell-22" class="cell" data-execution_count="22">
 <div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> torch</span>
@@ -3723,7 +4483,7 @@ Epoch [5/5], Loss: 0.2185</code></pre>
 </div>
 </div>
 <p>Neat!! Now let’s visualize some of the predictions.</p>
-<div id="cell-23" class="cell" data-execution_count="26">
+<div id="cell-24" class="cell" data-execution_count="26">
 <div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> random</span>
@@ -3875,7 +4635,9 @@ font-style: inherit;">'red'</span>)</span>
 </div>
 </div>
 <p>Now let us visualize the confisuion matrix to exactly see how the model is doing.</p>
-<div id="cell-25" class="cell" data-execution_count="30">
+<div id="cell-26" class="cell" data-execution_count="30">
+<details class="code-fold">
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># see the confusion matrix</span></span>
@@ -4011,6 +4773,7 @@ font-style: inherit;">"center"</span>)</span>
 <span id="cb17-32"></span>
 <span id="cb17-33">plt.tight_layout()</span>
 <span id="cb17-34">plt.show()</span></code></pre></div>
+</details>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
