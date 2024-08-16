@@ -6,15 +6,15 @@
       version="2.0">
 <channel>
 <title>deepamminda</title>
-<link>https://www.deepamminda.com/blog.html</link>
-<atom:link href="https://www.deepamminda.com/blog.xml" rel="self" type="application/rss+xml"/>
+<link>https://mindadeepam.github.io/blog.html</link>
+<atom:link href="https://mindadeepam.github.io/blog.xml" rel="self" type="application/rss+xml"/>
 <description></description>
 <generator>quarto-1.5.53</generator>
 <lastBuildDate>Fri, 09 Aug 2024 18:30:00 GMT</lastBuildDate>
 <item>
   <title>Training a Resnet in Pytorch</title>
   <dc:creator>Deepam Minda</dc:creator>
-  <link>https://www.deepamminda.com/posts/cnns/01_resnet.html</link>
+  <link>https://mindadeepam.github.io/posts/cnns/01_resnet.html</link>
   <description><![CDATA[ 
 
 
@@ -31,7 +31,7 @@
 <p>This approach allows for the creation of very deep networks without the problem of vanishing gradients, as the gradient can flow directly through the skip connections (also known as shortcut connections) during backpropagation. We can imagine this as a graident highway that goes right through the network and then comes back to the input.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="https://www.deepamminda.com/posts/cnns/resnet-architecture.png" class="img-fluid figure-img"></p>
+<p><img src="https://mindadeepam.github.io/posts/cnns/resnet-architecture.png" class="img-fluid figure-img"></p>
 <figcaption>This is a resnet-architecture</figcaption>
 </figure>
 </div>
@@ -42,7 +42,7 @@
 <div id="fig-vgg" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-vgg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://www.deepamminda.com/posts/cnns/vgg.png" class="img-fluid figure-img">
+<img src="https://mindadeepam.github.io/posts/cnns/vgg.png" class="img-fluid figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-vgg-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;1: vgg-19-architecture
@@ -2073,22 +2073,22 @@ font-style: inherit;">3</span>)</span></code></pre></div>
 
   Also note that grads start even when loss isnt decreasing at the first few steps.</code></pre>
 <p>Look at the the below figures:</p>
-<p>### VGG-11 <img src="https://www.deepamminda.com/posts/cnns/vgg_11_final_layer_grads.png" id="fig-vgg_11_final_layer_grads" style="width:100.0%" alt="‘VGG-11 Final Layer Gradients’"></p>
+<p>### VGG-11 <img src="https://mindadeepam.github.io/posts/cnns/vgg_11_final_layer_grads.png" id="fig-vgg_11_final_layer_grads" style="width:100.0%" alt="‘VGG-11 Final Layer Gradients’"></p>
 <div id="fig-vgg_11_first_layers_grad_plot" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-vgg_11_first_layers_grad_plot-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://www.deepamminda.com/posts/cnns/vgg_11_first_layers_grad_plot.png" style="width:100.0%" class="figure-img">
+<img src="https://mindadeepam.github.io/posts/cnns/vgg_11_first_layers_grad_plot.png" style="width:100.0%" class="figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-vgg_11_first_layers_grad_plot-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;2: “VGG-11 First Layers Gradient Plot”
 </figcaption>
 </figure>
 </div>
-<p>### VGG-16 <img src="https://www.deepamminda.com/posts/cnns/vgg_16_final_layers_grad.png" id="fig-vgg_16_final_layers_grad" style="width:100.0%" alt="“VGG-16 Final Layers Gradients”"></p>
+<p>### VGG-16 <img src="https://mindadeepam.github.io/posts/cnns/vgg_16_final_layers_grad.png" id="fig-vgg_16_final_layers_grad" style="width:100.0%" alt="“VGG-16 Final Layers Gradients”"></p>
 <div id="fig-vgg_16_first_layers_grad_plot_vanishing-grads" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-vgg_16_first_layers_grad_plot_vanishing-grads-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://www.deepamminda.com/posts/cnns/vgg_16_first_layers_grad_plot_vanishing-grads.png" style="width:100.0%" class="figure-img">
+<img src="https://mindadeepam.github.io/posts/cnns/vgg_16_first_layers_grad_plot_vanishing-grads.png" style="width:100.0%" class="figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-vgg_16_first_layers_grad_plot_vanishing-grads-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;3: “VGG-16 First Layers Gradient Plot”(Vanishing Gradients)
@@ -2643,13 +2643,13 @@ Estimated Total Size (MB): 167.45
  ]]></description>
   <category>cnns</category>
   <category>deep-learning</category>
-  <guid>https://www.deepamminda.com/posts/cnns/01_resnet.html</guid>
+  <guid>https://mindadeepam.github.io/posts/cnns/01_resnet.html</guid>
   <pubDate>Fri, 09 Aug 2024 18:30:00 GMT</pubDate>
 </item>
 <item>
   <title>Intro to Convolution Neural Networks</title>
   <dc:creator>Deepam Minda</dc:creator>
-  <link>https://www.deepamminda.com/posts/cnns/00_cnn_basics.html</link>
+  <link>https://mindadeepam.github.io/posts/cnns/00_cnn_basics.html</link>
   <description><![CDATA[ 
 
 
@@ -3442,6 +3442,13 @@ final result:
 </code></pre>
 </div>
 </div>
+<p><img src="https://lilianweng.github.io/posts/2017-12-15-object-recognition-part-2/numerical_no_padding_no_strides.gif" class="img-fluid" style="display: block; margin: auto;" width="500"></p>
+<div class="quarto-figure quarto-figure-center" style="display: block; margin: auto;">
+<figure class="figure">
+<p><img src="https://lilianweng.github.io/posts/2017-12-15-object-recognition-part-2/numerical_padding_strides.gif" class="img-fluid figure-img" width="500"></p>
+<figcaption>Two examples of 2D convolution operation: (top) no padding and 1x1 strides; (bottom) 1x1 border zeros padding and 2x2 strides. (Image source: deeplearning.net)</figcaption>
+</figure>
+</div>
 </section>
 </section>
 <section id="neural-networks" class="level2">
@@ -3491,7 +3498,7 @@ This works fine for tabular features of some data, because they actually are not
 2. Earlier when classical image processing methods were being used, many a times hand-made "filters" were used to extract features from images. In CNNs, we learn these filters! and we learn a lot of them. So think of each layer in this CNN as having a lot of these filters which are learned during network. We'll soon visualize what concepts they learn.
 
 3. Another concept that helps is parameter sharing. We could in thoery have different set of filters for different patches in the image, but this would shoot up the parameter count of our model. So in a single layer, we use a single set of filters for all patches in the image. -->
-<div id="cell-12" class="cell" data-execution_count="92">
+<div id="cell-13" class="cell" data-execution_count="92">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><span class="im" style="color: #00769E;
@@ -3630,7 +3637,7 @@ Total params in a conv layer with kernel size (3,3) and 64 filters: 1792</code><
 </ol>
 <p>The entire operation is the same as the convolutional layer except instead of convolving <img src="https://latex.codecogs.com/png.latex?f"> with a filter <img src="https://latex.codecogs.com/png.latex?g"> of size <img src="https://latex.codecogs.com/png.latex?(k,k,%20C_%7Bin%7D)">, we take the max/mean of <img src="https://latex.codecogs.com/png.latex?f"> for each patch of size <img src="https://latex.codecogs.com/png.latex?(k,k,%20C_%7Bin%7D)">.</p>
 <p>Let’s look at an example of max pooling, which is the most common type of pooling:</p>
-<div id="cell-15" class="cell" data-execution_count="81">
+<div id="cell-16" class="cell" data-execution_count="81">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="co" style="color: #5E5E5E;
@@ -3900,7 +3907,7 @@ class ConvLayer:
 <div id="fig-cnn-activation-maps" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-cnn-activation-maps-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://www.deepamminda.com/posts/cnns/visualizing-activation-maps-cnns.png" style="width:90.0%" class="figure-img">
+<img src="https://mindadeepam.github.io/posts/cnns/visualizing-activation-maps-cnns.png" style="width:90.0%" class="figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-cnn-activation-maps-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;1: visualizing activation maps in cnns. From the paper ‘Visualizing and Understanding Convolutional Networks’
@@ -3916,7 +3923,7 @@ Figure&nbsp;1: visualizing activation maps in cnns. From the paper ‘Visualizin
 <p>the below code is all generated by claude-sonnet-3.5, bcuz its kinda boring to train a toy model on a toy dataset, that too for classification. dont worry though, ill soon be back with a more interesting vision problem to get our hands dirty.</p>
 </blockquote>
 <p>Training itself is pretty straightforward. We split the data into train-test, and then train the model for a few epochs. We use the Adam optimizer and CrossEntropyLoss as the loss function. The outputs of the model are bare logits, which the loss functions accepts with targets. A learning rate of 0.001 is used for the optimizer. In the end we test on the test set, and print the accuracy.</p>
-<div id="cell-22" class="cell" data-execution_count="22">
+<div id="cell-23" class="cell" data-execution_count="22">
 <div class="sourceCode cell-code" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> torch</span>
@@ -4474,7 +4481,7 @@ Epoch [5/5], Loss: 0.2185</code></pre>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://www.deepamminda.com/posts/cnns/00_cnn_basics_files/figure-html/cell-8-output-2.png" class="img-fluid figure-img"></p>
+<p><img src="https://mindadeepam.github.io/posts/cnns/00_cnn_basics_files/figure-html/cell-8-output-2.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -4483,7 +4490,7 @@ Epoch [5/5], Loss: 0.2185</code></pre>
 </div>
 </div>
 <p>Neat!! Now let’s visualize some of the predictions.</p>
-<div id="cell-24" class="cell" data-execution_count="26">
+<div id="cell-25" class="cell" data-execution_count="26">
 <div class="sourceCode cell-code" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> random</span>
@@ -4629,13 +4636,13 @@ font-style: inherit;">'red'</span>)</span>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://www.deepamminda.com/posts/cnns/00_cnn_basics_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
+<p><img src="https://mindadeepam.github.io/posts/cnns/00_cnn_basics_files/figure-html/cell-9-output-1.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
 </div>
 <p>Now let us visualize the confisuion matrix to exactly see how the model is doing.</p>
-<div id="cell-26" class="cell" data-execution_count="30">
+<div id="cell-27" class="cell" data-execution_count="30">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><span class="co" style="color: #5E5E5E;
@@ -4777,7 +4784,7 @@ font-style: inherit;">"center"</span>)</span>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://www.deepamminda.com/posts/cnns/00_cnn_basics_files/figure-html/cell-10-output-1.png" class="img-fluid figure-img"></p>
+<p><img src="https://mindadeepam.github.io/posts/cnns/00_cnn_basics_files/figure-html/cell-10-output-1.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -4805,13 +4812,13 @@ font-style: inherit;">"center"</span>)</span>
  ]]></description>
   <category>cnns</category>
   <category>deep-learning</category>
-  <guid>https://www.deepamminda.com/posts/cnns/00_cnn_basics.html</guid>
+  <guid>https://mindadeepam.github.io/posts/cnns/00_cnn_basics.html</guid>
   <pubDate>Mon, 29 Jul 2024 18:30:00 GMT</pubDate>
 </item>
 <item>
   <title>Language Modelling with RNNs</title>
   <dc:creator>Deepam Minda</dc:creator>
-  <link>https://www.deepamminda.com/posts/rnns/01_rnns_basics.html</link>
+  <link>https://mindadeepam.github.io/posts/rnns/01_rnns_basics.html</link>
   <description><![CDATA[ 
 
 
@@ -5325,7 +5332,7 @@ y[0] tensor([ 81,   8, 112,  37,  49,  21,  37,  31,  37,  47,  31,  79,  37, 10
 <div id="fig-unrolled-rnn" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-unrolled-rnn-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="https://www.deepamminda.com/posts/rnns/rnn_unrolled.png" style="width:70.0%" class="figure-img">
+<img src="https://mindadeepam.github.io/posts/rnns/rnn_unrolled.png" style="width:70.0%" class="figure-img">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-unrolled-rnn-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;1: unrolled RNN
@@ -6440,7 +6447,7 @@ font-style: inherit;">"Loss"</span>)</span></code></pre></div>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="https://www.deepamminda.com/posts/rnns/01_rnns_basics_files/figure-html/cell-15-output-2.png" class="img-fluid figure-img"></p>
+<p><img src="https://mindadeepam.github.io/posts/rnns/01_rnns_basics_files/figure-html/cell-15-output-2.png" class="img-fluid figure-img"></p>
 </figure>
 </div>
 </div>
@@ -6560,13 +6567,13 @@ their part, and there was help being upon us the whole was snicks when?”
   <category>nlp</category>
   <category>seq-to-seq</category>
   <category>langauge-modelling</category>
-  <guid>https://www.deepamminda.com/posts/rnns/01_rnns_basics.html</guid>
+  <guid>https://mindadeepam.github.io/posts/rnns/01_rnns_basics.html</guid>
   <pubDate>Fri, 19 Jul 2024 18:30:00 GMT</pubDate>
 </item>
 <item>
   <title>Few Shot learning: Classify using few examples!</title>
   <dc:creator>Deepam Minda</dc:creator>
-  <link>https://www.deepamminda.com/posts/few-shot-learning/prototype_networks.html</link>
+  <link>https://mindadeepam.github.io/posts/few-shot-learning/prototype_networks.html</link>
   <description><![CDATA[ 
 
 
@@ -6665,7 +6672,7 @@ font-style: inherit;">"does it give good quality photos in the night?"</span>]</
 <p>Let us have a quick look at the architecture of the system.</p>
 <div id="few-shot" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="https://www.deepamminda.com/posts/few-shot-learning/1_few_shot_system.png" class="img-fluid figure-img"></p>
+<p><img src="https://mindadeepam.github.io/posts/few-shot-learning/1_few_shot_system.png" class="img-fluid figure-img"></p>
 <figcaption>A simple few shot classification system</figcaption>
 </figure>
 </div>
@@ -7291,9 +7298,9 @@ the predicted class is camera</code></pre>
   <category>classification</category>
   <category>few-shot learning</category>
   <category>nlp</category>
-  <guid>https://www.deepamminda.com/posts/few-shot-learning/prototype_networks.html</guid>
+  <guid>https://mindadeepam.github.io/posts/few-shot-learning/prototype_networks.html</guid>
   <pubDate>Mon, 11 Sep 2023 18:30:00 GMT</pubDate>
-  <media:content url="https://www.deepamminda.com/posts/few-shot-learning/cover.jpeg" medium="image" type="image/jpeg"/>
+  <media:content url="https://mindadeepam.github.io/posts/few-shot-learning/cover.jpeg" medium="image" type="image/jpeg"/>
 </item>
 </channel>
 </rss>

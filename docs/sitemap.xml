@@ -1,35 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://www.deepamminda.com/blog.html</loc>
-    <lastmod>2024-08-12T22:01:20.240Z</lastmod>
+    <loc>https://mindadeepam.github.io/blog.html</loc>
+    <lastmod>2024-08-16T14:36:40.657Z</lastmod>
   </url>
   <url>
-    <loc>https://www.deepamminda.com/about.html</loc>
-    <lastmod>2024-07-30T20:08:36.700Z</lastmod>
+    <loc>https://mindadeepam.github.io/about.html</loc>
+    <lastmod>2024-08-16T15:12:24.367Z</lastmod>
   </url>
   <url>
-    <loc>https://www.deepamminda.com/posts/rnns/01_rnns_basics.html</loc>
+    <loc>https://mindadeepam.github.io/posts/rnns/01_rnns_basics.html</loc>
     <lastmod>2024-08-08T17:53:06.701Z</lastmod>
   </url>
   <url>
-    <loc>https://www.deepamminda.com/posts/cnns/00_cnn_basics.html</loc>
-    <lastmod>2024-08-10T16:57:09.749Z</lastmod>
+    <loc>https://mindadeepam.github.io/posts/cnns/00_cnn_basics.html</loc>
+    <lastmod>2024-08-15T12:41:05.834Z</lastmod>
   </url>
   <url>
-    <loc>https://www.deepamminda.com/posts/few-shot-learning/prototype_networks.html</loc>
-    <lastmod>2024-08-08T17:53:20.945Z</lastmod>
+    <loc>https://mindadeepam.github.io/posts/few-shot-learning/prototype_networks.html</loc>
+    <lastmod>2024-08-16T15:09:19.425Z</lastmod>
   </url>
   <url>
-    <loc>https://www.deepamminda.com/posts/cnns/01_resnet.html</loc>
-    <lastmod>2024-08-10T17:41:36.092Z</lastmod>
+    <loc>https://mindadeepam.github.io/forest.html</loc>
+    <lastmod>2024-08-16T14:43:54.563Z</lastmod>
   </url>
   <url>
-    <loc>https://www.deepamminda.com/index.html</loc>
-    <lastmod>2024-07-30T20:08:46.317Z</lastmod>
+    <loc>https://mindadeepam.github.io/posts/cnns/01_resnet.html</loc>
+    <lastmod>2024-08-14T15:53:39.091Z</lastmod>
   </url>
   <url>
-    <loc>https://www.deepamminda.com/links.html</loc>
-    <lastmod>2024-08-12T22:06:03.653Z</lastmod>
+    <loc>https://mindadeepam.github.io/index.html</loc>
+    <lastmod>2024-08-16T15:12:15.185Z</lastmod>
+  </url>
+  <url>
+    <loc>https://mindadeepam.github.io/garden.html</loc>
+    <lastmod>2024-08-16T15:09:39.184Z</lastmod>
   </url>
 </urlset>
