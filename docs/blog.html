@@ -78,9 +78,9 @@ ul.task-list li input[type="checkbox"] {
     }
 
     const options = {
-      valueNames: ['listing-date','listing-title','listing-author',{ data: ['index'] },{ data: ['categories'] },{ data: ['listing-date-sort'] },{ data: ['listing-title-sort'] }],
+      valueNames: ['listing-date','listing-title','listing-reading-time',{ data: ['index'] },{ data: ['categories'] },{ data: ['listing-date-sort'] },{ data: ['listing-file-modified-sort'] }],
       
-      searchColumns: ["listing-date","listing-title","listing-author"],
+      searchColumns: ["listing-title","listing-author","listing-date","listing-image","listing-description","listing-categories"],
     };
 
     window['quarto-listings'] = window['quarto-listings'] || {};
@@ -213,68 +213,85 @@ window.Quarto = {
 
 
 
-<div class="quarto-listing quarto-listing-container-table" id="listing-listing">
-<table class="quarto-listing-table table">
-<thead>
-<tr>
-<th>
-Date
-</th>
-<th>
-Title
-</th>
-<th>
-Author
-</th>
-</tr>
-</thead>
-<tbody class="list">
-<tr data-index="0" data-categories="cnns,deep-learning" data-listing-date-sort="1723228200000" data-listing-file-modified-sort="1723650819091" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="6" data-listing-word-count-sort="1182" data-listing-title-sort="Training a Resnet in Pytorch" data-listing-filename-sort="01_resnet.ipynb">
-<td>
-<span class="listing-date">Aug 10, 2024</span>
-</td>
-<td>
-<a href="./posts/cnns/01_resnet.html" class="title listing-title">Training a Resnet in Pytorch</a>
-</td>
-<td>
-<span class="listing-author">Deepam Minda</span>
-</td>
-</tr>
-<tr data-index="1" data-categories="cnns,deep-learning" data-listing-date-sort="1722277800000" data-listing-file-modified-sort="1723725665834" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="17" data-listing-word-count-sort="3339" data-listing-title-sort="Intro to Convolution Neural Networks" data-listing-filename-sort="00_cnn_basics.ipynb">
-<td>
-<span class="listing-date">Jul 30, 2024</span>
-</td>
-<td>
-<a href="./posts/cnns/00_cnn_basics.html" class="title listing-title">Intro to Convolution Neural Networks</a>
-</td>
-<td>
-<span class="listing-author">Deepam Minda</span>
-</td>
-</tr>
-<tr data-index="2" data-categories="rnns,nlp,seq-to-seq,langauge-modelling" data-listing-date-sort="1721413800000" data-listing-file-modified-sort="1723139586701" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="10" data-listing-word-count-sort="1857" data-listing-title-sort="Language Modelling with RNNs" data-listing-filename-sort="01_rnns_basics.ipynb">
-<td>
-<span class="listing-date">Jul 20, 2024</span>
-</td>
-<td>
-<a href="./posts/rnns/01_rnns_basics.html" class="title listing-title">Language Modelling with RNNs</a>
-</td>
-<td>
-<span class="listing-author">Deepam Minda</span>
-</td>
-</tr>
-<tr data-index="3" data-categories="classification,few-shot learning,nlp" data-listing-date-sort="1694457000000" data-listing-file-modified-sort="1723820959425" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="7" data-listing-word-count-sort="1249" data-listing-title-sort="Few Shot learning: Classify using few examples!" data-listing-filename-sort="prototype_networks.ipynb">
-<td>
-<span class="listing-date">Sep 12, 2023</span>
-</td>
-<td>
-<a href="./posts/few-shot-learning/prototype_networks.html" class="title listing-title">Few Shot learning: Classify using few examples!</a>
-</td>
-<td>
-<span class="listing-author">Deepam Minda</span>
-</td>
-</tr>
-</tbody>
-</table>
+<div class="quarto-listing quarto-listing-container-grid" id="listing-listing">
+<div class="list grid quarto-listing-cols-3">
+<div class="g-col-1" data-index="0" data-categories="cnns,deep-learning" data-listing-date-sort="1723228200000" data-listing-file-modified-sort="1724182129957" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="6" data-listing-word-count-sort="1182">
+<a href="./posts/cnns/01_resnet.html" class="quarto-grid-link">
+<div class="quarto-grid-item card h-100 card-left">
+<div class="card-body post-contents">
+<h5 class="no-anchor card-title listing-title">
+Training a Resnet in Pytorch
+</h5>
+<div class="listing-reading-time card-text text-muted">
+6 min
+</div>
+<div class="card-attribution card-text-small end">
+<div class="listing-date">
+Aug 10, 2024
+</div>
+</div>
+</div>
+</div>
+</a>
+</div>
+<div class="g-col-1" data-index="1" data-categories="cnns,deep-learning" data-listing-date-sort="1722277800000" data-listing-file-modified-sort="1724186606850" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="22" data-listing-word-count-sort="4326">
+<a href="./posts/cnns/00_cnn_basics.html" class="quarto-grid-link">
+<div class="quarto-grid-item card h-100 card-left">
+<div class="card-body post-contents">
+<h5 class="no-anchor card-title listing-title">
+Intro to Convolution Neural Networks
+</h5>
+<div class="listing-reading-time card-text text-muted">
+22 min
+</div>
+<div class="card-attribution card-text-small end">
+<div class="listing-date">
+Jul 30, 2024
+</div>
+</div>
+</div>
+</div>
+</a>
+</div>
+<div class="g-col-1" data-index="2" data-categories="rnns,nlp,seq-to-seq,langauge-modelling" data-listing-date-sort="1721413800000" data-listing-file-modified-sort="1723139586701" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="10" data-listing-word-count-sort="1857">
+<a href="./posts/rnns/01_rnns_basics.html" class="quarto-grid-link">
+<div class="quarto-grid-item card h-100 card-left">
+<div class="card-body post-contents">
+<h5 class="no-anchor card-title listing-title">
+Language Modelling with RNNs
+</h5>
+<div class="listing-reading-time card-text text-muted">
+10 min
+</div>
+<div class="card-attribution card-text-small end">
+<div class="listing-date">
+Jul 20, 2024
+</div>
+</div>
+</div>
+</div>
+</a>
+</div>
+<div class="g-col-1" data-index="3" data-categories="classification,few-shot learning,nlp" data-listing-date-sort="1694457000000" data-listing-file-modified-sort="1723820959425" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="7" data-listing-word-count-sort="1249">
+<a href="./posts/few-shot-learning/prototype_networks.html" class="quarto-grid-link">
+<div class="quarto-grid-item card h-100 card-left">
+<div class="card-body post-contents">
+<h5 class="no-anchor card-title listing-title">
+Few Shot learning: Classify using few examples!
+</h5>
+<div class="listing-reading-time card-text text-muted">
+7 min
+</div>
+<div class="card-attribution card-text-small end">
+<div class="listing-date">
+Sep 12, 2023
+</div>
+</div>
+</div>
+</div>
+</a>
+</div>
+</div>
 <div class="listing-no-matching d-none">
 No matching items
 </div>

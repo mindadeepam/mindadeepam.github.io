@@ -1,13 +1,14 @@
 ---
-title: "Blog"
+title: "blog"
 listing:
   contents: posts
-  type: table
+  type: grid
   sort: "date desc"
   categories: true
   sort-ui: false
   filter-ui: false
   feed: true
+  fields: [date, title, reading-time]
 page-layout: full
 title-block-banner: true
 ---

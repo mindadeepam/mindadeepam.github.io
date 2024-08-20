@@ -1,5 +1,5 @@
 ---
-title: "About Me"
+title: "about"
 image: profile.jpg
 about:
   template: jolla
@@ -16,7 +16,7 @@ about:
 
 ---
  
-Hi Y'all. My name is Deepam Minda and this is my website. I'll be writing a lot more blogs, TILs, etc about various things that interest me. I'm interested in topics like AI, llms, and tech in general. 
+Hi Y'all. My name is Deepam Minda and this is my website. I'll be writing a lot more blogs, TILs, etc about various things that interest me, which include but are not limited to AI, tech, music, football. 
 
 I am a data scientist/ML engineer at [Farmart](https://www.farmart.co/) by profession. I graduated from Delhi Technological University, Delhi, India. Apart from this, I also ocassionally dabble with a bit of guitar, and like everyone sane, music in general.
 

@@ -303,7 +303,7 @@ Figure&nbsp;1: vgg-19-architecture
 <p>Let us look inside a conv block, for eg the conv2 block in <a href="#fig-vgg" class="quarto-xref">Figure&nbsp;1</a>. We can see that the particular block has a max_pool (red) layer and 2 single-conv layers(blue). Each single-conv layer within that block is a:</p>
 <p><code>conv_layer = [CNN-&gt;ReLU]</code></p>
 <p>In torch,</p>
-<div id="cell-3" class="cell">
+<div id="cell-4" class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch </span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torch <span class="im">import</span> nn</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -326,7 +326,7 @@ Figure&nbsp;1: vgg-19-architecture
 <span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> x</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Lets create the conv1 layer and visualize the input and output volumes. The input is a rgb image of size <code>224x224x3</code></p>
-<div id="cell-5" class="cell">
+<div id="cell-6" class="cell">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>input_img <span class="op">=</span> torch.rand(<span class="dv">224</span>, <span class="dv">224</span>, <span class="dv">3</span>)   </span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a> </span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># input images must have shape (C,H,W) this is usually managed by torch's to_tensor transform</span></span>
@@ -352,7 +352,7 @@ Figure&nbsp;1: vgg-19-architecture
 <p>The feature extractor will look like this:</p>
 <p>[<code>block_1 -&gt; Max_pool -&gt; block_2 -&gt; Max_pool -&gt; block_3 -&gt; ...</code>]</p>
 <p>Lets create a block class:</p>
-<div id="cell-7" class="cell">
+<div id="cell-8" class="cell">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Block(nn.Module):</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, input_channels, num_layers, out_channels, activation<span class="op">=</span>nn.ReLU()):</span>
@@ -374,7 +374,7 @@ Figure&nbsp;1: vgg-19-architecture
 <span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> forward(<span class="va">self</span>, x):</span>
 <span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span>.layers(x)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div id="cell-8" class="cell">
+<div id="cell-9" class="cell">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>max_pool <span class="op">=</span> nn.MaxPool2d(kernel_size<span class="op">=</span><span class="dv">2</span>, stride<span class="op">=</span><span class="dv">2</span>)</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>conv1_block <span class="op">=</span> Block(input_channels<span class="op">=</span><span class="dv">3</span>, num_layers<span class="op">=</span><span class="dv">2</span>, out_channels<span class="op">=</span><span class="dv">64</span>)</span>
@@ -397,7 +397,7 @@ Figure&nbsp;1: vgg-19-architecture
 <p>The classifier part has fixed configuration, but the feature extractor can be configured by passing a list of numbers and strings to the constructor. Each item is either a number or a string and represents a conv layer or a max_pool layer. The number is the number of conv layers in the block, and the string is ‘M’ which indicates a max pool layer.</p>
 <p>The classifier part consists of 2 hidden-FC layers (4096 neurons each) with activations and dropout regularization added. The final layer is the classifier head with 1000 outputs. (Imagenet dataset has 1k classes)</p>
 <p>Lastly, to enable the model to initialize with variable input sizes, we have used a dynamic input size of the 1st FC layer., and a dynamic hidden_fc_size for the last FC layer. This will allow us to experiment with smaller datasets locally</p>
-<div id="cell-10" class="cell">
+<div id="cell-11" class="cell">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>_vgg_config <span class="op">=</span> {</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">'vgg19'</span>: [<span class="dv">64</span>, <span class="dv">64</span>, <span class="st">'M'</span>, <span class="dv">128</span>, <span class="dv">128</span>, <span class="st">'M'</span>, <span class="dv">256</span>, <span class="dv">256</span>, <span class="dv">256</span>, <span class="dv">256</span>, <span class="st">'M'</span>, <span class="dv">512</span>, <span class="dv">512</span>, <span class="dv">512</span>, <span class="dv">512</span>, <span class="st">'M'</span>, <span class="dv">512</span>, <span class="dv">512</span>, <span class="dv">512</span>, <span class="dv">512</span>, <span class="st">'M'</span>],</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">'vgg11'</span>: [<span class="dv">64</span>, <span class="st">'M'</span>, <span class="dv">128</span>, <span class="st">'M'</span>, <span class="dv">256</span>, <span class="dv">256</span>, <span class="st">'M'</span>, <span class="dv">512</span>, <span class="dv">512</span>, <span class="st">'M'</span>, <span class="dv">512</span>, <span class="dv">512</span>, <span class="st">'M'</span>],</span>
@@ -452,14 +452,14 @@ Figure&nbsp;1: vgg-19-architecture
 <span id="cb5-52"><a href="#cb5-52" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> x</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Now lets visualize the model, output shapes of various layers and its size, etc using torchinfo.summary(). To install the package run <code>pip install torchinfo</code> on your terminal.</p>
-<div id="cell-12" class="cell">
+<div id="cell-13" class="cell">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torchinfo <span class="im">import</span> summary</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>vgg19 <span class="op">=</span> VGG(_vgg_config[<span class="st">'vgg19'</span>])</span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>summary(vgg19, input_size<span class="op">=</span>(<span class="dv">3</span>,<span class="dv">224</span>,<span class="dv">224</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>A pretty huge model (140million parameters) isn’t it?! The original model was trained on the entire Imagenet dataset (150gb). But we’ll use the TinyImagenet dataset(&lt;1gb) for this example. So we’ll use a much smaller model.</p>
-<div id="cell-14" class="cell">
+<div id="cell-15" class="cell">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>NUM_CLASSES<span class="op">=</span><span class="dv">200</span> <span class="co"># Tiny ImageNet has 200 classes</span></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>IMG_SIZE <span class="op">=</span> <span class="dv">64</span></span>
@@ -476,7 +476,7 @@ Figure&nbsp;1: vgg-19-architecture
 </div>
 <p>This brings our model size down to a much more manageble 12million parameters from the original ~140 million parameters.</p>
 <p>For training we’ll use the Adam optimizer and learing rate of 0.001. We’ll also use the CrossEntropyLoss as the loss function as this is a classification task.</p>
-<div id="cell-16" class="cell">
+<div id="cell-17" class="cell">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch.nn <span class="im">as</span> nn</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch.optim <span class="im">as</span> optim</span>
@@ -656,7 +656,7 @@ Figure&nbsp;1: vgg-19-architecture
 <ul>
 <li>Running vgg11 on colab gives us a score of ~28% accuracy on the validation set in 20 epochs, while training loss and val loss both were kind of still decreasing.</li>
 </ul>
-<div id="cell-18" class="cell">
+<div id="cell-19" class="cell">
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> plot_params_and_grads(model, n<span class="op">=</span><span class="dv">3</span>):</span>
@@ -737,7 +737,7 @@ Figure&nbsp;3: “VGG-16 First Layers Gradient Plot”(Vanishing Gradients)
 <section id="inception" class="level1">
 <h1>Inception</h1>
 <p>VGGs large networks deal with issues of overfitting and increased computation. After it focus shifted to making the networks more compute efficient. Aiming to solve these issues by introducing extra sparsity in the network, the Inception model was proposed.</p>
-<div id="cell-22" class="cell" data-execution_count="136">
+<div id="cell-23" class="cell" data-execution_count="136">
 <div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> NaiveInceptionBlock(nn.Module):</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, in_channels, out_channels):</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>        <span class="bu">super</span>(NaiveInceptionBlock, <span class="va">self</span>).<span class="fu">__init__</span>()</span>
@@ -784,7 +784,7 @@ Figure&nbsp;3: “VGG-16 First Layers Gradient Plot”(Vanishing Gradients)
 <span id="cb11-44"><a href="#cb11-44" aria-hidden="true" tabindex="-1"></a>        <span class="co"># return [out1, out2, out3, out4]</span></span>
 <span id="cb11-45"><a href="#cb11-45" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> torch.cat([out1, out2, out3, out4], dim<span class="op">=</span><span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div id="cell-23" class="cell" data-execution_count="140">
+<div id="cell-24" class="cell" data-execution_count="140">
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>inp <span class="op">=</span> torch.rand(<span class="dv">1</span>, <span class="dv">256</span>, <span class="dv">64</span>, <span class="dv">64</span>) <span class="co"># some intermediate layer output</span></span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>block <span class="op">=</span> NaiveInceptionBlock(<span class="dv">256</span>, <span class="dv">64</span>)</span>
@@ -813,7 +813,7 @@ Estimated Total Size (MB): 12.78
 ==========================================================================================</code></pre>
 </div>
 </div>
-<div id="cell-24" class="cell" data-execution_count="129">
+<div id="cell-25" class="cell" data-execution_count="129">
 <div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>conv_block <span class="op">=</span> ConvReLU(<span class="dv">256</span>, <span class="dv">192</span>, <span class="dv">3</span>)</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>out <span class="op">=</span> conv_block(inp)</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(out.shape)</span>
@@ -839,7 +839,7 @@ Estimated Total Size (MB): 12.26
 ==========================================================================================</code></pre>
 </div>
 </div>
-<div id="cell-25" class="cell" data-execution_count="147">
+<div id="cell-26" class="cell" data-execution_count="147">
 <div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>out_channels <span class="op">=</span> <span class="dv">192</span><span class="op">//</span><span class="dv">4</span></span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>block <span class="op">=</span> InceptionBlock(<span class="dv">256</span>, out_channels, out_channels, out_channels, <span class="dv">64</span>, <span class="dv">32</span>, out_channels)</span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>out <span class="op">=</span> block(inp)</span>
@@ -885,6 +885,124 @@ Input size (MB): 51.38
 Forward/backward pass size (MB): 115.61
 Params size (MB): 0.46
 Estimated Total Size (MB): 167.45
+==========================================================================================</code></pre>
+</div>
+</div>
+<div id="cell-27" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torchvision <span class="im">import</span> models</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Load the DenseNet121 model pre-trained on ImageNet</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>densenet121 <span class="op">=</span> models.densenet121(pretrained<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Set the model to evaluation mode</span></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>densenet121.<span class="bu">eval</span>()</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Example input tensor (batch size of 1, 3 color channels, 224x224 image)</span></span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>input_tensor <span class="op">=</span> torch.rand(<span class="dv">1</span>, <span class="dv">3</span>, <span class="dv">224</span>, <span class="dv">224</span>)</span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torchinfo <span class="im">import</span> summary </span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a>summary(densenet121, input_data<span class="op">=</span>input_tensor)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<pre><code>==========================================================================================
+Layer (type:depth-idx)                   Output Shape              Param #
+==========================================================================================
+DenseNet                                 [1, 1000]                 --
+├─Sequential: 1-1                        [1, 1024, 7, 7]           --
+│    └─Conv2d: 2-1                       [1, 64, 112, 112]         9,408
+│    └─BatchNorm2d: 2-2                  [1, 64, 112, 112]         128
+│    └─ReLU: 2-3                         [1, 64, 112, 112]         --
+│    └─MaxPool2d: 2-4                    [1, 64, 56, 56]           --
+│    └─_DenseBlock: 2-5                  [1, 256, 56, 56]          --
+│    │    └─_DenseLayer: 3-1             [1, 32, 56, 56]           45,440
+│    │    └─_DenseLayer: 3-2             [1, 32, 56, 56]           49,600
+│    │    └─_DenseLayer: 3-3             [1, 32, 56, 56]           53,760
+│    │    └─_DenseLayer: 3-4             [1, 32, 56, 56]           57,920
+│    │    └─_DenseLayer: 3-5             [1, 32, 56, 56]           62,080
+│    │    └─_DenseLayer: 3-6             [1, 32, 56, 56]           66,240
+│    └─_Transition: 2-6                  [1, 128, 28, 28]          --
+│    │    └─BatchNorm2d: 3-7             [1, 256, 56, 56]          512
+│    │    └─ReLU: 3-8                    [1, 256, 56, 56]          --
+│    │    └─Conv2d: 3-9                  [1, 128, 56, 56]          32,768
+│    │    └─AvgPool2d: 3-10              [1, 128, 28, 28]          --
+│    └─_DenseBlock: 2-7                  [1, 512, 28, 28]          --
+│    │    └─_DenseLayer: 3-11            [1, 32, 28, 28]           53,760
+│    │    └─_DenseLayer: 3-12            [1, 32, 28, 28]           57,920
+│    │    └─_DenseLayer: 3-13            [1, 32, 28, 28]           62,080
+│    │    └─_DenseLayer: 3-14            [1, 32, 28, 28]           66,240
+│    │    └─_DenseLayer: 3-15            [1, 32, 28, 28]           70,400
+│    │    └─_DenseLayer: 3-16            [1, 32, 28, 28]           74,560
+│    │    └─_DenseLayer: 3-17            [1, 32, 28, 28]           78,720
+│    │    └─_DenseLayer: 3-18            [1, 32, 28, 28]           82,880
+│    │    └─_DenseLayer: 3-19            [1, 32, 28, 28]           87,040
+│    │    └─_DenseLayer: 3-20            [1, 32, 28, 28]           91,200
+│    │    └─_DenseLayer: 3-21            [1, 32, 28, 28]           95,360
+│    │    └─_DenseLayer: 3-22            [1, 32, 28, 28]           99,520
+│    └─_Transition: 2-8                  [1, 256, 14, 14]          --
+│    │    └─BatchNorm2d: 3-23            [1, 512, 28, 28]          1,024
+│    │    └─ReLU: 3-24                   [1, 512, 28, 28]          --
+│    │    └─Conv2d: 3-25                 [1, 256, 28, 28]          131,072
+│    │    └─AvgPool2d: 3-26              [1, 256, 14, 14]          --
+│    └─_DenseBlock: 2-9                  [1, 1024, 14, 14]         --
+│    │    └─_DenseLayer: 3-27            [1, 32, 14, 14]           70,400
+│    │    └─_DenseLayer: 3-28            [1, 32, 14, 14]           74,560
+│    │    └─_DenseLayer: 3-29            [1, 32, 14, 14]           78,720
+│    │    └─_DenseLayer: 3-30            [1, 32, 14, 14]           82,880
+│    │    └─_DenseLayer: 3-31            [1, 32, 14, 14]           87,040
+│    │    └─_DenseLayer: 3-32            [1, 32, 14, 14]           91,200
+│    │    └─_DenseLayer: 3-33            [1, 32, 14, 14]           95,360
+│    │    └─_DenseLayer: 3-34            [1, 32, 14, 14]           99,520
+│    │    └─_DenseLayer: 3-35            [1, 32, 14, 14]           103,680
+│    │    └─_DenseLayer: 3-36            [1, 32, 14, 14]           107,840
+│    │    └─_DenseLayer: 3-37            [1, 32, 14, 14]           112,000
+│    │    └─_DenseLayer: 3-38            [1, 32, 14, 14]           116,160
+│    │    └─_DenseLayer: 3-39            [1, 32, 14, 14]           120,320
+│    │    └─_DenseLayer: 3-40            [1, 32, 14, 14]           124,480
+│    │    └─_DenseLayer: 3-41            [1, 32, 14, 14]           128,640
+│    │    └─_DenseLayer: 3-42            [1, 32, 14, 14]           132,800
+│    │    └─_DenseLayer: 3-43            [1, 32, 14, 14]           136,960
+│    │    └─_DenseLayer: 3-44            [1, 32, 14, 14]           141,120
+│    │    └─_DenseLayer: 3-45            [1, 32, 14, 14]           145,280
+│    │    └─_DenseLayer: 3-46            [1, 32, 14, 14]           149,440
+│    │    └─_DenseLayer: 3-47            [1, 32, 14, 14]           153,600
+│    │    └─_DenseLayer: 3-48            [1, 32, 14, 14]           157,760
+│    │    └─_DenseLayer: 3-49            [1, 32, 14, 14]           161,920
+│    │    └─_DenseLayer: 3-50            [1, 32, 14, 14]           166,080
+│    └─_Transition: 2-10                 [1, 512, 7, 7]            --
+│    │    └─BatchNorm2d: 3-51            [1, 1024, 14, 14]         2,048
+│    │    └─ReLU: 3-52                   [1, 1024, 14, 14]         --
+│    │    └─Conv2d: 3-53                 [1, 512, 14, 14]          524,288
+│    │    └─AvgPool2d: 3-54              [1, 512, 7, 7]            --
+│    └─_DenseBlock: 2-11                 [1, 1024, 7, 7]           --
+│    │    └─_DenseLayer: 3-55            [1, 32, 7, 7]             103,680
+│    │    └─_DenseLayer: 3-56            [1, 32, 7, 7]             107,840
+│    │    └─_DenseLayer: 3-57            [1, 32, 7, 7]             112,000
+│    │    └─_DenseLayer: 3-58            [1, 32, 7, 7]             116,160
+│    │    └─_DenseLayer: 3-59            [1, 32, 7, 7]             120,320
+│    │    └─_DenseLayer: 3-60            [1, 32, 7, 7]             124,480
+│    │    └─_DenseLayer: 3-61            [1, 32, 7, 7]             128,640
+│    │    └─_DenseLayer: 3-62            [1, 32, 7, 7]             132,800
+│    │    └─_DenseLayer: 3-63            [1, 32, 7, 7]             136,960
+│    │    └─_DenseLayer: 3-64            [1, 32, 7, 7]             141,120
+│    │    └─_DenseLayer: 3-65            [1, 32, 7, 7]             145,280
+│    │    └─_DenseLayer: 3-66            [1, 32, 7, 7]             149,440
+│    │    └─_DenseLayer: 3-67            [1, 32, 7, 7]             153,600
+│    │    └─_DenseLayer: 3-68            [1, 32, 7, 7]             157,760
+│    │    └─_DenseLayer: 3-69            [1, 32, 7, 7]             161,920
+│    │    └─_DenseLayer: 3-70            [1, 32, 7, 7]             166,080
+│    └─BatchNorm2d: 2-12                 [1, 1024, 7, 7]           2,048
+├─Linear: 1-2                            [1, 1000]                 1,025,000
+==========================================================================================
+Total params: 7,978,856
+Trainable params: 7,978,856
+Non-trainable params: 0
+Total mult-adds (G): 2.83
+==========================================================================================
+Input size (MB): 0.60
+Forward/backward pass size (MB): 180.54
+Params size (MB): 31.92
+Estimated Total Size (MB): 213.06
 ==========================================================================================</code></pre>
 </div>
 </div>
