@@ -525,6 +525,7 @@ F  2  2  1  2  1  2
 <p>When for dense graohs <img src="https://latex.codecogs.com/png.latex?E"> approaches <img src="https://latex.codecogs.com/png.latex?N%5E2">, <img src="https://latex.codecogs.com/png.latex?T"> approaches <img src="https://latex.codecogs.com/png.latex?O(N%5E3)"> and hence the algo is similar to FW, But when <img src="https://latex.codecogs.com/png.latex?E%3C%3CN%5E2">, ie sparse graphs: T-&gt;<img src="https://latex.codecogs.com/png.latex?O(N%5E2%20logN)"> -&gt; <img src="https://latex.codecogs.com/png.latex?O(N%5E2)"></p>
 <p>Dijkstra’s algorithm assumes that all edge weights are non-negative. If your graph has negative weights, Dijkstra’s algorithm can give incorrect results.</p>
 <p>While FW can open up use-cases where negative weights are common, such as in routing algorithms, certain scheduling problems, or in algorithms for finding the transitive closure of a graph.</p>
+<hr>
 <p>Thats it for this one. Hope you understood it well! Cya!</p>
 
 
