@@ -2,6 +2,7 @@
   {
     "listing": "/blog.html",
     "items": [
+      "/posts/floyd_warshall.html",
       "/posts/cnns/01_resnet.html",
       "/posts/cnns/00_cnn_basics.html",
       "/posts/rnns/01_rnns_basics.html",
