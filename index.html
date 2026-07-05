@@ -3,242 +3,63 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta
-      name="description"
-      content="Deepam Minda is an AI engineer and data scientist building production agentic systems, multimodal document intelligence, and internal automation platforms."
-    />
-    <meta name="theme-color" content="#f3eee3" />
+    <meta name="description" content="Deepam Minda. AI engineer. Notes, projects, and writing." />
+    <meta name="theme-color" content="#f5f1e8" />
     <meta property="og:title" content="Deepam Minda" />
-    <meta
-      property="og:description"
-      content="AI systems, backend automation, and applied ML from Delhi NCR."
-    />
+    <meta property="og:description" content="AI engineer. Notes, projects, and writing." />
     <meta property="og:type" content="website" />
     <title>Deepam Minda</title>
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%23211b16'/%3E%3Ctext x='32' y='39' text-anchor='middle' font-family='Georgia' font-size='22' fill='%23f3eee3'%3EDM%3C/text%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%231f1b16'/%3E%3Ctext x='32' y='39' text-anchor='middle' font-family='Georgia' font-size='22' fill='%23f5f1e8'%3EDM%3C/text%3E%3C/svg%3E"
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="grain" aria-hidden="true"></div>
     <header class="site-header">
-      <a class="wordmark" href="#top" aria-label="Deepam Minda home">DM</a>
-      <nav class="nav-links" aria-label="Primary navigation">
-        <a href="#systems">Systems</a>
-        <a href="#experience">Experience</a>
-        <a href="#notes">Notes</a>
-        <a href="mailto:deepamminda99@gmail.com">Contact</a>
+      <a class="mark" href="./">Deepam Minda</a>
+      <nav aria-label="Primary navigation">
+        <a href="./blog/">Blog</a>
+        <a href="#contact">Contact</a>
       </nav>
     </header>
 
-    <main id="top">
-      <section class="hero" aria-labelledby="hero-title">
-        <div class="hero-copy reveal">
-          <p class="eyebrow">Delhi NCR · AI engineering · production systems</p>
-          <h1 id="hero-title">Deepam Minda builds AI systems for messy operations.</h1>
-          <p class="hero-deck">
-            Data Scientist I at Farmart, working across agentic workflows, multimodal document
-            intelligence, backend automation, and applied ML.
-          </p>
-          <div class="hero-actions" aria-label="Contact links">
-            <a class="button primary" href="mailto:deepamminda99@gmail.com">Email</a>
-            <a class="button ghost" href="https://github.com/mindadeepam">GitHub</a>
-          </div>
-        </div>
+    <main>
+      <section class="home">
+        <p class="small">Delhi NCR · AI systems</p>
+        <h1>Deepam Minda</h1>
+        <p class="intro">Data Scientist I at Farmart. Building agents, backend systems, and applied ML tools.</p>
+      </section>
 
-        <div class="hero-art reveal" aria-label="Operations ledger">
-          <div class="ledger">
-            <div class="ledger-head">
-              <span>Ops ledger</span>
-              <span>live interests</span>
-            </div>
-            <div class="ledger-row">
-              <span>agent</span>
-              <p>WhatsApp and internal app workflows that turn messy inputs into structured actions.</p>
-            </div>
-            <div class="ledger-row">
-              <span>review</span>
-              <p>Document intelligence, validation, invoices, and compliance checks with model + rule layers.</p>
-            </div>
-            <div class="ledger-row">
-              <span>ship</span>
-              <p>Cron jobs, dashboards, cloud functions, and deployment paths that keep the tool alive.</p>
-            </div>
-            <div class="ledger-foot">
-              <span>DS-I @ Farmart</span>
-              <span>AI Engineer track</span>
-            </div>
-          </div>
+      <section class="simple-section" aria-labelledby="work-title">
+        <h2 id="work-title">Work</h2>
+        <div class="rows">
+          <p>Farmart · AI systems, document intelligence, internal tooling</p>
+          <p>Vizdum · automation surfaces, dashboards, deployment work</p>
+          <p>Doubtnut · ML intern, moderation and speech workflows</p>
         </div>
       </section>
 
-      <section class="ticker" aria-label="Capabilities">
-        <div class="ticker-track">
-          <span>OpenAI SDKs</span>
-          <span>Google Gemini</span>
-          <span>Python</span>
-          <span>FastAPI</span>
-          <span>AWS ECS</span>
-          <span>GCP Cloud Functions</span>
-          <span>Postgres</span>
-          <span>MongoDB</span>
-          <span>Redis</span>
-          <span>PyTorch</span>
-          <span>Hugging Face</span>
-          <span>Databricks</span>
-        </div>
+      <section class="simple-section" aria-labelledby="writing-title">
+        <h2 id="writing-title">Writing</h2>
+        <a class="post-row" href="./blog/post.html?slug=how-to-async-in-python">
+          <span>How to async in python?</span>
+          <time datetime="2025-06-16">16 Jun 2025</time>
+        </a>
       </section>
 
-      <section id="systems" class="section systems">
-        <div class="section-intro reveal">
-          <p class="eyebrow">Selected systems</p>
-          <h2>Work that sits between models, users, and messy production reality.</h2>
-        </div>
-
-        <div class="system-list">
-          <article class="system-item reveal">
-            <div>
-              <p class="system-label">Agent surface</p>
-              <h3>Agentic platform for chat and operations</h3>
-            </div>
-            <p>
-              Multimodal chat interfaces across WhatsApp and internal apps, with backend services for
-              lead ingestion, structured extraction, and downstream order workflows.
-            </p>
-            <span>Agents · backend orchestration · structured output</span>
-          </article>
-
-          <article class="system-item reveal">
-            <div>
-              <p class="system-label">Review queue</p>
-              <h3>AI review and document intelligence</h3>
-            </div>
-            <p>
-              Compliance reviews, invoice generation, document verification, and multimodal extraction
-              using Gemini plus rule-based and ML validators.
-            </p>
-            <span>Gemini · validation · operational tooling</span>
-          </article>
-
-          <article class="system-item reveal">
-            <div>
-              <p class="system-label">Internal console</p>
-              <h3>Vizdum automation surface</h3>
-            </div>
-            <p>
-              Internal product experiments, dashboards, automation flows, cron-backed jobs, and
-              community post generation shipped as practical tools rather than demos.
-            </p>
-            <span>Internal tools · deployment · monitoring</span>
-          </article>
-
-          <article class="system-item reveal">
-            <div>
-              <p class="system-label">Model work</p>
-              <h3>Applied ML for commodity workflows</h3>
-            </div>
-            <p>
-              Grain quality assessment using SAM-based segmentation and contrastive learning, plus
-              earlier VQA, moderation, speech, and forecasting work.
-            </p>
-            <span>Computer vision · NLP · production ML</span>
-          </article>
-        </div>
-      </section>
-
-      <section id="experience" class="section experience">
-        <div class="section-intro reveal">
-          <p class="eyebrow">Experience</p>
-          <h2>A generalist track, narrowing toward serious AI engineering.</h2>
-        </div>
-
-        <div class="timeline">
-          <div class="timeline-item reveal">
-            <p class="date">Oct 2024 - Present</p>
-            <div>
-              <h3>Data Scientist I · Farmart</h3>
-              <p>
-                Building production AI systems across agents, multimodal review, backend automation,
-                internal tooling, and operational data workflows.
-              </p>
-            </div>
-          </div>
-          <div class="timeline-item reveal">
-            <p class="date">May 2023 - Oct 2024</p>
-            <div>
-              <h3>Associate Data Scientist · Farmart</h3>
-              <p>
-                Delivered applied ML and automation systems spanning computer vision, document
-                understanding, content moderation, and production support.
-              </p>
-            </div>
-          </div>
-          <div class="timeline-item reveal">
-            <p class="date">May 2022 - Nov 2022</p>
-            <div>
-              <h3>Machine Learning Engineer Intern · Doubtnut</h3>
-              <p>
-                Trained and deployed moderation and speech workflows, including Hinglish profanity
-                classification and Whisper-based transcription.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section technical">
-        <div class="technical-copy reveal">
-          <p class="eyebrow">Technical index</p>
-          <h2>Tools are treated as parts of a system, not personality.</h2>
-        </div>
-        <dl class="skill-grid reveal">
-          <div>
-            <dt>LLM systems</dt>
-            <dd>OpenAI SDKs, OpenRouter, Gemini, multimodal extraction, RAG, structured output.</dd>
-          </div>
-          <div>
-            <dt>Backend</dt>
-            <dd>Python, FastAPI-style services, cron jobs, Docker, integrations, production support.</dd>
-          </div>
-          <div>
-            <dt>Infrastructure</dt>
-            <dd>AWS EC2/ECS/SQS/SNS, GCP Cloud Functions, monitoring, deployment decisions.</dd>
-          </div>
-          <div>
-            <dt>Data and ML</dt>
-            <dd>Postgres, MongoDB, Redis, MySQL, Databricks, PyTorch, scikit-learn, Hugging Face.</dd>
-          </div>
-        </dl>
-      </section>
-
-      <section id="notes" class="section notes">
-        <div class="section-intro reveal">
-          <p class="eyebrow">Now</p>
-          <h2>Public portfolio as a working surface.</h2>
-        </div>
-        <div class="note-columns">
-          <p class="reveal">
-            The next version should make the work legible through deeper case studies: what failed,
-            what shipped, what tradeoffs mattered, and where models met real business constraints.
-          </p>
-          <p class="reveal">
-            Current focus areas: agentic systems, LLMOps, RAG evaluation, production AI architecture,
-            and the craft of building tools that people keep using after the demo ends.
-          </p>
+      <section id="contact" class="simple-section" aria-labelledby="contact-title">
+        <h2 id="contact-title">Contact</h2>
+        <div class="links">
+          <a href="mailto:deepamminda99@gmail.com">Email</a>
+          <a href="https://github.com/mindadeepam">GitHub</a>
+          <a href="https://www.linkedin.com/in/mindadeepam/">LinkedIn</a>
         </div>
       </section>
     </main>
 
-    <footer class="footer">
-      <p>Deepam Minda</p>
-      <div>
-        <a href="mailto:deepamminda99@gmail.com">Email</a>
-        <a href="https://github.com/mindadeepam">GitHub</a>
-      </div>
+    <footer>
+      <p>© Deepam Minda</p>
     </footer>
-
-    <script src="./script.js"></script>
   </body>
 </html>

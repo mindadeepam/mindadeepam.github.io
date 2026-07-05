@@ -1,0 +1,9 @@
+[
+  {
+    "slug": "how-to-async-in-python",
+    "title": "How to async in python?",
+    "date": "2025-06-16",
+    "displayDate": "16 Jun 2025",
+    "description": "Notes on Python async, FastAPI, event loops, tasks, and migrating blocking code."
+  }
+]
