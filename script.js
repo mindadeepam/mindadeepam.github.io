@@ -261,6 +261,102 @@ function bindJumpControls() {
   syncDirection();
 }
 
+function bindWorkPanels() {
+  const trigger = document.querySelector("[data-work-toggle]");
+  const detail = document.querySelector("[data-work-detail]");
+  if (!trigger || !detail) return;
+
+  function setOpen(open) {
+    trigger.setAttribute("aria-expanded", String(open));
+    trigger.classList.toggle("is-open", open);
+    detail.classList.toggle("is-open", open);
+    detail.hidden = !open;
+  }
+
+  trigger.addEventListener("click", () => {
+    setOpen(trigger.getAttribute("aria-expanded") !== "true");
+  });
+}
+
+function bindProjectRows() {
+  const rows = Array.from(document.querySelectorAll("[data-project-row]"));
+  if (!rows.length) return;
+  const panel = document.querySelector("[data-project-panel]");
+  const panelKicker = document.querySelector("[data-project-panel-kicker]");
+  const panelTitle = document.querySelector("[data-project-panel-title]");
+  const panelSummary = document.querySelector("[data-project-panel-summary]");
+  const panelDetail = document.querySelector("[data-project-panel-detail]");
+  let activeRow = null;
+
+  function renderPanel(row) {
+    if (!panel || !panelKicker || !panelTitle || !panelSummary || !panelDetail) return;
+
+    if (!row) {
+      panel.hidden = true;
+      panelKicker.textContent = "";
+      panelTitle.textContent = "";
+      panelSummary.textContent = "";
+      panelDetail.textContent = "";
+      return;
+    }
+
+    panel.hidden = false;
+    panelKicker.textContent = row.querySelector(".project-kicker")?.textContent.trim() || "";
+    panelTitle.textContent = row.querySelector("h3")?.textContent.trim() || "";
+    panelSummary.textContent = row.querySelector(".project-summary")?.textContent.trim() || "";
+    panelDetail.textContent = row.querySelector(".project-detail")?.textContent.trim() || "";
+  }
+
+  function setActive(rowToActivate) {
+    activeRow = rowToActivate;
+    rows.forEach((row) => {
+      const isActive = row === rowToActivate;
+      row.classList.toggle("is-active", isActive);
+      row.setAttribute("aria-expanded", String(isActive));
+    });
+    renderPanel(rowToActivate);
+  }
+
+  rows.forEach((row) => {
+    row.tabIndex = 0;
+    row.setAttribute("role", "button");
+    row.setAttribute("aria-expanded", "false");
+    row.addEventListener("click", () => {
+      setActive(activeRow === row ? null : row);
+    });
+    row.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      setActive(activeRow === row ? null : row);
+    });
+  });
+
+  setActive(rows[0]);
+}
+
+function bindLocalTime() {
+  const targets = document.querySelectorAll("[data-local-time]");
+  if (!targets.length) return;
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  function renderTime() {
+    const parts = Object.fromEntries(formatter.formatToParts(new Date()).map((part) => [part.type, part.value]));
+    const value = `${parts.hour}:${parts.minute} ${parts.dayPeriod.toLowerCase()} ist`;
+    targets.forEach((target) => {
+      target.textContent = value;
+    });
+  }
+
+  renderTime();
+  window.setInterval(renderTime, 30000);
+}
+
 async function renderMermaid() {
   if (!document.querySelector(".mermaid")) return;
 
@@ -270,11 +366,13 @@ async function renderMermaid() {
       startOnLoad: false,
       theme: "base",
       themeVariables: {
-        background: "#f5f1e8",
-        primaryColor: "#ede6d8",
-        primaryTextColor: "#1f1b16",
-        primaryBorderColor: "#8f3f25",
-        lineColor: "#8f3f25",
+        background: "#070707",
+        primaryColor: "#0e0b06",
+        primaryTextColor: "#f3f2ee",
+        primaryBorderColor: "#ffc400",
+        lineColor: "#ffc400",
+        secondaryColor: "#141006",
+        tertiaryColor: "#1b1509",
         fontFamily: "ui-sans-serif, system-ui, sans-serif",
       },
     });
@@ -316,3 +414,6 @@ async function highlightCodeBlocks() {
 
 renderBlogIndex().catch(console.error);
 renderPost().catch(console.error);
+bindWorkPanels();
+bindProjectRows();
+bindLocalTime();
