@@ -1,5 +1,5 @@
 async function loadPosts() {
-  const response = await fetch("../posts/index.json");
+  const response = await fetch("../posts/index.json", { cache: "no-cache" });
   if (!response.ok) throw new Error("Could not load posts index");
   return response.json();
 }
@@ -28,6 +28,7 @@ function escapeHtml(value) {
 
 function inlineMarkdown(value) {
   return escapeHtml(value)
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">')
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/_([^_]+)_/g, "<em>$1</em>")
     .replace(/`([^`]+)`/g, "<code>$1</code>")
@@ -40,6 +41,7 @@ function markdownToHtml(markdown) {
   let paragraph = [];
   let list = false;
   let code = false;
+  let codeLanguage = "";
   let codeLines = [];
 
   function flushParagraph() {
@@ -54,57 +56,113 @@ function markdownToHtml(markdown) {
     list = false;
   }
 
-  lines.forEach((line) => {
+  function isTableSeparator(line) {
+    return /^\s*\|?[\s:-]+\|[\s|:-]*$/.test(line);
+  }
+
+  function renderTable(start) {
+    const rows = [];
+    let index = start;
+    while (index < lines.length && lines[index].includes("|") && lines[index].trim()) {
+      rows.push(lines[index]);
+      index += 1;
+    }
+
+    const cells = (row) =>
+      row
+        .split("|")
+        .map((cell) => cell.trim())
+        .filter(Boolean);
+
+    const header = cells(rows[0]);
+    const body = rows.slice(2).map(cells);
+    html.push(`
+      <div class="table-wrap">
+        <table>
+          <thead><tr>${header.map((cell) => `<th>${inlineMarkdown(cell)}</th>`).join("")}</tr></thead>
+          <tbody>
+            ${body
+              .map((row) => `<tr>${row.map((cell) => `<td>${inlineMarkdown(cell)}</td>`).join("")}</tr>`)
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    `);
+    return index - 1;
+  }
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+
     if (line.startsWith("```")) {
       if (code) {
-        html.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
+        const codeText = escapeHtml(codeLines.join("\n"));
+        if (codeLanguage === "mermaid") {
+          html.push(`<div class="mermaid">${codeText}</div>`);
+        } else {
+          const language = codeLanguage ? escapeHtml(codeLanguage) : "text";
+          html.push(`
+            <figure class="code-block" data-language="${language}">
+              <pre><code class="language-${language}">${codeText}</code></pre>
+            </figure>
+          `);
+        }
         code = false;
+        codeLanguage = "";
         codeLines = [];
       } else {
         flushParagraph();
         closeList();
         code = true;
+        codeLanguage = line.slice(3).trim().toLowerCase();
       }
-      return;
+      continue;
     }
 
     if (code) {
       codeLines.push(line);
-      return;
+      continue;
     }
 
     if (!line.trim()) {
       flushParagraph();
       closeList();
-      return;
+      continue;
+    }
+
+    if (line.includes("|") && lines[i + 1] && isTableSeparator(lines[i + 1])) {
+      flushParagraph();
+      closeList();
+      i = renderTable(i);
+      continue;
     }
 
     if (line.startsWith("# ")) {
       flushParagraph();
       closeList();
       html.push(`<h1>${inlineMarkdown(line.slice(2))}</h1>`);
-      return;
+      continue;
     }
 
     if (line.startsWith("## ")) {
       flushParagraph();
       closeList();
       html.push(`<h2>${inlineMarkdown(line.slice(3))}</h2>`);
-      return;
+      continue;
     }
 
     if (line.startsWith("### ")) {
       flushParagraph();
       closeList();
       html.push(`<h3>${inlineMarkdown(line.slice(4))}</h3>`);
-      return;
+      continue;
     }
 
     if (line.startsWith("> ")) {
       flushParagraph();
       closeList();
       html.push(`<blockquote>${inlineMarkdown(line.slice(2))}</blockquote>`);
-      return;
+      continue;
     }
 
     if (line.startsWith("- ")) {
@@ -114,18 +172,18 @@ function markdownToHtml(markdown) {
         list = true;
       }
       html.push(`<li>${inlineMarkdown(line.slice(2))}</li>`);
-      return;
+      continue;
     }
 
     if (line === "---") {
       flushParagraph();
       closeList();
       html.push("<hr>");
-      return;
+      continue;
     }
 
     paragraph.push(line.trim());
-  });
+  }
 
   flushParagraph();
   closeList();
@@ -154,7 +212,7 @@ async function renderPost() {
   if (!target) return;
 
   const slug = new URLSearchParams(window.location.search).get("slug") || "how-to-async-in-python";
-  const response = await fetch(`../posts/${slug}.md`);
+  const response = await fetch(`../posts/${slug}.md`, { cache: "no-cache" });
   if (!response.ok) {
     target.innerHTML = "<p>Post not found.</p>";
     return;
@@ -164,14 +222,96 @@ async function renderPost() {
   document.title = `${meta.title || "Post"} · Deepam Minda`;
   target.innerHTML = `
     <a class="back-link" href="./">Back to blog</a>
+    <button class="jump-button" type="button" data-jump="bottom" aria-label="Jump to bottom">
+      <span aria-hidden="true">↓</span>
+    </button>
     <article>
       <header>
         <h1>${escapeHtml(meta.title || "Untitled")}</h1>
         <p class="article-meta">${escapeHtml(meta.date || "")}</p>
       </header>
       <div class="article-body">${markdownToHtml(markdown.replace(/^# .+$/m, "").trim())}</div>
+      <span id="post-bottom" tabindex="-1"></span>
     </article>
   `;
+  bindJumpControls();
+  highlightCodeBlocks();
+  renderMermaid();
+}
+
+function bindJumpControls() {
+  const button = document.querySelector("[data-jump]");
+  if (!button) return;
+
+  function syncDirection() {
+    const nearBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 160;
+    const nextDirection = nearBottom ? "top" : "bottom";
+    button.dataset.jump = nextDirection;
+    button.setAttribute("aria-label", nextDirection === "top" ? "Jump to top" : "Jump to bottom");
+    button.querySelector("span").textContent = nextDirection === "top" ? "↑" : "↓";
+  }
+
+  button.addEventListener("click", () => {
+    const target = button.dataset.jump === "bottom" ? document.querySelector("#post-bottom") : document.body;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  window.addEventListener("scroll", syncDirection, { passive: true });
+  window.addEventListener("resize", syncDirection);
+  syncDirection();
+}
+
+async function renderMermaid() {
+  if (!document.querySelector(".mermaid")) return;
+
+  try {
+    const mermaid = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    mermaid.default.initialize({
+      startOnLoad: false,
+      theme: "base",
+      themeVariables: {
+        background: "#f5f1e8",
+        primaryColor: "#ede6d8",
+        primaryTextColor: "#1f1b16",
+        primaryBorderColor: "#8f3f25",
+        lineColor: "#8f3f25",
+        fontFamily: "ui-sans-serif, system-ui, sans-serif",
+      },
+    });
+    await mermaid.default.run({ querySelector: ".mermaid" });
+  } catch (error) {
+    console.error("Mermaid failed to render", error);
+  }
+}
+
+function loadExternalScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) {
+      resolve();
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+async function highlightCodeBlocks() {
+  if (!document.querySelector(".code-block")) return;
+
+  try {
+    await loadExternalScript("https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js");
+    await loadExternalScript("https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-clike.min.js");
+    await loadExternalScript("https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js");
+    await loadExternalScript("https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js");
+    window.Prism.highlightAllUnder(document.querySelector(".article-body"));
+  } catch (error) {
+    console.error("Syntax highlighting failed", error);
+  }
 }
 
 renderBlogIndex().catch(console.error);

@@ -8,8 +8,6 @@ source: https://mindadeepam.bearblog.dev/how-to-async-in-python/
 
 # How to async in python?
 
-_Originally published on [Bear](https://mindadeepam.bearblog.dev/how-to-async-in-python/)._
-
 Let's say you want to deploy a backend service in Python. You are likely considering between 2 popular options:
 
 - **Flask** - A mature, widely-used framework that's great for synchronous applications. It has a large ecosystem but limited native support for asynchronous programming.
@@ -23,7 +21,7 @@ Above your application layer (app.py) is a gateway layer that takes in requests 
 
 app.py
 
-```
+```python
 from flask import Flask
 import time
 
@@ -41,14 +39,14 @@ if __name__ == '__main__':
 
 In the terminal, run this script.
 
-```
+```bash
 python app.py
 
 ```
 
 You will see->
 
-```
+```output
 * Serving Flask app 'app'
  * Debug mode: on
 WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
@@ -77,7 +75,7 @@ Before we dive deeper, it's worth understanding two related concepts: **concurre
 
 **Deploying with gunicorn:** Let’s say we have a 4-core 8 GB RAM machine. It's generally advised to have at most 2-4 threads per core. So if we max out, we can push the concurrency to 4 * 4 -> 16
 
-```
+```bash
 gunicorn app:app --workers 4 --threads 4 --bind 0.0.0.0:8000
 
 ```
@@ -122,7 +120,7 @@ Async programming offers a way around these limitations by enabling **cooperativ
 
 Let's demonstrate this with a simple blocking function:
 
-```
+```python
 # Version 1: Blocking
 import time
 
@@ -143,7 +141,7 @@ main()
 
 **Output:**
 
-```
+```output
 Sleeping for 2 seconds
 Done sleeping for 2 seconds
 Sleeping for 1 seconds
@@ -154,7 +152,7 @@ time taken: ~3.0s
 
 Now, let's use **multithreading** to run both concurrently:
 
-```
+```python
 # Version 2: Multithreading
 import threading
 
@@ -172,7 +170,7 @@ def main():
 
 So far, so good. Now let's try **async/await**:
 
-```
+```python
 # Version 3: Async
 import asyncio
 
@@ -193,7 +191,7 @@ asyncio.run(main())
 
 **Output:**
 
-```
+```output
 Sleeping for 2 seconds
 Done sleeping for 2 seconds
 Sleeping for 1 seconds
@@ -206,7 +204,7 @@ Wait -- wasn't async supposed to help with concurrency? Yes, but the above runs 
 
 To make them run concurrently, use `asyncio.gather`:
 
-```
+```python
 # Concurrent version using asyncio.gather
 async def main():
     start = time.time()
@@ -232,7 +230,7 @@ A single-threaded scheduler that runs asynchronous tasks. It maintains:
 
 Only one coroutine runs at a time, but it **yields control using `await`**, allowing the event loop to run something else.
 
-```
+```python
 asyncio.run(main())  # bootstraps the event loop and runs main() coroutine
 
 ```
@@ -241,7 +239,7 @@ asyncio.run(main())  # bootstraps the event loop and runs main() coroutine
 
 A coroutine is a function that can **pause itself** ( `await`) and yield control to the event loop, which can then resume it later. It's like a lightweight thread, but cooperatively scheduled and far more memory-efficient.
 
-```
+```python
 async def sleep(t):
     await asyncio.sleep(t)
 
@@ -251,14 +249,14 @@ async def sleep(t):
 
 When you `await` a coroutine, it runs to completion (or to the next `await`) **within the current coroutine**. It's like calling a function and blocking until it returns.
 
-```
+```python
 await sleep(2)  # sequential, blocks current coroutine until done
 
 ```
 
 If instead you want it to run **independently**, use `asyncio.create_task()`:
 
-```
+```python
 task = asyncio.create_task(sleep(2))  # schedules it immediately
 # ... do other stuff ...
 await task  # wait later if needed
@@ -277,7 +275,7 @@ This allows true concurrency (within a single thread) -- multiple tasks can yiel
 
 Note that a coroutine can have blocking functions inside it, but you can't put coroutines inside blocking functions.
 
-```
+```python
 # this is wrong
 def main():
     await some_coroutine()
@@ -291,7 +289,7 @@ FastAPI is the most popular framework that supports asynchronous processing.
 
 Here is a basic FastAPI server deployed using an asynchronous server gateway interface, uvicorn.
 
-```
+```python
 import uvicorn
 from fastapi import FastAPI
 import time
@@ -352,7 +350,7 @@ Reset a Value: The `set()`method returns a token that can be used to reset the v
 
 **Example**
 
-```
+```python
 import asyncio
 import contextvars
 
@@ -406,7 +404,7 @@ Below are the changes you need to make while migrating from a blocking codebase 
 
 All api calls must be asynchronous. Httpx is a modern asynchronous alternative for requests.
 
-```
+```python
 import httpx
 import asyncio
 
@@ -432,7 +430,7 @@ SQL libraries also have their async versions, which are mostly a drop-in replace
 
 Here's an example using `aiomysql`:
 
-```
+```python
 import aiomysql
 import asyncio
 
@@ -458,7 +456,7 @@ if __name__ == "__main__":
 
 ### 3. For MongoDB calls, use motor:
 
-```
+```python
 from motor.motor_asyncio import AsyncIOMotorClient
 import asyncio
 
@@ -482,7 +480,7 @@ if __name__ == "__main__":
 
 For blocking code that is CPU-intensive, you can offload the task to a separate thread using `asyncio.to_thread`. This allows you to perform CPU-bound operations without blocking the main event loop.
 
-```
+```python
 import asyncio
 import time
 
@@ -511,7 +509,7 @@ In this example, `asyncio.to_thread` is used to run the `cpu_bound_operation` fu
 
 ### 5. For things that can be parallelized, use tasks
 
-```
+```python
 import asyncio
 import time
 import random
