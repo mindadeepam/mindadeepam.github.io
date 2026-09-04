@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Typography directions - Deepam Minda</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,ital,wght@6..96,0,400;6..96,0,500;6..96,0,600;6..96,1,500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display:ital@0;1&family=Fraunces:opsz,SOFT,WONK,wght@9..144,0,0,400;9..144,0,0,500;9..144,0,0,600;9..144,0,0,700&family=Geist+Mono:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet" />
+    <style>
+      @font-face {
+        font-family: "Geist";
+        font-style: normal;
+        font-weight: 100 900;
+        src: url("https://cdn.jsdelivr.net/npm/geist@1.4.1/dist/fonts/geist-sans/Geist-Variable.woff2") format("woff2");
+      }
+      :root {
+        color-scheme: dark;
+        --void: #070707;
+        --paper: #f4f2ed;
+        --text: #f4f2ed;
+        --muted: #9b9b96;
+        --line: #222220;
+        --amber: #ffc400;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--void);
+        color: var(--text);
+      }
+      .page {
+        width: min(1120px, calc(100% - 48px));
+        margin: 0 auto;
+        padding: 56px 0 96px;
+      }
+      .page > header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 24px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--line);
+      }
+      .page h1, .page p { margin: 0; }
+      .page-title { font: 500 15px/1.2 "IBM Plex Mono", monospace; color: var(--amber); }
+      .page-note { font: 400 13px/1.4 "IBM Plex Mono", monospace; color: var(--muted); text-align: right; }
+      .specimens { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 28px; }
+      .specimen { min-height: 410px; padding: 30px; border: 1px solid var(--line); }
+      .specimen-label { margin-bottom: 44px !important; font: 500 12px/1.2 var(--mono); color: var(--amber); }
+      .role { font: 500 12px/1.2 var(--mono); color: var(--muted); }
+      .name { max-width: 540px; margin-top: 14px !important; font: 600 clamp(44px, 5vw, 68px)/.92 var(--display); letter-spacing: -0.055em; }
+      .intro { max-width: 530px; margin-top: 22px !important; font: 400 20px/1.28 var(--sans); color: #c1c1bc; }
+      .links { display: flex; flex-wrap: wrap; gap: 14px 20px; margin-top: 30px; font: 500 12px/1.2 var(--mono); }
+      .links a { color: var(--text); text-decoration: none; border-bottom: 1px solid #55554f; padding-bottom: 4px; }
+      .blog-sample { margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--line); }
+      .blog-kicker { font: 500 11px/1.2 var(--mono); color: var(--amber); }
+      .blog-row { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; margin-top: 14px; }
+      .blog-title { font: 500 19px/1.16 var(--sans); }
+      .blog-date { flex: 0 0 auto; font: 400 11px/1.2 var(--mono); color: var(--muted); }
+      .instrument { --display: "Instrument Sans", sans-serif; --sans: "Instrument Sans", sans-serif; --mono: "IBM Plex Mono", monospace; }
+      .geist { --display: "Geist", sans-serif; --sans: "Geist", sans-serif; --mono: "Geist Mono", monospace; }
+      .newsreader { --display: "Newsreader", Georgia, serif; --sans: "Instrument Sans", sans-serif; --mono: "IBM Plex Mono", monospace; }
+      .dm { --display: "DM Sans", sans-serif; --sans: "DM Sans", sans-serif; --mono: "JetBrains Mono", monospace; }
+      .fraunces { --display: "Fraunces", Georgia, serif; --sans: "Instrument Sans", sans-serif; --mono: "IBM Plex Mono", monospace; }
+      .dm-serif { --display: "DM Serif Display", Georgia, serif; --sans: "DM Sans", sans-serif; --mono: "IBM Plex Mono", monospace; }
+      .bodoni { --display: "Bodoni Moda", Didot, serif; --sans: "Instrument Sans", sans-serif; --mono: "IBM Plex Mono", monospace; }
+      .newsreader .name { letter-spacing: -0.045em; font-weight: 500; }
+      .fraunces .name { letter-spacing: -0.05em; font-weight: 600; }
+      .dm-serif .name { letter-spacing: -0.04em; font-weight: 400; }
+      .bodoni .name { letter-spacing: -0.06em; font-weight: 500; }
+      .geist .name { letter-spacing: -0.06em; }
+      @media (max-width: 760px) {
+        .page { width: min(100% - 32px, 560px); padding-top: 32px; }
+        .page > header { display: block; }
+        .page-note { margin-top: 10px; text-align: left; }
+        .specimens { grid-template-columns: 1fr; }
+        .specimen { min-height: 0; padding: 24px; }
+        .specimen-label { margin-bottom: 34px !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <h1 class="page-title">type directions</h1>
+        <p class="page-note">Same content and layout. Pick the system, not a description.</p>
+      </header>
+      <section class="specimens" aria-label="Typography comparison">
+        <article class="specimen instrument">
+          <p class="specimen-label">01 - Instrument Sans / IBM Plex Mono</p>
+          <p class="role">applied ml engineer</p>
+          <h2 class="name">Deepam<br />Minda</h2>
+          <p class="intro">I build practical AI systems - agents, applied ML workflows, and the backend that makes them useful.</p>
+          <p class="links"><a href="#">email</a><a href="#">linkedin</a><a href="#">github</a><a href="#">resume</a></p>
+          <div class="blog-sample"><p class="blog-kicker">writing</p><div class="blog-row"><p class="blog-title">How to async in Python?</p><p class="blog-date">16 Jun 2025</p></div></div>
+        </article>
+        <article class="specimen geist">
+          <p class="specimen-label">02 - Geist / Geist Mono</p>
+          <p class="role">applied ml engineer</p>
+          <h2 class="name">Deepam<br />Minda</h2>
+          <p class="intro">I build practical AI systems - agents, applied ML workflows, and the backend that makes them useful.</p>
+          <p class="links"><a href="#">email</a><a href="#">linkedin</a><a href="#">github</a><a href="#">resume</a></p>
+          <div class="blog-sample"><p class="blog-kicker">writing</p><div class="blog-row"><p class="blog-title">How to async in Python?</p><p class="blog-date">16 Jun 2025</p></div></div>
+        </article>
+        <article class="specimen newsreader">
+          <p class="specimen-label">03 - Newsreader / Instrument Sans / IBM Plex Mono</p>
+          <p class="role">applied ml engineer</p>
+          <h2 class="name">Deepam<br />Minda</h2>
+          <p class="intro">I build practical AI systems - agents, applied ML workflows, and the backend that makes them useful.</p>
+          <p class="links"><a href="#">email</a><a href="#">linkedin</a><a href="#">github</a><a href="#">resume</a></p>
+          <div class="blog-sample"><p class="blog-kicker">writing</p><div class="blog-row"><p class="blog-title">How to async in Python?</p><p class="blog-date">16 Jun 2025</p></div></div>
+        </article>
+        <article class="specimen dm">
+          <p class="specimen-label">04 - DM Sans / JetBrains Mono</p>
+          <p class="role">applied ml engineer</p>
+          <h2 class="name">Deepam<br />Minda</h2>
+          <p class="intro">I build practical AI systems - agents, applied ML workflows, and the backend that makes them useful.</p>
+          <p class="links"><a href="#">email</a><a href="#">linkedin</a><a href="#">github</a><a href="#">resume</a></p>
+          <div class="blog-sample"><p class="blog-kicker">writing</p><div class="blog-row"><p class="blog-title">How to async in Python?</p><p class="blog-date">16 Jun 2025</p></div></div>
+        </article>
+        <article class="specimen fraunces">
+          <p class="specimen-label">05 - Fraunces / Instrument Sans / IBM Plex Mono</p>
+          <p class="role">applied ml engineer</p>
+          <h2 class="name">Deepam<br />Minda</h2>
+          <p class="intro">I build practical AI systems - agents, applied ML workflows, and the backend that makes them useful.</p>
+          <p class="links"><a href="#">email</a><a href="#">linkedin</a><a href="#">github</a><a href="#">resume</a></p>
+          <div class="blog-sample"><p class="blog-kicker">writing</p><div class="blog-row"><p class="blog-title">How to async in Python?</p><p class="blog-date">16 Jun 2025</p></div></div>
+        </article>
+        <article class="specimen dm-serif">
+          <p class="specimen-label">06 - DM Serif Display / DM Sans / IBM Plex Mono</p>
+          <p class="role">applied ml engineer</p>
+          <h2 class="name">Deepam<br />Minda</h2>
+          <p class="intro">I build practical AI systems - agents, applied ML workflows, and the backend that makes them useful.</p>
+          <p class="links"><a href="#">email</a><a href="#">linkedin</a><a href="#">github</a><a href="#">resume</a></p>
+          <div class="blog-sample"><p class="blog-kicker">writing</p><div class="blog-row"><p class="blog-title">How to async in Python?</p><p class="blog-date">16 Jun 2025</p></div></div>
+        </article>
+        <article class="specimen bodoni">
+          <p class="specimen-label">07 - Bodoni Moda / Instrument Sans / IBM Plex Mono</p>
+          <p class="role">applied ml engineer</p>
+          <h2 class="name">Deepam<br />Minda</h2>
+          <p class="intro">I build practical AI systems - agents, applied ML workflows, and the backend that makes them useful.</p>
+          <p class="links"><a href="#">email</a><a href="#">linkedin</a><a href="#">github</a><a href="#">resume</a></p>
+          <div class="blog-sample"><p class="blog-kicker">writing</p><div class="blog-row"><p class="blog-title">How to async in Python?</p><p class="blog-date">16 Jun 2025</p></div></div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

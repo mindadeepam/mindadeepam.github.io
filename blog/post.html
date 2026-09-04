@@ -4,19 +4,32 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#070707" />
+    <script>
+      (() => {
+        const savedTheme = localStorage.getItem("deepam-theme");
+        const theme = savedTheme || (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
     <title>Post · Deepam Minda</title>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E"
     />
-    <link rel="stylesheet" href="../styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,SOFT,WONK,wght@9..144,0,0,400;9..144,0,0,500;9..144,0,0,600;9..144,0,0,700&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../styles.css?v=18" />
   </head>
   <body>
     <header class="site-header">
       <a class="mark" href="../">deepam</a>
       <nav aria-label="Primary navigation">
         <a href="./">blog</a>
-        <a href="../#contact">links</a>
+        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to light mode" title="Switch color mode">
+          <span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span>
+          <span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span>
+        </button>
       </nav>
     </header>
 
@@ -25,6 +38,6 @@
     <footer>
       <p>© Deepam Minda</p>
     </footer>
-    <script src="../script.js?v=7"></script>
+    <script src="../script.js?v=14"></script>
   </body>
 </html>

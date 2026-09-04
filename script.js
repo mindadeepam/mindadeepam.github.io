@@ -4,6 +4,30 @@ async function loadPosts() {
   return response.json();
 }
 
+function initializeThemeToggle() {
+  const storageKey = "deepam-theme";
+  const root = document.documentElement;
+  const toggle = document.querySelector("[data-theme-toggle]");
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+
+  function applyTheme(theme, persist = false) {
+    root.dataset.theme = theme;
+    if (themeMeta) themeMeta.content = theme === "light" ? "#f6f7f3" : "#070707";
+    if (toggle) {
+      const nextTheme = theme === "dark" ? "light" : "dark";
+      toggle.setAttribute("aria-label", `Switch to ${nextTheme} mode`);
+      toggle.setAttribute("title", `Switch to ${nextTheme} mode`);
+    }
+    if (persist) localStorage.setItem(storageKey, theme);
+  }
+
+  applyTheme(root.dataset.theme || "dark");
+
+  toggle?.addEventListener("click", () => {
+    applyTheme(root.dataset.theme === "dark" ? "light" : "dark", true);
+  });
+}
+
 function parseFrontMatter(markdown) {
   if (!markdown.startsWith("---")) return [{}, markdown];
   const end = markdown.indexOf("\n---", 3);
@@ -357,6 +381,92 @@ function bindLocalTime() {
   window.setInterval(renderTime, 30000);
 }
 
+async function renderGithubActivity() {
+  const target = document.querySelector("[data-github-activity]");
+  if (!target) return;
+
+  const kickerTarget = target.querySelector(".github-kicker");
+  const totalTarget = target.querySelector("[data-github-total]");
+  const noteTarget = target.querySelector("[data-github-note]");
+  const monthsTarget = target.querySelector("[data-github-months]");
+  const gridTarget = target.querySelector("[data-github-grid]");
+  if (!kickerTarget || !totalTarget || !noteTarget || !monthsTarget || !gridTarget) return;
+
+  try {
+    const response = await fetch("/api/github-activity", { cache: "no-cache" });
+    if (!response.ok) throw new Error(`GitHub activity request failed: ${response.status}`);
+
+    const payload = await response.json();
+    const cells = Array.isArray(payload.cells) ? payload.cells : [];
+    if (!cells.length) throw new Error(payload.error || "No contribution data returned");
+
+    const weekPositions = [...new Set(cells.map((cell) => cell.x))].sort((a, b) => a - b);
+    const dayPositions = [...new Set(cells.map((cell) => cell.y))].sort((a, b) => a - b);
+    const weekIndex = new Map(weekPositions.map((position, index) => [position, index]));
+    const dayIndex = new Map(dayPositions.map((position, index) => [position, index]));
+    const dateFormatter = new Intl.DateTimeFormat("en-US", { month: "short" });
+    const seenMonths = new Set();
+    const monthLabels = [];
+
+    for (const cell of [...cells].sort((a, b) => a.date.localeCompare(b.date))) {
+      const monthKey = cell.date.slice(0, 7);
+      if (seenMonths.has(monthKey)) continue;
+      seenMonths.add(monthKey);
+      monthLabels.push({
+        label: dateFormatter.format(new Date(`${cell.date}T00:00:00`)),
+        week: weekIndex.get(cell.x) || 0,
+      });
+    }
+
+    const total = new Intl.NumberFormat("en-US").format(Number(payload.total) || 0);
+    const title = typeof payload.title === "string" ? payload.title : "contributions in the last year";
+    kickerTarget.textContent = "all activity";
+    totalTarget.textContent = `${total} ${title}`;
+    noteTarget.textContent =
+      typeof payload.note === "string" && payload.note
+        ? payload.note
+        : `Last 12 months across ${weekPositions.length} weeks.`;
+
+    monthsTarget.style.setProperty("--github-weeks", String(weekPositions.length));
+    gridTarget.style.setProperty("--github-weeks", String(weekPositions.length));
+
+    monthsTarget.innerHTML = monthLabels
+      .map((month) => `<span style="grid-column: ${month.week + 1};">${month.label}</span>`)
+      .join("");
+
+    gridTarget.innerHTML = cells
+      .slice()
+      .sort((left, right) => {
+        const weekDelta = (weekIndex.get(left.x) || 0) - (weekIndex.get(right.x) || 0);
+        if (weekDelta !== 0) return weekDelta;
+        return (dayIndex.get(left.y) || 0) - (dayIndex.get(right.y) || 0);
+      })
+      .map((cell) => {
+        const level = Math.max(0, Math.min(4, Number(cell.level) || 0));
+        const count = Number(cell.count) || 0;
+        return `
+          <span
+            class="github-cell"
+            data-level="${level}"
+            title="${cell.date}: ${count} contributions"
+            aria-label="${cell.date}: ${count} contributions"
+          ></span>
+        `;
+      })
+      .join("");
+
+    target.dataset.state = "ready";
+  } catch (error) {
+    console.error("GitHub activity failed", error);
+    kickerTarget.textContent = "contribution graph";
+    totalTarget.textContent = "GitHub activity unavailable";
+    noteTarget.textContent = "Couldn’t load the live contribution graph right now.";
+    monthsTarget.innerHTML = "";
+    gridTarget.innerHTML = "";
+    target.dataset.state = "error";
+  }
+}
+
 async function renderMermaid() {
   if (!document.querySelector(".mermaid")) return;
 
@@ -412,8 +522,10 @@ async function highlightCodeBlocks() {
   }
 }
 
+initializeThemeToggle();
 renderBlogIndex().catch(console.error);
 renderPost().catch(console.error);
 bindWorkPanels();
 bindProjectRows();
 bindLocalTime();
+renderGithubActivity().catch(console.error);

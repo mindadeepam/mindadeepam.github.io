@@ -3,289 +3,55 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Deepam Minda. AI engineer. Notes, projects, and writing." />
+    <meta name="description" content="Deepam Minda. Applied ML Engineer." />
     <meta name="theme-color" content="#070707" />
+    <script>
+      (() => {
+        const savedTheme = localStorage.getItem("deepam-theme");
+        const theme = savedTheme || (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
     <meta property="og:title" content="Deepam Minda" />
-    <meta property="og:description" content="AI engineer. Notes, projects, and writing." />
+    <meta property="og:description" content="Applied ML Engineer." />
     <meta property="og:type" content="website" />
     <title>Deepam Minda</title>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E"
     />
-    <link rel="stylesheet" href="./styles.css?v=13" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,SOFT,WONK,wght@9..144,0,0,400;9..144,0,0,500;9..144,0,0,600;9..144,0,0,700&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=18" />
   </head>
   <body>
     <header class="site-header">
       <a class="mark" href="./">deepam</a>
       <nav aria-label="Primary navigation">
-        <a href="#work">work</a>
-        <a href="#skills">skills</a>
         <a href="./blog/">blog</a>
-        <a href="#contact">links</a>
+        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to light mode" title="Switch color mode">
+          <span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span>
+          <span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span>
+        </button>
       </nav>
     </header>
 
     <main>
-      <section class="home">
+      <section class="home home-minimal" aria-labelledby="home-title">
         <div class="hero-shell">
-          <p class="small"><span aria-hidden="true"></span> building agents and backend AI systems</p>
-          <div class="name-frame" aria-label="Deepam Minda">
-            <h1>Deepam Minda</h1>
+          <p class="small"><span aria-hidden="true"></span> applied ML engineer</p>
+          <div class="name-frame">
+            <h1 id="home-title">Deepam Minda</h1>
           </div>
-          <p class="intro">Data Scientist I at Farmart. I build agents, backend systems, and applied ML tools.</p>
-          <p class="place">delhi ncr · india · <span data-local-time>ist</span></p>
-          <div class="hero-actions" aria-label="Primary links">
-            <a class="pill-link primary" href="mailto:deepamminda99@gmail.com">mail</a>
-            <a class="pill-link" href="./blog/">blog</a>
-            <a class="pill-link" href="https://www.linkedin.com/in/mindadeepam/">linkedin</a>
+          <p class="intro">I build practical AI systems - agents, applied ML workflows, and the backend that makes them useful.</p>
+          <p class="place">delhi ncr, india</p>
+          <div class="hero-links" aria-label="Connect">
+            <a href="mailto:deepamminda99@gmail.com">email</a>
+            <a href="https://www.linkedin.com/in/mindadeepam/">linkedin</a>
+            <a href="https://github.com/mindadeepam">github</a>
+            <a href="./output/pdf/Deepam_Minda_Applied_ML_Engineer.pdf" target="_blank" rel="noreferrer">resume.pdf</a>
           </div>
-        </div>
-      </section>
-
-      <section id="work" class="simple-section work-section" aria-labelledby="work-title">
-        <h2 id="work-title">work</h2>
-        <div class="work-stack">
-          <button class="work-trigger" type="button" data-work-toggle aria-expanded="false" aria-controls="farmart-detail">
-            <span class="work-trigger-meta">Farmart · Data Scientist</span>
-            <span class="work-trigger-title">AI systems across agri-commerce operations</span>
-            <span class="work-trigger-note">Associate Data Scientist -> Data Scientist I</span>
-          </button>
-
-          <div class="work-detail" id="farmart-detail" data-work-detail hidden>
-            <p class="role-path" aria-label="Farmart role progression">
-              Associate Data Scientist <span aria-hidden="true">-></span> Data Scientist I
-            </p>
-
-            <p class="work-lede">
-              At Farmart, I moved from model training into the operating layer around applied AI:
-              agents, validators, data pipelines, internal tools, and production workflows.
-            </p>
-
-            <div class="project-map" aria-label="Farmart project areas">
-              <article class="project-slice" data-project-row>
-                <p class="project-kicker">Agents</p>
-                <h3>Multi-agent trade assistant</h3>
-                <div class="project-copy">
-                  <p class="project-summary">
-                    Built production agent systems for product and messaging channels, supporting
-                    text, voice, image, document, and business-context inputs.
-                  </p>
-                  <p class="project-detail">
-                    Capability areas: intent classification, concierge routing, domain micro-agents,
-                    tool calling, persistent user memory, chat/session state, media ingestion,
-                    auth-aware actions, event-triggered workflows, and retrieval or web-search
-                    augmentation. Built the backend patterns around the model too: context passing,
-                    action boundaries, media references, fallback behavior, and reviewable outputs.
-                  </p>
-                </div>
-              </article>
-
-              <article class="project-slice" data-project-row>
-                <p class="project-kicker">AI Review</p>
-                <h3>Operational decision automation</h3>
-                <div class="project-copy">
-                  <p class="project-summary">
-                    Built AI review systems that turn document-heavy operations into structured,
-                    reviewable decisions using extraction, rules, and ML validators.
-                  </p>
-                  <p class="project-detail">
-                    Capability areas: document classification, schema extraction, field-level
-                    validation, confidence and risk scoring, cross-field consistency checks,
-                    business-rule engines, exception queues, human-in-the-loop review, and
-                    audit-friendly outputs. Designed for lower manual processing time without
-                    turning operational decisions into black boxes.
-                  </p>
-                </div>
-              </article>
-
-              <article class="project-slice" data-project-row>
-                <p class="project-kicker">Grain QC</p>
-                <h3>Computer vision for procurement quality</h3>
-                <div class="project-copy">
-                  <p class="project-summary">
-                    Built computer vision models for image-based quality assessment using
-                    segmentation, supervised classification, and representation learning.
-                  </p>
-                  <p class="project-detail">
-                    Capability areas: image preprocessing, segmentation-assisted feature extraction,
-                    DenseNet-style classifiers, contrastive learning, threshold calibration, model
-                    evaluation, error analysis, and deployment-facing decision thresholds. Work
-                    included custom training and fine-tuning loops, not just API integration.
-                  </p>
-                </div>
-              </article>
-
-              <article class="project-slice" data-project-row>
-                <p class="project-kicker">Community</p>
-                <h3>Community content automation</h3>
-                <div class="project-copy">
-                  <p class="project-summary">
-                    Built content automation pipelines for discovery, relevance scoring, tagging,
-                    draft generation, and human review.
-                  </p>
-                  <p class="project-detail">
-                    Capability areas: configurable search engines, keyword/query management, source
-                    ingestion, deduplication, relevance classification, metadata tagging, retrieval
-                    context, DSPy-based draft workflows, review queues, AI-assisted editing, and
-                    admin controls for non-engineering users. This combines LLM workflow design,
-                    data pipelines, and practical product surfaces around model output.
-                  </p>
-                </div>
-              </article>
-
-              <article class="project-slice" data-project-row>
-                <p class="project-kicker">Forecasting</p>
-                <h3>Commodity price forecasting</h3>
-                <div class="project-copy">
-                  <p class="project-summary">
-                    Built forecasting experiments from multi-source market data, scraped signals,
-                    engineered features, and classical ML baselines.
-                  </p>
-                  <p class="project-detail">
-                    Capability areas: web scraping, data cleaning, feature engineering, time-window
-                    aggregation, regression baselines, tree ensembles, Random Forest, Extra Trees,
-                    XGBoost, backtesting-style evaluation, notebook analysis, visualization, and
-                    retraining experiments. The emphasis was end-to-end modeling from messy data,
-                    not only model selection.
-                  </p>
-                </div>
-              </article>
-
-              <article class="project-slice" data-project-row>
-                <p class="project-kicker">Moderation</p>
-                <h3>Custom and few-shot text classifiers</h3>
-                <div class="project-copy">
-                  <p class="project-summary">
-                    Trained classification models for community moderation and policy enforcement,
-                    including custom model training and label-efficient Transformer workflows.
-                  </p>
-                  <p class="project-detail">
-                    Capability areas: PyTorch training loops, Hugging Face Transformers, fine-tuning,
-                    embeddings, sentence transformers, contrastive learning, SetFit-style few-shot
-                    learning, label strategy, evaluation sets, false-positive analysis, and
-                    iteration on new moderation categories. The work covered practical ML under
-                    limited labels: training, evaluation, error analysis, and iteration.
-                  </p>
-                </div>
-              </article>
-
-              <article class="project-slice" data-project-row>
-                <p class="project-kicker">Pipelines</p>
-                <h3>Distributed jobs and data pipelines</h3>
-                <div class="project-copy">
-                  <p class="project-summary">
-                    Maintained scheduled DS services, distributed workers, and internal controls for
-                    recurring model/data workflows.
-                  </p>
-                  <p class="project-detail">
-                    Capability areas: Celery Beat scheduling, SQS-backed queues, Redis result state,
-                    Mongo-backed runtime configuration, retries, timeouts, late acknowledgements,
-                    feature flags, job history, manual recovery, and production monitoring through
-                    process managers, logs, alerts, and error tracking.
-                  </p>
-                </div>
-              </article>
-
-              <article class="project-slice" data-project-row>
-                <p class="project-kicker">Platform</p>
-                <h3>Internal tools surface</h3>
-                <div class="project-copy">
-                  <p class="project-summary">
-                    Primary maintainer for an internal platform that made AI systems, automations,
-                    review queues, and scheduled jobs usable by operations teams.
-                  </p>
-                  <p class="project-detail">
-                    Capability areas: backend APIs, role-aware surfaces, monitoring dashboards,
-                    experiment controls, source management, review queues, cron controls, workflow
-                    operations, permission checks, and Mongo/FastAPI integration. I shipped UI
-                    surface area quickly while owning integration quality, permissions, and
-                    production behavior.
-                  </p>
-                </div>
-              </article>
-
-            </div>
-          </div>
-
-          <div class="work-line">
-            <span>Doubtnut · ML intern</span>
-            <p>Moderation, Hinglish profanity classification, Whisper transcription, and translation workflows.</p>
-          </div>
-        </div>
-      </section>
-
-      <section id="skills" class="simple-section skills-section" aria-labelledby="skills-title">
-        <h2 id="skills-title">skills</h2>
-        <div class="skills-grid" aria-label="Technical skills">
-          <div class="skill-group">
-            <p>AI / ML</p>
-            <span>PyTorch</span>
-            <span>Hugging Face</span>
-            <span>Transformers</span>
-            <span>fine-tuning</span>
-            <span>custom classifiers</span>
-            <span>LLM agents</span>
-            <span>multimodal AI</span>
-            <span>computer vision</span>
-            <span>segmentation</span>
-            <span>contrastive learning</span>
-            <span>SetFit</span>
-            <span>forecasting</span>
-          </div>
-          <div class="skill-group">
-            <p>Agents / LLM Systems</p>
-            <span>multi-agent architectures</span>
-            <span>LangChain</span>
-            <span>LangGraph</span>
-            <span>tool calling</span>
-            <span>persistent memory</span>
-            <span>authentication</span>
-            <span>harness engineering</span>
-            <span>RAG</span>
-            <span>DSPy</span>
-            <span>OpenAI</span>
-            <span>multimodal media</span>
-          </div>
-          <div class="skill-group">
-            <p>Backend / Data</p>
-            <span>Python</span>
-            <span>FastAPI</span>
-            <span>Celery</span>
-            <span>event-driven workflows</span>
-            <span>REST APIs</span>
-            <span>auth context</span>
-            <span>MongoDB</span>
-            <span>Postgres</span>
-            <span>Redis</span>
-          </div>
-          <div class="skill-group">
-            <p>Infra / Ops</p>
-            <span>AWS EC2/ECS/SQS/SNS</span>
-            <span>GCP Cloud Functions</span>
-            <span>Databricks</span>
-            <span>PM2</span>
-            <span>Sentry</span>
-            <span>CloudWatch</span>
-            <span>cron operations</span>
-          </div>
-        </div>
-      </section>
-
-      <section class="simple-section" aria-labelledby="writing-title">
-        <h2 id="writing-title">writing</h2>
-        <a class="post-row" href="./blog/post.html?slug=how-to-async-in-python">
-          <span>How to async in python?</span>
-          <time datetime="2025-06-16">16 Jun 2025</time>
-        </a>
-      </section>
-
-      <section id="contact" class="simple-section" aria-labelledby="contact-title">
-        <h2 id="contact-title">links</h2>
-        <div class="links">
-          <a href="mailto:deepamminda99@gmail.com">email</a>
-          <a href="https://github.com/mindadeepam">github</a>
-          <a href="https://www.linkedin.com/in/mindadeepam/">linkedin</a>
         </div>
       </section>
     </main>
@@ -293,6 +59,6 @@
     <footer>
       <p>© Deepam Minda</p>
     </footer>
-    <script src="./script.js?v=11"></script>
+    <script src="./script.js?v=15"></script>
   </body>
 </html>

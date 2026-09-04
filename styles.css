@@ -1,4 +1,7 @@
 :root {
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Instrument Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, ui-monospace, monospace;
   --void: #070707;
   --panel: rgba(255, 255, 255, 0.035);
   --panel-soft: rgba(255, 255, 255, 0.035);
@@ -10,7 +13,40 @@
   --amber: #ffc400;
   --green: #00a884;
   --ink-line: rgba(255, 255, 255, 0.1);
+  --subtle-line: rgba(255, 255, 255, 0.07);
+  --amber-soft: rgba(255, 196, 0, 0.36);
+  --github-empty: rgba(255, 255, 255, 0.05);
+  --github-cell-border: rgba(255, 255, 255, 0.02);
+  --code-surface: #0e0b06;
+  --code-label-surface: #141006;
+  --code-comment: #81786b;
+  --code-string: #56e7b0;
+  --code-number: #ef7d47;
   color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  --void: #f6f7f3;
+  --panel: rgba(19, 22, 19, 0.045);
+  --panel-soft: rgba(19, 22, 19, 0.035);
+  --text: #141714;
+  --muted: #62675f;
+  --soft: #30352f;
+  --line: rgba(20, 23, 20, 0.16);
+  --line-strong: rgba(20, 23, 20, 0.3);
+  --amber: #9b6700;
+  --green: #007b62;
+  --ink-line: rgba(20, 23, 20, 0.13);
+  --subtle-line: rgba(20, 23, 20, 0.09);
+  --amber-soft: rgba(155, 103, 0, 0.38);
+  --github-empty: rgba(20, 23, 20, 0.075);
+  --github-cell-border: rgba(20, 23, 20, 0.04);
+  --code-surface: #e9ece5;
+  --code-label-surface: #e1e4dc;
+  --code-comment: #697067;
+  --code-string: #007b62;
+  --code-number: #ad4c22;
+  color-scheme: light;
 }
 
 *,
@@ -32,9 +68,11 @@ body {
   margin: 0;
   background: var(--void);
   color: var(--text);
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
   line-height: 1.55;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
 }
 
 a {
@@ -81,8 +119,7 @@ nav,
 .article-meta,
 .back-link,
 footer {
-  font-family:
-    "SFMono-Regular", Consolas, "Liberation Mono", Menlo, ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 
 .mark {
@@ -107,6 +144,50 @@ nav,
   font-size: 15px;
 }
 
+.theme-toggle {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  margin: -5px 0;
+  padding: 0;
+  border: 1px solid var(--ink-line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--soft);
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--amber);
+  background: var(--panel);
+  color: var(--amber);
+  transform: rotate(10deg);
+}
+
+.theme-icon {
+  grid-area: 1 / 1;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.theme-icon-moon {
+  display: none;
+}
+
+html[data-theme="light"] .theme-icon-sun {
+  display: none;
+}
+
+html[data-theme="light"] .theme-icon-moon {
+  display: inline;
+}
+
 nav a,
 .links a {
   transition:
@@ -120,18 +201,18 @@ nav a:hover,
 }
 
 .home {
-  min-height: min(760px, calc(100svh - 72px));
+  min-height: calc(100svh - 72px);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-content: center;
-  gap: 44px;
-  padding: 82px 0 70px;
+  padding: 72px 0;
 }
 
 .hero-shell {
   position: relative;
-  width: min(100%, 1120px);
-  padding: clamp(34px, 7vw, 92px) clamp(0px, 3vw, 54px);
+  width: min(100%, 860px);
+  margin-inline: auto;
+  padding: 0;
 }
 
 .small {
@@ -139,9 +220,9 @@ nav a:hover,
   align-items: center;
   gap: 16px;
   width: fit-content;
-  margin: 0 0 54px;
+  margin: 0 0 34px;
   color: var(--muted);
-  font-size: clamp(15px, 1.4vw, 22px);
+  font-size: 14px;
   line-height: 1.3;
 }
 
@@ -183,67 +264,52 @@ h3 {
 
 .home h1 {
   color: var(--text);
-  font-size: clamp(68px, 9.2vw, 138px);
-  font-weight: 760;
-  line-height: 0.88;
+  font-family: var(--font-display);
+  font-size: clamp(58px, 7.2vw, 108px);
+  font-weight: 600;
+  line-height: 0.86;
+  letter-spacing: -0.06em;
 }
 
 .intro {
-  max-width: 780px;
-  margin: 48px 0 0;
+  max-width: 680px;
+  margin: 32px 0 0;
   color: var(--soft);
-  font-size: clamp(24px, 3vw, 42px);
-  line-height: 1.24;
+  font-size: clamp(22px, 2.5vw, 34px);
+  line-height: 1.27;
   letter-spacing: -0.035em;
 }
 
 .place {
-  margin: 34px 0 0;
+  margin: 24px 0 0;
   color: var(--muted);
   font-size: 14px;
 }
 
-.hero-actions {
+.hero-links {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 22px;
-  margin-top: 40px;
+  gap: 12px 24px;
+  margin-top: 44px;
 }
 
-.pill-link {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  padding: 0 20px;
-  border: 1px solid var(--ink-line);
-  border-radius: 999px;
+.hero-links a {
+  display: inline-block;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--line-strong);
   color: var(--soft);
-  background: rgba(255, 255, 255, 0.035);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1;
   transition:
-    border-color 160ms ease,
     color 160ms ease,
-    background 160ms ease,
-    transform 160ms ease;
+    border-color 160ms ease;
 }
 
-.pill-link.primary {
-  border-color: var(--text);
-  background: var(--text);
-  color: var(--void);
-}
-
-.pill-link:hover {
+.hero-links a:hover {
   border-color: var(--amber);
-  background: rgba(255, 196, 0, 0.12);
-  color: var(--text);
-  transform: translateY(-2px);
-}
-
-.pill-link.primary:hover {
-  background: var(--amber);
-  color: var(--void);
+  color: var(--amber);
 }
 
 .simple-section {
@@ -271,9 +337,10 @@ h3 {
   position: relative;
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 44px;
-  gap: 14px 28px;
-  padding: 0 0 34px;
+  grid-template-columns: 210px minmax(0, 1fr) 44px;
+  align-items: start;
+  gap: 0 30px;
+  padding: 0 0 30px;
   border: 0;
   border-bottom: 1px solid var(--line);
   background: transparent;
@@ -284,8 +351,8 @@ h3 {
 
 .work-trigger::after {
   content: "+";
-  grid-row: 1 / span 3;
-  grid-column: 2;
+  grid-row: 1;
+  grid-column: 3;
   align-self: center;
   width: 44px;
   height: 44px;
@@ -320,6 +387,7 @@ h3 {
 }
 
 .work-trigger-meta {
+  grid-column: 1;
   color: var(--amber);
 }
 
@@ -328,10 +396,11 @@ h3 {
 }
 
 .work-trigger-title {
-  max-width: 700px;
-  font-size: clamp(31px, 3.6vw, 48px);
+  grid-column: 2;
+  max-width: 940px;
+  font-size: clamp(24px, 2.8vw, 38px);
   font-weight: 760;
-  line-height: 1;
+  line-height: 1.08;
   letter-spacing: -0.055em;
 }
 
@@ -376,7 +445,7 @@ h3 {
 .project-map {
   display: grid;
   grid-template-columns: 1fr;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid var(--subtle-line);
 }
 
 .project-slice {
@@ -387,7 +456,7 @@ h3 {
   column-gap: clamp(22px, 4vw, 54px);
   row-gap: 10px;
   padding: 19px 0 19px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--subtle-line);
   cursor: pointer;
   outline: 0;
   transition:
@@ -402,7 +471,7 @@ h3 {
   bottom: 30px;
   left: 0;
   width: 2px;
-  background: rgba(255, 196, 0, 0.36);
+  background: var(--amber-soft);
   transform: scaleY(0);
   transform-origin: top;
   transition:
@@ -495,20 +564,22 @@ h3 {
   grid-template-columns: 210px minmax(0, 1fr);
   gap: 30px;
   padding: 30px 0 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--subtle-line);
 }
 
 .work-line span {
-  color: var(--muted);
+  color: var(--amber);
   font-size: 12px;
+  letter-spacing: 0;
 }
 
 .work-line p {
   margin: 0 0 30px;
-  color: var(--soft);
-  font-size: clamp(22px, 2.4vw, 32px);
-  line-height: 1.12;
-  letter-spacing: -0.045em;
+  color: var(--text);
+  font-size: clamp(24px, 2.8vw, 38px);
+  font-weight: 720;
+  line-height: 1.08;
+  letter-spacing: -0.055em;
 }
 
 .skills-grid {
@@ -534,7 +605,7 @@ h3 {
   bottom: 28px;
   left: 0;
   width: 2px;
-  background: rgba(255, 196, 0, 0.35);
+  background: var(--amber-soft);
 }
 
 .skill-group p {
@@ -550,12 +621,175 @@ h3 {
   align-items: center;
   min-height: 28px;
   padding: 0 10px;
-  border: 1px solid rgba(255, 255, 255, 0.075);
+  border: 1px solid var(--subtle-line);
   border-radius: 999px;
   color: var(--soft);
   font-size: 13px;
   line-height: 1;
-  background: rgba(255, 255, 255, 0.018);
+  background: var(--panel-soft);
+}
+
+.github-activity {
+  display: grid;
+  gap: 18px;
+  max-width: 100%;
+  padding-top: 4px;
+}
+
+.github-activity-head {
+  display: grid;
+  gap: 8px;
+}
+
+.github-kicker {
+  margin: 0;
+  color: var(--amber);
+  font-family:
+    "SFMono-Regular", Consolas, "Liberation Mono", Menlo, ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.github-total {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(28px, 3.1vw, 44px);
+  font-weight: 760;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.github-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.github-months {
+  --github-cell: 11px;
+  --github-gap: 3px;
+  display: grid;
+  grid-template-columns: repeat(var(--github-weeks, 53), var(--github-cell));
+  gap: var(--github-gap);
+  padding-left: 36px;
+  color: var(--muted);
+  font-family:
+    "SFMono-Regular", Consolas, "Liberation Mono", Menlo, ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.github-months span {
+  white-space: nowrap;
+}
+
+.github-grid-wrap {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.github-days {
+  display: grid;
+  grid-template-rows: repeat(7, var(--github-cell, 11px));
+  gap: var(--github-gap, 3px);
+  padding-top: 1px;
+  color: var(--muted);
+  font-family:
+    "SFMono-Regular", Consolas, "Liberation Mono", Menlo, ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.github-days span {
+  display: flex;
+  align-items: center;
+  height: var(--github-cell, 11px);
+}
+
+.github-grid {
+  --github-cell: 11px;
+  --github-gap: 3px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--github-cell);
+  grid-template-rows: repeat(7, var(--github-cell));
+  gap: var(--github-gap);
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 196, 0, 0.28) transparent;
+}
+
+.github-cell {
+  width: var(--github-cell);
+  height: var(--github-cell);
+  border-radius: 2px;
+  background: var(--github-empty);
+  border: 1px solid var(--github-cell-border);
+  transition:
+    transform 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.github-cell:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 196, 0, 0.36);
+}
+
+.github-cell[data-level="1"] {
+  background: rgba(255, 196, 0, 0.16);
+}
+
+.github-cell[data-level="2"] {
+  background: rgba(255, 196, 0, 0.28);
+}
+
+.github-cell[data-level="3"] {
+  background: rgba(255, 196, 0, 0.46);
+}
+
+.github-cell[data-level="4"] {
+  background: rgba(255, 196, 0, 0.72);
+}
+
+.github-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-family:
+    "SFMono-Regular", Consolas, "Liberation Mono", Menlo, ui-monospace, monospace;
+  font-size: 11px;
+}
+
+.github-swatch {
+  width: var(--github-cell, 11px);
+  height: var(--github-cell, 11px);
+  border-radius: 2px;
+  display: inline-block;
+  background: var(--github-empty);
+}
+
+.github-swatch[data-level="1"] {
+  background: rgba(255, 196, 0, 0.16);
+}
+
+.github-swatch[data-level="2"] {
+  background: rgba(255, 196, 0, 0.28);
+}
+
+.github-swatch[data-level="3"] {
+  background: rgba(255, 196, 0, 0.46);
+}
+
+.github-swatch[data-level="4"] {
+  background: rgba(255, 196, 0, 0.72);
 }
 
 @keyframes work-open {
@@ -573,15 +807,13 @@ h3 {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 24px;
-  padding: 24px 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  gap: 18px;
+  padding: 19px 0;
   color: var(--text);
-  font-size: clamp(26px, 3.2vw, 44px);
-  font-weight: 720;
-  line-height: 1;
-  letter-spacing: -0.06em;
+  font-size: clamp(19px, 2.1vw, 25px);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
 }
 
 .post-row:hover {
@@ -600,6 +832,10 @@ h3 {
   border-bottom: 1px solid var(--line-strong);
 }
 
+.github-section {
+  align-items: start;
+}
+
 footer {
   padding: 44px 0;
   border-top: 1px solid var(--ink-line);
@@ -612,19 +848,32 @@ footer p {
 }
 
 .page-head {
-  padding: 92px 0 56px;
-  border-bottom: 1px solid var(--line);
+  width: min(100%, 760px);
+  margin-inline: auto;
+  padding: 74px 0 22px;
 }
 
 .page-head h1 {
-  max-width: 900px;
-  font-size: clamp(52px, 7vw, 92px);
-  font-weight: 760;
-  line-height: 0.92;
+  font-family: var(--font-display);
+  font-size: clamp(38px, 4vw, 54px);
+  font-weight: 600;
+  line-height: 0.9;
+  letter-spacing: -0.055em;
+}
+
+.blog-eyebrow {
+  margin: 0 0 14px;
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
 }
 
 .blog-list {
-  padding: 32px 0 72px;
+  width: min(100%, 760px);
+  margin-inline: auto;
+  padding: 24px 0 88px;
 }
 
 .article {
@@ -640,9 +889,10 @@ footer p {
 }
 
 .article h1 {
+  font-family: var(--font-display);
   font-size: clamp(44px, 6vw, 72px);
-  font-weight: 760;
-  line-height: 0.96;
+  font-weight: 600;
+  line-height: 0.9;
 }
 
 .article-meta {
@@ -714,14 +964,14 @@ footer p {
     "SFMono-Regular", Consolas, "Liberation Mono", Menlo, ui-monospace, monospace;
   font-size: 11px;
   text-transform: uppercase;
-  background: #141006;
+  background: var(--code-label-surface);
 }
 
 .article-body pre {
   overflow-x: auto;
   margin: 0;
   padding: 40px 18px 18px;
-  background: #0e0b06;
+  background: var(--code-surface);
   border: 1px solid var(--line);
 }
 
@@ -735,7 +985,7 @@ footer p {
 .article-body .token.prolog,
 .article-body .token.doctype,
 .article-body .token.cdata {
-  color: #81786b;
+  color: var(--code-comment);
 }
 
 .article-body .token.keyword,
@@ -746,7 +996,7 @@ footer p {
 .article-body .token.string,
 .article-body .token.char,
 .article-body .token.attr-value {
-  color: #56e7b0;
+  color: var(--code-string);
 }
 
 .article-body .token.function,
@@ -757,7 +1007,31 @@ footer p {
 .article-body .token.number,
 .article-body .token.boolean,
 .article-body .token.constant {
-  color: #ef7d47;
+  color: var(--code-number);
+}
+
+@media (max-width: 840px) {
+  .github-grid-wrap {
+    grid-template-columns: 1fr;
+  }
+
+  .github-days {
+    display: none;
+  }
+
+  .github-months {
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .github-activity {
+    gap: 14px;
+  }
+
+  .github-total {
+    font-size: clamp(24px, 7vw, 34px);
+  }
 }
 
 .article-body .token.punctuation {
@@ -923,12 +1197,16 @@ footer p {
     margin-top: 28px;
   }
 
+  .home-minimal .hero-shell {
+    padding: 0;
+  }
+
   .simple-section {
     padding: 52px 0;
   }
 
   .work-trigger {
-    grid-template-columns: minmax(0, 1fr) 34px;
+    grid-template-columns: 1fr 34px;
     gap: 12px 14px;
     padding: 0 0 28px;
   }
@@ -940,7 +1218,12 @@ footer p {
   }
 
   .work-trigger-title {
+    grid-column: 1;
     font-size: clamp(28px, 8.5vw, 34px);
+  }
+
+  .work-trigger-meta {
+    grid-column: 1;
   }
 
   .work-lede {
