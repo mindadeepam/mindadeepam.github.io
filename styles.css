@@ -876,6 +876,25 @@ footer p {
   padding: 24px 0 88px;
 }
 
+.note-row-text {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.note-row-desc {
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  transition: color 160ms ease;
+}
+
+.note-row:hover .note-row-desc {
+  color: var(--soft);
+}
+
 .article {
   width: min(100% - 48px, 820px);
   margin: 0 auto;

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Deepam Minda. Applied ML Engineer." />
+    <meta name="description" content="Study notes by Deepam Minda on machine learning and deep learning." />
     <meta name="theme-color" content="#070707" />
     <script>
       (() => {
@@ -12,10 +12,7 @@
         document.documentElement.dataset.theme = theme;
       })();
     </script>
-    <meta property="og:title" content="Deepam Minda" />
-    <meta property="og:description" content="Applied ML Engineer." />
-    <meta property="og:type" content="website" />
-    <title>Deepam Minda</title>
+    <title>Study notes · Deepam Minda</title>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E"
@@ -23,14 +20,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,SOFT,WONK,wght@9..144,0,0,400;9..144,0,0,500;9..144,0,0,600;9..144,0,0,700&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=18" />
+    <link rel="stylesheet" href="../styles.css?v=19" />
   </head>
   <body>
     <header class="site-header">
-      <a class="mark" href="./">deepam</a>
+      <a class="mark" href="../">deepam</a>
       <nav aria-label="Primary navigation">
-        <a href="./blog/">blog</a>
-        <a href="./notes/">study notes</a>
+        <a href="../blog/">blog</a>
+        <a href="./" aria-current="page">study notes</a>
         <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to light mode" title="Switch color mode">
           <span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span>
           <span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span>
@@ -39,27 +36,29 @@
     </header>
 
     <main>
-      <section class="home home-minimal" aria-labelledby="home-title">
-        <div class="hero-shell">
-          <p class="small"><span aria-hidden="true"></span> applied ML engineer</p>
-          <div class="name-frame">
-            <h1 id="home-title">Deepam Minda</h1>
-          </div>
-          <p class="intro">I build practical AI systems - agents, applied ML workflows, and the backend that makes them useful.</p>
-          <p class="place">delhi ncr, india</p>
-          <div class="hero-links" aria-label="Connect">
-            <a href="mailto:deepamminda99@gmail.com">email</a>
-            <a href="https://www.linkedin.com/in/mindadeepam/">linkedin</a>
-            <a href="https://github.com/mindadeepam">github</a>
-            <a href="./output/pdf/Deepam_Minda_Applied_ML_Engineer.pdf" target="_blank" rel="noreferrer">resume.pdf</a>
-          </div>
-        </div>
+      <section class="page-head">
+        <p class="blog-eyebrow">learning</p>
+        <h1>Study notes</h1>
+      </section>
+      <!-- One row per note, newest first. Generated notes are added or updated
+           between the markers by their build script; hand-written ones can be
+           added here directly. -->
+      <section class="blog-list" aria-label="Study notes">
+        <!-- notes:start -->
+        <a class="post-row note-row" href="./deep-learning-nlp.html">
+          <span class="note-row-text">
+            <span>Deep learning – NLP</span>
+            <span class="note-row-desc">RNNs, LSTMs and GRUs, transformers, BERT and GPT, and fine-tuning, with diagrams, worked maths and practice questions.</span>
+          </span>
+          <time datetime="2026-10-09">09 Oct 2026</time>
+        </a>
+        <!-- notes:end -->
       </section>
     </main>
 
     <footer>
       <p>© Deepam Minda</p>
     </footer>
-    <script src="./script.js?v=15"></script>
+    <script src="../script.js?v=15"></script>
   </body>
 </html>

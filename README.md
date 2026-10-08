@@ -1,6 +1,6 @@
 # Deepam Minda
 
-Personal site for [Deepam Minda](https://deepamminda.vercel.app/), an Applied ML Engineer. The site is intentionally small: a home page, a Markdown-backed blog, and a generated resume PDF.
+Personal site for [Deepam Minda](https://deepamminda.vercel.app/), an Applied ML Engineer. The site is intentionally small: a home page, a Markdown-backed blog, study notes, and a generated resume PDF.
 
 It is deployed on **Vercel**, not GitHub Pages. The repository does not use a JavaScript framework, package manager, or build step for its static pages.
 
@@ -13,6 +13,8 @@ script.js                  Theme toggle, Markdown renderer, blog rendering
 blog/index.html            Blog index
 blog/post.html             Blog post shell
 posts/                     Markdown sources and post index
+notes/index.html           Study notes index (rows between notes:start/end markers)
+notes/*.html               Study notes, prebuilt standalone pages
 resume/build_resume.py     Generates the resume PDF
 output/pdf/                Generated resume linked from the home page
 api/github-activity.js     Optional Vercel serverless endpoint
@@ -99,6 +101,14 @@ Posts are plain Markdown files in [`posts/`](./posts). The blog index is driven 
    ```
 
 The lightweight renderer supports headings, links, images, lists, blockquotes, tables, fenced code blocks with language labels, and Mermaid diagrams. It does not currently render Jupyter notebooks. When notebook publishing becomes necessary, add a build-time renderer that converts `.ipynb` files to styled static HTML; do not attempt to render raw notebooks in the browser.
+
+## Study notes
+
+Study notes are long-form standalone HTML pages in [`notes/`](./notes), each with its own styling (diagrams, MathJax maths, a light/dark toggle that shares the site's `deepam-theme` setting). They are built outside this repository from private sources: the build strips private content, writes `notes/<slug>.html`, and adds or updates the note's row in [`notes/index.html`](./notes/index.html) between the `<!-- notes:start -->` and `<!-- notes:end -->` markers.
+
+- To add a hand-written note, put the full HTML page in `notes/` and add a row between the markers, newest first, copying an existing row's markup.
+- Preview `/notes/` and the note itself, including MathJax rendering and phone width.
+- Never commit private notes, interview prep, or links to private repositories.
 
 ## Resume PDF
 
