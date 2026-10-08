@@ -1,0 +1,1009 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transformers · Deepam Minda</title>
+<meta name="description" content="Seq2seq and attention, the transformer part by part, BERT and GPT, fine-tuning and LoRA, with diagrams, pseudocode and practice questions.">
+<meta property="og:title" content="Transformers">
+<meta property="og:description" content="Seq2seq and attention, the transformer part by part, BERT and GPT, fine-tuning and LoRA, with diagrams, pseudocode and practice questions.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+(function () {
+  try { var t = localStorage.getItem("deepam-theme"); if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<style>
+/* Green graph-paper theme for the recurrent-notebook content.
+   Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
+   One sans for text, one mono for labels; MathJax draws the maths. Green = the cell / notebook,
+   slate = the hidden state, orange only for gradients. */
+:root {
+  --paper: #f5f7f2;
+  --grid: #edf1e9;
+  --grid-major: #e4eadf;
+  --surface: #fcfdfb;
+  --ink: #141b17;
+  --ink-2: #46524a;
+  --ink-3: #6f7c73;
+  --rule: #d3dccf;
+  --link: #1c6a43;
+  --cell: #1c6a43;
+  --cell-wash: #e2eee4;
+  --hid: #2f5470;
+  --hid-wash: #e4ecf1;
+  --gate: #3d4a42;
+  --gate-wash: #e9efe6;
+  --grad: #c75a1a;
+  --grad-wash: #f8e7db;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --serif: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0d1310; --grid: #111813; --grid-major: #151e18; --surface: #151d18;
+    --ink: #e3eae4; --ink-2: #a8b4ab; --ink-3: #76837a; --rule: #26332b; --link: #7ccc9b;
+    --cell: #7ccc9b; --cell-wash: #1a2a20; --hid: #8fb6d2; --hid-wash: #17232b;
+    --gate: #c9d3cb; --gate-wash: #1b241e; --grad: #f0975a; --grad-wash: #2e1f16;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0d1310; --grid: #111813; --grid-major: #151e18; --surface: #151d18;
+  --ink: #e3eae4; --ink-2: #a8b4ab; --ink-3: #76837a; --rule: #26332b; --link: #7ccc9b;
+  --cell: #7ccc9b; --cell-wash: #1a2a20; --hid: #8fb6d2; --hid-wash: #17232b;
+  --gate: #c9d3cb; --gate-wash: #1b241e; --grad: #f0975a; --grad-wash: #2e1f16;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
+body {
+  margin: 0; color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: 50% 0;
+  font: 16.5px/1.7 var(--sans); letter-spacing: -.003em;
+  padding-inline: 20px; padding-block: 44px 88px;
+  -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 640px) { body { font-size: 16px; padding-inline: 16px; padding-block: 24px 80px; } }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+table, button { font: inherit; }
+code { font: .86em var(--mono); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; }
+
+.page { max-width: 1200px; margin: 0 auto; display: grid; gap: 52px; grid-template-columns: 220px minmax(0, 860px); justify-content: center; }
+@media (max-width: 1080px) { .page { grid-template-columns: minmax(0, 860px); gap: 0; } }
+
+/* theme toggle */
+.theme-toggle {
+  position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); right: 16px; z-index: 6;
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  font: 500 12px/1 var(--mono); color: var(--ink-2);
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; padding: 8px 12px;
+}
+.theme-toggle:hover { color: var(--ink); border-color: var(--ink-3); }
+.theme-toggle .dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(90deg, var(--ink) 50%, var(--surface) 50%); border: 1px solid var(--ink-3); }
+
+/* contents */
+.toc { position: sticky; top: 28px; align-self: start; font: 13.5px/1.4 var(--sans); max-height: calc(100vh - 56px); overflow-y: auto; }
+.toc summary { display: none; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--ink-2); text-decoration: none; }
+.toc a:hover { background: var(--surface); color: var(--ink); }
+.toc a.on { color: var(--ink); background: var(--surface); box-shadow: inset 2px 0 0 var(--cell); }
+.toc .n { font: 500 11px var(--mono); color: var(--ink-3); margin-right: 8px; }
+.toc .label { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 10px 10px; }
+.toc li.part { font: 500 10.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 14px 10px 4px; }
+@media (max-width: 1080px) {
+  .toc { position: static; margin-bottom: 26px; max-height: none; }
+  .toc .label { display: none; }
+  .toc details { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  .toc summary { display: block; cursor: pointer; padding: 12px 14px; font: 500 14px var(--sans); list-style: none; }
+  .toc summary::-webkit-details-marker { display: none; }
+  .toc summary::after { content: "+"; float: right; color: var(--ink-3); }
+  .toc details[open] summary::after { content: "–"; }
+  .toc details ol { padding: 0 6px 10px; }
+}
+.jump {
+  display: none; position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+  font: 500 13px var(--sans); color: var(--ink); background: var(--surface); text-decoration: none;
+  border: 1px solid var(--rule); border-radius: 999px; padding: 9px 14px;
+}
+@media (max-width: 1080px) { .jump { display: block; } }
+
+/* article */
+article { min-width: 0; }
+header.hero { display: grid; gap: 10px; margin-bottom: 26px; }
+.kicker { font: 500 12px/1 var(--mono); color: var(--ink-3); letter-spacing: .02em; }
+h1 { margin: 0; font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.6rem); line-height: 1.1; font-weight: 600; letter-spacing: -.028em; text-wrap: balance; }
+.dek { margin: 0; font-size: 1.1rem; line-height: 1.55; color: var(--ink-2); max-width: 40em; }
+.meta { font: 12px/1.5 var(--mono); color: var(--ink-3); }
+.key { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.key span::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--c); margin-right: 6px; vertical-align: middle; }
+
+h2 { font-size: 1.36rem; line-height: 1.25; font-weight: 600; letter-spacing: -.018em; margin: 56px 0 12px; text-wrap: balance; scroll-margin-top: 16px; }
+h2 .pn { font: 500 .74em/1 var(--mono); color: var(--ink-3); margin-right: .7em; letter-spacing: 0; }
+h3 { font-size: 1.04rem; font-weight: 600; letter-spacing: -.01em; margin: 30px 0 6px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 1.25em; }
+li { margin-bottom: 5px; }
+li::marker { color: var(--ink-3); }
+strong { font-weight: 600; }
+.mj { overflow-x: auto; overflow-y: hidden; margin: 4px 0 16px; padding: 2px 0; }
+mjx-container[display="true"] { margin: 0 !important; }
+
+/* plan and summary panels */
+.tldr { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 22px 6px; margin-bottom: 14px; }
+.tldr h2 { margin: 0 0 10px; font: 500 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.tldr ol { padding-left: 1.3em; }
+.tldr li { margin-bottom: 8px; }
+.tldr p { margin: 0 0 12px; font-size: 15.5px; }
+.tldr .tbl { margin: 4px 0 12px; }
+
+/* notes: quote-style, coloured by kind */
+.note { margin: 16px 0 20px; padding: 2px 0 2px 16px; border-left: 2px solid var(--c); color: var(--ink-2); font-size: .97em; }
+.note > .nl { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); margin: 4px 0 8px; }
+.note strong { color: var(--ink); }
+.note.ask { --c: var(--cell); }
+.note.say { --c: var(--hid); }
+.note.trap { --c: var(--grad); }
+.note.lab { --c: var(--cell); }
+.note .q { font-style: italic; color: var(--ink); }
+.note ul { margin: 0 0 10px; }
+.note li { margin-bottom: 5px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 6px 0 20px; }
+table { border-collapse: collapse; width: 100%; font-size: .93em; line-height: 1.5; }
+th { text-align: left; vertical-align: bottom; font: 500 11px/1.4 var(--mono); color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; padding: 0 14px 8px 0; border-bottom: 1px solid var(--ink-3); }
+td { padding: 8px 14px 8px 0; vertical-align: top; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+td .src { display: block; font: 11.5px/1.4 var(--mono); color: var(--ink-3); margin-top: 2px; }
+
+/* gate cards */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0 20px; }
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.gc { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 4px; font-size: 15.5px; line-height: 1.6; }
+.gc h4 { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.gc h4 .tag { font: 500 11px var(--mono); color: var(--c); }
+.gc.g1 { --c: var(--cell); }
+.gc.g2 { --c: var(--ink-3); }
+.gc p { margin-bottom: 10px; }
+
+/* figures */
+figure { margin: 18px 0 24px; }
+.plate { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 10px; overflow-x: auto; }
+.plate svg { display: block; width: 100%; height: auto; min-width: 460px; max-width: 700px; margin: 0 auto; }
+@media (max-width: 500px) { .plate svg { max-width: none; } }
+figcaption { font-size: .86rem; line-height: 1.5; color: var(--ink-3); margin-top: 10px; }
+.dg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink-2); }
+.dg .v { font-family: var(--serif); font-style: italic; font-size: 19px; fill: var(--ink); }
+.dg .v .s { font-size: 12.5px; }
+.dg .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; fill: var(--ink-3); }
+.dg .gl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--gate); }
+.dg .gs { font-family: var(--serif); font-style: normal; font-size: 12px; fill: var(--ink-3); }
+.dg .cl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--ink); }
+.dg .cs { font-family: var(--sans); font-size: 12px; fill: var(--ink-2); }
+.dg .optx { font: 500 17px var(--sans); fill: var(--ink); }
+.dg .cell { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.dg .hid { stroke: var(--hid); stroke-width: 2.4; fill: none; }
+.dg .hid.thick { stroke-width: 3.6; }
+.dg .in { stroke: var(--ink-3); stroke-width: 1.5; fill: none; }
+.dg .gw { stroke: var(--gate); stroke-width: 1.6; fill: none; }
+.dg .cw { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+.dg .grad { stroke: var(--grad); fill: none; stroke-linecap: round; }
+.dg .gbox { fill: var(--gate-wash); stroke: var(--gate); stroke-width: 1.3; }
+.dg .box { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .op { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.3; }
+.dg .dot { fill: var(--ink-2); }
+.dg .cellon { fill: var(--cell-wash); stroke: var(--cell); stroke-width: 1; }
+.dg .celloff { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.dg .stream { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.mk-cell { fill: var(--cell); } .mk-hid { fill: var(--hid); } .mk-in { fill: var(--ink-3); }
+.mk-gate { fill: var(--gate); } .mk-cw { fill: var(--ink-2); } .mk-grad { fill: var(--grad); }
+
+/* questions */
+details.qa { border-bottom: 1px solid var(--rule); }
+details.qa:first-of-type { border-top: 1px solid var(--rule); }
+details.qa summary { cursor: pointer; padding: 11px 2px; font-weight: 500; font-size: 15.5px; line-height: 1.45; list-style: none; display: flex; gap: 12px; }
+details.qa summary::-webkit-details-marker { display: none; }
+details.qa summary .qn { font: 500 11.5px/1.9 var(--mono); color: var(--ink-3); flex: none; min-width: 1.9em; }
+details.qa summary::after { content: "+"; margin-left: auto; color: var(--ink-3); flex: none; }
+details.qa[open] summary::after { content: "–"; }
+details.qa .ans { padding: 0 4px 12px 32px; font-size: 15.5px; color: var(--ink-2); }
+summary:focus-visible, a:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+
+.sheet { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 6px; }
+.sheet h3 { margin: 4px 0 6px; font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: .9rem; color: var(--ink-3); }
+
+/* code blocks */
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; margin: 8px 0 20px; overflow-x: auto; font: 12.8px/1.6 var(--mono); color: var(--ink); white-space: pre; }
+pre.code code { font: inherit; background: none; border: 0; padding: 0; }
+pre.code .cm { color: var(--ink-3); }
+@media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
+
+/* public copy: links back to the site */
+.crumbs { max-width: 1132px; margin: 0 auto 28px; display: flex; flex-wrap: wrap; gap: 8px; font: 500 12px/1.6 var(--mono); color: var(--ink-3); }
+.crumbs a { color: var(--ink-2); }
+.crumbs a:hover { color: var(--link); }
+@media (max-width: 1080px) { .crumbs { max-width: 860px; } }
+footer .site-nav { display: block; margin-top: 10px; }
+.next { margin-top: 36px; font-weight: 500; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="a-cell" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path class="mk-cell" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-hid" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto"><path class="mk-hid" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-in" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-in" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-gate" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-cw" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-cw" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-grad" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path class="mk-grad" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<button type="button" class="theme-toggle" id="theme-toggle"><span class="dot"></span><span class="t">Dark mode</span></button>
+<nav class="crumbs" aria-label="Site"><a href="../">deepam</a><span aria-hidden="true">/</span><a href="./">study notes</a></nav>
+<div class="page">
+  <nav class="toc" aria-label="Contents">
+    <details id="tocd" open>
+      <summary>Contents</summary>
+      <div class="label">Contents</div>
+      <ol>
+        <li><a href="#tldr"><span class="n">00</span>In short</a></li>
+        <li class="part">Transformers</li>
+        <li><a href="#bridge"><span class="n">01</span>From LSTMs to transformers</a></li>
+        <li><a href="#tf"><span class="n">02</span>The transformer</a></li>
+        <li><a href="#tfwhat"><span class="n">03</span>Transformer what-ifs</a></li>
+        <li><a href="#plm"><span class="n">04</span>BERT, GPT and fine-tuning</a></li>
+        <li><a href="#bert-train"><span class="n">↳</span>Training BERT, end to end</a></li>
+        <li class="part">Interview prep</li>
+        <li><a href="#questions"><span class="n">05</span>Interview questions</a></li>
+        <li><a href="#sheet"><span class="n">06</span>Cheat sheet</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <article>
+    <header class="hero">
+      <div class="kicker">Study notes · Deep learning</div>
+      <h1>Transformers</h1>
+      <p class="dek">From seq2seq and attention to the transformer, BERT, GPT and fine-tuning: what every part does, why it is there, and what breaks without it.</p>
+      <div class="meta">Diagrams, worked maths and practice questions · follows <a href="./sequence-models.html">Sequence models</a>
+      </div>
+    </header>
+
+
+    <section class="tldr" id="tldr" aria-labelledby="tldr-h">
+      <h2 id="tldr-h">In short</h2>
+      <ol>
+        <li>Seq2seq squeezed the whole source sentence into one fixed vector. Attention let the decoder look back at every encoder state. The transformer dropped recurrence and kept only attention.</li>
+        <li>Each token reads every other token directly, \(\text{softmax}(QK^\top/\sqrt{d_k})\,V\). Training runs in parallel and any two tokens are one step apart, at a cost that grows as \(n^2\).</li>
+        <li>Each block adds two things to a residual stream: attention, which moves information between tokens, and an MLP, which processes it within each token.</li>
+        <li><strong>BERT</strong> (encoder-only) is pretrained to fill in masked tokens and suits classification and tagging. <strong>GPT</strong> (decoder-only) is pretrained to predict the next token under a causal mask and suits generation.</li>
+        <li>To adapt a pretrained model: a frozen backbone with a linear probe when labelled data is small, fine-tuning when there's more data or a domain shift, LoRA when memory is tight or many tasks share one base.</li>
+      </ol>
+    </section>
+
+    <!-- 08 bridge -->
+    <h2 id="bridge"><span class="pn">01</span>From LSTMs to transformers</h2>
+    <p>The field moved from LSTMs to transformers in three steps, each fixing the last one's bottleneck.</p>
+
+    <h3>1. Seq2seq: encode, then decode (Sutskever, Vinyals and Le, 2014)</h3>
+    <p>An LSTM <strong>encoder</strong> reads the source sentence. Its last state is handed to an LSTM <strong>decoder</strong>, which writes the output one token at a time, each output becoming the next input:</p>
+    <div class="mj">\[ h_j = \text{LSTM}_{\text{enc}}(x_j, h_{j-1}) \qquad c = h_T \]</div>
+    <div class="mj">\[ s_t = \text{LSTM}_{\text{dec}}(y_{t-1}, s_{t-1}),\ \ s_0 = c \qquad p(y_t \mid y_{&lt;t}, x) = \text{softmax}(W s_t) \qquad L = -\sum_t \log p(y_t \mid y_{&lt;t}, x) \]</div>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 720 250" role="img" aria-label="Seq2seq. An LSTM encoder reads the, cat, sat, end; its last state is the only thing passed to an LSTM decoder, which outputs le, chat, assis, end, feeding each output back in as the next input.">
+          <rect class="box" x="30" y="100" width="60" height="36" rx="8"/><text x="60" y="123" text-anchor="middle">LSTM</text>
+          <rect class="box" x="110" y="100" width="60" height="36" rx="8"/><text x="140" y="123" text-anchor="middle">LSTM</text>
+          <rect class="box" x="190" y="100" width="60" height="36" rx="8"/><text x="220" y="123" text-anchor="middle">LSTM</text>
+          <rect class="box" x="270" y="100" width="60" height="36" rx="8"/><text x="300" y="123" text-anchor="middle">LSTM</text>
+          <path class="hid" d="M90 118 H108" marker-end="url(#a-hid)"/><path class="hid" d="M170 118 H188" marker-end="url(#a-hid)"/><path class="hid" d="M250 118 H268" marker-end="url(#a-hid)"/>
+          <path class="in" d="M60 196 V139" marker-end="url(#a-in)"/><path class="in" d="M140 196 V139" marker-end="url(#a-in)"/>
+          <path class="in" d="M220 196 V139" marker-end="url(#a-in)"/><path class="in" d="M300 196 V139" marker-end="url(#a-in)"/>
+          <text x="60" y="212" text-anchor="middle">the</text><text x="140" y="212" text-anchor="middle">cat</text>
+          <text x="220" y="212" text-anchor="middle">sat</text><text x="300" y="212" text-anchor="middle">&lt;eos&gt;</text>
+
+          <path class="cell" d="M330 118 H406" marker-end="url(#a-cell)"/>
+          <text class="lbl" x="369" y="96" text-anchor="middle">ONE FIXED VECTOR</text>
+          <text class="lbl" x="369" y="146" text-anchor="middle">c = h₄</text>
+
+          <rect class="box" x="410" y="100" width="60" height="36" rx="8"/><text x="440" y="123" text-anchor="middle">LSTM</text>
+          <rect class="box" x="490" y="100" width="60" height="36" rx="8"/><text x="520" y="123" text-anchor="middle">LSTM</text>
+          <rect class="box" x="570" y="100" width="60" height="36" rx="8"/><text x="600" y="123" text-anchor="middle">LSTM</text>
+          <rect class="box" x="650" y="100" width="60" height="36" rx="8"/><text x="680" y="123" text-anchor="middle">LSTM</text>
+          <path class="hid" d="M470 118 H488" marker-end="url(#a-hid)"/><path class="hid" d="M550 118 H568" marker-end="url(#a-hid)"/><path class="hid" d="M630 118 H648" marker-end="url(#a-hid)"/>
+          <path class="in" d="M440 196 V139" marker-end="url(#a-in)"/><path class="in" d="M520 196 V139" marker-end="url(#a-in)"/>
+          <path class="in" d="M600 196 V139" marker-end="url(#a-in)"/><path class="in" d="M680 196 V139" marker-end="url(#a-in)"/>
+          <text x="440" y="212" text-anchor="middle">&lt;bos&gt;</text><text x="520" y="212" text-anchor="middle">le</text>
+          <text x="600" y="212" text-anchor="middle">chat</text><text x="680" y="212" text-anchor="middle">assis</text>
+          <path class="cw" d="M440 100 V58" marker-end="url(#a-cw)"/><path class="cw" d="M520 100 V58" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M600 100 V58" marker-end="url(#a-cw)"/><path class="cw" d="M680 100 V58" marker-end="url(#a-cw)"/>
+          <text x="440" y="48" text-anchor="middle" style="fill:var(--ink);font-weight:500">le</text><text x="520" y="48" text-anchor="middle" style="fill:var(--ink);font-weight:500">chat</text>
+          <text x="600" y="48" text-anchor="middle" style="fill:var(--ink);font-weight:500">assis</text><text x="680" y="48" text-anchor="middle" style="fill:var(--ink);font-weight:500">&lt;eos&gt;</text>
+          <text class="lbl" x="180" y="240" text-anchor="middle">ENCODER: READS THE SOURCE</text>
+          <text class="lbl" x="560" y="240" text-anchor="middle">DECODER: WRITES, FEEDING EACH WORD BACK IN</text>
+        </svg>
+      </div>
+      <figcaption>Seq2seq. Everything the decoder learns about the source arrives through one fixed-size vector (green), whether the sentence has 4 words or 40, so quality fell on long sentences. During training the decoder's inputs are the true previous words (teacher forcing).</figcaption>
+    </figure>
+
+    <h3>2. Attention: let the decoder look back (Bahdanau, Cho and Bengio, 2014)</h3>
+    <p>Keep <em>every</em> encoder state. At each decoder step, score each one against the decoder's current state, softmax the scores into weights, and read their weighted sum, the <strong>context</strong>:</p>
+    <div class="mj">\[ e_{tj} = v^\top \tanh(W s_{t-1} + U h_j) \quad \text{(additive; Luong's dot-product version: } e_{tj} = s_{t-1}^\top h_j\text{)} \]</div>
+    <div class="mj">\[ \alpha_{tj} = \frac{\exp(e_{tj})}{\sum_k \exp(e_{tk})} \qquad c_t = \sum_j \alpha_{tj} h_j \qquad s_t = \text{LSTM}_{\text{dec}}([y_{t-1};\, c_t],\ s_{t-1}) \]</div>
+    <div class="tbl"><table>
+      <thead><tr><th>Thing</th><th>Shape</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>Encoder states \(H_{\text{enc}} = [h_1; \dots; h_{T_x}]\)</td><td>\(T_x \times H\)</td><td>One row per source word, all kept</td></tr>
+        <tr><td>Decoder state \(s_{t-1}\)</td><td>\(H\)</td><td></td></tr>
+        <tr><td>Additive score: \(W,\ U,\ v\)</td><td>\(a \times H,\ a \times H,\ a\)</td><td>\(a\) is a small attention size; \(e_{tj}\) is one number</td></tr>
+        <tr><td>Scores \(e_t\), weights \(\alpha_t\)</td><td>\(T_x\)</td><td>One per source word; \(\alpha_t\) sums to 1</td></tr>
+        <tr><td>Context \(c_t = \alpha_t^\top H_{\text{enc}}\)</td><td>\((1 \times T_x)(T_x \times H) = H\)</td><td>A weighted average of the rows</td></tr>
+        <tr><td>Decoder input \([y_{t-1}; c_t]\)</td><td>\(d + H\)</td><td>Previous word's embedding plus context</td></tr>
+        <tr><td>Output layer</td><td>\(V \times H\)</td><td>Logits over the target vocabulary</td></tr>
+      </tbody>
+    </table></div>
+    <h3>One attention step, in code</h3>
+    <pre class="code"><code><span class="cm"># enc: (T_x, H) every encoder state;  s: (H,) decoder state</span>
+scores  = v @ tanh(W @ s[:, None] + U @ enc.T)    <span class="cm"># (T_x,)  additive score per source word</span>
+alpha   = softmax(scores)                         <span class="cm"># (T_x,)  sums to 1</span>
+context = alpha @ enc                             <span class="cm"># (H,)    weighted average of encoder states</span>
+s       = lstm_dec(concat([embed(y_prev), context]), s)
+y_hat   = softmax(W_out @ s + b_out)              <span class="cm"># next-word probabilities</span></code></pre>
+
+
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 680 300" role="img" aria-label="Attention at one decoder step. The previous decoder state is compared with each encoder state to get scores; a softmax turns them into weights; the context is the weighted sum of encoder states, with the strongest line from the most relevant state; the context is fed into the decoder's next state.">
+          <rect class="box" x="50" y="224" width="64" height="34" rx="8"/><text class="v" x="74" y="247">h<tspan class="s" dy="5">1</tspan></text>
+          <rect class="box" x="150" y="224" width="64" height="34" rx="8"/><text class="v" x="174" y="247">h<tspan class="s" dy="5">2</tspan></text>
+          <rect class="box" x="250" y="224" width="64" height="34" rx="8"/><text class="v" x="274" y="247">h<tspan class="s" dy="5">3</tspan></text>
+          <rect class="box" x="350" y="224" width="64" height="34" rx="8"/><text class="v" x="374" y="247">h<tspan class="s" dy="5">4</tspan></text>
+          <text class="lbl" x="232" y="214" text-anchor="middle">ENCODER STATES, ALL KEPT</text>
+          <path d="M590 258 V280 H82 M82 280 V260 M182 280 V260 M282 280 V260 M382 280 V260" style="fill:none;stroke:var(--gate);stroke-width:1.3;stroke-dasharray:4 3"/>
+          <text class="lbl" x="470" y="294" text-anchor="middle">SCORE EACH h AGAINST s, THEN SOFTMAX</text>
+          <rect class="cellon" x="70" y="176" width="24" height="14"/>
+          <rect class="cellon" x="170" y="132" width="24" height="58"/>
+          <rect class="cellon" x="270" y="168" width="24" height="22"/>
+          <rect class="cellon" x="370" y="182" width="24" height="8"/>
+          <text class="lbl" x="475" y="150" text-anchor="middle">WEIGHTS α, SUM TO 1</text>
+          <path class="cell" d="M82 176 L210 76" style="stroke-width:1.2"/>
+          <path class="cell" d="M182 132 L222 76" style="stroke-width:4"/>
+          <path class="cell" d="M282 168 L238 76" style="stroke-width:1.8"/>
+          <path class="cell" d="M382 182 L250 76" style="stroke-width:0.9"/>
+          <rect class="box" x="150" y="40" width="160" height="36" rx="8"/>
+          <text x="230" y="63" text-anchor="middle">context c<tspan dy="4" font-size="10">t</tspan><tspan dy="-4"> = Σ α h</tspan></text>
+          <rect class="gbox" x="552" y="224" width="76" height="34" rx="8"/><text class="v" x="572" y="247">s<tspan class="s" dy="5">t−1</tspan></text>
+          <rect class="gbox" x="552" y="40" width="76" height="36" rx="8"/><text class="v" x="578" y="64">s<tspan class="s" dy="5">t</tspan></text>
+          <path class="hid" d="M590 224 V79" marker-end="url(#a-hid)"/>
+          <path class="cell" d="M310 58 H549" marker-end="url(#a-cell)"/>
+          <text class="lbl" x="430" y="50" text-anchor="middle">INTO THE DECODER</text>
+          <path class="cw" d="M590 40 V18" marker-end="url(#a-cw)"/>
+          <text class="v" x="604" y="20" style="font-size:16px">ŷ<tspan class="s" dy="5">t</tspan></text>
+          <text class="lbl" x="600" y="160" text-anchor="middle">DECODER</text>
+        </svg>
+      </div>
+      <figcaption>One decoder step with attention. The weights say how relevant each source word is right now (here, the second). Every source word is one step from every output word, so nothing has to survive a long chain, and the bottleneck is gone.</figcaption>
+    </figure>
+
+    <h3>3. The transformer: attention without recurrence (Vaswani et al., 2017)</h3>
+    <p>If attention gives the direct path, drop the recurrence altogether: let every position attend to every other position, in every layer, all at once (“Attention Is All You Need”). BERT (encoder-only) and GPT (decoder-only) followed in 2018, and modern LLMs descend from GPT.</p>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>LSTM / GRU</th><th>Transformer</th></tr></thead>
+      <tbody>
+        <tr><td>How positions are processed</td><td>One after another</td><td>All at once, in parallel</td></tr>
+        <tr><td>Path from token 1 to token \(n\)</td><td>\(n - 1\) steps</td><td>1 step</td></tr>
+        <tr><td>Memory of the past</td><td>One fixed-size state</td><td>Every past token, kept</td></tr>
+        <tr><td>Cost per layer for \(n\) tokens</td><td>\(n\) sequential steps of about \(H^2\)</td><td>About \(n^2 d\) for attention, plus \(n d^2\) for the MLP</td></tr>
+        <tr><td>One more token at inference</td><td>Constant work: update the state</td><td>Grows with \(n\): attend to every past token</td></tr>
+      </tbody>
+    </table></div>
+    <p>The last row is why recurrent models still win for streaming with constant memory, and why recent state-space models such as Mamba try to get both: a fixed-size, RNN-like state with parallel training.</p>
+
+    <!-- 09 transformer -->
+    <h2 id="tf"><span class="pn">02</span>The transformer, part by part</h2>
+    <p>Each token starts as an embedding (a learned vector per token) plus a position signal. A stack of identical blocks then updates every token's vector, and each block does two things: <strong>attention moves information between tokens, and a small MLP processes it within each token.</strong></p>
+
+    <h3>Self-attention: a soft lookup</h3>
+    <div class="mj">\[ Q = XW_Q,\quad K = XW_K,\quad V = XW_V \qquad\qquad \text{Attention}(Q, K, V) = \text{softmax}\!\Big(\frac{QK^\top}{\sqrt{d_k}}\Big) V \]</div>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 700 230" role="img" aria-label="Scaled dot-product attention. X is projected three ways into Q, K and V. Q times K transpose over root d k gives an n by n score matrix, an optional mask blocks some scores, a row-wise softmax turns them into weights, and the weights multiply V to give the output Z.">
+          <rect class="box" x="10" y="92" width="54" height="40" rx="8"/><text class="v" x="30" y="118">X</text>
+          <text class="lbl" x="37" y="150" text-anchor="middle">n × d</text>
+          <path class="cw" d="M64 112 H82 V42 H98" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M64 112 H98" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M82 112 V178 H98" marker-end="url(#a-cw)"/>
+          <rect class="gbox" x="100" y="24" width="72" height="36" rx="8"/><text x="136" y="47" text-anchor="middle">× W<tspan dy="4" font-size="10">Q</tspan></text>
+          <rect class="gbox" x="100" y="94" width="72" height="36" rx="8"/><text x="136" y="117" text-anchor="middle">× W<tspan dy="4" font-size="10">K</tspan></text>
+          <rect class="gbox" x="100" y="160" width="72" height="36" rx="8"/><text x="136" y="183" text-anchor="middle">× W<tspan dy="4" font-size="10">V</tspan></text>
+          <text class="v" x="180" y="48">Q</text><text class="v" x="180" y="118">K</text><text class="v" x="180" y="184">V</text>
+          <path class="cw" d="M198 42 H208 V74 H220" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M198 112 H208 V96 H220" marker-end="url(#a-cw)"/>
+          <rect class="box" x="222" y="58" width="122" height="52" rx="8"/>
+          <text x="283" y="81" text-anchor="middle">Q Kᵀ / √d<tspan dy="4" font-size="10">k</tspan></text>
+          <text class="lbl" x="283" y="99" text-anchor="middle">n × n scores</text>
+          <path class="cw" d="M344 84 H360" marker-end="url(#a-cw)"/>
+          <rect x="362" y="64" width="72" height="40" rx="8" style="fill:var(--surface);stroke:var(--ink-3);stroke-width:1.2;stroke-dasharray:4 3"/>
+          <text x="398" y="88" text-anchor="middle">mask</text>
+          <text class="lbl" x="398" y="122" text-anchor="middle">−∞ where blocked</text>
+          <path class="cw" d="M434 84 H450" marker-end="url(#a-cw)"/>
+          <rect class="box" x="452" y="62" width="92" height="44" rx="8"/><text x="498" y="88" text-anchor="middle">softmax</text>
+          <text class="lbl" x="498" y="122" text-anchor="middle">rows sum to 1</text>
+          <path class="cw" d="M544 84 H606 V106" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M198 178 H606 V156" marker-end="url(#a-cw)"/>
+          <rect class="box" x="572" y="110" width="70" height="42" rx="8"/><text x="607" y="136" text-anchor="middle">× V</text>
+          <path class="cw" d="M642 131 H664" marker-end="url(#a-cw)"/>
+          <text class="v" x="670" y="137">Z</text>
+          <text class="lbl" x="676" y="160" text-anchor="middle">n × d_v</text>
+          <text class="lbl" x="400" y="196" text-anchor="middle">V: WHAT EACH TOKEN HANDS OVER</text>
+        </svg>
+      </div>
+      <figcaption>Scaled dot-product attention, for all tokens at once. Row \(i\) of the score matrix is how relevant every token is to token \(i\). The softmax turns each row into weights, and each output row is that weighted mix of the value vectors.</figcaption>
+    </figure>
+
+    <ul>
+      <li><strong>Every token makes three vectors:</strong> a <em>query</em> (what am I looking for?), a <em>key</em> (what do I contain, as an advertisement?) and a <em>value</em> (what do I hand over if picked?).</li>
+      <li><strong>Score = query · key.</strong> Row \(i\) of \(QK^\top\) says how relevant each token \(j\) is to token \(i\). The softmax turns each row into weights that are positive and add up to 1.</li>
+      <li><strong>Output = weighted average of values.</strong> Token \(i\)'s new vector is a mix of every token's value, weighted by relevance. All tokens do this at once, as two matrix multiplies, which is why it trains in parallel.</li>
+      <li><strong>Why three separate projections?</strong> What a token looks for and what it advertises differ (a verb looks for its subject; the subject doesn't look for the verb the same way), so the scores can be asymmetric. And what gets copied (the value) needn't be what was matched on (the key).</li>
+    </ul>
+
+    <h3>Why divide by \(\sqrt{d_k}\)</h3>
+    <p>A dot product of two random \(d_k\)-dimensional vectors with unit-variance entries has variance \(d_k\). With \(d_k = 64\) the scores spread over tens, the softmax goes nearly one-hot, and its gradient goes to almost zero: the same saturation problem as a tanh stuck at ±1. Dividing by \(\sqrt{d_k}\) brings the variance back to about 1.</p>
+
+    <h3>Multi-head attention</h3>
+    <div class="mj">\[ \text{head}_i = \text{Attention}\big(XW_Q^{(i)},\, XW_K^{(i)},\, XW_V^{(i)}\big) \qquad \text{MultiHead}(X) = [\text{head}_1; \dots; \text{head}_h]\, W_O \]</div>
+    <p>Instead of one attention over the full width \(d\), run \(h\) heads in parallel, each with its own \(W_Q, W_K, W_V\) of width \(d/h\), then concatenate their outputs and mix them with \(W_O\). One softmax can only focus on one pattern per token; several heads can track several (a syntactic link, a coreference, a neighbouring word) at once. It costs about the same as one full-width head.</p>
+
+    <h3>Where word order comes from</h3>
+    <p>Attention treats its input as a set: shuffle the tokens and the outputs shuffle the same way. So position has to be added.</p>
+    <ul>
+      <li><strong>Sinusoidal</strong> (the original paper): fixed sine and cosine vectors of different frequencies added to the embeddings. They work for any length and change smoothly with position.</li>
+      <li><strong>Learned</strong> (BERT, GPT-2): one trained vector per position. Simple, but capped at the longest length seen in training.</li>
+      <li><strong>RoPE</strong> (most modern LLMs, e.g. Llama): rotate each query and key by an angle proportional to its position, so \(q_i \cdot k_j\) depends only on the offset \(i - j\). Relative position is built into the score itself.</li>
+    </ul>
+    <div class="mj">\[ PE_{(pos,\,2i)} = \sin\!\big(pos / 10000^{2i/d}\big) \qquad PE_{(pos,\,2i+1)} = \cos\!\big(pos / 10000^{2i/d}\big) \]</div>
+    <p>Each dimension pair is a sine wave of a different wavelength, so every position gets a unique pattern, and a fixed offset is a fixed rotation of it. That makes relative positions easy to read off.</p>
+
+    <h3>The block</h3>
+    <div class="mj">\[ x \leftarrow x + \text{MultiHead}(\text{LN}(x)) \qquad x \leftarrow x + \text{FFN}(\text{LN}(x)) \]</div>
+    <div class="mj">\[ \text{FFN}(x) = W_2\,\text{GELU}(W_1 x) \]</div>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 680 210" role="img" aria-label="A pre-LayerNorm transformer block. The residual stream runs left to right. A first branch applies LayerNorm then multi-head attention and adds the result back; a second branch applies LayerNorm then the feed-forward network and adds it back.">
+          <path class="stream" d="M40 160 H640" marker-end="url(#a-cell)"/>
+          <text class="v" x="14" y="166">x</text>
+          <text class="lbl" x="340" y="190" text-anchor="middle">residual stream: each sublayer adds to it, nothing overwrites it</text>
+          <circle class="dot" cx="80" cy="160" r="3.5"/>
+          <path class="cw" d="M80 160 V70 H104" marker-end="url(#a-cw)"/>
+          <rect class="box" x="106" y="52" width="86" height="36" rx="8"/><text x="149" y="75" text-anchor="middle">LayerNorm</text>
+          <path class="cw" d="M192 70 H214" marker-end="url(#a-cw)"/>
+          <rect class="gbox" x="216" y="52" width="122" height="36" rx="8"/><text x="277" y="75" text-anchor="middle" style="fill:var(--gate)">Multi-head attn</text>
+          <path class="cw" d="M338 70 H352 V146" marker-end="url(#a-cw)"/>
+          <circle class="op" cx="352" cy="160" r="13"/><text class="optx" x="352" y="166" text-anchor="middle">+</text>
+          <text class="lbl" x="277" y="38" text-anchor="middle">between tokens</text>
+          <circle class="dot" cx="390" cy="160" r="3.5"/>
+          <path class="cw" d="M390 160 V70 H414" marker-end="url(#a-cw)"/>
+          <rect class="box" x="416" y="52" width="86" height="36" rx="8"/><text x="459" y="75" text-anchor="middle">LayerNorm</text>
+          <path class="cw" d="M502 70 H524" marker-end="url(#a-cw)"/>
+          <rect class="gbox" x="526" y="52" width="70" height="36" rx="8"/><text x="561" y="75" text-anchor="middle" style="fill:var(--gate)">FFN</text>
+          <path class="cw" d="M596 70 H610 V146" marker-end="url(#a-cw)"/>
+          <circle class="op" cx="610" cy="160" r="13"/><text class="optx" x="610" y="166" text-anchor="middle">+</text>
+          <text class="lbl" x="561" y="38" text-anchor="middle">within each token</text>
+        </svg>
+      </div>
+      <figcaption>A pre-LN transformer block. Attention gathers information from other tokens; the FFN processes it inside each token. The residual stream is a straight line, so the gradient has an untouched path through every layer, just like the LSTM's cell does through time.</figcaption>
+    </figure>
+    <ul>
+      <li><strong>The FFN</strong> is a two-layer MLP applied to each token separately, usually 4× wider than \(d\). Attention gathers; the FFN thinks. Most of a transformer's parameters, and much of its stored knowledge, live here.</li>
+      <li><strong>Residual connections</strong> make each sublayer add to the stream instead of replacing it, so the gradient has a straight path through every layer. It's the same trick as the LSTM's \(c_t = c_{t-1} + \dots\), applied across depth instead of time.</li>
+      <li><strong>LayerNorm, not BatchNorm.</strong> LayerNorm normalizes each token's vector on its own, so it doesn't care about batch size, sequence length or padding, and it behaves the same in training and at inference. BatchNorm would average across a batch of padded, variable-length sequences, and breaks with a batch of one.</li>
+      <li><strong>Pre-LN vs post-LN.</strong> The original transformer put LayerNorm after each residual add (post-LN) and needed a learning-rate warmup to train. Putting it inside the branch (pre-LN, above) keeps the residual path clean and trains more stably, so most modern models use pre-LN.</li>
+    </ul>
+
+
+    <h3>Shapes through one block</h3>
+    <p>For one sequence of \(n\) tokens, model width \(d\), \(h\) heads with \(d_k = d_v = d/h\), and FFN width \(d_{ff} = 4d\). A batch adds a leading \(B\) everywhere.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Thing</th><th>Shape</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>Token embedding table \(E\)</td><td>\(V \times d\)</td><td>Look up one row per token</td></tr>
+        <tr><td>Positions (learned)</td><td>\(n_{\max} \times d\)</td><td>Added to the token rows</td></tr>
+        <tr><td>\(X\) (input to a block)</td><td>\(n \times d\)</td><td>One row per token; the residual stream keeps this shape all the way through</td></tr>
+        <tr><td>\(W_Q, W_K, W_V\) (all heads)</td><td>\(d \times d\) each</td><td>Per head: \(d \times d_k\)</td></tr>
+        <tr><td>\(Q, K, V\) per head</td><td>\(n \times d_k\)</td><td>In code: \(B \times n \times d\) → reshape → \(B \times h \times n \times d_k\)</td></tr>
+        <tr><td>Scores \(QK^\top\), weights \(A\)</td><td>\(n \times n\) per head</td><td>\(B \times h \times n \times n\): the memory that grows as \(n^2\)</td></tr>
+        <tr><td>\(A V\) per head</td><td>\(n \times d_k\)</td><td></td></tr>
+        <tr><td>Concatenated heads</td><td>\(n \times d\)</td><td>\(h \cdot d_k = d\)</td></tr>
+        <tr><td>\(W_O\)</td><td>\(d \times d\)</td><td>Mixes the heads; output \(n \times d\)</td></tr>
+        <tr><td>FFN \(W_1,\ W_2\)</td><td>\(d \times 4d,\ 4d \times d\)</td><td>Hidden activations \(n \times 4d\)</td></tr>
+        <tr><td>LayerNorm \(\gamma,\ \beta\)</td><td>\(d\) each</td><td>Normalizes each row (token) over its \(d\) features</td></tr>
+        <tr><td>Cross-attention scores</td><td>\(n_{\text{dec}} \times n_{\text{enc}}\)</td><td>Queries from the decoder, keys and values from the encoder</td></tr>
+        <tr><td>Output head (GPT)</td><td>\(d \times V\)</td><td>Logits \(n \times V\); often tied to \(E^\top\)</td></tr>
+        <tr><td>KV cache</td><td>\(2 \times n \times d\) per layer</td><td>Grows by \(2d\) numbers per layer for every generated token</td></tr>
+      </tbody>
+    </table></div>
+    <p>Parameters per block: \(4d^2\) (\(W_Q, W_K, W_V, W_O\)) \(+\ 8d^2\) (FFN) \(\approx 12 d^2\), plus small bias and LayerNorm terms.</p>
+
+    <h3>The transformer in pseudocode</h3>
+    <pre class="code"><code>def attention(Q, K, V, mask=None):          <span class="cm"># Q: (n, d_k)  K: (m, d_k)  V: (m, d_v)</span>
+    scores = Q @ K.T / sqrt(d_k)            <span class="cm"># (n, m): how relevant each key is to each query</span>
+    if mask is not None:
+        scores = where(mask, scores, -inf)  <span class="cm"># blocked pairs get weight 0</span>
+    A = softmax(scores, axis=-1)            <span class="cm"># each row sums to 1</span>
+    return A @ V                            <span class="cm"># (n, d_v): weighted mix of values</span>
+
+def multi_head(X, mask=None):               <span class="cm"># X: (n, d)</span>
+    Q, K, V = X @ W_Q, X @ W_K, X @ W_V     <span class="cm"># each (n, d)</span>
+    Q, K, V = split_heads(Q, K, V, h)       <span class="cm"># each (h, n, d/h)</span>
+    heads = [attention(Q[i], K[i], V[i], mask) for i in range(h)]
+    return concat(heads, axis=-1) @ W_O     <span class="cm"># (n, d)</span>
+
+def block(X, mask=None):                    <span class="cm"># one pre-LN transformer block</span>
+    X = X + multi_head(layer_norm(X), mask)          <span class="cm"># mix information BETWEEN tokens</span>
+    X = X + gelu(layer_norm(X) @ W_1) @ W_2          <span class="cm"># MLP WITHIN each token: d -&gt; 4d -&gt; d</span>
+    return X                                <span class="cm"># same shape in and out: (n, d)</span>
+
+def gpt(tokens):                            <span class="cm"># decoder-only, e.g. GPT</span>
+    n = len(tokens)
+    X = E[tokens] + P[:n]                   <span class="cm"># token + position embeddings: (n, d)</span>
+    causal = tril(ones(n, n))               <span class="cm"># token i may see tokens j &lt;= i</span>
+    for _ in range(L):
+        X = block(X, mask=causal)
+    return layer_norm(X) @ E.T              <span class="cm"># logits (n, V); output weights tied to E</span>
+
+def generate(prompt, steps, temperature=1.0):
+    tokens = list(prompt)
+    for _ in range(steps):
+        logits = gpt(tokens)[-1]            <span class="cm"># only the last position predicts the next token</span>
+        tokens.append(sample(softmax(logits / temperature)))
+    return tokens
+<span class="cm"># KV cache: store each layer's K and V for past tokens; a new token computes only its own</span>
+<span class="cm"># q, k, v and attends to the cache, so each step costs O(n * d) instead of re-running everything.</span>
+<span class="cm"># BERT = the same blocks with NO causal mask (every token sees every token).</span></code></pre>
+
+    <h3>Masks</h3>
+    <p>Before the softmax, blocked scores are set to \(-\infty\), so they get weight 0. A <strong>padding mask</strong> blocks pad tokens. A <strong>causal mask</strong> blocks the future: token \(i\) may only attend to tokens \(j \le i\). That's what lets a decoder train on every position of a sequence at once without peeking at the answer.</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 600 230" role="img" aria-label="A causal mask on five tokens: token i can attend to tokens 1 to i; everything to the right of the diagonal is blocked.">
+          <text class="lbl" x="300" y="18" text-anchor="middle">KEY: TOKEN j IT LOOKS AT →</text>
+          <text class="lbl" x="150" y="130" text-anchor="middle" transform="rotate(-90 150 130)">QUERY: TOKEN i ↓</text>
+          <g id="causal">
+            <rect class="cellon" x="200" y="34" width="36" height="36"/><rect class="celloff" x="240" y="34" width="36" height="36"/><rect class="celloff" x="280" y="34" width="36" height="36"/><rect class="celloff" x="320" y="34" width="36" height="36"/><rect class="celloff" x="360" y="34" width="36" height="36"/>
+            <rect class="cellon" x="200" y="74" width="36" height="36"/><rect class="cellon" x="240" y="74" width="36" height="36"/><rect class="celloff" x="280" y="74" width="36" height="36"/><rect class="celloff" x="320" y="74" width="36" height="36"/><rect class="celloff" x="360" y="74" width="36" height="36"/>
+            <rect class="cellon" x="200" y="114" width="36" height="36"/><rect class="cellon" x="240" y="114" width="36" height="36"/><rect class="cellon" x="280" y="114" width="36" height="36"/><rect class="celloff" x="320" y="114" width="36" height="36"/><rect class="celloff" x="360" y="114" width="36" height="36"/>
+            <rect class="cellon" x="200" y="154" width="36" height="36"/><rect class="cellon" x="240" y="154" width="36" height="36"/><rect class="cellon" x="280" y="154" width="36" height="36"/><rect class="cellon" x="320" y="154" width="36" height="36"/><rect class="celloff" x="360" y="154" width="36" height="36"/>
+            <rect class="cellon" x="200" y="194" width="36" height="36"/><rect class="cellon" x="240" y="194" width="36" height="36"/><rect class="cellon" x="280" y="194" width="36" height="36"/><rect class="cellon" x="320" y="194" width="36" height="36"/><rect class="cellon" x="360" y="194" width="36" height="36"/>
+          </g>
+          <text x="420" y="92">allowed: a score, then softmax</text>
+          <rect class="cellon" x="404" y="80" width="12" height="12"/>
+          <text x="420" y="122">blocked: −∞, so weight 0</text>
+          <rect class="celloff" x="404" y="110" width="12" height="12"/>
+        </svg>
+      </div>
+      <figcaption>A causal mask on five tokens. Each row is one token's attention: it may look at itself and everything before it, never after.</figcaption>
+    </figure>
+
+    <h3>Three shapes</h3>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 680 420" role="img" aria-label="The original encoder-decoder transformer. The encoder embeds the source tokens with positions and passes them through N blocks of self-attention and feed-forward. The decoder embeds the target tokens shifted right and passes them through N blocks of masked self-attention, cross-attention to the encoder's outputs, and feed-forward, then a linear layer and softmax give next-token probabilities.">
+          <text x="160" y="410" text-anchor="middle">source tokens</text>
+          <path class="in" d="M160 396 V368" marker-end="url(#a-in)"/>
+          <rect class="box" x="60" y="332" width="200" height="34" rx="8"/><text x="160" y="354" text-anchor="middle">Embedding + position</text>
+          <path class="cw" d="M160 332 V306" marker-end="url(#a-cw)"/>
+          <rect x="40" y="150" width="240" height="154" rx="12" style="fill:none;stroke:var(--ink-3);stroke-width:1.2;stroke-dasharray:5 4"/>
+          <text class="lbl" x="28" y="232" text-anchor="middle">×N</text>
+          <rect class="gbox" x="60" y="246" width="200" height="40" rx="8"/><text x="160" y="270" text-anchor="middle">Self-attention (all tokens)</text>
+          <path class="cw" d="M160 246 V224" marker-end="url(#a-cw)"/>
+          <rect class="box" x="60" y="182" width="200" height="40" rx="8"/><text x="160" y="206" text-anchor="middle">Feed-forward</text>
+          <text class="lbl" x="160" y="168" text-anchor="middle">residual + LayerNorm around each</text>
+          <text class="lbl" x="160" y="320" text-anchor="middle">ENCODER</text>
+          <path class="cell" d="M160 150 V126 H330 V239 H397" marker-end="url(#a-cell)"/>
+          <text class="lbl" x="245" y="118" text-anchor="middle">KEYS AND VALUES</text>
+
+          <text x="500" y="410" text-anchor="middle">target tokens, shifted right</text>
+          <path class="in" d="M500 396 V368" marker-end="url(#a-in)"/>
+          <rect class="box" x="400" y="332" width="200" height="34" rx="8"/><text x="500" y="354" text-anchor="middle">Embedding + position</text>
+          <path class="cw" d="M500 332 V310" marker-end="url(#a-cw)"/>
+          <rect x="380" y="110" width="240" height="198" rx="12" style="fill:none;stroke:var(--ink-3);stroke-width:1.2;stroke-dasharray:5 4"/>
+          <text class="lbl" x="638" y="212" text-anchor="middle">×N</text>
+          <rect class="gbox" x="400" y="266" width="200" height="38" rx="8"/><text x="500" y="289" text-anchor="middle">Masked self-attention</text>
+          <path class="cw" d="M500 266 V260" marker-end="url(#a-cw)"/>
+          <rect class="gbox" x="400" y="220" width="200" height="38" rx="8"/><text x="500" y="243" text-anchor="middle">Cross-attention</text>
+          <path class="cw" d="M500 220 V202" marker-end="url(#a-cw)"/>
+          <rect class="box" x="400" y="162" width="200" height="38" rx="8"/><text x="500" y="185" text-anchor="middle">Feed-forward</text>
+          <text class="lbl" x="500" y="128" text-anchor="middle">residual + LayerNorm around each</text>
+          <path class="cw" d="M500 110 V100" marker-end="url(#a-cw)"/>
+          <rect class="box" x="420" y="64" width="160" height="34" rx="8"/><text x="500" y="86" text-anchor="middle">Linear + softmax</text>
+          <path class="cw" d="M500 64 V48" marker-end="url(#a-cw)"/>
+          <text x="500" y="38" text-anchor="middle" style="fill:var(--ink);font-weight:500">next-token probabilities</text>
+          <text class="lbl" x="500" y="324" text-anchor="middle">DECODER</text>
+        </svg>
+      </div>
+      <figcaption>The original transformer (encoder–decoder). The encoder lets every source token see every other. The decoder's masked self-attention sees only earlier target tokens; its cross-attention takes queries from the decoder and keys and values from the encoder's outputs (green). BERT keeps only the left tower, GPT only the right one without cross-attention.</figcaption>
+    </figure>
+    <div class="mj">\[ \text{CrossAttn}(S, H) = \text{softmax}\!\Big(\frac{(S W_Q)(H W_K)^\top}{\sqrt{d_k}}\Big)\, H W_V \qquad S = \text{decoder states},\ H = \text{encoder outputs} \]</div>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Attention</th><th>Trained to</th><th>Good for</th><th>Examples</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Encoder-only</strong></td><td>Bidirectional: sees both sides</td><td>Fill in masked tokens</td><td>Classification, embeddings, tagging</td><td>BERT</td></tr>
+        <tr><td><strong>Decoder-only</strong></td><td>Causal</td><td>Predict the next token</td><td>Generation; modern LLMs</td><td>GPT, Llama</td></tr>
+        <tr><td><strong>Encoder–decoder</strong></td><td>Encoder bidirectional; decoder causal, plus <em>cross-attention</em> (queries from the decoder, keys and values from the encoder)</td><td>Map one sequence to another</td><td>Translation, summarization</td><td>The original transformer, T5</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>What it costs</h3>
+    <ul>
+      <li><strong>Attention</strong> builds an \(n \times n\) score matrix per head: about \(n^2 d\) time and \(n^2\) memory per layer. The FFN costs about \(n d^2\). Short sequences are dominated by the FFN, long ones by attention.</li>
+      <li><strong>Training</strong> processes all positions at once. <strong>Generation</strong> is still one token at a time; the <strong>KV cache</strong> stores every past token's keys and values, so each new token costs about \(n d\) instead of recomputing everything.</li>
+      <li><strong>Parameters per block:</strong> \(4d^2\) for \(W_Q, W_K, W_V, W_O\), plus \(8d^2\) for the FFN with a 4× hidden width, so about \(12 d^2\).</li>
+    </ul>
+
+    <!-- 10 what-ifs -->
+    <h2 id="tfwhat"><span class="pn">03</span>Transformer what-ifs</h2>
+    <p>The “take a piece out, what happens?” questions. Each answer follows from what the piece is for.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Change</th><th>What happens</th></tr></thead>
+      <tbody>
+        <tr><td>Drop the \(\sqrt{d_k}\)</td><td>Scores grow with \(d_k\), the softmax saturates to near one-hot, gradients through it vanish, and training gets unstable.</td></tr>
+        <tr><td>Drop positional encodings</td><td>The model sees a bag of tokens: “dog bites man” = “man bites dog”. (A causal decoder can still infer some order from how much it is allowed to see.)</td></tr>
+        <tr><td>Drop residual connections</td><td>Every gradient has to pass through every sublayer, so deep stacks train badly, much like a plain deep network without skip connections.</td></tr>
+        <tr><td>BatchNorm instead of LayerNorm</td><td>Statistics get mixed across padded sequences and examples, are noisy with small batches, and break at inference with batch size 1.</td></tr>
+        <tr><td>Drop the causal mask in a decoder</td><td>In training each position can see the token it is supposed to predict, so the loss collapses. At generation the future isn't there, so it fails.</td></tr>
+        <tr><td>One head instead of many (same width)</td><td>Each token gets one attention pattern instead of several, so it can't track several relations at once. Quality drops; cost is about the same.</td></tr>
+        <tr><td>Drop the FFN</td><td>Each layer can only take weighted averages of value vectors, with no per-token computation. Capacity drops sharply.</td></tr>
+        <tr><td>Drop the softmax (linear attention)</td><td>Weights are no longer positive and normalized. With kernel tricks it can run in \(O(n)\), but quality is usually lower.</td></tr>
+        <tr><td>Tie queries and keys (\(W_Q = W_K\))</td><td>Scores become symmetric, and each token tends to score itself highest, so it over-attends to itself.</td></tr>
+        <tr><td>Replace attention with an LSTM layer</td><td>Back to sequential processing: you lose the parallel training and the one-step path between tokens.</td></tr>
+      </tbody>
+    </table></div>
+
+    <!-- plm -->
+    <h2 id="plm"><span class="pn">04</span>Pretrained language models: BERT, GPT and fine-tuning</h2>
+    <p>The modern recipe: pretrain a transformer on a huge unlabelled corpus with a self-supervised objective, then adapt it to a small labelled task. The two classic objectives produce the two classic shapes.</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 700 300" role="img" aria-label="BERT versus GPT. BERT: a bidirectional transformer encoder reads CLS, the, MASK, sat, SEP and predicts the hidden word cat at the masked position; the CLS output feeds a classifier. GPT: a causal transformer decoder reads the, cat, sat, on, the and at every position predicts the next word: cat, sat, on, the, mat.">
+          <text x="170" y="22" text-anchor="middle" style="fill:var(--ink);font-weight:600;font-size:13.5px">BERT: fill in the blanks</text>
+          <text x="530" y="22" text-anchor="middle" style="fill:var(--ink);font-weight:600;font-size:13.5px">GPT: predict the next token</text>
+          <rect class="cellon" x="290" y="28" width="8" height="8"/><rect class="cellon" x="299" y="28" width="8" height="8"/><rect class="cellon" x="308" y="28" width="8" height="8"/><rect class="cellon" x="317" y="28" width="8" height="8"/><rect class="cellon" x="290" y="37" width="8" height="8"/><rect class="cellon" x="299" y="37" width="8" height="8"/><rect class="cellon" x="308" y="37" width="8" height="8"/><rect class="cellon" x="317" y="37" width="8" height="8"/><rect class="cellon" x="290" y="46" width="8" height="8"/><rect class="cellon" x="299" y="46" width="8" height="8"/><rect class="cellon" x="308" y="46" width="8" height="8"/><rect class="cellon" x="317" y="46" width="8" height="8"/><rect class="cellon" x="290" y="55" width="8" height="8"/><rect class="cellon" x="299" y="55" width="8" height="8"/><rect class="cellon" x="308" y="55" width="8" height="8"/><rect class="cellon" x="317" y="55" width="8" height="8"/>
+          <rect class="cellon" x="650" y="28" width="8" height="8"/><rect class="celloff" x="659" y="28" width="8" height="8"/><rect class="celloff" x="668" y="28" width="8" height="8"/><rect class="celloff" x="677" y="28" width="8" height="8"/><rect class="cellon" x="650" y="37" width="8" height="8"/><rect class="cellon" x="659" y="37" width="8" height="8"/><rect class="celloff" x="668" y="37" width="8" height="8"/><rect class="celloff" x="677" y="37" width="8" height="8"/><rect class="cellon" x="650" y="46" width="8" height="8"/><rect class="cellon" x="659" y="46" width="8" height="8"/><rect class="cellon" x="668" y="46" width="8" height="8"/><rect class="celloff" x="677" y="46" width="8" height="8"/><rect class="cellon" x="650" y="55" width="8" height="8"/><rect class="cellon" x="659" y="55" width="8" height="8"/><rect class="cellon" x="668" y="55" width="8" height="8"/><rect class="cellon" x="677" y="55" width="8" height="8"/>
+          <text class="lbl" x="306" y="76" text-anchor="middle">all-to-all</text>
+          <text class="lbl" x="666" y="76" text-anchor="middle">causal</text>
+
+          <rect class="gbox" x="25" y="150" width="290" height="54" rx="10"/>
+          <text x="170" y="174" text-anchor="middle" style="fill:var(--ink)">Transformer encoder × N</text>
+          <text class="lbl" x="170" y="192" text-anchor="middle">every token sees every token</text>
+          <path class="in" d="M50 256 V207" marker-end="url(#a-in)"/><path class="in" d="M110 256 V207" marker-end="url(#a-in)"/>
+          <path class="in" d="M170 256 V207" marker-end="url(#a-in)"/><path class="in" d="M230 256 V207" marker-end="url(#a-in)"/>
+          <path class="in" d="M290 256 V207" marker-end="url(#a-in)"/>
+          <text x="50" y="272" text-anchor="middle">[CLS]</text><text x="110" y="272" text-anchor="middle">the</text>
+          <text x="170" y="272" text-anchor="middle" style="fill:var(--cell);font-weight:600">[MASK]</text>
+          <text x="230" y="272" text-anchor="middle">sat</text><text x="290" y="272" text-anchor="middle">[SEP]</text>
+          <path class="cw" d="M50 150 V112" marker-end="url(#a-cw)"/><path class="cw" d="M170 150 V112" marker-end="url(#a-cw)"/>
+          <text x="50" y="102" text-anchor="middle" style="fill:var(--ink);font-weight:500">class</text>
+          <text x="170" y="102" text-anchor="middle" style="fill:var(--cell);font-weight:600">“cat”</text>
+          <text class="lbl" x="110" y="62" text-anchor="middle">loss only at masked positions</text>
+
+          <rect class="gbox" x="385" y="150" width="290" height="54" rx="10"/>
+          <text x="530" y="174" text-anchor="middle" style="fill:var(--ink)">Transformer decoder × N</text>
+          <text class="lbl" x="530" y="192" text-anchor="middle">each token sees only the past</text>
+          <path class="in" d="M410 256 V207" marker-end="url(#a-in)"/><path class="in" d="M470 256 V207" marker-end="url(#a-in)"/>
+          <path class="in" d="M530 256 V207" marker-end="url(#a-in)"/><path class="in" d="M590 256 V207" marker-end="url(#a-in)"/>
+          <path class="in" d="M650 256 V207" marker-end="url(#a-in)"/>
+          <text x="410" y="272" text-anchor="middle">the</text><text x="470" y="272" text-anchor="middle">cat</text>
+          <text x="530" y="272" text-anchor="middle">sat</text><text x="590" y="272" text-anchor="middle">on</text><text x="650" y="272" text-anchor="middle">the</text>
+          <path class="cw" d="M410 150 V112" marker-end="url(#a-cw)"/><path class="cw" d="M470 150 V112" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M530 150 V112" marker-end="url(#a-cw)"/><path class="cw" d="M590 150 V112" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M650 150 V112" marker-end="url(#a-cw)"/>
+          <text x="410" y="102" text-anchor="middle" style="fill:var(--cell);font-weight:600">cat</text><text x="470" y="102" text-anchor="middle" style="fill:var(--cell);font-weight:600">sat</text>
+          <text x="530" y="102" text-anchor="middle" style="fill:var(--cell);font-weight:600">on</text><text x="590" y="102" text-anchor="middle" style="fill:var(--cell);font-weight:600">the</text>
+          <text x="650" y="102" text-anchor="middle" style="fill:var(--cell);font-weight:600">mat</text>
+          <text class="lbl" x="500" y="62" text-anchor="middle">a loss at every position</text>
+        </svg>
+      </div>
+      <figcaption>BERT reads the whole sentence at once and is trained to recover hidden tokens; its <code>[CLS]</code> output feeds a classifier. GPT reads left to right under a causal mask and predicts the next token at every position, so every position is a training example. The small grids show which tokens each one may attend to.</figcaption>
+    </figure>
+    <div class="mj">\[ L_{\text{BERT}} = -\sum_{i \in \mathcal{M}} \log p\big(x_i \mid x_{\setminus \mathcal{M}}\big) \qquad L_{\text{GPT}} = -\sum_t \log p(x_t \mid x_{&lt;t}), \quad p(x) = \prod_t p(x_t \mid x_{&lt;t}) \]</div>
+    <p>Here \(\mathcal{M}\) is the set of masked positions and \(x_{\setminus \mathcal{M}}\) is everything else. BERT learns from about 15% of the tokens per sentence, while GPT learns from every one.</p>
+    <h3>Sizes worth knowing</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Model</th><th>Layers</th><th>\(d\)</th><th>Heads</th><th>\(d_{ff}\)</th><th>Vocabulary</th><th>Parameters</th></tr></thead>
+      <tbody>
+        <tr><td>BERT-base</td><td>12</td><td>768</td><td>12 (\(d_k = 64\))</td><td>3072</td><td>~30K WordPiece</td><td>~110M</td></tr>
+        <tr><td>BERT-large</td><td>24</td><td>1024</td><td>16</td><td>4096</td><td>~30K</td><td>~340M</td></tr>
+        <tr><td>GPT-2 small</td><td>12</td><td>768</td><td>12</td><td>3072</td><td>~50K BPE</td><td>~124M</td></tr>
+        <tr><td>ProtBert</td><td>30</td><td>1024</td><td>16</td><td>4096</td><td>Amino acids</td><td>~420M</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Checking BERT-base:</strong> \(12 d^2 = 12 \times 768^2 \approx 7.1\text{M}\) per block, × 12 blocks ≈ 85M, plus embeddings \(30{,}522 \times 768 \approx 23\text{M}\) ≈ 110M.</li>
+      <li><strong>How small a linear probe is:</strong> a linear head on a frozen 1024-d encoder for 61 classes is \(1024 \times 61 + 61 = 62{,}525\) parameters. That's the entire trainable model; the encoder, often hundreds of millions of parameters, stays frozen.</li>
+    </ul>
+
+
+
+    <h3>BERT: fill in the blanks (encoder-only)</h3>
+    <ul>
+      <li><strong>Masked language modelling.</strong> Pick 15% of the tokens. Of those, replace 80% with <code>[MASK]</code>, 10% with a random token, and leave 10% unchanged. Predict the original token at those positions only, with cross-entropy over the vocabulary.</li>
+      <li><strong>Why 80/10/10?</strong> It fixes two problems you'd get if every chosen position showed <code>[MASK]</code>:
+        <ul>
+          <li><em>A train/test mismatch.</em> The loss would only ever ask about <code>[MASK]</code> positions, so the model would have no reason to build careful vectors for the ordinary words it sees. But BERT is mostly used as an encoder for classification, tagging, QA and embeddings, and there the input never contains <code>[MASK]</code>: every token is a real word. (You <em>can</em> put <code>[MASK]</code> in at inference for fill-in-the-blank; that is the one exception.)</li>
+          <li><em>The random 10%</em> (“the cat sat on the <em>banana</em>”, predict “mat”) means no visible word can be blindly trusted, since any might be a planted fake. The model has to check <em>every</em> token against its context.</li>
+          <li><em>The unchanged 10%</em> (the true word shown, still predicted) stops the opposite habit of ignoring what it sees: the visible word is usually right, so use it, but verify it. These positions also look exactly like real inputs.</li>
+          <li>Because the random and unchanged cases look like ordinary words, the model can't tell which tokens are being tested, so it keeps a good contextual vector for all of them. Overall that's 12% of tokens masked, 1.5% randomized and 1.5% left as-is. The exact split was chosen by ablation in the BERT paper.</li>
+        </ul></li>
+      <li><strong>Input format:</strong> <code>[CLS] tokens [SEP]</code>, with token, position and segment embeddings added together. The final <code>[CLS]</code> vector feeds classification heads, and each token's final vector feeds tagging heads.</li>
+      <li><strong>Next-sentence prediction</strong> was a second objective in the original BERT. RoBERTa dropped it, trained longer and re-drew the mask every epoch (“dynamic masking”), and did better.</li>
+      <li><strong>Why bidirectional suits understanding:</strong> each token sees both sides, which is what tagging and classification need. It can't generate text left to right naturally.</li>
+      <li><strong>Domain BERTs:</strong> the same recipe on other “languages”. ProtBert is BERT trained with masked LM on protein sequences, with amino acids as tokens.</li>
+    </ul>
+
+    <h3>BERT's masking, in code</h3>
+    <pre class="code"><code>def mlm_example(tokens):
+    labels = [IGNORE] * len(tokens)            <span class="cm"># no loss at unmasked positions</span>
+    for i in sample_positions(tokens, frac=0.15):
+        labels[i] = tokens[i]                  <span class="cm"># predict the original token here</span>
+        r = random()
+        if r &lt; 0.8:   tokens[i] = MASK_ID      <span class="cm"># 80%: [MASK]</span>
+        elif r &lt; 0.9: tokens[i] = random_token()   <span class="cm"># 10%: a random token</span>
+        <span class="cm"># else:       10%: leave it unchanged</span>
+    return tokens, labels
+
+logits = bert(tokens)                          <span class="cm"># (n, V), bidirectional: no causal mask</span>
+loss = cross_entropy(logits, labels, ignore_index=IGNORE)</code></pre>
+
+
+    <h3 id="bert-train">Training and using BERT, end to end</h3>
+    <p><strong>1. Pretraining</strong> (self-supervised). Corrupt the input \(x\) into \(\tilde x\) by choosing 15% of positions \(\mathcal M\) and applying 80/10/10. Run the encoder, and at each chosen position predict the original token:</p>
+    <div class="mj">\[ L_{\text{MLM}} = -\frac{1}{|\mathcal M|}\sum_{i \in \mathcal M} \log p_\theta(x_i \mid \tilde x) \]</div>
+    <div class="mj">\[ p_\theta(\cdot \mid \tilde x) = \text{softmax}\big(E\, g(h_i) + b\big) \in \mathbb{R}^{V} \]</div>
+    <p>Here \(h_i\) is the encoder's final vector at position \(i\), \(g\) is a small dense + GELU + LayerNorm head, and \(E\) is the token-embedding matrix reused as the output layer (one logit per vocabulary word). The original BERT added next-sentence prediction, a binary cross-entropy on the <code>[CLS]</code> vector, so \(L = L_{\text{MLM}} + L_{\text{NSP}}\); RoBERTa later dropped it.</p>
+    <pre class="code"><code><span class="cm"># ---- 1. pretraining: masked LM (self-supervised, huge unlabelled corpus) ----</span>
+for batch in corpus_batches:                      <span class="cm"># token ids (B, n), e.g. n = 512</span>
+    inputs, labels = mlm_example(batch)           <span class="cm"># 15% chosen; 80/10/10; labels = IGNORE elsewhere</span>
+    H = bert_encoder(inputs)                      <span class="cm"># (B, n, d): no causal mask, every token sees all</span>
+    logits = gelu_ln(H @ W_t) @ E.T + b           <span class="cm"># (B, n, V): MLM head, output tied to embeddings E</span>
+    loss = cross_entropy(logits, labels, ignore_index=IGNORE)   <span class="cm"># only the chosen positions count</span>
+    <span class="cm"># original BERT also: loss += cross_entropy(W_nsp @ H[:, 0], is_next)   # next-sentence prediction</span>
+    loss.backward(); clip_grad_norm(1.0); adamw.step(); warmup_then_linear_decay.step(); zero_grad()</code></pre>
+
+    <p><strong>2. Fine-tuning</strong> (supervised, per task). Add a small head and train everything briefly, with a small learning rate (about 2e-5 to 5e-5) for 2–4 epochs:</p>
+    <div class="mj">\[ L_{\text{task}} = -\log \text{softmax}\big(W h_{\text{[CLS]}} + b\big)_{y} \]</div>
+    <pre class="code"><code><span class="cm"># ---- 2. fine-tuning: add a small head, train everything briefly (small lr, 2-4 epochs) ----</span>
+head = Linear(d, num_classes)                     <span class="cm"># new, randomly initialized</span>
+for tokens, y in labelled_batches:                <span class="cm"># "[CLS] text [SEP]", class labels</span>
+    H = bert_encoder(tokens)                      <span class="cm"># (B, n, d), starting from the pretrained weights</span>
+    logits = head(H[:, 0])                        <span class="cm"># H[:, 0] is the [CLS] vector: (B, num_classes)</span>
+    loss = cross_entropy(logits, y)
+    loss.backward(); adamw.step(lr=2e-5); zero_grad()
+<span class="cm"># frozen-backbone variant: no grad for bert_encoder, train only `head` (a linear probe)</span></code></pre>
+
+    <p><strong>3. Inference.</strong> Always one forward pass, with no generation loop. What you read off depends on the task:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Task</th><th>Input</th><th>Read off</th></tr></thead>
+      <tbody>
+        <tr><td>Fill-in-the-blank</td><td>Text containing <code>[MASK]</code></td><td>MLM-head logits at the masked position. This is the one place <code>[MASK]</code> appears after pretraining.</td></tr>
+        <tr><td>Sentence classification</td><td><code>[CLS] text [SEP]</code></td><td>\(h_{\text{[CLS]}}\) → linear → softmax</td></tr>
+        <tr><td>Sentence pair (similarity, entailment)</td><td><code>[CLS] A [SEP] B [SEP]</code>, with segment embeddings</td><td>\(h_{\text{[CLS]}}\) → classifier</td></tr>
+        <tr><td>Token tagging (NER, codon per amino acid)</td><td><code>[CLS] text [SEP]</code></td><td>Each \(h_i\) → linear → a label per token</td></tr>
+        <tr><td>Extractive QA</td><td><code>[CLS] question [SEP] passage [SEP]</code></td><td>Start and end scores per token → the best span</td></tr>
+        <tr><td>Embeddings / search</td><td>Text</td><td>Mean of the \(h_i\) (or \(h_{\text{[CLS]}}\)), compared by cosine similarity</td></tr>
+      </tbody>
+    </table></div>
+    <pre class="code"><code><span class="cm"># ---- 3. inference: one forward pass, then read off what the task needs ----</span>
+H = bert_encoder(tokenize(text))                  <span class="cm"># (n, d)</span>
+label    = argmax(head(H[0]))                     <span class="cm"># classification: the [CLS] vector</span>
+tags     = [argmax(tag_head(h)) for h in H]       <span class="cm"># NER / tagging: one label per token</span>
+best_fill = argmax(mlm_head(H[mask_pos]))         <span class="cm"># fill-in-the-blank: input contained [MASK]</span>
+start, end = argmax(H @ w_start), argmax(H @ w_end)   <span class="cm"># extractive QA: answer span in the passage</span>
+embedding = H.mean(axis=0)                        <span class="cm"># search / similarity: compare by cosine</span></code></pre>
+
+    <p>For contrast, GPT's training is simpler: shift the sequence by one and predict the next token at every position.</p>
+    <pre class="code"><code><span class="cm"># ---- GPT for contrast: next-token prediction, a loss at EVERY position ----</span>
+for batch in corpus_batches:                      <span class="cm"># (B, n + 1) token ids</span>
+    inputs, targets = batch[:, :-1], batch[:, 1:] <span class="cm"># predict token t+1 from tokens 1..t</span>
+    logits = gpt(inputs)                          <span class="cm"># (B, n, V), causal mask inside</span>
+    loss = cross_entropy(logits, targets)         <span class="cm"># every position is a training example</span>
+    loss.backward(); adamw.step(); zero_grad()
+<span class="cm"># inference: generate() samples one token at a time, feeding each back in (with a KV cache)</span></code></pre>
+
+    <h3>GPT: predict the next token (decoder-only)</h3>
+    <ul>
+      <li>A causal mask, and a loss at every position: predict token \(t+1\) from tokens \(1 \dots t\). Every position is a training example, so it's very data-efficient.</li>
+      <li>It generates naturally, one token at a time. Scaled up, it gives modern LLMs, which can do new tasks from a few examples in the prompt (in-context learning). <a href="./tabfm.html">TabFM</a> applies the same idea to tables.</li>
+    </ul>
+
+    <h3>Tokenization</h3>
+    <ul>
+      <li><strong>Words:</strong> any word outside the vocabulary becomes an unknown token. <strong>Characters:</strong> nothing is unknown, but sequences get long. <strong>Subwords</strong> sit in between: frequent words stay whole, and rare words split into pieces.</li>
+      <li><strong>BPE</strong> (GPT) starts from characters (or bytes) and repeatedly merges the most frequent adjacent pair. <strong>WordPiece</strong> (BERT) is similar but picks the merge that most increases the likelihood of the corpus. <strong>SentencePiece</strong> runs on raw text and can learn a BPE or unigram vocabulary.</li>
+      <li><strong>Domain tokens:</strong> in biology, amino acids or codons (3-nucleotide units) are natural tokens.</li>
+    </ul>
+
+    <h3>Using a pretrained model</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Option</th><th>What trains</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td>Frozen features + linear probe</td><td>Only a small head</td><td>Little labelled data, embeddings already good, cheap to run. ppLM-CO: frozen ProtBert plus one linear layer, about 62K trainable parameters.</td></tr>
+        <tr><td>Partial fine-tune</td><td>The top layers and the head</td><td>Moderate data, some domain shift</td></tr>
+        <tr><td>Full fine-tune</td><td>Everything, at a small learning rate (about 1e-5 to 5e-5)</td><td>Lots of data, or a big domain shift. Risks forgetting and overfitting.</td></tr>
+        <tr><td>Adapters / LoRA</td><td>Small added matrices; the backbone stays frozen</td><td>Limited memory, many tasks sharing one base model</td></tr>
+      </tbody>
+    </table></div>
+    <aside class="note ask"><p class="nl">A common question</p><p class="q">Why can a frozen backbone with a linear head beat a model trained from scratch, or a much bigger fine-tuned one?</p><p>The pretrained embeddings already encode the structure, learned from far more data than the labelled set. With little labelled data, training millions of parameters overfits, while a linear head has few parameters, so low variance. A model trained from scratch has to learn the representation and the task from the same small dataset.</p></aside>
+
+    <h3>LoRA</h3>
+    <div class="mj">\[ W' = W + \frac{\alpha}{r} B A, \qquad B \in \mathbb{R}^{d \times r},\ A \in \mathbb{R}^{r \times k},\ r \ll \min(d, k) \]</div>
+    <ul>
+      <li>Freeze \(W\) and train only the low-rank pair \(B A\), often under 1% of the parameters. \(B\) starts at 0, so training starts from the unchanged model.</li>
+      <li>It works because the weight <em>change</em> needed for a new task tends to have low intrinsic rank. After training, merge \(BA\) into \(W\): no extra inference cost.</li>
+      <li>QLoRA keeps the frozen base in 4-bit precision and trains LoRA on top, which fits big models on one GPU.</li>
+    </ul>
+
+    <h3>LoRA, in code</h3>
+    <pre class="code"><code>class LoRALinear:
+    def __init__(self, W, r=8, alpha=16):      <span class="cm"># W: (d_out, d_in), frozen</span>
+        self.W = W
+        self.A = randn(r, d_in) * 0.01         <span class="cm"># trainable</span>
+        self.B = zeros(d_out, r)               <span class="cm"># trainable, starts at 0: the model starts unchanged</span>
+        self.scale = alpha / r
+    def forward(self, x):
+        return self.W @ x + self.scale * (self.B @ (self.A @ x))
+<span class="cm"># after training: W_merged = W + scale * B @ A   (no extra cost at inference)</span></code></pre>
+
+    <h3>Catastrophic forgetting</h3>
+    <p>Fine-tuning can overwrite what the model learned in pretraining. To reduce it:</p>
+    <ul>
+      <li>use a small learning rate and fewer epochs;</li>
+      <li>freeze the lower layers, or use layer-wise learning-rate decay (lower layers learn slower);</li>
+      <li>use LoRA or adapters;</li>
+      <li>mix some old data back in (replay);</li>
+      <li>or penalize changes to the weights that mattered most (EWC; see <a href="./deep-learning-basics.html#odds">Odds and ends</a> in Deep learning basics).</li>
+    </ul>
+
+    <h3>Masking logits</h3>
+    <p>Set the logits of invalid classes to \(-\infty\) before the softmax:</p>
+    <ul>
+      <li>those classes get probability 0;</li>
+      <li>the softmax renormalizes over the valid set;</li>
+      <li>no gradient flows to the masked logits.</li>
+    </ul>
+    <p>It's the same mechanism as a transformer's causal and padding masks. Codon-optimization models use it so every predicted codon matches its amino acid. <strong>Apply the mask at both training and inference.</strong> Otherwise the model trains on a different distribution from the one it's used on.</p>
+
+    <!-- 07 -->
+    <h2 id="questions"><span class="pn">05</span>Interview questions</h2>
+    <p>Answer out loud first, then open the answer.</p>
+    <h3>Transformers</h3>
+    <details class="qa"><summary><span class="qn">T1</span>Why did transformers replace LSTMs?</summary><div class="ans">
+      <p>Three reasons. They train in parallel across positions instead of step by step. Any two tokens are one attention step apart, so there's no long chain for gradients to vanish along. And they keep every past token instead of squeezing the past into one fixed state. The price is \(n^2\) cost in sequence length, and generation is still sequential (helped by the KV cache).</p></div></details>
+    <details class="qa"><summary><span class="qn">T2</span>Walk me through self-attention. Why separate Q, K and V?</summary><div class="ans">
+      <p>Project each token into a query, a key and a value. Scores are \(QK^\top/\sqrt{d_k}\), a softmax per row turns them into weights, and each output is the weighted sum of values. Separate projections let “what I look for” differ from “what I advertise” (so relevance can be asymmetric), and let what gets copied differ from what was matched on.</p></div></details>
+    <details class="qa"><summary><span class="qn">T3</span>Why divide by \(\sqrt{d_k}\)?</summary><div class="ans">
+      <p>A dot product of two random \(d_k\)-dimensional vectors has variance about \(d_k\). Large scores push the softmax to near one-hot, where its gradient is almost zero. Dividing by \(\sqrt{d_k}\) keeps the scores' variance near 1, so the softmax stays in its sensitive range.</p></div></details>
+    <details class="qa"><summary><span class="qn">T4</span>Why multi-head attention?</summary><div class="ans">
+      <p>One softmax gives each token a single attention pattern. With \(h\) heads of width \(d/h\), each head can track a different relation (syntax, coreference, nearby words), and \(W_O\) mixes the results. The cost is about the same as one full-width head.</p></div></details>
+    <details class="qa"><summary><span class="qn">T5</span>How does a transformer know word order? What is RoPE?</summary><div class="ans">
+      <p>Attention is permutation-equivariant, so position must be injected: sinusoidal encodings (fixed, any length), learned position vectors (capped at the trained length), or RoPE. RoPE rotates each query and key by an angle proportional to its position, so \(q_i \cdot k_j\) depends only on the relative offset \(i - j\). Most modern LLMs use it.</p></div></details>
+    <details class="qa"><summary><span class="qn">T6</span>What do the FFN, the residual connections and LayerNorm each do? Why not BatchNorm?</summary><div class="ans">
+      <p>The FFN is a per-token MLP: attention moves information between tokens, and the FFN processes it within each one (most parameters live here). Residuals give gradients a straight path through depth, like the LSTM's cell through time. LayerNorm normalizes each token on its own, so it's independent of batch size, length and padding. BatchNorm would mix statistics across padded sequences and fail with a batch of one. Pre-LN trains more stably than post-LN, which needed warmup.</p></div></details>
+    <details class="qa"><summary><span class="qn">T7</span>Encoder-only vs decoder-only vs encoder–decoder: what are cross-attention and the causal mask for?</summary><div class="ans">
+      <p>Encoder-only (BERT) is bidirectional and trained to fill in masked tokens, which suits classification and embeddings. Decoder-only (GPT) uses a causal mask and is trained to predict the next token, which suits generation. Encoder–decoder (T5, the original) maps one sequence to another; its decoder's cross-attention takes queries from the decoder and keys and values from the encoder. The causal mask sets future scores to \(-\infty\), so training on all positions at once can't peek at the answer.</p></div></details>
+    <details class="qa"><summary><span class="qn">T8</span>What does attention cost, and what is the KV cache?</summary><div class="ans">
+      <p>About \(n^2 d\) time and \(n^2\) memory per layer for the score matrix, versus \(n d^2\) for the FFN. At generation, each new token would otherwise recompute keys and values for the whole prefix; the KV cache stores them, so a new token costs about \(n d\). The cache's memory grows with length, which is what limits long contexts.</p></div></details>
+    <details class="qa"><summary><span class="qn">T9</span>How many parameters does one transformer block have?</summary><div class="ans">
+      <p>About \(4d^2\) for \(W_Q, W_K, W_V, W_O\), plus \(8d^2\) for an FFN with hidden width \(4d\) (two \(d \times 4d\) matrices), so about \(12 d^2\), plus small LayerNorm and bias terms. Embeddings add vocabulary size × \(d\).</p></div></details>
+
+    <h3>Pretrained models and training</h3>
+    <details class="qa"><summary><span class="qn">P1</span>Explain BERT's pretraining. Why the 80/10/10 rule?</summary><div class="ans">
+      <p>Masked language modelling: pick 15% of tokens and predict the originals from both sides' context, with cross-entropy at those positions only. Of the chosen tokens, 80% become <code>[MASK]</code>, 10% a random token, and 10% stay as they are. Since <code>[MASK]</code> never appears at fine-tuning time, the random and unchanged cases force a useful representation for every token. The original BERT also used next-sentence prediction, which RoBERTa showed wasn't needed.</p></div></details>
+    <details class="qa"><summary><span class="qn">P2</span>Frozen backbone with a linear probe, full fine-tune, or LoRA: when each? Why can a probe beat a big trained model?</summary><div class="ans">
+      <p>Use a probe when labelled data is small and the pretrained embeddings already capture the structure: few parameters, low variance, cheap. Fine-tune (with a small learning rate, maybe only the top layers) when there's more data or a domain shift. Use LoRA when memory is tight or many tasks share one base. A probe can win because the representation was learned from far more data than the labelled set; a big model trained on the small set overfits. That's ppLM-CO's result: 62K trainable parameters against 7.1M.</p></div></details>
+    <details class="qa"><summary><span class="qn">P3</span>What is LoRA, and why does it work?</summary><div class="ans">
+      <p>Freeze \(W\) and learn a low-rank update, \(W' = W + (\alpha/r) BA\), with \(r\) small (say 8) and \(B\) starting at zero. You train under 1% of the parameters, and \(BA\) merges into \(W\) afterwards, so inference costs nothing extra. It works because the change a new task needs tends to have low intrinsic rank. QLoRA does the same on a 4-bit frozen base.</p></div></details>
+    <details class="qa"><summary><span class="qn">P4</span>What does a \(-\infty\) logit mask do to the probabilities and the gradients?</summary><div class="ans">
+      <p>Masked classes get \(e^{-\infty} = 0\) probability, so the softmax renormalizes over the valid set, and no gradient flows to the masked logits. It's the same mechanism as the causal and padding masks. Apply it in both training and inference; otherwise the model trains on a different distribution from the one it's used on.</p></div></details>
+    <details class="qa"><summary><span class="qn">P5</span>Bi-LSTM or transformer for a per-token tagging task?</summary><div class="ans">
+      <p>Both see both sides. A bi-LSTM carries context through gated states (\(n\) steps from end to end, cheap per token, fine on small data). A transformer connects any two positions in one step and can start from a pretrained encoder like BERT, which usually wins when one exists, at \(n^2\) cost. Watch inference on sequences longer than any in training: learned position embeddings can't extend, while RoPE or an RNN handles length more gracefully. Either way, a CRF layer or a logit mask can enforce valid outputs.</p></div></details>
+    <details class="qa"><summary><span class="qn">P6</span>Validation loss starts rising at epoch 5 while training loss keeps falling. What do you do?</summary><div class="ans">
+      <p>It's overfitting. Keep the epoch-5 checkpoint (early stopping with some patience). Then add regularization: dropout, weight decay, augmentation, a smaller model or more data. Lower the learning rate or add decay if the curves are noisy. Before all that, rule out leakage or a distribution shift between the splits, and check that the metric you care about moves the same way as the loss.</p></div></details>
+    <details class="qa"><summary><span class="qn">P7</span>Your loss suddenly spikes to NaN halfway through training. Causes and fixes?</summary><div class="ans">
+      <p>Usually exploding gradients: one bad batch or a steep cliff in the loss, often worse in RNNs or with fp16 overflow. Clip the gradient norm, lower the learning rate or add warmup, check the inputs for huge or missing values, use numerically stable log-softmax, and use loss scaling for fp16. Plot the gradient norm next to the loss to confirm.</p></div></details>
+    <details class="qa"><summary><span class="qn">P8</span>How would you optimize a metric that isn't differentiable?</summary><div class="ans">
+      <p>Use a smooth surrogate (soft versions of max and argmax, with a temperature), Gumbel-softmax, a straight-through estimator, or REINFORCE with the metric as the reward and a baseline to cut variance. Or keep cross-entropy and weight it. Check that the surrogate tracks the real metric; it can also add nothing when cross-entropy already captures what the metric rewards.</p></div></details>
+    <details class="qa"><summary><span class="qn">P9</span>What is catastrophic forgetting, and how do you reduce it?</summary><div class="ans">
+      <p>Training on new data overwrites what the model knew. To reduce it: a small learning rate and fewer epochs; freeze lower layers or use layer-wise learning-rate decay; adapters or LoRA; replay some old data; or EWC, which penalizes moving the weights that mattered for old tasks (weighted by Fisher information). In production, the same issue shows up as retraining under drift.</p></div></details>
+
+    <!-- 08 -->
+    <h2 id="sheet"><span class="pn">06</span>Cheat sheet</h2>
+    <div class="sheet">
+      <h3>Transformer</h3>
+      <div class="mj">\[ Q = XW_Q,\ K = XW_K,\ V = XW_V \qquad \text{Attention} = \text{softmax}\!\Big(\frac{QK^\top}{\sqrt{d_k}}\Big) V \]</div>
+      <div class="mj">\[ x \leftarrow x + \text{MHA}(\text{LN}(x)) \qquad x \leftarrow x + \text{FFN}(\text{LN}(x)) \qquad \approx 12 d^2 \text{ parameters per block} \]</div>
+      <h3>Shapes</h3>
+      <div class="mj">\[ \text{Attention: } X\ n{\times}d \to Q, K, V\ n{\times}d_k \to QK^\top\ n{\times}n \to AV\ n{\times}d_k \to \text{concat} \cdot W_O\ n{\times}d \]</div>
+    </div>
+
+    <footer><a href="./">More study notes</a> · <a href="../">Deepam Minda</a></footer>
+  </article>
+</div>
+<a class="jump" href="#tldr">Contents ↑</a>
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+  svg: { fontCache: "global" },
+  options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script>
+(function () {
+  var d = document.getElementById("tocd");
+  var wide = window.matchMedia("(min-width: 1081px)");
+  function sync() { d.open = wide.matches; }
+  sync();
+  if (wide.addEventListener) wide.addEventListener("change", sync);
+  var jump = document.querySelector(".jump");
+  jump.addEventListener("click", function () { if (!wide.matches) d.open = true; });
+  d.addEventListener("click", function (e) {
+    if (!wide.matches && e.target.closest("a")) d.open = false;
+  });
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+  function spy() {
+    var y = window.scrollY + 120, cur = 0;
+    targets.forEach(function (t, i) { if (t && t.getBoundingClientRect().top + window.scrollY <= y) cur = i; });
+    links.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
+  }
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+})();
+</script>
+
+<script>
+(function () {
+  var root = document.documentElement, b = document.getElementById("theme-toggle"), t = b.querySelector(".t");
+  function cur() {
+    var a = root.getAttribute("data-theme");
+    if (a === "dark" || a === "light") return a;
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function label() {
+    var c = cur();
+    t.textContent = c === "dark" ? "Light mode" : "Dark mode";
+    b.setAttribute("aria-label", "Switch to " + (c === "dark" ? "light" : "dark") + " mode");
+  }
+  b.addEventListener("click", function () {
+    var n = cur() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", n);
+    try { localStorage.setItem("deepam-theme", n); } catch (e) {}
+    label();
+  });
+  label();
+})();
+</script>
+</body>
+</html>

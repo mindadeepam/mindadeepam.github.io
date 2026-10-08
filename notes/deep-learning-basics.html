@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Deep learning basics · Deepam Minda</title>
-<meta name="description" content="Forward pass and backprop in NumPy, optimizers, activations, losses, initialization, normalization, regularization, residuals and convolutions.">
+<meta name="description" content="Forward pass and backprop in NumPy, optimizers, activations, losses, initialization, normalization, regularization, residuals, convolutions and reading loss curves.">
 <meta property="og:title" content="Deep learning basics">
-<meta property="og:description" content="Forward pass and backprop in NumPy, optimizers, activations, losses, initialization, normalization, regularization, residuals and convolutions.">
+<meta property="og:description" content="Forward pass and backprop in NumPy, optimizers, activations, losses, initialization, normalization, regularization, residuals, convolutions and reading loss curves.">
 <meta property="og:type" content="article">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
 <script>
@@ -243,6 +243,7 @@ pre.code .cm { color: var(--ink-3); }
 .crumbs a:hover { color: var(--link); }
 @media (max-width: 1080px) { .crumbs { max-width: 860px; } }
 footer .site-nav { display: block; margin-top: 10px; }
+.next { margin-top: 36px; font-weight: 500; }
 </style>
 </head>
 <body>
@@ -279,8 +280,10 @@ footer .site-nav { display: block; margin-top: 10px; }
         <li><a href="#addcat"><span class="n">11</span>Adding vs concatenating vectors</a></li>
         <li><a href="#cnn"><span class="n">12</span>Convolutions in one page</a></li>
         <li><a href="#loop"><span class="n">13</span>The training loop, and debugging it</a></li>
-        <li><a href="#questions"><span class="n">14</span>Interview questions</a></li>
-        <li><a href="#sheet"><span class="n">15</span>Cheat sheet</a></li>
+        <li><a href="#curves"><span class="n">14</span>Training dynamics</a></li>
+        <li><a href="#odds"><span class="n">15</span>Odds and ends</a></li>
+        <li><a href="#questions"><span class="n">16</span>Interview questions</a></li>
+        <li><a href="#sheet"><span class="n">17</span>Cheat sheet</a></li>
       </ol>
     </details>
   </nav>
@@ -525,7 +528,7 @@ def dropout(h, p, training):
     <ul>
       <li><strong>The gradient gets a straight path.</strong> The identity term means the error reaches early layers even when \(\partial F/\partial x\) is small. That's what made 100+ layer networks trainable (ResNet, 2015).</li>
       <li><strong>Doing nothing is easy.</strong> A block only has to learn a correction to its input; if a layer isn't useful, \(F \to 0\) leaves the input unchanged. Without the skip, it would have to learn the identity mapping, which is surprisingly hard.</li>
-      <li>The same idea appears as the <a href="./deep-learning-nlp.html#lstm">LSTM's cell update</a> through time and as the <a href="./deep-learning-nlp.html#tf">transformer's residual stream</a> through depth.</li>
+      <li>The same idea appears as the <a href="./sequence-models.html#lstm">LSTM's cell update</a> through time and as the <a href="./transformers.html#tf">transformer's residual stream</a> through depth.</li>
     </ul>
 
     <!-- addcat -->
@@ -624,8 +627,57 @@ for o in range(C_out):
         val_loss = mean(loss_fn(model(xb), yb) for xb, yb in val_loader)
     <span class="cm"># early stopping: keep the checkpoint with the best val_loss</span></code></pre>
 
+    <!-- curves -->
+    <h2 id="curves"><span class="pn">14</span>Training dynamics and loss curves</h2>
+    <p>Read a training run by plotting train and validation loss on the same axes, with the gradient norm and the learning rate underneath. Most problems have a recognisable shape:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>What you see</th><th>Likely cause</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td>Train keeps falling, validation falls then rises</td><td>Overfitting</td><td>Early stopping on validation (with patience), dropout, weight decay, augmentation, more data, a smaller model</td></tr>
+        <tr><td>Both flat from the start, near \(\log K\) (or the entropy of the class prior)</td><td>Not learning: learning rate far off, a data bug (labels shifted by one), saturated inputs, dead units</td><td>First try to overfit one batch. Check the data pipeline; run a learning-rate range test.</td></tr>
+        <tr><td>Smooth but very slow decrease</td><td>Learning rate too low</td><td>Raise it; use a schedule</td></tr>
+        <tr><td>Noisy, oscillating or diverging</td><td>Learning rate too high, or batch too small</td><td>Lower it, add warmup, use a bigger batch</td></tr>
+        <tr><td>Sudden spikes, or NaN</td><td>Exploding gradients, a bad batch, fp16 overflow</td><td>Clip the gradient norm, lower the learning rate, check the inputs, use loss scaling</td></tr>
+        <tr><td>Long plateau, then a sudden drop</td><td>A hard feature or a long-range dependency found late, or a step in the learning-rate schedule</td><td>Be patient; the forget bias set to 1 helps LSTMs; decay the learning rate</td></tr>
+        <tr><td>Validation loss below training loss</td><td>Dropout and augmentation are on only in training; training loss is averaged over an epoch of improving weights; the validation set is easier</td><td>Usually fine. Compare with dropout off; check for leakage.</td></tr>
+        <tr><td>Loss falls, but the metric (AUC, F1) doesn't move</td><td>Loss and metric are misaligned: calibration, threshold, class imbalance</td><td>Track the metric itself; try weighted or focal loss; tune the threshold</td></tr>
+        <tr><td>A gap between train and validation from step 0</td><td>The two splits come from different distributions</td><td>Re-split; look for drift or leakage</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>The learning rate matters more than almost anything else</strong> (Greff et al. found this for LSTMs). Tune it first, on a log scale.</li>
+      <li><strong>Warmup:</strong> ramp the learning rate up over the first steps. Adam's per-parameter scale is noisy early on, and post-LN transformers diverge without warmup. Then decay it (step, cosine, one-cycle).</li>
+      <li><strong>Batch size and learning rate move together.</strong> A bigger batch gives a less noisy gradient, so it can take a proportionally bigger learning rate (the linear scaling rule, with warmup). Very large batches tend to land in sharper minima.</li>
+      <li><strong>Adam vs AdamW:</strong> Adam's L2 penalty gets rescaled by its per-parameter step size. AdamW applies weight decay directly to the weights, decoupled from the gradient, which regularizes as intended.</li>
+      <li><strong>Loss landscapes</strong> (Li et al., 2018): plot the loss along one or two random directions around the trained weights, with each filter's direction scaled to match its weights (“filter normalization”) so different networks are comparable. Skip connections make the landscape much smoother, and flatter minima tend to generalize better.</li>
+      <li><strong>Double descent:</strong> as model size grows, test error can fall, rise near the point where the model just fits the training data, then fall again.</li>
+    </ul>
+
+    <!-- odds -->
+    <h2 id="odds"><span class="pn">15</span>Odds and ends</h2>
+    <h3>Optimizing a metric you can't differentiate</h3>
+    <ul>
+      <li><strong>Smooth surrogate:</strong> replace hard choices (argmax, max) with a softmax, with a temperature, and optimize that. A softened codon adaptation index (CAI), added as an extra loss term, is one example.</li>
+      <li><strong>Gumbel-softmax:</strong> a differentiable approximation of sampling a one-hot choice.</li>
+      <li><strong>Straight-through:</strong> use the hard choice in the forward pass, and pretend it was the identity in the backward pass.</li>
+      <li><strong>REINFORCE / policy gradient:</strong> treat the metric as a reward. It's unbiased but high-variance; subtract a baseline. Summarizers trained with reinforcement learning use it to optimize ROUGE directly.</li>
+      <li><strong>Why it may not help:</strong> cross-entropy may already push toward what the metric rewards, and a surrogate can disagree with the real metric.</li>
+    </ul>
+    <h3>Neural ODEs</h3>
+    <p>A residual layer, \(h_{l+1} = h_l + f(h_l)\), is one Euler step of \(dh/dt = f(h, t)\). A neural ODE replaces the stack of layers with an ODE solver: continuous depth, and memory that stays constant with depth when trained with the adjoint method. Flows built this way are invertible, which is why they're used for image registration. The costs are slow, adaptive solvers and trouble with stiff dynamics.</p>
+    <h3>Continual learning</h3>
+    <p>Learning tasks in sequence without forgetting the old ones. There are three families of fixes:</p>
+    <ul>
+      <li><strong>Regularization:</strong> EWC penalizes changes to the weights that mattered for old tasks, with importance measured by the Fisher information.</li>
+      <li><strong>Replay:</strong> keep, or generate, old examples and mix them in.</li>
+      <li><strong>Architecture:</strong> add new heads or adapters per task.</li>
+    </ul>
+    <p>In production, the same problem shows up as concept drift: monitor, retrain on a schedule, and keep old patterns in the training mix.</p>
+    <h3>Implicit neural representations</h3>
+    <p>An MLP that maps coordinates \((x, y)\) to a pixel value. Because it's continuous, you can sample it at any resolution, which is how arbitrary-scale super-resolution works. Plain MLPs struggle with fine detail (“spectral bias”), so INRs use Fourier features or sine activations (SIREN).</p>
+
     <!-- questions -->
-    <h2 id="questions"><span class="pn">14</span>Interview questions</h2>
+    <h2 id="questions"><span class="pn">16</span>Interview questions</h2>
     <p>Answer out loud first, then open the answer.</p>
     <details class="qa"><summary><span class="qn">1</span>Why do we need non-linear activations?</summary><div class="ans"><p>Without them, any stack of layers is one linear map, since \(W_2 W_1 x = (W_2 W_1) x\). It can only draw straight decision boundaries. The non-linearity between layers is what lets depth build complex functions.</p></div></details>
     <details class="qa"><summary><span class="qn">2</span>Walk through forward and backward propagation for a two-layer network.</summary><div class="ans"><p>Forward: \(z_1 = W_1 x + b_1\), \(a_1 = \text{ReLU}(z_1)\), \(z_2 = W_2 a_1 + b_2\), \(\hat y = \text{softmax}(z_2)\), cross-entropy loss, storing each value. Backward: \(\delta_2 = \hat y - y\); \(\partial L/\partial W_2 = \delta_2 a_1^\top\), \(\partial L/\partial b_2 = \delta_2\); \(\delta_1 = (W_2^\top \delta_2) \odot \text{ReLU}'(z_1)\); \(\partial L/\partial W_1 = \delta_1 x^\top\), \(\partial L/\partial b_1 = \delta_1\). Then a gradient step on every weight.</p></div></details>
@@ -646,7 +698,7 @@ for o in range(C_out):
     <details class="qa"><summary><span class="qn">17</span>How does batch size affect training?</summary><div class="ans"><p>Bigger batches give less noisy gradients and better hardware use, and usually allow a proportionally larger learning rate (with warmup). Very large batches can generalize slightly worse (sharper minima) and need more epochs' worth of tuning. Small batches are noisier, which acts as a mild regularizer, but they're slower per example.</p></div></details>
 
     <!-- sheet -->
-    <h2 id="sheet"><span class="pn">15</span>Cheat sheet</h2>
+    <h2 id="sheet"><span class="pn">17</span>Cheat sheet</h2>
     <div class="sheet">
       <h3>Layer and backprop</h3>
       <div class="mj">\[ z_l = W_l a_{l-1} + b_l,\ a_l = f(z_l) \qquad \delta_{\text{out}} = \hat y - y \qquad \delta_l = (W_{l+1}^\top \delta_{l+1}) \odot f'(z_l) \qquad \partial L/\partial W_l = \delta_l a_{l-1}^\top \]</div>
