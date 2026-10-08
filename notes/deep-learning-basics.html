@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deep learning basics · Deepam Minda</title>
+<meta name="description" content="Forward pass and backprop in NumPy, optimizers, activations, losses, initialization, normalization, regularization, residuals and convolutions.">
+<meta property="og:title" content="Deep learning basics">
+<meta property="og:description" content="Forward pass and backprop in NumPy, optimizers, activations, losses, initialization, normalization, regularization, residuals and convolutions.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+(function () {
+  try { var t = localStorage.getItem("deepam-theme"); if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<style>
+/* Green graph-paper theme for the recurrent-notebook content.
+   Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
+   One sans for text, one mono for labels; MathJax draws the maths. Green = the cell / notebook,
+   slate = the hidden state, orange only for gradients. */
+:root {
+  --paper: #f5f7f2;
+  --grid: #edf1e9;
+  --grid-major: #e4eadf;
+  --surface: #fcfdfb;
+  --ink: #141b17;
+  --ink-2: #46524a;
+  --ink-3: #6f7c73;
+  --rule: #d3dccf;
+  --link: #1c6a43;
+  --cell: #1c6a43;
+  --cell-wash: #e2eee4;
+  --hid: #2f5470;
+  --hid-wash: #e4ecf1;
+  --gate: #3d4a42;
+  --gate-wash: #e9efe6;
+  --grad: #c75a1a;
+  --grad-wash: #f8e7db;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --serif: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0d1310; --grid: #111813; --grid-major: #151e18; --surface: #151d18;
+    --ink: #e3eae4; --ink-2: #a8b4ab; --ink-3: #76837a; --rule: #26332b; --link: #7ccc9b;
+    --cell: #7ccc9b; --cell-wash: #1a2a20; --hid: #8fb6d2; --hid-wash: #17232b;
+    --gate: #c9d3cb; --gate-wash: #1b241e; --grad: #f0975a; --grad-wash: #2e1f16;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0d1310; --grid: #111813; --grid-major: #151e18; --surface: #151d18;
+  --ink: #e3eae4; --ink-2: #a8b4ab; --ink-3: #76837a; --rule: #26332b; --link: #7ccc9b;
+  --cell: #7ccc9b; --cell-wash: #1a2a20; --hid: #8fb6d2; --hid-wash: #17232b;
+  --gate: #c9d3cb; --gate-wash: #1b241e; --grad: #f0975a; --grad-wash: #2e1f16;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
+body {
+  margin: 0; color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: 50% 0;
+  font: 16.5px/1.7 var(--sans); letter-spacing: -.003em;
+  padding-inline: 20px; padding-block: 44px 88px;
+  -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 640px) { body { font-size: 16px; padding-inline: 16px; padding-block: 24px 80px; } }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+table, button { font: inherit; }
+code { font: .86em var(--mono); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; }
+
+.page { max-width: 1200px; margin: 0 auto; display: grid; gap: 52px; grid-template-columns: 220px minmax(0, 860px); justify-content: center; }
+@media (max-width: 1080px) { .page { grid-template-columns: minmax(0, 860px); gap: 0; } }
+
+/* theme toggle */
+.theme-toggle {
+  position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); right: 16px; z-index: 6;
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  font: 500 12px/1 var(--mono); color: var(--ink-2);
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; padding: 8px 12px;
+}
+.theme-toggle:hover { color: var(--ink); border-color: var(--ink-3); }
+.theme-toggle .dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(90deg, var(--ink) 50%, var(--surface) 50%); border: 1px solid var(--ink-3); }
+
+/* contents */
+.toc { position: sticky; top: 28px; align-self: start; font: 13.5px/1.4 var(--sans); max-height: calc(100vh - 56px); overflow-y: auto; }
+.toc summary { display: none; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--ink-2); text-decoration: none; }
+.toc a:hover { background: var(--surface); color: var(--ink); }
+.toc a.on { color: var(--ink); background: var(--surface); box-shadow: inset 2px 0 0 var(--cell); }
+.toc .n { font: 500 11px var(--mono); color: var(--ink-3); margin-right: 8px; }
+.toc .label { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 10px 10px; }
+.toc li.part { font: 500 10.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 14px 10px 4px; }
+@media (max-width: 1080px) {
+  .toc { position: static; margin-bottom: 26px; max-height: none; }
+  .toc .label { display: none; }
+  .toc details { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  .toc summary { display: block; cursor: pointer; padding: 12px 14px; font: 500 14px var(--sans); list-style: none; }
+  .toc summary::-webkit-details-marker { display: none; }
+  .toc summary::after { content: "+"; float: right; color: var(--ink-3); }
+  .toc details[open] summary::after { content: "–"; }
+  .toc details ol { padding: 0 6px 10px; }
+}
+.jump {
+  display: none; position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+  font: 500 13px var(--sans); color: var(--ink); background: var(--surface); text-decoration: none;
+  border: 1px solid var(--rule); border-radius: 999px; padding: 9px 14px;
+}
+@media (max-width: 1080px) { .jump { display: block; } }
+
+/* article */
+article { min-width: 0; }
+header.hero { display: grid; gap: 10px; margin-bottom: 26px; }
+.kicker { font: 500 12px/1 var(--mono); color: var(--ink-3); letter-spacing: .02em; }
+h1 { margin: 0; font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.6rem); line-height: 1.1; font-weight: 600; letter-spacing: -.028em; text-wrap: balance; }
+.dek { margin: 0; font-size: 1.1rem; line-height: 1.55; color: var(--ink-2); max-width: 40em; }
+.meta { font: 12px/1.5 var(--mono); color: var(--ink-3); }
+.key { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.key span::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--c); margin-right: 6px; vertical-align: middle; }
+
+h2 { font-size: 1.36rem; line-height: 1.25; font-weight: 600; letter-spacing: -.018em; margin: 56px 0 12px; text-wrap: balance; scroll-margin-top: 16px; }
+h2 .pn { font: 500 .74em/1 var(--mono); color: var(--ink-3); margin-right: .7em; letter-spacing: 0; }
+h3 { font-size: 1.04rem; font-weight: 600; letter-spacing: -.01em; margin: 30px 0 6px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 1.25em; }
+li { margin-bottom: 5px; }
+li::marker { color: var(--ink-3); }
+strong { font-weight: 600; }
+.mj { overflow-x: auto; overflow-y: hidden; margin: 4px 0 16px; padding: 2px 0; }
+mjx-container[display="true"] { margin: 0 !important; }
+
+/* plan and summary panels */
+.tldr { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 22px 6px; margin-bottom: 14px; }
+.tldr h2 { margin: 0 0 10px; font: 500 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.tldr ol { padding-left: 1.3em; }
+.tldr li { margin-bottom: 8px; }
+.tldr p { margin: 0 0 12px; font-size: 15.5px; }
+.tldr .tbl { margin: 4px 0 12px; }
+
+/* notes: quote-style, coloured by kind */
+.note { margin: 16px 0 20px; padding: 2px 0 2px 16px; border-left: 2px solid var(--c); color: var(--ink-2); font-size: .97em; }
+.note > .nl { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); margin: 4px 0 8px; }
+.note strong { color: var(--ink); }
+.note.ask { --c: var(--cell); }
+.note.say { --c: var(--hid); }
+.note.trap { --c: var(--grad); }
+.note.lab { --c: var(--cell); }
+.note .q { font-style: italic; color: var(--ink); }
+.note ul { margin: 0 0 10px; }
+.note li { margin-bottom: 5px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 6px 0 20px; }
+table { border-collapse: collapse; width: 100%; font-size: .93em; line-height: 1.5; }
+th { text-align: left; vertical-align: bottom; font: 500 11px/1.4 var(--mono); color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; padding: 0 14px 8px 0; border-bottom: 1px solid var(--ink-3); }
+td { padding: 8px 14px 8px 0; vertical-align: top; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+td .src { display: block; font: 11.5px/1.4 var(--mono); color: var(--ink-3); margin-top: 2px; }
+
+/* gate cards */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0 20px; }
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.gc { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 4px; font-size: 15.5px; line-height: 1.6; }
+.gc h4 { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.gc h4 .tag { font: 500 11px var(--mono); color: var(--c); }
+.gc.g1 { --c: var(--cell); }
+.gc.g2 { --c: var(--ink-3); }
+.gc p { margin-bottom: 10px; }
+
+/* figures */
+figure { margin: 18px 0 24px; }
+.plate { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 10px; overflow-x: auto; }
+.plate svg { display: block; width: 100%; height: auto; min-width: 460px; max-width: 700px; margin: 0 auto; }
+@media (max-width: 500px) { .plate svg { max-width: none; } }
+figcaption { font-size: .86rem; line-height: 1.5; color: var(--ink-3); margin-top: 10px; }
+.dg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink-2); }
+.dg .v { font-family: var(--serif); font-style: italic; font-size: 19px; fill: var(--ink); }
+.dg .v .s { font-size: 12.5px; }
+.dg .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; fill: var(--ink-3); }
+.dg .gl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--gate); }
+.dg .gs { font-family: var(--serif); font-style: normal; font-size: 12px; fill: var(--ink-3); }
+.dg .cl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--ink); }
+.dg .cs { font-family: var(--sans); font-size: 12px; fill: var(--ink-2); }
+.dg .optx { font: 500 17px var(--sans); fill: var(--ink); }
+.dg .cell { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.dg .hid { stroke: var(--hid); stroke-width: 2.4; fill: none; }
+.dg .hid.thick { stroke-width: 3.6; }
+.dg .in { stroke: var(--ink-3); stroke-width: 1.5; fill: none; }
+.dg .gw { stroke: var(--gate); stroke-width: 1.6; fill: none; }
+.dg .cw { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+.dg .grad { stroke: var(--grad); fill: none; stroke-linecap: round; }
+.dg .gbox { fill: var(--gate-wash); stroke: var(--gate); stroke-width: 1.3; }
+.dg .box { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .op { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.3; }
+.dg .dot { fill: var(--ink-2); }
+.dg .cellon { fill: var(--cell-wash); stroke: var(--cell); stroke-width: 1; }
+.dg .celloff { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.dg .stream { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.mk-cell { fill: var(--cell); } .mk-hid { fill: var(--hid); } .mk-in { fill: var(--ink-3); }
+.mk-gate { fill: var(--gate); } .mk-cw { fill: var(--ink-2); } .mk-grad { fill: var(--grad); }
+
+/* questions */
+details.qa { border-bottom: 1px solid var(--rule); }
+details.qa:first-of-type { border-top: 1px solid var(--rule); }
+details.qa summary { cursor: pointer; padding: 11px 2px; font-weight: 500; font-size: 15.5px; line-height: 1.45; list-style: none; display: flex; gap: 12px; }
+details.qa summary::-webkit-details-marker { display: none; }
+details.qa summary .qn { font: 500 11.5px/1.9 var(--mono); color: var(--ink-3); flex: none; min-width: 1.9em; }
+details.qa summary::after { content: "+"; margin-left: auto; color: var(--ink-3); flex: none; }
+details.qa[open] summary::after { content: "–"; }
+details.qa .ans { padding: 0 4px 12px 32px; font-size: 15.5px; color: var(--ink-2); }
+summary:focus-visible, a:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+
+.sheet { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 6px; }
+.sheet h3 { margin: 4px 0 6px; font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: .9rem; color: var(--ink-3); }
+
+/* code blocks */
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; margin: 8px 0 20px; overflow-x: auto; font: 12.8px/1.6 var(--mono); color: var(--ink); white-space: pre; }
+pre.code code { font: inherit; background: none; border: 0; padding: 0; }
+pre.code .cm { color: var(--ink-3); }
+@media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
+
+/* public copy: links back to the site */
+.crumbs { max-width: 1132px; margin: 0 auto 28px; display: flex; flex-wrap: wrap; gap: 8px; font: 500 12px/1.6 var(--mono); color: var(--ink-3); }
+.crumbs a { color: var(--ink-2); }
+.crumbs a:hover { color: var(--link); }
+@media (max-width: 1080px) { .crumbs { max-width: 860px; } }
+footer .site-nav { display: block; margin-top: 10px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="a-cell" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path class="mk-cell" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-hid" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto"><path class="mk-hid" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-in" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-in" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-gate" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-cw" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-cw" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-grad" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path class="mk-grad" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<button type="button" class="theme-toggle" id="theme-toggle"><span class="dot"></span><span class="t">Dark mode</span></button>
+<nav class="crumbs" aria-label="Site"><a href="../">deepam</a><span aria-hidden="true">/</span><a href="./">study notes</a></nav>
+<div class="page">
+  <nav class="toc" aria-label="Contents">
+    <details id="tocd" open>
+      <summary>Contents</summary>
+      <div class="label">Contents</div>
+      <ol>
+        <li><a href="#tldr"><span class="n">00</span>In short</a></li>
+        <li><a href="#layer"><span class="n">01</span>A neuron, a layer, a network</a></li>
+        <li><a href="#forward"><span class="n">02</span>The forward pass</a></li>
+        <li><a href="#backprop"><span class="n">03</span>Backpropagation</a></li>
+        <li><a href="#optim"><span class="n">04</span>Gradient descent and optimizers</a></li>
+        <li><a href="#activations"><span class="n">05</span>Activations</a></li>
+        <li><a href="#losses"><span class="n">06</span>Losses</a></li>
+        <li><a href="#init"><span class="n">07</span>Vanishing, exploding and initialization</a></li>
+        <li><a href="#norm"><span class="n">08</span>BatchNorm and LayerNorm</a></li>
+        <li><a href="#reg"><span class="n">09</span>Regularization</a></li>
+        <li><a href="#residual"><span class="n">10</span>Residual connections</a></li>
+        <li><a href="#addcat"><span class="n">11</span>Adding vs concatenating vectors</a></li>
+        <li><a href="#cnn"><span class="n">12</span>Convolutions in one page</a></li>
+        <li><a href="#loop"><span class="n">13</span>The training loop, and debugging it</a></li>
+        <li><a href="#questions"><span class="n">14</span>Interview questions</a></li>
+        <li><a href="#sheet"><span class="n">15</span>Cheat sheet</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <article>
+    <header class="hero">
+      <div class="kicker">Study notes · Neural networks</div>
+      <h1>Deep learning basics</h1>
+      <p class="dek">How a neural network computes, how backprop finds every gradient in one pass, and the pieces that make deep networks trainable: activations, losses, initialization, normalization, regularization, residuals, convolutions.</p>
+      <div class="meta">About 30 minutes · forward pass, backprop, then everything that keeps training stable ·
+        <span class="key"><span style="--c: var(--hid)">forward values</span><span style="--c: var(--grad)">gradients</span><span style="--c: var(--cell)">highlights</span></span>
+      </div>
+    </header>
+
+    <section class="tldr" id="tldr" aria-labelledby="tldr-h">
+      <h2 id="tldr-h">In short</h2>
+      <ol>
+        <li>A layer is \(a = f(Wx + b)\): a weighted sum, then a non-linearity. Without the non-linearity, any stack of layers collapses into one linear map.</li>
+        <li>The <strong>forward pass</strong> computes and stores every layer's output. The <strong>backward pass</strong> applies the chain rule from the loss backwards: \(\delta_l = (W_{l+1}^\top \delta_{l+1}) \odot f'(z_l)\), and each weight's gradient is \(\delta_l\, a_{l-1}^\top\).</li>
+        <li>One backward pass costs about two forward passes and gives the gradient for <em>every</em> weight. That's why deep learning is feasible.</li>
+        <li>Deep networks fail when gradients vanish or explode (a product of one factor per layer). The fixes are ReLU-family activations, variance-preserving initialization, normalization, residual connections and clipping.</li>
+        <li>Regularization (weight decay, dropout, early stopping, augmentation) fights overfitting; Adam(W) with a tuned learning rate and warmup is the default optimizer.</li>
+        <li>Add vectors when they're updates to the same representation (residuals, positions); concatenate when they're different sources that need their own weights.</li>
+      </ol>
+    </section>
+
+    <!-- layer -->
+    <h2 id="layer"><span class="pn">01</span>A neuron, a layer, a network</h2>
+    <p>A neuron takes a weighted sum of its inputs plus a bias, then applies a non-linear <strong>activation</strong>. A layer is many neurons side by side, so the weights become a matrix:</p>
+    <div class="mj">\[ z = W x + b \qquad a = f(z) \]</div>
+    <div class="tbl"><table>
+      <thead><tr><th>Thing</th><th>Shape</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>\(x\)</td><td>\(d_{in}\)</td><td>Input (or the previous layer's output)</td></tr>
+        <tr><td>\(W\)</td><td>\(d_{out} \times d_{in}\)</td><td>Row \(i\) is neuron \(i\)'s weights</td></tr>
+        <tr><td>\(b,\ z,\ a\)</td><td>\(d_{out}\)</td><td>Bias, pre-activation, activation</td></tr>
+        <tr><td>A batch \(X\)</td><td>\(B \times d_{in}\)</td><td>In code rows are examples: \(Z = X W^\top + b\), shape \(B \times d_{out}\)</td></tr>
+        <tr><td>Parameters</td><td>\(d_{out}(d_{in} + 1)\)</td><td></td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Why the non-linearity is essential:</strong> two linear layers make one, since \(W_2(W_1 x) = (W_2 W_1) x\). Only the bend between layers lets depth build curved decision boundaries. With it, a single hidden layer that's wide enough can approximate any continuous function (the universal approximation theorem); depth makes that far more efficient.</p>
+
+    <!-- forward -->
+    <h2 id="forward"><span class="pn">02</span>The forward pass</h2>
+    <p>Run the layers in order and keep every intermediate result, because the backward pass will need them. For a two-layer classifier:</p>
+    <div class="mj">\[ z_1 = W_1 x + b_1 \qquad a_1 = \text{ReLU}(z_1) \qquad z_2 = W_2 a_1 + b_2 \qquad \hat y = \text{softmax}(z_2) \qquad L = -\sum_k y_k \log \hat y_k \]</div>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 700 240" role="img" aria-label="A two-layer network. Forward, left to right: x, then W1 x plus b1, ReLU, W2 a1 plus b2, softmax, loss. Backward, right to left in orange: delta 2 equals y hat minus y, times W2 transpose, times the ReLU slope, with weight gradients delta 2 a1 transpose and delta 1 x transpose.">
+          <rect class="box" x="14" y="52" width="56" height="38" rx="8"/><text class="v" x="35" y="77">x</text>
+          <rect class="gbox" x="104" y="52" width="110" height="38" rx="8"/><text x="159" y="76" text-anchor="middle">W₁x + b₁</text>
+          <rect class="box" x="248" y="52" width="70" height="38" rx="8"/><text x="283" y="76" text-anchor="middle">ReLU</text>
+          <rect class="gbox" x="352" y="52" width="110" height="38" rx="8"/><text x="407" y="76" text-anchor="middle">W₂a₁ + b₂</text>
+          <rect class="box" x="496" y="52" width="80" height="38" rx="8"/><text x="536" y="76" text-anchor="middle">softmax</text>
+          <rect class="box" x="610" y="52" width="70" height="38" rx="8"/><text x="645" y="76" text-anchor="middle">loss L</text>
+          <path class="hid" d="M70 71 H101" marker-end="url(#a-hid)"/><path class="hid" d="M214 71 H245" marker-end="url(#a-hid)"/>
+          <path class="hid" d="M318 71 H349" marker-end="url(#a-hid)"/><path class="hid" d="M462 71 H493" marker-end="url(#a-hid)"/>
+          <path class="hid" d="M576 71 H607" marker-end="url(#a-hid)"/>
+          <text class="lbl" x="42" y="110" text-anchor="middle">x: d</text>
+          <text class="lbl" x="159" y="110" text-anchor="middle">z₁: H</text>
+          <text class="lbl" x="283" y="110" text-anchor="middle">a₁: H</text>
+          <text class="lbl" x="407" y="110" text-anchor="middle">z₂: K</text>
+          <text class="lbl" x="536" y="110" text-anchor="middle">ŷ: K</text>
+          <text class="lbl" x="645" y="110" text-anchor="middle">a number</text>
+          <text class="lbl" x="350" y="32" text-anchor="middle">FORWARD: COMPUTE AND STORE</text>
+          <path class="grad" d="M645 160 H40" stroke-width="2.4" marker-end="url(#a-grad)"/>
+          <text class="lbl" x="350" y="232" text-anchor="middle">BACKWARD: CHAIN RULE, RIGHT TO LEFT</text>
+          <text x="560" y="150" text-anchor="middle" style="fill:var(--grad)">δ₂ = ŷ − y</text>
+          <text x="407" y="150" text-anchor="middle" style="fill:var(--grad)">× W₂ᵀ</text>
+          <text x="283" y="150" text-anchor="middle" style="fill:var(--grad)">⊙ ReLU′(z₁) → δ₁</text>
+          <text x="159" y="150" text-anchor="middle" style="fill:var(--grad)">× W₁ᵀ</text>
+          <text class="lbl" x="407" y="186" text-anchor="middle">∂L/∂W₂ = δ₂ a₁ᵀ  (K×H)</text>
+          <text class="lbl" x="159" y="186" text-anchor="middle">∂L/∂W₁ = δ₁ xᵀ  (H×d)</text>
+          <text class="lbl" x="560" y="186" text-anchor="middle">∂L/∂b₂ = δ₂</text>
+          <text class="lbl" x="283" y="186" text-anchor="middle">∂L/∂b₁ = δ₁</text>
+        </svg>
+      </div>
+      <figcaption>A two-layer network. Forward (blue) computes and stores every intermediate value. Backward (orange) starts at the loss and multiplies by one local derivative per step; each weight's gradient is read off on the way.</figcaption>
+    </figure>
+    <p>Every operation here is simple, with a simple local derivative. That's what makes the next section work: the chain rule just multiplies local derivatives along the path.</p>
+
+    <!-- backprop -->
+    <h2 id="backprop"><span class="pn">03</span>Backpropagation</h2>
+    <p>The question backprop answers: for every weight, how much would the loss change if that weight moved a little? Define the <strong>error</strong> at layer \(l\) as the gradient at its pre-activation, \(\delta_l = \partial L / \partial z_l\). Everything follows from four equations:</p>
+    <div class="mj">\[ \text{(1)}\ \ \delta_{\text{out}} = \hat y - y \qquad\qquad \text{(2)}\ \ \delta_l = \big(W_{l+1}^\top \delta_{l+1}\big) \odot f'(z_l) \]</div>
+    <div class="mj">\[ \text{(3)}\ \ \frac{\partial L}{\partial W_l} = \delta_l\, a_{l-1}^\top \qquad\qquad \text{(4)}\ \ \frac{\partial L}{\partial b_l} = \delta_l \]</div>
+    <ul>
+      <li><strong>(1) Start at the output.</strong> For softmax with cross-entropy (or sigmoid with log loss), the gradient at the logits is prediction minus truth. For MSE on a linear output it's \(\hat y - y\) too.</li>
+      <li><strong>(2) Pass the error back one layer.</strong> \(W_{l+1}^\top\) sends each unit's error back along the same weights it used going forward (unit \(j\) collects \(\sum_i W_{ij}\, \delta_i\)). Then multiply by the activation's slope, \(f'(z_l)\), slot by slot, because the error has to pass back through the non-linearity. For ReLU that slope is 1 where the unit was on and 0 where it was off.</li>
+      <li><strong>(3) Read off the weight gradient.</strong> \(W_l[i,j]\) multiplied \(a_{l-1}[j]\) into \(z_l[i]\), so its gradient is \(\delta_l[i] \cdot a_{l-1}[j]\): an outer product, the same shape as \(W_l\).</li>
+      <li><strong>(4) The bias gradient</strong> is just the error, since the bias is added with slope 1.</li>
+    </ul>
+    <div class="tbl"><table>
+      <thead><tr><th>Batch version (rows = examples)</th><th>Shape</th></tr></thead>
+      <tbody>
+        <tr><td>\(\Delta_{\text{out}} = (\hat Y - Y)/B\)</td><td>\(B \times K\) (the \(1/B\) is from averaging the loss)</td></tr>
+        <tr><td>\(\Delta_l = (\Delta_{l+1} W_{l+1}) \odot f'(Z_l)\)</td><td>\(B \times d_l\)</td></tr>
+        <tr><td>\(\partial L/\partial W_l = \Delta_l^\top A_{l-1}\)</td><td>\(d_l \times d_{l-1}\): the sum of every example's outer product</td></tr>
+        <tr><td>\(\partial L/\partial b_l = \) column sums of \(\Delta_l\)</td><td>\(d_l\)</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Forward and backward, in NumPy</h3>
+    <pre class="code"><code><span class="cm"># X: (B, d)  Y: (B, K) one-hot;  W1: (H, d)  W2: (K, H)</span>
+Z1 = X @ W1.T + b1            <span class="cm"># (B, H)</span>
+A1 = relu(Z1)
+Z2 = A1 @ W2.T + b2           <span class="cm"># (B, K) logits</span>
+P  = softmax(Z2)              <span class="cm"># (B, K)</span>
+loss = -(Y * log(P)).sum() / B
+
+D2  = (P - Y) / B             <span class="cm"># delta at the logits: (B, K)</span>
+dW2 = D2.T @ A1               <span class="cm"># (K, H)</span>
+db2 = D2.sum(axis=0)
+D1  = (D2 @ W2) * (Z1 &gt; 0)    <span class="cm"># back through W2, then ReLU's slope: (B, H)</span>
+dW1 = D1.T @ X                <span class="cm"># (H, d)</span>
+db1 = D1.sum(axis=0)
+for p, g in [(W1, dW1), (b1, db1), (W2, dW2), (b2, db2)]:
+    p -= lr * g               <span class="cm"># one gradient-descent step</span></code></pre>
+
+    <h3>Why it's cheap, and what it costs</h3>
+    <ul>
+      <li><strong>Reverse mode.</strong> The loss is one number and there are millions of weights. Going backward from that one number reuses every intermediate result, so one backward pass (about twice the cost of a forward pass) gives <em>all</em> the gradients. Nudging each weight and re-running the forward pass would cost one pass per weight.</li>
+      <li><strong>Memory.</strong> The backward pass needs every stored activation, so memory grows with depth × batch × width. Gradient checkpointing stores only some and recomputes the rest, trading compute for memory.</li>
+      <li><strong>Gradient checking:</strong> compare with \((L(w + \varepsilon) - L(w - \varepsilon)) / 2\varepsilon\) on a few weights when you write a backward pass by hand.</li>
+    </ul>
+    <aside class="note trap"><p class="nl">Trap</p><p>“The gradient at a layer is the prediction minus the target.” Only at the output layer. Everywhere else, \(\delta\) is the error passed back through the weights <em>and</em> multiplied by the activation's slope at that layer.</p></aside>
+
+    <!-- optim -->
+    <h2 id="optim"><span class="pn">04</span>Gradient descent and optimizers</h2>
+    <div class="mj">\[ \text{SGD: } \theta \leftarrow \theta - \eta\, g \qquad \text{Momentum: } v \leftarrow \beta v + g,\ \ \theta \leftarrow \theta - \eta\, v \]</div>
+    <div class="mj">\[ \text{Adam: } m \leftarrow \beta_1 m + (1 - \beta_1) g, \quad v \leftarrow \beta_2 v + (1 - \beta_2) g^2, \quad \theta \leftarrow \theta - \eta\, \frac{\hat m}{\sqrt{\hat v} + \epsilon}, \quad \hat m = \frac{m}{1 - \beta_1^t},\ \hat v = \frac{v}{1 - \beta_2^t} \]</div>
+    <ul>
+      <li><strong>Mini-batch SGD:</strong> each step uses the gradient on a small batch, a noisy but cheap estimate of the full gradient. The noise even helps escape sharp minima.</li>
+      <li><strong>Momentum</strong> keeps a running average of gradients, so steps build up speed in consistent directions and zig-zags cancel out.</li>
+      <li><strong>RMSProp</strong> divides each weight's step by a running average of its squared gradient, so rarely-updated and steep directions get sensibly sized steps.</li>
+      <li><strong>Adam</strong> does both. The bias correction (\(\hat m, \hat v\)) matters early on: \(m\) and \(v\) start at 0, so without it the first steps would be too small.</li>
+      <li><strong>AdamW</strong> applies weight decay directly to the weights (\(\theta \leftarrow \theta - \eta\lambda\theta\)) instead of adding \(\lambda\theta\) to the gradient, where Adam's scaling would distort it. It's the default for transformers.</li>
+      <li><strong>The learning rate</strong> is the most important hyperparameter: warm it up at the start, then decay it (step, cosine). A bigger batch can usually take a proportionally bigger learning rate.</li>
+    </ul>
+
+    <h3>Adam / AdamW, in code</h3>
+    <pre class="code"><code>m = beta1 * m + (1 - beta1) * g             <span class="cm"># running mean of gradients</span>
+v = beta2 * v + (1 - beta2) * g * g         <span class="cm"># running mean of squared gradients</span>
+m_hat = m / (1 - beta1 ** t)                <span class="cm"># bias correction (m, v start at 0)</span>
+v_hat = v / (1 - beta2 ** t)
+w -= lr * (m_hat / (sqrt(v_hat) + eps) + wd * w)   <span class="cm"># AdamW: decay applied to w directly</span></code></pre>
+
+    <!-- activations -->
+    <h2 id="activations"><span class="pn">05</span>Activations</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Activation</th><th>Formula</th><th>Slope</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Sigmoid</td><td>\(\sigma(z) = 1/(1 + e^{-z})\)</td><td>\(\sigma(1 - \sigma) \le 0.25\)</td><td>Output layer for yes/no and gates. Saturates and isn't zero-centred, so it's poor in hidden layers.</td></tr>
+        <tr><td>tanh</td><td>\(\tanh z\)</td><td>\(1 - \tanh^2 z \le 1\)</td><td>Zero-centred and bounded (RNN states), but still saturates.</td></tr>
+        <tr><td>ReLU</td><td>\(\max(0, z)\)</td><td>1 or 0</td><td>Cheap and doesn't saturate for \(z > 0\), so the default. Units can “die” (stuck at 0, zero gradient forever).</td></tr>
+        <tr><td>Leaky ReLU</td><td>\(\max(\alpha z, z)\)</td><td>1 or \(\alpha\)</td><td>A small slope for \(z &lt; 0\) keeps dead units learning.</td></tr>
+        <tr><td>GELU</td><td>\(z\,\Phi(z)\)</td><td>Smooth</td><td>A smooth ReLU; the transformer default.</td></tr>
+        <tr><td>SiLU / SwiGLU</td><td>\(z\,\sigma(z)\); gated \((xW) \odot \text{SiLU}(xV)\)</td><td>Smooth</td><td>SwiGLU is the FFN in most modern LLMs.</td></tr>
+        <tr><td>Softmax (output)</td><td>\(e^{z_k} / \sum_j e^{z_j}\)</td><td>With cross-entropy: \(\hat y - y\)</td><td>Turns logits into probabilities; subtract \(\max z\) first for numerical stability.</td></tr>
+      </tbody>
+    </table></div>
+
+    <!-- losses -->
+    <h2 id="losses"><span class="pn">06</span>Losses</h2>
+    <div class="mj">\[ \text{MSE} = \tfrac{1}{n}\sum (y - \hat y)^2 \qquad \text{BCE} = -[y \log p + (1 - y)\log(1 - p)] \qquad \text{CE} = -\sum_k y_k \log \hat y_k \qquad \text{Focal} = -(1 - p_t)^\gamma \log p_t \]</div>
+    <ul>
+      <li><strong>Each loss is a likelihood:</strong> Gaussian noise gives MSE, Laplace noise gives MAE, Bernoulli labels give binary cross-entropy, categorical labels give cross-entropy. Huber is MSE near 0 and MAE in the tails, so it's robust to outliers.</li>
+      <li><strong>Why cross-entropy, not MSE, for classification:</strong> with a sigmoid or softmax, MSE's gradient includes the activation's slope, which is tiny exactly when the model is confidently wrong. Cross-entropy's gradient at the logits is simply \(\hat y - y\), largest when most wrong.</li>
+      <li><strong>Focal loss</strong> down-weights easy, well-classified examples (\((1 - p_t)^\gamma\)), for heavy class imbalance. Class weights are the simpler alternative.</li>
+    </ul>
+
+    <!-- init -->
+    <h2 id="init"><span class="pn">07</span>Vanishing, exploding and initialization</h2>
+    <p>The backward pass multiplies the error by one factor, \(W^\top \text{diag}(f')\), per layer. Over many layers that product shrinks or grows exponentially: vanishing or exploding gradients. Early layers stop learning, or training blows up.</p>
+    <p><strong>Initialization keeps the signal's size steady.</strong> A pre-activation \(z = \sum_j w_j x_j\) has variance \(n_{in}\,\text{Var}(w)\,\text{Var}(x)\). To keep it equal to \(\text{Var}(x)\) layer after layer:</p>
+    <div class="mj">\[ \text{Xavier (tanh, sigmoid): } \text{Var}(w) = \frac{2}{n_{in} + n_{out}} \qquad \text{He (ReLU): } \text{Var}(w) = \frac{2}{n_{in}} \]</div>
+    <ul>
+      <li>He has the extra factor 2 because ReLU zeroes half its inputs, halving the variance.</li>
+      <li><strong>All-zero (or all-equal) initialization fails:</strong> every unit in a layer computes the same thing and gets the same gradient, so they stay identical forever. Random initialization breaks the symmetry.</li>
+      <li><strong>The full toolkit against vanishing/exploding:</strong> ReLU-family activations, He/Xavier initialization, normalization layers, residual connections, gradient clipping (for exploding), and gated cells in RNNs.</li>
+    </ul>
+
+    <!-- norm -->
+    <h2 id="norm"><span class="pn">08</span>BatchNorm and LayerNorm</h2>
+    <div class="mj">\[ \hat x = \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}} \qquad y = \gamma \hat x + \beta \]</div>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 600 210" role="img" aria-label="BatchNorm versus LayerNorm on a batch-by-features grid. BatchNorm normalizes one feature column across the batch; LayerNorm normalizes one example row across its features.">
+          <text x="150" y="22" text-anchor="middle" style="fill:var(--ink);font-weight:600">BatchNorm</text>
+          <text x="450" y="22" text-anchor="middle" style="fill:var(--ink);font-weight:600">LayerNorm</text>
+          <rect class="celloff" x="78" y="52" width="22" height="22"/><rect class="celloff" x="102" y="52" width="22" height="22"/><rect class="cellon" x="126" y="52" width="22" height="22"/><rect class="celloff" x="150" y="52" width="22" height="22"/><rect class="celloff" x="174" y="52" width="22" height="22"/><rect class="celloff" x="198" y="52" width="22" height="22"/><rect class="celloff" x="78" y="76" width="22" height="22"/><rect class="celloff" x="102" y="76" width="22" height="22"/><rect class="cellon" x="126" y="76" width="22" height="22"/><rect class="celloff" x="150" y="76" width="22" height="22"/><rect class="celloff" x="174" y="76" width="22" height="22"/><rect class="celloff" x="198" y="76" width="22" height="22"/><rect class="celloff" x="78" y="100" width="22" height="22"/><rect class="celloff" x="102" y="100" width="22" height="22"/><rect class="cellon" x="126" y="100" width="22" height="22"/><rect class="celloff" x="150" y="100" width="22" height="22"/><rect class="celloff" x="174" y="100" width="22" height="22"/><rect class="celloff" x="198" y="100" width="22" height="22"/><rect class="celloff" x="78" y="124" width="22" height="22"/><rect class="celloff" x="102" y="124" width="22" height="22"/><rect class="cellon" x="126" y="124" width="22" height="22"/><rect class="celloff" x="150" y="124" width="22" height="22"/><rect class="celloff" x="174" y="124" width="22" height="22"/><rect class="celloff" x="198" y="124" width="22" height="22"/><rect class="celloff" x="78" y="148" width="22" height="22"/><rect class="celloff" x="102" y="148" width="22" height="22"/><rect class="cellon" x="126" y="148" width="22" height="22"/><rect class="celloff" x="150" y="148" width="22" height="22"/><rect class="celloff" x="174" y="148" width="22" height="22"/><rect class="celloff" x="198" y="148" width="22" height="22"/>
+          <rect class="celloff" x="378" y="52" width="22" height="22"/><rect class="celloff" x="402" y="52" width="22" height="22"/><rect class="celloff" x="426" y="52" width="22" height="22"/><rect class="celloff" x="450" y="52" width="22" height="22"/><rect class="celloff" x="474" y="52" width="22" height="22"/><rect class="celloff" x="498" y="52" width="22" height="22"/><rect class="cellon" x="378" y="76" width="22" height="22"/><rect class="cellon" x="402" y="76" width="22" height="22"/><rect class="cellon" x="426" y="76" width="22" height="22"/><rect class="cellon" x="450" y="76" width="22" height="22"/><rect class="cellon" x="474" y="76" width="22" height="22"/><rect class="cellon" x="498" y="76" width="22" height="22"/><rect class="celloff" x="378" y="100" width="22" height="22"/><rect class="celloff" x="402" y="100" width="22" height="22"/><rect class="celloff" x="426" y="100" width="22" height="22"/><rect class="celloff" x="450" y="100" width="22" height="22"/><rect class="celloff" x="474" y="100" width="22" height="22"/><rect class="celloff" x="498" y="100" width="22" height="22"/><rect class="celloff" x="378" y="124" width="22" height="22"/><rect class="celloff" x="402" y="124" width="22" height="22"/><rect class="celloff" x="426" y="124" width="22" height="22"/><rect class="celloff" x="450" y="124" width="22" height="22"/><rect class="celloff" x="474" y="124" width="22" height="22"/><rect class="celloff" x="498" y="124" width="22" height="22"/><rect class="celloff" x="378" y="148" width="22" height="22"/><rect class="celloff" x="402" y="148" width="22" height="22"/><rect class="celloff" x="426" y="148" width="22" height="22"/><rect class="celloff" x="450" y="148" width="22" height="22"/><rect class="celloff" x="474" y="148" width="22" height="22"/><rect class="celloff" x="498" y="148" width="22" height="22"/>
+          <text class="lbl" x="150" y="190" text-anchor="middle">each feature, across the batch</text>
+          <text class="lbl" x="450" y="190" text-anchor="middle">each example, across its features</text>
+          <text class="lbl" x="58" y="105" text-anchor="middle" transform="rotate(-90 58 105)">examples ↓</text>
+          <text class="lbl" x="150" y="44" text-anchor="middle">features →</text>
+          <text class="lbl" x="358" y="105" text-anchor="middle" transform="rotate(-90 358 105)">examples ↓</text>
+          <text class="lbl" x="450" y="44" text-anchor="middle">features →</text>
+        </svg>
+      </div>
+      <figcaption>Same formula, different axis. BatchNorm computes \(\mu, \sigma\) down a column (one feature, all examples); LayerNorm across a row (one example, all its features).</figcaption>
+    </figure>
+    <ul>
+      <li><strong>BatchNorm</strong> (CNNs): statistics per feature over the batch. At inference there may be one example, so it uses running averages saved during training; the train/eval switch is a classic bug. It struggles with small batches and padded sequences.</li>
+      <li><strong>LayerNorm</strong> (transformers, RNNs): statistics per example over its features. It doesn't depend on the batch and behaves the same in training and inference.</li>
+      <li><strong>Why they help:</strong> they keep each layer's inputs at a steady scale, which allows bigger learning rates and smooths the loss landscape. The learned \(\gamma, \beta\) let the network undo the normalization if that's better.</li>
+    </ul>
+
+    <!-- reg -->
+    <h2 id="reg"><span class="pn">09</span>Regularization</h2>
+    <div class="mj">\[ \text{Dropout (training): } \tilde h = \frac{h \odot m}{1 - p},\ \ m_i \sim \text{Bernoulli}(1 - p) \qquad \text{L2: } L + \frac{\lambda}{2}\lVert w \rVert^2 \]</div>
+    <ul>
+      <li><strong>Weight decay (L2)</strong> shrinks weights every step, favouring simpler functions. <strong>L1</strong> pushes weights to exactly 0 (sparsity).</li>
+      <li><strong>Dropout</strong> zeroes each unit with probability \(p\) during training and scales the survivors by \(1/(1-p)\), so the expected activation is unchanged and nothing needs rescaling at inference, where it's off. It stops units relying on each other and acts like averaging many thinned networks.</li>
+      <li><strong>Early stopping</strong> keeps the checkpoint with the best validation loss. <strong>Data augmentation</strong> adds realistic variations. <strong>Label smoothing</strong> softens one-hot targets so the model isn't pushed to infinite confidence.</li>
+      <li><strong>Bias–variance:</strong> big gap between train and validation → overfitting (high variance): regularize, add data, shrink the model. Both bad → underfitting (high bias): bigger model, longer training, better features.</li>
+    </ul>
+
+    <h3>BatchNorm, LayerNorm and dropout, in code</h3>
+    <pre class="code"><code>def batchnorm(x, training):                 <span class="cm"># x: (B, F)</span>
+    if training:
+        mu, var = x.mean(axis=0), x.var(axis=0)     <span class="cm"># per feature, over the batch</span>
+        run_mu  = 0.9 * run_mu  + 0.1 * mu          <span class="cm"># saved for inference</span>
+        run_var = 0.9 * run_var + 0.1 * var
+    else:
+        mu, var = run_mu, run_var                   <span class="cm"># inference: no batch statistics</span>
+    return gamma * (x - mu) / sqrt(var + eps) + beta
+
+def layernorm(x):                           <span class="cm"># per example, over its features</span>
+    mu  = x.mean(axis=-1, keepdims=True)
+    var = x.var(axis=-1, keepdims=True)
+    return gamma * (x - mu) / sqrt(var + eps) + beta   <span class="cm"># same in training and inference</span>
+
+def dropout(h, p, training):
+    if not training:
+        return h                            <span class="cm"># off at inference</span>
+    keep = random(h.shape) &gt; p
+    return h * keep / (1 - p)               <span class="cm"># scale so the expected value is unchanged</span></code></pre>
+
+    <!-- residual -->
+    <h2 id="residual"><span class="pn">10</span>Residual connections</h2>
+    <div class="mj">\[ y = x + F(x) \qquad \frac{\partial y}{\partial x} = I + \frac{\partial F}{\partial x} \]</div>
+    <ul>
+      <li><strong>The gradient gets a straight path.</strong> The identity term means the error reaches early layers even when \(\partial F/\partial x\) is small. That's what made 100+ layer networks trainable (ResNet, 2015).</li>
+      <li><strong>Doing nothing is easy.</strong> A block only has to learn a correction to its input; if a layer isn't useful, \(F \to 0\) leaves the input unchanged. Without the skip, it would have to learn the identity mapping, which is surprisingly hard.</li>
+      <li>The same idea appears as the <a href="./deep-learning-nlp.html#lstm">LSTM's cell update</a> through time and as the <a href="./deep-learning-nlp.html#tf">transformer's residual stream</a> through depth.</li>
+    </ul>
+
+    <!-- addcat -->
+    <h2 id="addcat"><span class="pn">11</span>Adding vs concatenating vectors</h2>
+    <div class="mj">\[ W\,[x;\ y] = W_1 x + W_2 y \qquad \text{(concatenate, then a linear layer} = \text{project each separately, then add)} \]</div>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 660 210" role="img" aria-label="Adding versus concatenating. Left: a residual block where x passes through F and is added back to x, keeping width d. Right: x of width d1 and y of width d2 are concatenated into one vector of width d1 plus d2, which a linear layer then reads.">
+          <text x="160" y="22" text-anchor="middle" style="fill:var(--ink);font-weight:600">Add: x + F(x)</text>
+          <text x="490" y="22" text-anchor="middle" style="fill:var(--ink);font-weight:600">Concatenate: [x; y]</text>
+          <rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="30" y="114" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="40" y="114" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="50" y="114" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="60" y="114" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="70" y="114" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="80" y="114" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="256" y="114" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="266" y="114" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="276" y="114" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="286" y="114" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="296" y="114" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="306" y="114" width="10" height="12"/><text x="60" y="106" text-anchor="middle">x</text><text x="286" y="106" text-anchor="middle">x + F(x)</text>
+          <path class="hid" d="M92 120 H120 V64 H138" marker-end="url(#a-hid)"/>
+          <rect class="gbox" x="140" y="46" width="60" height="36" rx="8"/><text x="170" y="69" text-anchor="middle">F</text>
+          <path class="hid" d="M200 64 H226 V104" marker-end="url(#a-hid)"/>
+          <path class="cell" d="M92 120 H212" marker-end="url(#a-cell)"/>
+          <circle class="op" cx="226" cy="120" r="13"/><text class="optx" x="226" y="126" text-anchor="middle">+</text>
+          <path class="hid" d="M239 120 H252" marker-end="url(#a-hid)"/>
+          <text class="lbl" x="160" y="150" text-anchor="middle">skip: identity path</text>
+          <text class="lbl" x="160" y="196" text-anchor="middle">same width d in and out</text>
+          <rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="360" y="70" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="370" y="70" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="380" y="70" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="390" y="70" width="10" height="12"/><rect class="cellon" x="360" y="130" width="10" height="12"/><rect class="cellon" x="370" y="130" width="10" height="12"/><rect class="cellon" x="380" y="130" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="450" y="100" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="460" y="100" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="470" y="100" width="10" height="12"/><rect style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1" x="480" y="100" width="10" height="12"/><rect class="cellon" x="490" y="100" width="10" height="12"/><rect class="cellon" x="500" y="100" width="10" height="12"/><rect class="cellon" x="510" y="100" width="10" height="12"/><text x="380" y="62" text-anchor="middle">x: d₁</text><text x="375" y="160" text-anchor="middle">y: d₂</text><text x="485" y="92" text-anchor="middle">[x; y]</text><path class="cw" d="M402 76 H430 V104 H446" marker-end="url(#a-cw)"/><path class="cw" d="M392 136 H430 V110 H446" marker-end="url(#a-cw)"/><rect class="gbox" x="540" y="88" width="56" height="36" rx="8"/><text x="568" y="111" text-anchor="middle">W</text><path class="cw" d="M522 106 H537" marker-end="url(#a-cw)"/><path class="cw" d="M596 106 H626" marker-end="url(#a-cw)"/>
+          <text class="lbl" x="490" y="196" text-anchor="middle">width grows to d₁ + d₂; each part gets its own weights</text>
+        </svg>
+      </div>
+      <figcaption>Adding superimposes two vectors in one shared space and keeps the width. Concatenating keeps them side by side, so the next layer weighs each with its own columns of \(W\).</figcaption>
+    </figure>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Add \(x + y\)</th><th>Concatenate \([x; y]\)</th></tr></thead>
+      <tbody>
+        <tr><td>Sizes</td><td>Must match</td><td>Can differ</td></tr>
+        <tr><td>Output width</td><td>Stays \(d\)</td><td>\(d_1 + d_2\)</td></tr>
+        <tr><td>Next layer</td><td>Same weights for both: \(W(x + y) = Wx + Wy\)</td><td>Separate weights: \(W_1 x + W_2 y\)</td></tr>
+        <tr><td>Cost</td><td>No extra parameters</td><td>More parameters and memory downstream</td></tr>
+        <tr><td>Assumes</td><td>Both in the same space</td><td>Different sources</td></tr>
+        <tr><td>Typical uses</td><td>Residuals; token + position embeddings; transformer residual stream; summing a bag of embeddings</td><td>LSTM \([h_{t-1}, x_t]\); bi-LSTM outputs; multi-head concat → \(W_O\); U-Net skips; DenseNet; feature fusion</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Rule of thumb:</strong> add when it's an update to the same representation and you want a fixed width; concatenate when the inputs are different things the next layer should weigh separately, and you can afford the width. A sum is also order-free, which is right for sets.</p>
+
+    <!-- cnn -->
+    <h2 id="cnn"><span class="pn">12</span>Convolutions in one page</h2>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 600 220" role="img" aria-label="A 3 by 3 filter slides over a 6 by 6 input; at each position it gives one number of a 4 by 4 output, using the same nine weights everywhere.">
+          <rect class="celloff" x="80" y="50" width="18" height="18"/><rect class="cellon" x="100" y="50" width="18" height="18"/><rect class="cellon" x="120" y="50" width="18" height="18"/><rect class="cellon" x="140" y="50" width="18" height="18"/><rect class="celloff" x="160" y="50" width="18" height="18"/><rect class="celloff" x="180" y="50" width="18" height="18"/><rect class="celloff" x="80" y="70" width="18" height="18"/><rect class="cellon" x="100" y="70" width="18" height="18"/><rect class="cellon" x="120" y="70" width="18" height="18"/><rect class="cellon" x="140" y="70" width="18" height="18"/><rect class="celloff" x="160" y="70" width="18" height="18"/><rect class="celloff" x="180" y="70" width="18" height="18"/><rect class="celloff" x="80" y="90" width="18" height="18"/><rect class="cellon" x="100" y="90" width="18" height="18"/><rect class="cellon" x="120" y="90" width="18" height="18"/><rect class="cellon" x="140" y="90" width="18" height="18"/><rect class="celloff" x="160" y="90" width="18" height="18"/><rect class="celloff" x="180" y="90" width="18" height="18"/><rect class="celloff" x="80" y="110" width="18" height="18"/><rect class="celloff" x="100" y="110" width="18" height="18"/><rect class="celloff" x="120" y="110" width="18" height="18"/><rect class="celloff" x="140" y="110" width="18" height="18"/><rect class="celloff" x="160" y="110" width="18" height="18"/><rect class="celloff" x="180" y="110" width="18" height="18"/><rect class="celloff" x="80" y="130" width="18" height="18"/><rect class="celloff" x="100" y="130" width="18" height="18"/><rect class="celloff" x="120" y="130" width="18" height="18"/><rect class="celloff" x="140" y="130" width="18" height="18"/><rect class="celloff" x="160" y="130" width="18" height="18"/><rect class="celloff" x="180" y="130" width="18" height="18"/><rect class="celloff" x="80" y="150" width="18" height="18"/><rect class="celloff" x="100" y="150" width="18" height="18"/><rect class="celloff" x="120" y="150" width="18" height="18"/><rect class="celloff" x="140" y="150" width="18" height="18"/><rect class="celloff" x="160" y="150" width="18" height="18"/><rect class="celloff" x="180" y="150" width="18" height="18"/>
+          <rect class="celloff" x="400" y="70" width="18" height="18"/><rect class="cellon" x="420" y="70" width="18" height="18"/><rect class="celloff" x="440" y="70" width="18" height="18"/><rect class="celloff" x="460" y="70" width="18" height="18"/><rect class="celloff" x="400" y="90" width="18" height="18"/><rect class="celloff" x="420" y="90" width="18" height="18"/><rect class="celloff" x="440" y="90" width="18" height="18"/><rect class="celloff" x="460" y="90" width="18" height="18"/><rect class="celloff" x="400" y="110" width="18" height="18"/><rect class="celloff" x="420" y="110" width="18" height="18"/><rect class="celloff" x="440" y="110" width="18" height="18"/><rect class="celloff" x="460" y="110" width="18" height="18"/><rect class="celloff" x="400" y="130" width="18" height="18"/><rect class="celloff" x="420" y="130" width="18" height="18"/><rect class="celloff" x="440" y="130" width="18" height="18"/><rect class="celloff" x="460" y="130" width="18" height="18"/>
+          <path class="cell" d="M232 110 H352" marker-end="url(#a-cell)"/>
+          <text class="lbl" x="292" y="98" text-anchor="middle">same 3×3 weights</text>
+          <text class="lbl" x="292" y="130" text-anchor="middle">at every position</text>
+          <text class="lbl" x="140" y="208" text-anchor="middle">input 6×6</text>
+          <text class="lbl" x="440" y="208" text-anchor="middle">output 4×4 (no padding, stride 1)</text>
+        </svg>
+      </div>
+      <figcaption>A convolution is one small weighted window slid across the input: local (each output sees a 3×3 patch) and shared (the same 9 weights everywhere).</figcaption>
+    </figure>
+    <div class="mj">\[ \text{output size} = \frac{n + 2p - k}{s} + 1 \qquad \text{parameters} = k \cdot k \cdot C_{in} \cdot C_{out} + C_{out} \]</div>
+    <ul>
+      <li><strong>Why not a dense layer:</strong> parameter sharing (a 3×3×64→64 conv has about 37K weights, whatever the image size) and locality (neighbouring pixels matter together). A pattern learned in one place is detected everywhere: translation equivariance. Pooling adds some invariance and shrinks the map.</li>
+      <li><strong>Receptive field</strong> grows with depth, stride, pooling and dilation: early layers see edges, deep layers see objects.</li>
+      <li><strong>1×1 convolution:</strong> a dense layer across channels at every pixel. It changes the channel count cheaply (bottlenecks) and adds a non-linearity; it's the CNN version of the transformer's per-token FFN.</li>
+      <li>Tensor shape in PyTorch: \(B \times C \times H \times W\); the weights are \(C_{out} \times C_{in} \times k \times k\).</li>
+    </ul>
+
+    <h3>A convolution, in code (naive loops)</h3>
+    <pre class="code"><code><span class="cm"># x: (C_in, H, W)   w: (C_out, C_in, k, k)   no padding, stride 1</span>
+for o in range(C_out):
+    for i in range(H - k + 1):
+        for j in range(W - k + 1):
+            y[o, i, j] = (w[o] * x[:, i:i+k, j:j+k]).sum() + b[o]   <span class="cm"># same weights everywhere</span></code></pre>
+
+    <!-- loop -->
+    <h2 id="loop"><span class="pn">13</span>The training loop, and debugging it</h2>
+    <ol>
+      <li>For each batch: forward pass → loss → <code>optimizer.zero_grad()</code> → <code>loss.backward()</code> → clip gradients if needed → <code>optimizer.step()</code> → scheduler step.</li>
+      <li><code>model.train()</code> for training and <code>model.eval()</code> plus <code>torch.no_grad()</code> for validation (dropout off, BatchNorm uses running statistics).</li>
+    </ol>
+    <ul>
+      <li><strong>First, overfit one small batch.</strong> If the loss can't go near 0, there's a bug, not a modelling problem.</li>
+      <li><strong>Loss flat from the start:</strong> learning rate far off, labels misaligned, forgot <code>zero_grad</code> or <code>step</code>, dead ReLUs, inputs not normalized.</li>
+      <li><strong>Loss is NaN:</strong> learning rate too high, exploding gradients, <code>log(0)</code>; use log-softmax with NLL loss and clip gradients.</li>
+      <li><strong>Train good, validation bad:</strong> overfitting or leakage between the splits; regularize, stop early, check the split.</li>
+      <li>Plot training and validation loss together, with the gradient norm and the learning rate underneath.</li>
+    </ul>
+
+    <h3>The training loop, in PyTorch</h3>
+    <pre class="code"><code>for epoch in range(epochs):
+    model.train()                                   <span class="cm"># dropout on, BatchNorm uses batch stats</span>
+    for xb, yb in train_loader:
+        loss = loss_fn(model(xb), yb)               <span class="cm"># forward</span>
+        opt.zero_grad()                             <span class="cm"># clear old gradients</span>
+        loss.backward()                             <span class="cm"># backprop: fills p.grad for every weight</span>
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        opt.step()                                  <span class="cm"># update weights</span>
+        sched.step()                                <span class="cm"># learning-rate schedule</span>
+    model.eval()                                    <span class="cm"># dropout off, BatchNorm uses running stats</span>
+    with torch.no_grad():
+        val_loss = mean(loss_fn(model(xb), yb) for xb, yb in val_loader)
+    <span class="cm"># early stopping: keep the checkpoint with the best val_loss</span></code></pre>
+
+    <!-- questions -->
+    <h2 id="questions"><span class="pn">14</span>Interview questions</h2>
+    <p>Answer out loud first, then open the answer.</p>
+    <details class="qa"><summary><span class="qn">1</span>Why do we need non-linear activations?</summary><div class="ans"><p>Without them, any stack of layers is one linear map, since \(W_2 W_1 x = (W_2 W_1) x\). It can only draw straight decision boundaries. The non-linearity between layers is what lets depth build complex functions.</p></div></details>
+    <details class="qa"><summary><span class="qn">2</span>Walk through forward and backward propagation for a two-layer network.</summary><div class="ans"><p>Forward: \(z_1 = W_1 x + b_1\), \(a_1 = \text{ReLU}(z_1)\), \(z_2 = W_2 a_1 + b_2\), \(\hat y = \text{softmax}(z_2)\), cross-entropy loss, storing each value. Backward: \(\delta_2 = \hat y - y\); \(\partial L/\partial W_2 = \delta_2 a_1^\top\), \(\partial L/\partial b_2 = \delta_2\); \(\delta_1 = (W_2^\top \delta_2) \odot \text{ReLU}'(z_1)\); \(\partial L/\partial W_1 = \delta_1 x^\top\), \(\partial L/\partial b_1 = \delta_1\). Then a gradient step on every weight.</p></div></details>
+    <details class="qa"><summary><span class="qn">3</span>Why is backprop efficient compared with numerical gradients?</summary><div class="ans"><p>Reverse-mode differentiation: from one scalar loss, one backward pass (about two forward passes of compute) reuses all the stored intermediates and yields every weight's gradient. Finite differences need a forward pass per weight, so millions of passes. The price is memory for the stored activations.</p></div></details>
+    <details class="qa"><summary><span class="qn">4</span>Derive the gradient of softmax with cross-entropy.</summary><div class="ans"><p>With \(\hat y_k = e^{z_k}/\sum_j e^{z_j}\) and \(L = -\sum_k y_k \log \hat y_k\) for one-hot \(y\): \(\partial L/\partial z_i = \hat y_i - y_i\). The softmax's Jacobian and the log cancel neatly, which is why the pair is always used together.</p></div></details>
+    <details class="qa"><summary><span class="qn">5</span>Why use cross-entropy rather than MSE for classification?</summary><div class="ans"><p>Cross-entropy is the maximum-likelihood loss for categorical labels, and its gradient at the logits is \(\hat y - y\): big when confidently wrong. MSE through a sigmoid or softmax multiplies by the activation's slope, which is near 0 when the output is saturated, so learning stalls exactly when the model is most wrong.</p></div></details>
+    <details class="qa"><summary><span class="qn">6</span>What causes vanishing and exploding gradients, and how do you fix them?</summary><div class="ans"><p>The backward pass multiplies one Jacobian per layer (weights times activation slopes), so the product shrinks or grows exponentially with depth. Fixes: ReLU-family activations (slope 1), He/Xavier initialization, BatchNorm/LayerNorm, residual connections, gradient clipping for explosions, gated cells (LSTM/GRU) in recurrent nets.</p></div></details>
+    <details class="qa"><summary><span class="qn">7</span>Xavier vs He initialization? What if you initialize everything to zero?</summary><div class="ans"><p>Both keep the variance of activations (and gradients) roughly constant across layers: Xavier \(\text{Var}(w) = 2/(n_{in} + n_{out})\) for tanh/sigmoid, He \(2/n_{in}\) for ReLU, which zeroes half its inputs. All zeros (or all equal) makes every unit in a layer identical with identical gradients, so they never differentiate (symmetry).</p></div></details>
+    <details class="qa"><summary><span class="qn">8</span>BatchNorm vs LayerNorm. What changes at inference?</summary><div class="ans"><p>Same formula, different axis: BatchNorm normalizes each feature over the batch (CNNs), LayerNorm each example over its features (transformers, RNNs). At inference BatchNorm uses running means and variances saved during training, so forgetting <code>model.eval()</code> is a bug. LayerNorm needs no batch and behaves the same both ways.</p></div></details>
+    <details class="qa"><summary><span class="qn">9</span>How does dropout work? Why scale by \(1/(1-p)\)? What happens at inference?</summary><div class="ans"><p>During training each unit is zeroed with probability \(p\), which stops units co-adapting and acts like averaging many thinned networks. Scaling the survivors by \(1/(1-p)\) keeps the expected activation unchanged (inverted dropout), so at inference dropout is simply switched off with no rescaling.</p></div></details>
+    <details class="qa"><summary><span class="qn">10</span>L1 vs L2 vs weight decay. Why AdamW?</summary><div class="ans"><p>L2 penalizes squared weights, shrinking them smoothly; L1 penalizes absolute values, pushing some exactly to 0. With plain SGD, L2 and weight decay are the same. With Adam, an L2 term in the gradient gets rescaled per weight, weakening it for weights with large gradient history. AdamW decays the weights directly, decoupled from the gradient, so regularization works as intended.</p></div></details>
+    <details class="qa"><summary><span class="qn">11</span>Adam vs SGD with momentum. Why does Adam need bias correction?</summary><div class="ans"><p>Momentum averages gradients to smooth the path; Adam also scales each weight's step by its recent gradient size, so it needs less tuning and handles uneven scales. SGD with momentum sometimes generalizes a bit better on vision tasks. \(m\) and \(v\) start at 0, so early averages are biased toward 0; dividing by \(1 - \beta^t\) corrects that.</p></div></details>
+    <details class="qa"><summary><span class="qn">12</span>Why do residual connections help?</summary><div class="ans"><p>\(y = x + F(x)\) gives \(\partial y/\partial x = I + \partial F/\partial x\): an identity path for the gradient through any depth. The block only has to learn a correction, and doing nothing (\(F = 0\)) is easy. They made very deep networks trainable, and the same idea underlies the transformer's residual stream and the LSTM's cell.</p></div></details>
+    <details class="qa"><summary><span class="qn">13</span>When do you add vectors and when do you concatenate them?</summary><div class="ans"><p>Concatenation followed by a linear layer equals separate projections then a sum, \(W[x;y] = W_1 x + W_2 y\). So concatenating gives each input its own weights, at the cost of width. Adding forces a shared space and keeps the width fixed. Add for updates to the same representation (residuals, positional encodings, the residual stream); concatenate for different sources (LSTM inputs, bi-LSTM outputs, attention heads, U-Net skips, feature fusion).</p></div></details>
+    <details class="qa"><summary><span class="qn">14</span>Why a CNN instead of a dense network for images? What does a 1×1 convolution do?</summary><div class="ans"><p>Parameter sharing and locality: a small filter reused everywhere has few weights, uses neighbourhood structure and detects a pattern anywhere. A dense layer would need a weight per pixel per unit and relearn each pattern at each position. A 1×1 convolution mixes channels at each pixel: cheap channel reduction or expansion (bottlenecks) plus a non-linearity, the CNN version of a per-token FFN.</p></div></details>
+    <details class="qa"><summary><span class="qn">15</span>Compute the output size and parameters of a convolution layer.</summary><div class="ans"><p>Output side \((n + 2p - k)/s + 1\): a 32×32 input, 3×3 kernel, padding 1, stride 1 stays 32×32; stride 2 gives 16×16. Parameters: \(k^2 C_{in} C_{out} + C_{out}\), so 3×3, 64→128 has \(9 \times 64 \times 128 + 128 = 73{,}856\), independent of image size.</p></div></details>
+    <details class="qa"><summary><span class="qn">16</span>Your loss isn't decreasing. How do you debug it?</summary><div class="ans"><p>Overfit a tiny batch first; if that fails it's a bug. Check the data (labels aligned, inputs normalized), the loop (<code>zero_grad</code>, <code>backward</code>, <code>step</code>, <code>train()</code>/<code>eval()</code>), and the loss (log-softmax with NLL, not softmax twice). Then sweep the learning rate on a log scale, check gradient norms per layer for vanishing or exploding, and look for dead ReLUs.</p></div></details>
+    <details class="qa"><summary><span class="qn">17</span>How does batch size affect training?</summary><div class="ans"><p>Bigger batches give less noisy gradients and better hardware use, and usually allow a proportionally larger learning rate (with warmup). Very large batches can generalize slightly worse (sharper minima) and need more epochs' worth of tuning. Small batches are noisier, which acts as a mild regularizer, but they're slower per example.</p></div></details>
+
+    <!-- sheet -->
+    <h2 id="sheet"><span class="pn">15</span>Cheat sheet</h2>
+    <div class="sheet">
+      <h3>Layer and backprop</h3>
+      <div class="mj">\[ z_l = W_l a_{l-1} + b_l,\ a_l = f(z_l) \qquad \delta_{\text{out}} = \hat y - y \qquad \delta_l = (W_{l+1}^\top \delta_{l+1}) \odot f'(z_l) \qquad \partial L/\partial W_l = \delta_l a_{l-1}^\top \]</div>
+      <h3>Optimizers</h3>
+      <div class="mj">\[ \text{Adam: } \theta \leftarrow \theta - \eta\, \hat m / (\sqrt{\hat v} + \epsilon) \qquad \text{AdamW: } \ldots - \eta \lambda \theta \]</div>
+      <h3>Initialization, normalization, dropout</h3>
+      <div class="mj">\[ \text{He: } 2/n_{in} \quad \text{Xavier: } 2/(n_{in} + n_{out}) \qquad y = \gamma \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}} + \beta \qquad \tilde h = \frac{h \odot m}{1 - p} \]</div>
+      <h3>Residual, concatenation, convolution</h3>
+      <div class="mj">\[ \frac{\partial (x + F(x))}{\partial x} = I + \frac{\partial F}{\partial x} \qquad W[x; y] = W_1 x + W_2 y \qquad \text{out} = \frac{n + 2p - k}{s} + 1 \]</div>
+    </div>
+
+    <footer><a href="./">More study notes</a> · <a href="../">Deepam Minda</a></footer>
+  </article>
+</div>
+<a class="jump" href="#tldr">Contents ↑</a>
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+  svg: { fontCache: "global" },
+  options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script>
+(function () {
+  var d = document.getElementById("tocd");
+  var wide = window.matchMedia("(min-width: 1081px)");
+  function sync() { d.open = wide.matches; }
+  sync();
+  if (wide.addEventListener) wide.addEventListener("change", sync);
+  var jump = document.querySelector(".jump");
+  jump.addEventListener("click", function () { if (!wide.matches) d.open = true; });
+  d.addEventListener("click", function (e) {
+    if (!wide.matches && e.target.closest("a")) d.open = false;
+  });
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+  function spy() {
+    var y = window.scrollY + 120, cur = 0;
+    targets.forEach(function (t, i) { if (t && t.getBoundingClientRect().top + window.scrollY <= y) cur = i; });
+    links.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
+  }
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+})();
+</script>
+
+<script>
+(function () {
+  var root = document.documentElement, b = document.getElementById("theme-toggle"), t = b.querySelector(".t");
+  function cur() {
+    var a = root.getAttribute("data-theme");
+    if (a === "dark" || a === "light") return a;
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function label() {
+    var c = cur();
+    t.textContent = c === "dark" ? "Light mode" : "Dark mode";
+    b.setAttribute("aria-label", "Switch to " + (c === "dark" ? "light" : "dark") + " mode");
+  }
+  b.addEventListener("click", function () {
+    var n = cur() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", n);
+    try { localStorage.setItem("deepam-theme", n); } catch (e) {}
+    label();
+  });
+  label();
+})();
+</script>
+</body>
+</html>

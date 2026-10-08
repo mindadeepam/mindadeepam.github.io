@@ -242,6 +242,7 @@ pre.code .cm { color: var(--ink-3); }
 .crumbs a { color: var(--ink-2); }
 .crumbs a:hover { color: var(--link); }
 @media (max-width: 1080px) { .crumbs { max-width: 860px; } }
+footer .site-nav { display: block; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -1267,7 +1268,13 @@ def generate(prompt, steps, temperature=1.0):
     <h3>BERT: fill in the blanks (encoder-only)</h3>
     <ul>
       <li><strong>Masked language modelling.</strong> Pick 15% of the tokens. Of those, replace 80% with <code>[MASK]</code>, 10% with a random token, and leave 10% unchanged. Predict the original token at those positions only, with cross-entropy over the vocabulary.</li>
-      <li><strong>Why 80/10/10:</strong> <code>[MASK]</code> never appears at fine-tuning time. If every chosen token were masked, the model would only learn good representations at <code>[MASK]</code> positions. The random and unchanged cases force it to build a useful representation of <em>every</em> token.</li>
+      <li><strong>Why 80/10/10?</strong> It fixes two problems you'd get if every chosen position showed <code>[MASK]</code>:
+        <ul>
+          <li><em>A train/test mismatch.</em> The loss would only ever ask about <code>[MASK]</code> positions, so the model would have no reason to build careful vectors for the ordinary words it sees. But BERT is mostly used as an encoder for classification, tagging, QA and embeddings, and there the input never contains <code>[MASK]</code>: every token is a real word. (You <em>can</em> put <code>[MASK]</code> in at inference for fill-in-the-blank; that is the one exception.)</li>
+          <li><em>The random 10%</em> (“the cat sat on the <em>banana</em>”, predict “mat”) means no visible word can be blindly trusted, since any might be a planted fake. The model has to check <em>every</em> token against its context.</li>
+          <li><em>The unchanged 10%</em> (the true word shown, still predicted) stops the opposite habit of ignoring what it sees: the visible word is usually right, so use it, but verify it. These positions also look exactly like real inputs.</li>
+          <li>Because the random and unchanged cases look like ordinary words, the model can't tell which tokens are being tested, so it keeps a good contextual vector for all of them. Overall that's 12% of tokens masked, 1.5% randomized and 1.5% left as-is. The exact split was chosen by ablation in the BERT paper.</li>
+        </ul></li>
       <li><strong>Input format:</strong> <code>[CLS] tokens [SEP]</code>, with token, position and segment embeddings added together. The final <code>[CLS]</code> vector feeds classification heads, and each token's final vector feeds tagging heads.</li>
       <li><strong>Next-sentence prediction</strong> was a second objective in the original BERT. RoBERTa dropped it, trained longer and re-drew the mask every epoch (“dynamic masking”), and did better.</li>
       <li><strong>Why bidirectional suits understanding:</strong> each token sees both sides, which is what tagging and classification need. It can't generate text left to right naturally.</li>
@@ -1288,10 +1295,64 @@ def generate(prompt, steps, temperature=1.0):
 logits = bert(tokens)                          <span class="cm"># (n, V), bidirectional: no causal mask</span>
 loss = cross_entropy(logits, labels, ignore_index=IGNORE)</code></pre>
 
+
+    <h3 id="bert-train">Training and using BERT, end to end</h3>
+    <p><strong>1. Pretraining</strong> (self-supervised). Corrupt the input \(x\) into \(\tilde x\) by choosing 15% of positions \(\mathcal M\) and applying 80/10/10. Run the encoder, and at each chosen position predict the original token:</p>
+    <div class="mj">\[ L_{\text{MLM}} = -\frac{1}{|\mathcal M|}\sum_{i \in \mathcal M} \log p_\theta(x_i \mid \tilde x), \qquad p_\theta(\cdot \mid \tilde x) = \text{softmax}\big(E\, g(h_i) + b\big) \]</div>
+    <p>Here \(h_i\) is the encoder's final vector at position \(i\), \(g\) is a small dense + GELU + LayerNorm head, and \(E\) is the token-embedding matrix reused as the output layer (one logit per vocabulary word). The original BERT added next-sentence prediction, a binary cross-entropy on the <code>[CLS]</code> vector, so \(L = L_{\text{MLM}} + L_{\text{NSP}}\); RoBERTa later dropped it.</p>
+    <pre class="code"><code><span class="cm"># ---- 1. pretraining: masked LM (self-supervised, huge unlabelled corpus) ----</span>
+for batch in corpus_batches:                      <span class="cm"># token ids (B, n), e.g. n = 512</span>
+    inputs, labels = mlm_example(batch)           <span class="cm"># 15% chosen; 80/10/10; labels = IGNORE elsewhere</span>
+    H = bert_encoder(inputs)                      <span class="cm"># (B, n, d): no causal mask, every token sees all</span>
+    logits = gelu_ln(H @ W_t) @ E.T + b           <span class="cm"># (B, n, V): MLM head, output tied to embeddings E</span>
+    loss = cross_entropy(logits, labels, ignore_index=IGNORE)   <span class="cm"># only the chosen positions count</span>
+    <span class="cm"># original BERT also: loss += cross_entropy(W_nsp @ H[:, 0], is_next)   # next-sentence prediction</span>
+    loss.backward(); clip_grad_norm(1.0); adamw.step(); warmup_then_linear_decay.step(); zero_grad()</code></pre>
+
+    <p><strong>2. Fine-tuning</strong> (supervised, per task). Add a small head and train everything briefly, with a small learning rate (about 2e-5 to 5e-5) for 2–4 epochs:</p>
+    <div class="mj">\[ L_{\text{task}} = -\log \text{softmax}\big(W h_{\text{[CLS]}} + b\big)_{y} \]</div>
+    <pre class="code"><code><span class="cm"># ---- 2. fine-tuning: add a small head, train everything briefly (small lr, 2-4 epochs) ----</span>
+head = Linear(d, num_classes)                     <span class="cm"># new, randomly initialized</span>
+for tokens, y in labelled_batches:                <span class="cm"># "[CLS] text [SEP]", class labels</span>
+    H = bert_encoder(tokens)                      <span class="cm"># (B, n, d), starting from the pretrained weights</span>
+    logits = head(H[:, 0])                        <span class="cm"># H[:, 0] is the [CLS] vector: (B, num_classes)</span>
+    loss = cross_entropy(logits, y)
+    loss.backward(); adamw.step(lr=2e-5); zero_grad()
+<span class="cm"># frozen-backbone variant: no grad for bert_encoder, train only `head` (a linear probe)</span></code></pre>
+
+    <p><strong>3. Inference.</strong> Always one forward pass, with no generation loop. What you read off depends on the task:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Task</th><th>Input</th><th>Read off</th></tr></thead>
+      <tbody>
+        <tr><td>Fill-in-the-blank</td><td>Text containing <code>[MASK]</code></td><td>MLM-head logits at the masked position. This is the one place <code>[MASK]</code> appears after pretraining.</td></tr>
+        <tr><td>Sentence classification</td><td><code>[CLS] text [SEP]</code></td><td>\(h_{\text{[CLS]}}\) → linear → softmax</td></tr>
+        <tr><td>Sentence pair (similarity, entailment)</td><td><code>[CLS] A [SEP] B [SEP]</code>, with segment embeddings</td><td>\(h_{\text{[CLS]}}\) → classifier</td></tr>
+        <tr><td>Token tagging (NER, codon per amino acid)</td><td><code>[CLS] text [SEP]</code></td><td>Each \(h_i\) → linear → a label per token</td></tr>
+        <tr><td>Extractive QA</td><td><code>[CLS] question [SEP] passage [SEP]</code></td><td>Start and end scores per token → the best span</td></tr>
+        <tr><td>Embeddings / search</td><td>Text</td><td>Mean of the \(h_i\) (or \(h_{\text{[CLS]}}\)), compared by cosine similarity</td></tr>
+      </tbody>
+    </table></div>
+    <pre class="code"><code><span class="cm"># ---- 3. inference: one forward pass, then read off what the task needs ----</span>
+H = bert_encoder(tokenize(text))                  <span class="cm"># (n, d)</span>
+label    = argmax(head(H[0]))                     <span class="cm"># classification: the [CLS] vector</span>
+tags     = [argmax(tag_head(h)) for h in H]       <span class="cm"># NER / tagging: one label per token</span>
+best_fill = argmax(mlm_head(H[mask_pos]))         <span class="cm"># fill-in-the-blank: input contained [MASK]</span>
+start, end = argmax(H @ w_start), argmax(H @ w_end)   <span class="cm"># extractive QA: answer span in the passage</span>
+embedding = H.mean(axis=0)                        <span class="cm"># search / similarity: compare by cosine</span></code></pre>
+
+    <p>For contrast, GPT's training is simpler: shift the sequence by one and predict the next token at every position.</p>
+    <pre class="code"><code><span class="cm"># ---- GPT for contrast: next-token prediction, a loss at EVERY position ----</span>
+for batch in corpus_batches:                      <span class="cm"># (B, n + 1) token ids</span>
+    inputs, targets = batch[:, :-1], batch[:, 1:] <span class="cm"># predict token t+1 from tokens 1..t</span>
+    logits = gpt(inputs)                          <span class="cm"># (B, n, V), causal mask inside</span>
+    loss = cross_entropy(logits, targets)         <span class="cm"># every position is a training example</span>
+    loss.backward(); adamw.step(); zero_grad()
+<span class="cm"># inference: generate() samples one token at a time, feeding each back in (with a KV cache)</span></code></pre>
+
     <h3>GPT: predict the next token (decoder-only)</h3>
     <ul>
       <li>A causal mask, and a loss at every position: predict token \(t+1\) from tokens \(1 \dots t\). Every position is a training example, so it's very data-efficient.</li>
-      <li>It generates naturally, one token at a time. Scaled up, it gives modern LLMs, which can do new tasks from a few examples in the prompt (in-context learning).</li>
+      <li>It generates naturally, one token at a time. Scaled up, it gives modern LLMs, which can do new tasks from a few examples in the prompt (in-context learning). <a href="./tabfm.html">TabFM</a> applies the same idea to tables.</li>
     </ul>
 
     <h3>Tokenization</h3>
@@ -1379,6 +1440,7 @@ loss = cross_entropy(logits, labels, ignore_index=IGNORE)</code></pre>
 
     <!-- basics -->
     <h2 id="basics"><span class="pn">14</span>Deep-learning basics, rapid fire</h2>
+    <p>The short version. The <a href="./deep-learning-basics.html">Deep learning basics</a> note covers each of these in depth, with code.</p>
     <div class="tbl"><table>
       <thead><tr><th>Topic</th><th>The line to say</th></tr></thead>
       <tbody>

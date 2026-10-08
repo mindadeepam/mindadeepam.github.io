@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TabFM: in-context learning for tables · Deepam Minda</title>
+<meta name="description" content="Google&#x27;s tabular foundation model: predictions from your labelled rows in a forward pass, row and column attention, and where gradient-boosted trees still win.">
+<meta property="og:title" content="TabFM: in-context learning for tables">
+<meta property="og:description" content="Google&#x27;s tabular foundation model: predictions from your labelled rows in a forward pass, row and column attention, and where gradient-boosted trees still win.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+(function () {
+  try { var t = localStorage.getItem("deepam-theme"); if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<style>
+/* Green graph-paper theme for the recurrent-notebook content.
+   Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
+   One sans for text, one mono for labels; MathJax draws the maths. Green = the cell / notebook,
+   slate = the hidden state, orange only for gradients. */
+:root {
+  --paper: #f5f7f2;
+  --grid: #edf1e9;
+  --grid-major: #e4eadf;
+  --surface: #fcfdfb;
+  --ink: #141b17;
+  --ink-2: #46524a;
+  --ink-3: #6f7c73;
+  --rule: #d3dccf;
+  --link: #1c6a43;
+  --cell: #1c6a43;
+  --cell-wash: #e2eee4;
+  --hid: #2f5470;
+  --hid-wash: #e4ecf1;
+  --gate: #3d4a42;
+  --gate-wash: #e9efe6;
+  --grad: #c75a1a;
+  --grad-wash: #f8e7db;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --serif: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0d1310; --grid: #111813; --grid-major: #151e18; --surface: #151d18;
+    --ink: #e3eae4; --ink-2: #a8b4ab; --ink-3: #76837a; --rule: #26332b; --link: #7ccc9b;
+    --cell: #7ccc9b; --cell-wash: #1a2a20; --hid: #8fb6d2; --hid-wash: #17232b;
+    --gate: #c9d3cb; --gate-wash: #1b241e; --grad: #f0975a; --grad-wash: #2e1f16;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0d1310; --grid: #111813; --grid-major: #151e18; --surface: #151d18;
+  --ink: #e3eae4; --ink-2: #a8b4ab; --ink-3: #76837a; --rule: #26332b; --link: #7ccc9b;
+  --cell: #7ccc9b; --cell-wash: #1a2a20; --hid: #8fb6d2; --hid-wash: #17232b;
+  --gate: #c9d3cb; --gate-wash: #1b241e; --grad: #f0975a; --grad-wash: #2e1f16;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
+body {
+  margin: 0; color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: 50% 0;
+  font: 16.5px/1.7 var(--sans); letter-spacing: -.003em;
+  padding-inline: 20px; padding-block: 44px 88px;
+  -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 640px) { body { font-size: 16px; padding-inline: 16px; padding-block: 24px 80px; } }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+table, button { font: inherit; }
+code { font: .86em var(--mono); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; }
+
+.page { max-width: 1200px; margin: 0 auto; display: grid; gap: 52px; grid-template-columns: 220px minmax(0, 860px); justify-content: center; }
+@media (max-width: 1080px) { .page { grid-template-columns: minmax(0, 860px); gap: 0; } }
+
+/* theme toggle */
+.theme-toggle {
+  position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); right: 16px; z-index: 6;
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  font: 500 12px/1 var(--mono); color: var(--ink-2);
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; padding: 8px 12px;
+}
+.theme-toggle:hover { color: var(--ink); border-color: var(--ink-3); }
+.theme-toggle .dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(90deg, var(--ink) 50%, var(--surface) 50%); border: 1px solid var(--ink-3); }
+
+/* contents */
+.toc { position: sticky; top: 28px; align-self: start; font: 13.5px/1.4 var(--sans); max-height: calc(100vh - 56px); overflow-y: auto; }
+.toc summary { display: none; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--ink-2); text-decoration: none; }
+.toc a:hover { background: var(--surface); color: var(--ink); }
+.toc a.on { color: var(--ink); background: var(--surface); box-shadow: inset 2px 0 0 var(--cell); }
+.toc .n { font: 500 11px var(--mono); color: var(--ink-3); margin-right: 8px; }
+.toc .label { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 10px 10px; }
+.toc li.part { font: 500 10.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 14px 10px 4px; }
+@media (max-width: 1080px) {
+  .toc { position: static; margin-bottom: 26px; max-height: none; }
+  .toc .label { display: none; }
+  .toc details { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  .toc summary { display: block; cursor: pointer; padding: 12px 14px; font: 500 14px var(--sans); list-style: none; }
+  .toc summary::-webkit-details-marker { display: none; }
+  .toc summary::after { content: "+"; float: right; color: var(--ink-3); }
+  .toc details[open] summary::after { content: "–"; }
+  .toc details ol { padding: 0 6px 10px; }
+}
+.jump {
+  display: none; position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+  font: 500 13px var(--sans); color: var(--ink); background: var(--surface); text-decoration: none;
+  border: 1px solid var(--rule); border-radius: 999px; padding: 9px 14px;
+}
+@media (max-width: 1080px) { .jump { display: block; } }
+
+/* article */
+article { min-width: 0; }
+header.hero { display: grid; gap: 10px; margin-bottom: 26px; }
+.kicker { font: 500 12px/1 var(--mono); color: var(--ink-3); letter-spacing: .02em; }
+h1 { margin: 0; font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.6rem); line-height: 1.1; font-weight: 600; letter-spacing: -.028em; text-wrap: balance; }
+.dek { margin: 0; font-size: 1.1rem; line-height: 1.55; color: var(--ink-2); max-width: 40em; }
+.meta { font: 12px/1.5 var(--mono); color: var(--ink-3); }
+.key { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.key span::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--c); margin-right: 6px; vertical-align: middle; }
+
+h2 { font-size: 1.36rem; line-height: 1.25; font-weight: 600; letter-spacing: -.018em; margin: 56px 0 12px; text-wrap: balance; scroll-margin-top: 16px; }
+h2 .pn { font: 500 .74em/1 var(--mono); color: var(--ink-3); margin-right: .7em; letter-spacing: 0; }
+h3 { font-size: 1.04rem; font-weight: 600; letter-spacing: -.01em; margin: 30px 0 6px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 1.25em; }
+li { margin-bottom: 5px; }
+li::marker { color: var(--ink-3); }
+strong { font-weight: 600; }
+.mj { overflow-x: auto; overflow-y: hidden; margin: 4px 0 16px; padding: 2px 0; }
+mjx-container[display="true"] { margin: 0 !important; }
+
+/* plan and summary panels */
+.tldr { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 22px 6px; margin-bottom: 14px; }
+.tldr h2 { margin: 0 0 10px; font: 500 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.tldr ol { padding-left: 1.3em; }
+.tldr li { margin-bottom: 8px; }
+.tldr p { margin: 0 0 12px; font-size: 15.5px; }
+.tldr .tbl { margin: 4px 0 12px; }
+
+/* notes: quote-style, coloured by kind */
+.note { margin: 16px 0 20px; padding: 2px 0 2px 16px; border-left: 2px solid var(--c); color: var(--ink-2); font-size: .97em; }
+.note > .nl { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); margin: 4px 0 8px; }
+.note strong { color: var(--ink); }
+.note.ask { --c: var(--cell); }
+.note.say { --c: var(--hid); }
+.note.trap { --c: var(--grad); }
+.note.lab { --c: var(--cell); }
+.note .q { font-style: italic; color: var(--ink); }
+.note ul { margin: 0 0 10px; }
+.note li { margin-bottom: 5px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 6px 0 20px; }
+table { border-collapse: collapse; width: 100%; font-size: .93em; line-height: 1.5; }
+th { text-align: left; vertical-align: bottom; font: 500 11px/1.4 var(--mono); color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; padding: 0 14px 8px 0; border-bottom: 1px solid var(--ink-3); }
+td { padding: 8px 14px 8px 0; vertical-align: top; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+td .src { display: block; font: 11.5px/1.4 var(--mono); color: var(--ink-3); margin-top: 2px; }
+
+/* gate cards */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0 20px; }
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.gc { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 4px; font-size: 15.5px; line-height: 1.6; }
+.gc h4 { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.gc h4 .tag { font: 500 11px var(--mono); color: var(--c); }
+.gc.g1 { --c: var(--cell); }
+.gc.g2 { --c: var(--ink-3); }
+.gc p { margin-bottom: 10px; }
+
+/* figures */
+figure { margin: 18px 0 24px; }
+.plate { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 10px; overflow-x: auto; }
+.plate svg { display: block; width: 100%; height: auto; min-width: 460px; max-width: 700px; margin: 0 auto; }
+@media (max-width: 500px) { .plate svg { max-width: none; } }
+figcaption { font-size: .86rem; line-height: 1.5; color: var(--ink-3); margin-top: 10px; }
+.dg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink-2); }
+.dg .v { font-family: var(--serif); font-style: italic; font-size: 19px; fill: var(--ink); }
+.dg .v .s { font-size: 12.5px; }
+.dg .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; fill: var(--ink-3); }
+.dg .gl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--gate); }
+.dg .gs { font-family: var(--serif); font-style: normal; font-size: 12px; fill: var(--ink-3); }
+.dg .cl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--ink); }
+.dg .cs { font-family: var(--sans); font-size: 12px; fill: var(--ink-2); }
+.dg .optx { font: 500 17px var(--sans); fill: var(--ink); }
+.dg .cell { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.dg .hid { stroke: var(--hid); stroke-width: 2.4; fill: none; }
+.dg .hid.thick { stroke-width: 3.6; }
+.dg .in { stroke: var(--ink-3); stroke-width: 1.5; fill: none; }
+.dg .gw { stroke: var(--gate); stroke-width: 1.6; fill: none; }
+.dg .cw { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+.dg .grad { stroke: var(--grad); fill: none; stroke-linecap: round; }
+.dg .gbox { fill: var(--gate-wash); stroke: var(--gate); stroke-width: 1.3; }
+.dg .box { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .op { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.3; }
+.dg .dot { fill: var(--ink-2); }
+.dg .cellon { fill: var(--cell-wash); stroke: var(--cell); stroke-width: 1; }
+.dg .celloff { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.dg .stream { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.mk-cell { fill: var(--cell); } .mk-hid { fill: var(--hid); } .mk-in { fill: var(--ink-3); }
+.mk-gate { fill: var(--gate); } .mk-cw { fill: var(--ink-2); } .mk-grad { fill: var(--grad); }
+
+/* questions */
+details.qa { border-bottom: 1px solid var(--rule); }
+details.qa:first-of-type { border-top: 1px solid var(--rule); }
+details.qa summary { cursor: pointer; padding: 11px 2px; font-weight: 500; font-size: 15.5px; line-height: 1.45; list-style: none; display: flex; gap: 12px; }
+details.qa summary::-webkit-details-marker { display: none; }
+details.qa summary .qn { font: 500 11.5px/1.9 var(--mono); color: var(--ink-3); flex: none; min-width: 1.9em; }
+details.qa summary::after { content: "+"; margin-left: auto; color: var(--ink-3); flex: none; }
+details.qa[open] summary::after { content: "–"; }
+details.qa .ans { padding: 0 4px 12px 32px; font-size: 15.5px; color: var(--ink-2); }
+summary:focus-visible, a:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+
+.sheet { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 6px; }
+.sheet h3 { margin: 4px 0 6px; font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: .9rem; color: var(--ink-3); }
+
+/* code blocks */
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; margin: 8px 0 20px; overflow-x: auto; font: 12.8px/1.6 var(--mono); color: var(--ink); white-space: pre; }
+pre.code code { font: inherit; background: none; border: 0; padding: 0; }
+pre.code .cm { color: var(--ink-3); }
+@media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
+
+/* public copy: links back to the site */
+.crumbs { max-width: 1132px; margin: 0 auto 28px; display: flex; flex-wrap: wrap; gap: 8px; font: 500 12px/1.6 var(--mono); color: var(--ink-3); }
+.crumbs a { color: var(--ink-2); }
+.crumbs a:hover { color: var(--link); }
+@media (max-width: 1080px) { .crumbs { max-width: 860px; } }
+footer .site-nav { display: block; margin-top: 10px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="a-cell" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path class="mk-cell" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-hid" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto"><path class="mk-hid" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-in" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-in" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-gate" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-cw" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-cw" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-grad" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path class="mk-grad" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<button type="button" class="theme-toggle" id="theme-toggle"><span class="dot"></span><span class="t">Dark mode</span></button>
+<nav class="crumbs" aria-label="Site"><a href="../">deepam</a><span aria-hidden="true">/</span><a href="./">study notes</a></nav>
+<div class="page">
+  <nav class="toc" aria-label="Contents">
+    <details id="tocd" open>
+      <summary>Contents</summary>
+      <div class="label">Contents</div>
+      <ol>
+        <li><a href="#tldr"><span class="n">00</span>In short</a></li>
+        <li><a href="#idea"><span class="n">01</span>The idea: learn to learn from a table</a></li>
+        <li><a href="#how"><span class="n">02</span>How TabFM works</a></li>
+        <li><a href="#invariance"><span class="n">03</span>Invariance: rows yes, columns approximately</a></li>
+        <li><a href="#pretrain"><span class="n">04</span>Pretraining and size</a></li>
+        <li><a href="#results"><span class="n">05</span>Results, and where trees still win</a></li>
+        <li><a href="#questions"><span class="n">06</span>Interview questions</a></li>
+        <li><a href="#sheet"><span class="n">07</span>Cheat sheet</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <article>
+    <header class="hero">
+      <div class="kicker">Study notes · Tabular foundation models</div>
+      <h1>TabFM: in-context learning for tables</h1>
+      <p class="dek">Google's tabular foundation model, from 30 June 2026: hand it your labelled rows and the rows to predict, and it answers in a forward pass, with no training on your data. What it is, how it works, where it beats gradient-boosted trees and where it doesn't.</p>
+      <div class="meta">About 12 minutes · builds on the <a href="./deep-learning-nlp.html#tf">attention and transformer notes</a> ·
+        <span class="key"><span style="--c: var(--cell)">labelled rows</span><span style="--c: var(--gate)">attention</span></span>
+      </div>
+    </header>
+
+    <section class="tldr" id="tldr" aria-labelledby="tldr-h">
+      <h2 id="tldr-h">In short</h2>
+      <ol>
+        <li><strong>TabFM</strong> (Google Research, blog 30 Jun 2026; paper arXiv 2609.37959) is a transformer pretrained only on synthetic tables. You give it training rows <em>with</em> labels and test rows <em>without</em>, as one input, and it predicts the test labels with frozen weights. No gradient steps on your data.</li>
+        <li>That's <strong>in-context learning</strong>, the same idea as an LLM learning from examples in its prompt. It descends from TabPFN (Nature, 2025) and TabICL (ICML 2025).</li>
+        <li>Architecture: each cell becomes a token; the encoder alternates <strong>attention across rows within a column</strong> and <strong>attention across features within a row</strong>; each row becomes one vector; a 24-layer predictor lets every row attend to the labelled rows only.</li>
+        <li>It's invariant to <strong>row</strong> order by design, but <strong>not</strong> to column order (RoPE and column grouping); it gets close by averaging 32 column-shuffled views.</li>
+        <li>On Google's own TabArena numbers it beats tuned gradient-boosted trees and AutoML. In practice, trees still win on huge, imbalanced, latency-critical problems like fraud, and the open weights are non-commercial.</li>
+      </ol>
+    </section>
+
+    <!-- idea -->
+    <h2 id="idea"><span class="pn">01</span>The idea: learn to learn from a table</h2>
+    <p>The usual way: for each new dataset, train a model (XGBoost, say) with gradient steps. The in-context way: train <em>one</em> model, once, on millions of datasets, so that it learns the act of fitting. Then a new dataset is just its input.</p>
+    <div class="mj">\[ \min_\theta\ \mathbb{E}_{D \sim p(D)} \Big[ -\log q_\theta\big(y_{\text{test}} \mid x_{\text{test}},\ D_{\text{train}}\big) \Big] \]</div>
+    <ul>
+      <li>Each pretraining example is a whole <strong>dataset</strong> drawn from a prior \(p(D)\), split into training rows (with labels, in context) and test rows (labels hidden, to be predicted).</li>
+      <li>Minimizing this loss over many datasets makes \(q_\theta\) approximate the <strong>posterior predictive</strong> \(p(y \mid x, D)\): amortized Bayesian inference. That's why it's called a prior-data fitted network (TabPFN). The model has learned what a good fit looks like for data like the prior.</li>
+      <li><strong>Why synthetic data works:</strong> the prior is built from random <strong>structural causal models</strong> (random graphs of features causing other features and the label, with noise and non-linearities), which covers the kinds of structure real tables have. Real tables that look like the prior transfer well.</li>
+    </ul>
+    <aside class="note say"><p class="nl">In-context learning vs fine-tuning</p><p>Fine-tuning changes the weights with gradients on your data. In-context learning keeps the weights frozen and conditions on your data inside the forward pass: the “training” happens in the activations. The cost moves from training time to prediction time, and the amount of data is capped by the context size.</p></aside>
+
+    <!-- how -->
+    <h2 id="how"><span class="pn">02</span>How TabFM works</h2>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 700 280" role="img" aria-label="TabFM. A table with labelled training rows and unlabelled test rows becomes cell tokens; an encoder alternates column attention across rows and row attention across features, twice; each row becomes one vector; a predictor transformer lets every row attend only to the labelled rows and outputs predictions for the test rows.">
+          <text class="lbl" x="75" y="56" text-anchor="middle">YOUR TABLE</text>
+          <rect class="celloff" x="20" y="64" width="20" height="20"/><rect class="celloff" x="42" y="64" width="20" height="20"/><rect class="celloff" x="64" y="64" width="20" height="20"/><rect class="celloff" x="86" y="64" width="20" height="20"/><rect class="cellon" x="108" y="64" width="20" height="20"/><text x="118.0" y="78" text-anchor="middle" style="fill:var(--cell);font-size:11px">y</text><rect class="celloff" x="20" y="86" width="20" height="20"/><rect class="celloff" x="42" y="86" width="20" height="20"/><rect class="celloff" x="64" y="86" width="20" height="20"/><rect class="celloff" x="86" y="86" width="20" height="20"/><rect class="cellon" x="108" y="86" width="20" height="20"/><text x="118.0" y="100" text-anchor="middle" style="fill:var(--cell);font-size:11px">y</text><rect class="celloff" x="20" y="108" width="20" height="20"/><rect class="celloff" x="42" y="108" width="20" height="20"/><rect class="celloff" x="64" y="108" width="20" height="20"/><rect class="celloff" x="86" y="108" width="20" height="20"/><rect class="cellon" x="108" y="108" width="20" height="20"/><text x="118.0" y="122" text-anchor="middle" style="fill:var(--cell);font-size:11px">y</text><rect class="celloff" x="20" y="130" width="20" height="20"/><rect class="celloff" x="42" y="130" width="20" height="20"/><rect class="celloff" x="64" y="130" width="20" height="20"/><rect class="celloff" x="86" y="130" width="20" height="20"/><rect class="cellon" x="108" y="130" width="20" height="20"/><text x="118.0" y="144" text-anchor="middle" style="fill:var(--cell);font-size:11px">y</text><rect class="celloff" x="20" y="152" width="20" height="20"/><rect class="celloff" x="42" y="152" width="20" height="20"/><rect class="celloff" x="64" y="152" width="20" height="20"/><rect class="celloff" x="86" y="152" width="20" height="20"/><rect class="celloff" x="108" y="152" width="20" height="20" style="stroke-dasharray:3 2"/><text x="118.0" y="166" text-anchor="middle" style="font-size:11px">?</text><rect class="celloff" x="20" y="174" width="20" height="20"/><rect class="celloff" x="42" y="174" width="20" height="20"/><rect class="celloff" x="64" y="174" width="20" height="20"/><rect class="celloff" x="86" y="174" width="20" height="20"/><rect class="celloff" x="108" y="174" width="20" height="20" style="stroke-dasharray:3 2"/><text x="118.0" y="188" text-anchor="middle" style="font-size:11px">?</text><path d="M16 151 H132" style="stroke:var(--ink-3);stroke-width:1;stroke-dasharray:3 3;fill:none"/>
+          <text class="lbl" x="140" y="112">labelled</text>
+          <text class="lbl" x="140" y="184">to predict</text>
+          <path class="cw" d="M128 140 H186" marker-end="url(#a-cw)"/>
+          <rect x="192" y="48" width="206" height="184" rx="12" style="fill:none;stroke:var(--ink-3);stroke-width:1.2;stroke-dasharray:5 4"/>
+          <text class="lbl" x="295" y="40" text-anchor="middle">ENCODER</text>
+          <rect class="box" x="206" y="60" width="178" height="34" rx="8"/><text x="295" y="82" text-anchor="middle">cell tokens (Fourier features)</text>
+          <path class="cw" d="M295 94 V106" marker-end="url(#a-cw)"/>
+          <rect class="gbox" x="206" y="108" width="178" height="36" rx="8"/><text x="295" y="131" text-anchor="middle">column attention: across rows</text>
+          <path class="cw" d="M295 144 V156" marker-end="url(#a-cw)"/>
+          <rect class="gbox" x="206" y="158" width="178" height="36" rx="8"/><text x="295" y="181" text-anchor="middle">row attention: across features</text>
+          <text class="lbl" x="295" y="218" text-anchor="middle">×2 stages; 8 CLS tokens → 1 vector per row</text>
+          <path class="cw" d="M398 140 H426" marker-end="url(#a-cw)"/>
+          <rect class="gbox" x="430" y="98" width="180" height="84" rx="10"/>
+          <text x="520" y="126" text-anchor="middle" style="fill:var(--ink)">Predictor</text>
+          <text x="520" y="146" text-anchor="middle">24-layer transformer</text>
+          <text class="lbl" x="520" y="166" text-anchor="middle">rows attend to labelled rows only</text>
+          <path class="cell" d="M610 140 H646" marker-end="url(#a-cell)"/>
+          <text class="v" x="654" y="146">ŷ</text>
+          <text class="lbl" x="664" y="168" text-anchor="middle">test rows</text>
+          <text class="lbl" x="350" y="262" text-anchor="middle">NO GRADIENT STEPS ON YOUR DATA: FROZEN WEIGHTS, PREDICTION IN THE FORWARD PASS</text>
+        </svg>
+      </div>
+      <figcaption>TabFM end to end. Labelled training rows (green labels) and test rows (“?”) go in together. The encoder mixes information down each column and across each row; the predictor treats each row as a token and lets every row look only at the labelled rows, so test predictions don't depend on each other.</figcaption>
+    </figure>
+    <ul>
+      <li><strong>Tokens.</strong> Each cell becomes a token through 32 learned Fourier frequencies, with separate embeddings for numeric and categorical values. Training rows also get a label embedding; test rows don't.</li>
+      <li><strong>Column attention (across rows).</strong> For each feature, its cells attend to each other down the column, so each value is seen in the context of the column's distribution. It uses 256 inducing points, which makes it linear in the number of rows, and only the labelled training rows are summarized.</li>
+      <li><strong>Row attention (across features).</strong> Within each row, the features attend to each other, with RoPE positions, so the model learns interactions between columns. It alternates with column attention for two stages.</li>
+      <li><strong>Row vectors.</strong> Eight CLS tokens per row are combined into one vector per row.</li>
+      <li><strong>Predictor.</strong> A 24-layer transformer over those row vectors. A mask lets every row attend only to the labelled training rows, the in-context “training set”. It outputs class logits (up to 10 classes) or a regression value.</li>
+    </ul>
+    <h3>TabFM's forward pass, in pseudocode (simplified)</h3>
+    <pre class="code"><code><span class="cm"># X_train: (N, F) with labels y_train;  X_test: (M, F) without labels</span>
+tokens = cell_embed(concat([X_train, X_test]))      <span class="cm"># (N+M, F, d): one token per cell</span>
+tokens[:N] += label_embed(y_train)                  <span class="cm"># only training rows carry their label</span>
+for stage in range(2):
+    tokens = column_attention(tokens, context=N)    <span class="cm"># down each column, summarizing the training rows</span>
+    tokens = row_attention(tokens)                  <span class="cm"># across each row's features (RoPE)</span>
+rows = pool_cls(tokens)                             <span class="cm"># (N+M, d): one vector per row</span>
+mask = attend_only_to(range(N))                     <span class="cm"># every row sees the labelled rows, test rows not each other</span>
+y_test = head(predictor(rows, mask)[N:])            <span class="cm"># 24 layers; predictions for the M test rows</span>
+<span class="cm"># no gradient steps on your data; by default average 32 column-shuffled views</span></code></pre>
+
+    <aside class="note trap"><p class="nl">Why not flatten the table into one long sequence?</p><p>Attention over every cell of a \(T\)-row, \(H\)-column table costs \(O(T^2 H^2)\), and it would impose an order that doesn't exist. Attending along columns, then along rows, then between whole rows keeps the cost manageable (context up to about 16K rows) and matches the table's two axes.</p></aside>
+
+    <!-- invariance -->
+    <h2 id="invariance"><span class="pn">03</span>Invariance: rows yes, columns approximately</h2>
+    <ul>
+      <li><strong>Rows:</strong> reordering the rows doesn't change predictions. Rows get no positional encoding, and test rows are masked from each other. That's the right property, since a table's rows are a set.</li>
+      <li><strong>Columns:</strong> reordering columns <em>does</em> change predictions, because row attention uses RoPE and columns are grouped with nearby ones. TabFM approximates column invariance by averaging the predictions of 32 column-shuffled views by default. So the default isn't literally a single forward pass, even though the blog describes one.</li>
+    </ul>
+
+    <!-- pretraining -->
+    <h2 id="pretrain"><span class="pn">04</span>Pretraining and size</h2>
+    <ul>
+      <li><strong>Data:</strong> synthetic only, “hundreds of millions” of tables generated from structural causal models, with up to 100 columns. The context grew from 2,048 to 16,384 rows during training.</li>
+      <li><strong>Size:</strong> 408.7M parameters in the paper; the released Hugging Face checkpoint is larger, about 1.6B by its weight file.</li>
+      <li><strong>Limits:</strong> classification up to 10 classes, plus regression; the library accepts up to 500 features and subsamples larger tables. Compute grows quadratically with the number of context rows, so a GPU is expected.</li>
+      <li><strong>Licence:</strong> the code is Apache-2.0, but the released weights are for non-commercial, non-production use. There's also a BigQuery preview (50 feature columns, 10 classes).</li>
+    </ul>
+
+    <!-- results -->
+    <h2 id="results"><span class="pn">05</span>Results, and where trees still win</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Model</th><th>TabArena Elo, classification</th><th>Regression</th></tr></thead>
+      <tbody>
+        <tr><td>TabFM</td><td>1768.6</td><td>2055.2</td></tr>
+        <tr><td>AutoGluon 1.5 (extreme preset)</td><td>1669.7</td><td>1851.2</td></tr>
+        <tr><td>TabPFN-3</td><td>1641.9</td><td>1866.6</td></tr>
+        <tr><td>TabICL v2</td><td>1586.4</td><td>1723.6</td></tr>
+      </tbody>
+    </table></div>
+    <p>These are Google's own numbers; tuned gradient-boosted trees don't make either top 12. Ensembled variants score higher still: TabFM+ (32 views, extra features, calibration) and TabFM-Auto (adds feature engineering written by Gemini), both with frozen weights.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Situation</th><th>Lean towards</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Small or medium data, a quick strong baseline, a new or thin-file product</td><td>TabFM</td><td>No training or tuning; strong out of the box</td></tr>
+        <tr><td>Drift</td><td>TabFM is convenient</td><td>Swap in a fresh context instead of retraining</td></tr>
+        <tr><td>Fraud: millions of rows, rare positives</td><td>Trees</td><td>A sampled context drops the rare positives; trees use all the data</td></tr>
+        <tr><td>Real-time scoring</td><td>Trees</td><td>Milliseconds on a CPU vs a GPU forward pass over the context</td></tr>
+        <tr><td>Credit decisions needing explanations</td><td>Trees</td><td>Monotonic constraints and SHAP reason codes</td></tr>
+        <tr><td>Production use of the open weights</td><td>Trees, or TabFM as a challenger</td><td>The weights' licence is non-commercial</td></tr>
+      </tbody>
+    </table></div>
+    <h3>The family it belongs to</h3>
+    <ul>
+      <li><strong>TabPFN v2</strong> (Hollmann et al., Nature, Jan 2025): the prior-data fitted network that started this line; designed for up to about 10K rows and 500 features.</li>
+      <li><strong>TabICL</strong> (ICML 2025) and <strong>TabICL v2</strong> (Feb 2026): column-then-row encoders with in-context learning over rows, scaling to larger tables. TabFM is roughly a hybrid of TabPFN and TabICL.</li>
+    </ul>
+
+    <!-- questions -->
+    <h2 id="questions"><span class="pn">06</span>Interview questions</h2>
+    <details class="qa"><summary><span class="qn">1</span>What is TabFM, in one minute?</summary><div class="ans"><p>A tabular foundation model from Google (June 2026): a transformer pretrained only on synthetic tables from structural causal models. You pass labelled training rows and unlabelled test rows together, and it predicts the test labels with frozen weights through in-context learning, with no training on your data. It alternates column and row attention to encode the table, then a predictor lets each row attend to the labelled rows.</p></div></details>
+    <details class="qa"><summary><span class="qn">2</span>Why row and column attention instead of flattening the table?</summary><div class="ans"><p>Flattening gives \(T \times H\) tokens, so full attention costs \(O(T^2 H^2)\), and it invents an order. Attending down columns (each value against its column's distribution) and across rows (feature interactions), then between whole rows, matches the table's structure and keeps contexts of ~16K rows feasible.</p></div></details>
+    <details class="qa"><summary><span class="qn">3</span>Is it permutation-invariant?</summary><div class="ans"><p>Over rows, yes: no positional encoding on rows, and test rows are masked from each other. Over columns, no: row attention uses RoPE and columns are grouped, so it approximates invariance by averaging 32 column-shuffled views.</p></div></details>
+    <details class="qa"><summary><span class="qn">4</span>How does in-context learning differ from fine-tuning?</summary><div class="ans"><p>Fine-tuning updates the weights with gradients on your data. In-context learning keeps the weights frozen and puts your data in the input, so the fitting happens inside the forward pass. Compute moves to prediction time, and the data you can use is capped by the context size.</p></div></details>
+    <details class="qa"><summary><span class="qn">5</span>Why does pretraining on synthetic data work?</summary><div class="ans"><p>Minimizing loss on held-out rows across many datasets drawn from a prior teaches the model the posterior predictive \(p(y \mid x, D)\) under that prior: amortized Bayesian inference. A rich prior (random structural causal models) covers the structure real tables have, so it transfers to real data that resembles it.</p></div></details>
+    <details class="qa"><summary><span class="qn">6</span>What are its main limitations?</summary><div class="ans"><p>A capped context (rows sampled for big tables), at most 10 classes, cost quadratic in context rows (GPU needed), no built-in explanations, a non-commercial licence on the weights, and self-reported benchmarks. Rare-positive problems at scale, like fraud, lose information when the context is sampled.</p></div></details>
+    <details class="qa"><summary><span class="qn">7</span>How would you evaluate it against XGBoost on a credit dataset?</summary><div class="ans"><p>An out-of-time split, a properly tuned XGBoost (with monotonic constraints if production uses them), and the metrics that matter for credit: AUC and KS, calibration, and the bad rate at a fixed approval rate. Add bootstrap confidence intervals and learning curves over training-set size, plus latency and cost per prediction. I'd expect TabFM to shine at small sizes and trees to catch up or win as data grows.</p></div></details>
+
+    <h2 id="sheet"><span class="pn">07</span>Cheat sheet</h2>
+    <div class="sheet">
+      <h3>Objective (prior-data fitting)</h3>
+      <div class="mj">\[ \min_\theta\ \mathbb{E}_{D \sim p(D)}\big[-\log q_\theta(y_{\text{test}} \mid x_{\text{test}}, D_{\text{train}})\big] \ \Rightarrow\ q_\theta(y \mid x, D) \approx p(y \mid x, D) \]</div>
+      <h3>Pipeline</h3>
+      <div class="mj">\[ \text{cells} \to \text{tokens} \to (\text{column attn} \to \text{row attn}) \times 2 \to \text{row vectors} \to \text{predictor (attend to labelled rows)} \to \hat y \]</div>
+    </div>
+    <footer>Sources: Google Research blog, “Introducing TabFM” (30 Jun 2026); arXiv 2609.37959; github.com/google-research/tabfm; Hollmann et al., Nature 2025 (TabPFN v2); TabICL (ICML 2025).<span class="site-nav"><a href="./">More study notes</a> · <a href="../">Deepam Minda</a></span></footer>
+
+  </article>
+</div>
+<a class="jump" href="#tldr">Contents ↑</a>
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+  svg: { fontCache: "global" },
+  options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script>
+(function () {
+  var d = document.getElementById("tocd");
+  var wide = window.matchMedia("(min-width: 1081px)");
+  function sync() { d.open = wide.matches; }
+  sync();
+  if (wide.addEventListener) wide.addEventListener("change", sync);
+  var jump = document.querySelector(".jump");
+  jump.addEventListener("click", function () { if (!wide.matches) d.open = true; });
+  d.addEventListener("click", function (e) {
+    if (!wide.matches && e.target.closest("a")) d.open = false;
+  });
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+  function spy() {
+    var y = window.scrollY + 120, cur = 0;
+    targets.forEach(function (t, i) { if (t && t.getBoundingClientRect().top + window.scrollY <= y) cur = i; });
+    links.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
+  }
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+})();
+</script>
+
+<script>
+(function () {
+  var root = document.documentElement, b = document.getElementById("theme-toggle"), t = b.querySelector(".t");
+  function cur() {
+    var a = root.getAttribute("data-theme");
+    if (a === "dark" || a === "light") return a;
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function label() {
+    var c = cur();
+    t.textContent = c === "dark" ? "Light mode" : "Dark mode";
+    b.setAttribute("aria-label", "Switch to " + (c === "dark" ? "light" : "dark") + " mode");
+  }
+  b.addEventListener("click", function () {
+    var n = cur() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", n);
+    try { localStorage.setItem("deepam-theme", n); } catch (e) {}
+    label();
+  });
+  label();
+})();
+</script>
+</body>
+</html>
