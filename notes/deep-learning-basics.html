@@ -464,7 +464,9 @@ w -= lr * (m_hat / (sqrt(v_hat) + eps) + wd * w)   <span class="cm"># AdamW: dec
     <div class="mj">\[ \text{MSE} = \tfrac{1}{n}\sum (y - \hat y)^2 \qquad \text{BCE} = -[y \log p + (1 - y)\log(1 - p)] \qquad \text{CE} = -\sum_k y_k \log \hat y_k \qquad \text{Focal} = -(1 - p_t)^\gamma \log p_t \]</div>
     <ul>
       <li><strong>Each loss is a likelihood:</strong> Gaussian noise gives MSE, Laplace noise gives MAE, Bernoulli labels give binary cross-entropy, categorical labels give cross-entropy. Huber is MSE near 0 and MAE in the tails, so it's robust to outliers.</li>
-      <li><strong>Why cross-entropy, not MSE, for classification:</strong> with a sigmoid or softmax, MSE's gradient includes the activation's slope, which is tiny exactly when the model is confidently wrong. Cross-entropy's gradient at the logits is simply \(\hat y - y\), largest when most wrong.</li>
+      <li><strong>Why cross-entropy, not MSE, for classification:</strong> with a sigmoid or softmax, MSE's gradient includes the activation's slope, which is tiny exactly when the model is confidently wrong. Cross-entropy's gradient at the logits is simply \(\hat y - y\), largest when most wrong.
+        <div class="mj">\[ \begin{aligned} \frac{\partial L_{\text{CE}}}{\partial z} &amp;= \hat y - y \\ \frac{\partial L_{\text{MSE}}}{\partial z} &amp;= (\hat y - y)\,\hat y(1 - \hat y) \end{aligned} \]</div>
+        The derivation, step by step: <a href="./loss-functions.html#why-not-mse">Why not MSE for classification</a>.</li>
       <li><strong>Focal loss</strong> down-weights easy, well-classified examples (\((1 - p_t)^\gamma\)), for heavy class imbalance. Class weights are the simpler alternative.</li>
     </ul>
 
