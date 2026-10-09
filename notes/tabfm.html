@@ -275,9 +275,13 @@ footer .site-nav { display: block; margin-top: 10px; }
     <h2 id="idea"><span class="pn">01</span>The idea: learn to learn from a table</h2>
     <p>The usual way: for each new dataset, train a model (XGBoost, say) with gradient steps. The in-context way: train <em>one</em> model, once, on millions of datasets, so that it learns the act of fitting. Then a new dataset is just its input.</p>
     <div class="mj">\[ \min_\theta\ \mathbb{E}_{D \sim p(D)} \Big[ -\log q_\theta\big(y_{\text{test}} \mid x_{\text{test}},\ D_{\text{train}}\big) \Big] \]</div>
+    <p>In words: over many synthetic datasets, get better at predicting each held-out label from the labelled rows.</p>
     <ul>
       <li>Each pretraining example is a whole <strong>dataset</strong> drawn from a prior \(p(D)\), split into training rows (with labels, in context) and test rows (labels hidden, to be predicted).</li>
-      <li>Minimizing this loss over many datasets makes \(q_\theta\) approximate the <strong>posterior predictive</strong> \(p(y \mid x, D)\): amortized Bayesian inference. That's why it's called a prior-data fitted network (TabPFN). The model has learned what a good fit looks like for data like the prior.</li>
+      <li>Minimizing this loss over many datasets makes \(q_\theta\) approximate the <strong>posterior predictive</strong> \(p(y \mid x, D_{\text{train}})\): amortized Bayesian inference. That's why it's called a prior-data fitted network (TabPFN). The model has learned what a good fit looks like for data like the prior.</li>
+      <li><strong>Why the posterior predictive:</strong> each synthetic dataset is made by drawing a rule \(\phi\) from the prior, then sampling rows from it. So, given the labelled rows, a held-out label's true distribution is exactly the Bayesian posterior predictive:
+        <div class="mj">\[ p(y \mid x, D_{\text{train}}) = \int p(y \mid x, \phi)\, p(\phi \mid D_{\text{train}})\, d\phi \]</div>
+        In words: consider every rule \(\phi\) that could have generated the data, weight each by how plausible the prior made it and how well it explains the training rows, and average their predictions. Log loss is lowest when the predicted distribution equals the true one (any mismatch adds a KL-divergence penalty), so training pushes \(q_\theta\) towards it. Computing that average directly is intractable; the network learns to approximate it in one forward pass, paying the cost once in pretraining (“amortized”).</li>
       <li><strong>Why synthetic data works:</strong> the prior is built from random <strong>structural causal models</strong> (random graphs of features causing other features and the label, with noise and non-linearities), which covers the kinds of structure real tables have. Real tables that look like the prior transfer well.</li>
     </ul>
     <aside class="note say"><p class="nl">In-context learning vs fine-tuning</p><p>Fine-tuning changes the weights with gradients on your data. In-context learning keeps the weights frozen and conditions on your data inside the forward pass: the “training” happens in the activations. The cost moves from training time to prediction time, and the amount of data is capped by the context size.</p></aside>
@@ -314,11 +318,15 @@ footer .site-nav { display: block; margin-top: 10px; }
       <figcaption>TabFM end to end. Labelled training rows (green labels) and test rows (“?”) go in together. The encoder mixes information down each column and across each row; the predictor treats each row as a token and lets every row look only at the labelled rows, so test predictions don't depend on each other.</figcaption>
     </figure>
     <ul>
-      <li><strong>Tokens.</strong> Each cell becomes a token through 32 learned Fourier frequencies, with separate embeddings for numeric and categorical values. Training rows also get a label embedding; test rows don't.</li>
-      <li><strong>Column attention (across rows).</strong> For each feature, its cells attend to each other down the column, so each value is seen in the context of the column's distribution. It uses 256 inducing points, which makes it linear in the number of rows, and only the labelled training rows are summarized.</li>
+      <li><strong>Tokens.</strong> Each cell becomes a token through 32 learned Fourier frequencies, with separate embeddings for numeric and categorical values. Training rows also get a label embedding; test rows don't. Why Fourier features: a number times one weight vector gives an embedding that changes linearly with the value, which makes sharp thresholds hard to express; sines and cosines at many frequencies let the model react to small differences in a value.</li>
+      <li><strong>Column attention (across rows).</strong> For each feature, its cells attend to each other down the column, so each value is seen in the context of the column's distribution (is this income high <em>for this dataset</em>?), like a normalization learned on the fly. It uses 256 inducing points, which makes it linear in the number of rows, and only the labelled training rows are summarized.
+        <ul>
+          <li><strong>How inducing points work:</strong> 256 learned vectors first attend to the column's labelled cells, summarizing them; then every cell attends to those 256 summaries. No step compares all rows with all rows, so the cost grows linearly with rows, and test rows can't leak into the summary.</li>
+        </ul>
+      </li>
       <li><strong>Row attention (across features).</strong> Within each row, the features attend to each other, with RoPE positions, so the model learns interactions between columns. It alternates with column attention for two stages.</li>
       <li><strong>Row vectors.</strong> Eight CLS tokens per row are combined into one vector per row.</li>
-      <li><strong>Predictor.</strong> A 24-layer transformer over those row vectors. A mask lets every row attend only to the labelled training rows, the in-context “training set”. It outputs class logits (up to 10 classes) or a regression value.</li>
+      <li><strong>Predictor.</strong> A 24-layer transformer over those row vectors. A mask lets every row attend only to the labelled training rows, the in-context “training set”. Attention weights those rows by similarity and averages their label information, like a soft nearest-neighbour vote with a learned similarity. It outputs class logits (up to 10 classes) or a regression value.</li>
     </ul>
     <h3>TabFM's forward pass, in pseudocode (simplified)</h3>
     <pre class="code"><code><span class="cm"># X_train: (N, F) with labels y_train;  X_test: (M, F) without labels</span>
@@ -340,13 +348,15 @@ y_test = head(predictor(rows, mask)[N:])            <span class="cm"># 24 layers
       <li><strong>Rows:</strong> reordering the rows doesn't change predictions. Rows get no positional encoding, and test rows are masked from each other. That's the right property, since a table's rows are a set.</li>
       <li><strong>Columns:</strong> reordering columns <em>does</em> change predictions, because row attention uses RoPE and columns are grouped with nearby ones. TabFM approximates column invariance by averaging the predictions of 32 column-shuffled views by default. So the default isn't literally a single forward pass, even though the blog describes one.</li>
     </ul>
+    <p><strong>Why rows come out order-free:</strong> attention with no position code is a set operation. Its weights depend only on content, so reordering the inputs just reorders the outputs, \(\text{Attn}(PX) = P\,\text{Attn}(X)\) for any reordering \(P\): each output moves with its row but doesn't change. The labelled rows enter every prediction as a set that attention sums over, and the mask means a test row's prediction depends only on its own features and the labelled rows, never on which other rows are predicted alongside it.</p>
+    <p><strong>Why give columns a position at all:</strong> the likely reason (the argument TabICL made for its own RoPE) is that without one, two columns with similar value distributions get nearly identical embeddings, and the model can't tell them apart. A position code breaks the tie at the cost of order dependence. Grouping nearby columns has the same side effect: consecutive columns are handled together in small groups, so which features share a group depends on the column order. Averaging over random column orders then washes most of that dependence out; it's approximate, since exact invariance would need every ordering, and it doubles as an ensemble that usually improves accuracy.</p>
 
     <!-- pretraining -->
     <h2 id="pretrain"><span class="pn">04</span>Pretraining and size</h2>
     <ul>
       <li><strong>Data:</strong> synthetic only, “hundreds of millions” of tables generated from structural causal models, with up to 100 columns. The context grew from 2,048 to 16,384 rows during training.</li>
-      <li><strong>Size:</strong> 408.7M parameters in the paper; the released Hugging Face checkpoint is larger, about 1.6B by its weight file.</li>
-      <li><strong>Limits:</strong> classification up to 10 classes, plus regression; the library accepts up to 500 features and subsamples larger tables. Compute grows quadratically with the number of context rows, so a GPU is expected.</li>
+      <li><strong>Size:</strong> 408.7M parameters in the paper; the released checkpoint is larger, about 1.6B by its weight file.</li>
+      <li><strong>Limits:</strong> classification up to 10 classes, plus regression; the library accepts up to 500 features and subsamples larger tables. Compute grows quadratically with the number of context rows, because in the predictor every row attends to every labelled row, so a GPU is expected.</li>
       <li><strong>Licence:</strong> the code is Apache-2.0, but the released weights are for non-commercial, non-production use. There's also a BigQuery preview (50 feature columns, 10 classes).</li>
     </ul>
 
@@ -381,18 +391,88 @@ y_test = head(predictor(rows, mask)[N:])            <span class="cm"># 24 layers
 
     <!-- questions -->
     <h2 id="questions"><span class="pn">06</span>Interview questions</h2>
-    <details class="qa"><summary><span class="qn">1</span>What is TabFM, in one minute?</summary><div class="ans"><p>A tabular foundation model from Google (June 2026): a transformer pretrained only on synthetic tables from structural causal models. You pass labelled training rows and unlabelled test rows together, and it predicts the test labels with frozen weights through in-context learning, with no training on your data. It alternates column and row attention to encode the table, then a predictor lets each row attend to the labelled rows.</p></div></details>
-    <details class="qa"><summary><span class="qn">2</span>Why row and column attention instead of flattening the table?</summary><div class="ans"><p>Flattening gives \(T \times H\) tokens, so full attention costs \(O(T^2 H^2)\), and it invents an order. Attending down columns (each value against its column's distribution) and across rows (feature interactions), then between whole rows, matches the table's structure and keeps contexts of ~16K rows feasible.</p></div></details>
-    <details class="qa"><summary><span class="qn">3</span>Is it permutation-invariant?</summary><div class="ans"><p>Over rows, yes: no positional encoding on rows, and test rows are masked from each other. Over columns, no: row attention uses RoPE and columns are grouped, so it approximates invariance by averaging 32 column-shuffled views.</p></div></details>
-    <details class="qa"><summary><span class="qn">4</span>How does in-context learning differ from fine-tuning?</summary><div class="ans"><p>Fine-tuning updates the weights with gradients on your data. In-context learning keeps the weights frozen and puts your data in the input, so the fitting happens inside the forward pass. Compute moves to prediction time, and the data you can use is capped by the context size.</p></div></details>
-    <details class="qa"><summary><span class="qn">5</span>Why does pretraining on synthetic data work?</summary><div class="ans"><p>Minimizing loss on held-out rows across many datasets drawn from a prior teaches the model the posterior predictive \(p(y \mid x, D)\) under that prior: amortized Bayesian inference. A rich prior (random structural causal models) covers the structure real tables have, so it transfers to real data that resembles it.</p></div></details>
-    <details class="qa"><summary><span class="qn">6</span>What are its main limitations?</summary><div class="ans"><p>A capped context (rows sampled for big tables), at most 10 classes, cost quadratic in context rows (GPU needed), no built-in explanations, a non-commercial licence on the weights, and self-reported benchmarks. Rare-positive problems at scale, like fraud, lose information when the context is sampled.</p></div></details>
-    <details class="qa"><summary><span class="qn">7</span>How would you evaluate it against XGBoost on a credit dataset?</summary><div class="ans"><p>An out-of-time split, a properly tuned XGBoost (with monotonic constraints if production uses them), and the metrics that matter for credit: AUC and KS, calibration, and the bad rate at a fixed approval rate. Add bootstrap confidence intervals and learning curves over training-set size, plus latency and cost per prediction. I'd expect TabFM to shine at small sizes and trees to catch up or win as data grows.</p></div></details>
+    <details class="qa"><summary><span class="qn">1</span>What is TabFM, in one minute?</summary><div class="ans">
+      <p><strong>TabFM is a transformer from Google Research (June 2026), pretrained only on synthetic tables, that predicts labels for new rows from your labelled rows in a single forward pass, with no training on your data.</strong></p>
+      <ul>
+        <li><strong>How it's used:</strong> pass the labelled training rows and the unlabelled test rows together as one input; the weights stay frozen. This is in-context learning, the same idea as an LLM following the examples in its prompt.</li>
+        <li><strong>How it learned to do that:</strong> pretraining showed it hundreds of millions of synthetic datasets drawn from a <em>prior</em>, the distribution the synthetic tables come from. The prior is built from structural causal models: random graphs where features cause each other and the label. Each dataset was split into labelled rows and rows to predict, and minimizing the loss on the hidden labels taught it the act of fitting itself: approximate Bayesian prediction for data like that prior.</li>
+        <li><strong>Architecture:</strong> each cell becomes a token; an encoder alternates attention down each column (each value against its column's distribution) and across each row (feature interactions); each row is pooled into one vector; a 24-layer predictor lets every row attend only to the labelled rows.</li>
+        <li><strong>Where it stands:</strong> on Google's own results on TabArena, a public tabular benchmark, it beats tuned gradient-boosted trees and AutoML. Limits: a context of about 16K rows, at most 10 classes, GPU cost, and non-commercial weights.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> it descends from TabPFN and TabICL; “foundation model” means one pretrained model reused on any table.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">2</span>Why row and column attention instead of flattening the table?</summary><div class="ans">
+      <p><strong>A table has two axes that mean different things, and flattening it into one long sequence is both too expensive and wrong about the structure.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{cost of flattened attention} &amp;= O\big((TH)^2\big) = O(T^2 H^2) \\ \text{cost of column attention} &amp;= O(T H m) \\ \text{cost of row attention} &amp;= O(T H^2) \\ \text{cost of the predictor} &amp;= O(T^2) \end{aligned} \]</div>
+      <p>In words: \(T\) rows and \(H\) columns make \(TH\) cell tokens, and full attention compares every pair. Mixing along one axis at a time means no step pays for both axes squared. Here \(m\) is the number of inducing points (256).</p>
+      <ul>
+        <li><strong>Column attention</strong> lets each cell see the other values in its column, so a value is read relative to that column's distribution (is this income high <em>for this dataset</em>?), like a normalization learned on the fly. With inducing points, \(m\) learned vectors first summarize the column's labelled cells, then every cell reads those \(m\) summaries, so the cost is linear in rows.</li>
+        <li><strong>Row attention</strong> lets a row's features see each other, which is where interactions are learned (income relative to loan size, say).</li>
+        <li><strong>The predictor</strong> is where each row is compared with the labelled rows: attention weights them by similarity and averages their label information, like a soft nearest-neighbour vote with a learned similarity. It's the step that actually learns from the data.</li>
+        <li><strong>No fake order:</strong> a flattened sequence imposes a reading order (row 1 cell 1, row 1 cell 2, …) that a table doesn't have.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> it's the same factorization as axial attention in images and video.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">3</span>Is it permutation-invariant?</summary><div class="ans">
+      <p><strong>Over rows, yes, exactly. Over columns, no: it gets close by averaging its predictions over 32 shuffled column orders.</strong></p>
+      <div class="mj">\[ \text{Attn}(P X) = P\, \text{Attn}(X) \quad \text{for any reordering } P \text{ of the inputs} \]</div>
+      <p>In words: attention with no position code is a set operation. Its weights depend only on content, so reordering the inputs just reorders the outputs the same way: each output moves with its row but doesn't change. A test row's prediction is therefore invariant to row order.</p>
+      <ul>
+        <li><strong>Rows:</strong> rows get no position code, and the labelled rows enter every prediction as a set that attention sums over, so their order can't matter. The mask stops test rows from seeing each other, so a test row's prediction depends only on its own features and the labelled rows, not on which other rows are predicted alongside it. That's the right property, since a table's rows are a set.</li>
+        <li><strong>Columns:</strong> row attention uses RoPE, a position code by column index, so the model knows where each feature sits. Nearby columns are also grouped: consecutive columns are handled together in small groups, so which features share a group depends on the column order. Both make reordering change the output. The likely reason for a position code at all (the argument TabICL made): without one, two columns with similar value distributions get nearly identical embeddings, and the model can't tell them apart.</li>
+        <li><strong>The fix:</strong> averaging over 32 random column orders washes out most of the order effect. It's approximate (exact invariance would need every ordering) and doubles as an ensemble that usually improves accuracy, at 32 times the compute. So the default isn't literally one forward pass.</li>
+      </ul>
+    </div></details>
+    <details class="qa"><summary><span class="qn">4</span>How does in-context learning differ from fine-tuning?</summary><div class="ans">
+      <p><strong>Fine-tuning learns from your data by changing the weights with gradient steps. In-context learning keeps the weights frozen and learns from your data inside the forward pass, by reading it as part of the input.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{fine-tune:}\quad \theta_{t+1} &amp;= \theta_t - \eta\, \nabla L(\theta_t;\, D_{\text{train}}) \\ \text{then:}\quad \hat y &amp;= f_{\theta_T}(x) \\ \text{in-context:}\quad \hat y &amp;= f_{\theta}(x,\ D_{\text{train}}) \end{aligned} \]</div>
+      <p>In words: fine-tuning takes \(T\) gradient steps on your data and stores what it learned in the weights, once; in-context learning keeps the pretrained \(\theta\), holds what it learns in the activations, and recomputes it for every prediction.</p>
+      <ul>
+        <li><strong>Cost moves to prediction time:</strong> there's no training run, but every prediction attends over the whole context, so inference is heavier and grows with the number of labelled rows. Fine-tuned models and trees pay once to train, then predict cheaply.</li>
+        <li><strong>Data is capped:</strong> only what fits in the context is used, and bigger tables are subsampled. Fine-tuning can use all of it.</li>
+        <li><strong>No tuning, instant updates:</strong> there are no training hyperparameters and no gradient steps that could overfit a small dataset. To update the model after drift, swap in fresh labelled rows.</li>
+        <li><strong>Bounded by pretraining:</strong> the model can only do the kinds of fitting its prior taught it; fine-tuning can adapt to structure the prior never covered.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> the two can be combined: a pretrained in-context model can be fine-tuned on a family of related tables and still be used in context afterwards.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">5</span>Why does pretraining on synthetic data work?</summary><div class="ans">
+      <p><strong>Because the model isn't learning facts about any real dataset. It's learning the procedure of predicting from labelled examples, and that procedure can be learned from any data whose structure resembles real tables.</strong></p>
+      <div class="mj">\[ \begin{aligned} &amp;\min_\theta\ \mathbb{E}_{D \sim p(D)} \big[-\log q_\theta(y \mid x, D_{\text{train}})\big] \\ \Rightarrow\quad q_\theta(y \mid x, D_{\text{train}}) &amp;\approx p(y \mid x, D_{\text{train}}) \\ p(y \mid x, D_{\text{train}}) &amp;= \int p(y \mid x, \phi)\, p(\phi \mid D_{\text{train}})\, d\phi \end{aligned} \]</div>
+      <p>In words: each synthetic dataset is made by drawing a rule \(\phi\) from the prior, then sampling rows from it. So, given the labelled rows, a held-out label's true distribution is exactly the Bayes average on the last line: every possible rule, weighted by how plausible the prior made it and how well it explains the training rows. Log loss is lowest when the prediction matches the true distribution (any mismatch adds a KL-divergence penalty), so training pushes \(q_\theta\) towards it.</p>
+      <ul>
+        <li><strong>Amortized inference:</strong> exact Bayesian prediction over all those rules is intractable. The network learns to approximate it in one forward pass; the expensive part was paid once, in pretraining.</li>
+        <li><strong>Why this prior:</strong> random structural causal models (random graphs where each variable is a noisy, non-linear function of its parents, with some nodes picked as features and one as the label) produce what real tables have: irrelevant and correlated features, interactions, thresholds, noise, mixed types.</li>
+        <li><strong>When it fails:</strong> the posterior is for the prior, not for your data. Tables unlike anything sampled (far more rows than the context, long text, time-ordered data, extreme imbalance) transfer worse.</li>
+      </ul>
+    </div></details>
+    <details class="qa"><summary><span class="qn">6</span>What are its main limitations?</summary><div class="ans">
+      <p><strong>Most limits come from doing all the learning inside one forward pass: a capped context, heavy inference and a fixed output size. On top of that it has little built-in explainability, a non-commercial licence and self-reported benchmarks.</strong></p>
+      <ul>
+        <li><strong>Context cap:</strong> the context holds about 16K rows, so bigger tables are subsampled and the rest of the data goes unused. Trees learn from every row.</li>
+        <li><strong>Rare positives:</strong> subsampling hurts most when the signal is rare. A fraud table with millions of rows and a tiny positive rate keeps only a handful of frauds in a sampled context.</li>
+        <li><strong>Inference cost:</strong> in the predictor every row attends to every labelled row, so compute grows quadratically with the context, and every prediction re-reads it. That needs a GPU and is slow for real-time scoring, where a tree takes milliseconds on a CPU.</li>
+        <li><strong>Fixed output:</strong> at most 10 classes, because the head outputs a fixed set of class logits; the library takes up to 500 features.</li>
+        <li><strong>Explanations:</strong> there's no tree structure and no monotonic constraints. SHAP is possible but costs many forward passes, and regulated decisions such as credit need reason codes.</li>
+        <li><strong>Prior mismatch:</strong> it's only as good as the synthetic prior's coverage of your data's structure.</li>
+        <li><strong>Licence and evidence:</strong> the weights are non-commercial, and the benchmark results are the authors' own.</li>
+      </ul>
+    </div></details>
+    <details class="qa"><summary><span class="qn">7</span>How would you evaluate it against XGBoost on a credit dataset?</summary><div class="ans">
+      <p><strong>Compare them the way the model would be used: an out-of-time split, a properly tuned XGBoost, credit metrics plus calibration, confidence intervals, and a learning curve over training-set size, with latency and cost alongside.</strong></p>
+      <ul>
+        <li><strong>Out-of-time split:</strong> train on older applications and test on later ones. Credit data drifts (the economy, policy, the applicant mix), and a random split lets the model see the future, which flatters both models.</li>
+        <li><strong>A fair baseline:</strong> tune XGBoost (depth, learning rate, rounds with early stopping) and add monotonic constraints if production uses them; an untuned tree flatters any challenger. Give TabFM the same training rows, and note when its context forces subsampling.</li>
+        <li><strong>Metrics:</strong> AUC and KS (the biggest gap between the score distributions of good and bad borrowers) for how well each ranks good from bad; calibration, because predicted default probabilities feed pricing and expected loss; and the bad rate at a fixed approval rate, the number the business acts on.</li>
+        <li><strong>Is the gap real:</strong> bootstrap the test set for a confidence interval on the difference, since small AUC gaps are often noise.</li>
+        <li><strong>Learning curves:</strong> repeat at several training-set sizes. TabFM's pretrained prior should help most when data is small; as data grows, trees catch up, because they learn from all of it while TabFM stays capped by its context.</li>
+        <li><strong>Operations:</strong> latency and cost per prediction, reason codes for declined applicants, and the licence.</li>
+      </ul>
+    </div></details>
 
     <h2 id="sheet"><span class="pn">07</span>Cheat sheet</h2>
     <div class="sheet">
       <h3>Objective (prior-data fitting)</h3>
-      <div class="mj">\[ \min_\theta\ \mathbb{E}_{D \sim p(D)}\big[-\log q_\theta(y_{\text{test}} \mid x_{\text{test}}, D_{\text{train}})\big] \ \Rightarrow\ q_\theta(y \mid x, D) \approx p(y \mid x, D) \]</div>
+      <div class="mj">\[ \begin{aligned} &amp;\min_\theta\ \mathbb{E}_{D \sim p(D)}\big[-\log q_\theta(y_{\text{test}} \mid x_{\text{test}}, D_{\text{train}})\big] \\ \Rightarrow\quad q_\theta(y \mid x, D_{\text{train}}) &amp;\approx p(y \mid x, D_{\text{train}}) \end{aligned} \]</div>
       <h3>Pipeline</h3>
       <div class="mj">\[ \text{cells} \to \text{tokens} \to (\text{column attn} \to \text{row attn}) \times 2 \to \text{row vectors} \to \text{predictor (attend to labelled rows)} \to \hat y \]</div>
     </div>

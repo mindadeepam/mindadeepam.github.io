@@ -285,7 +285,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <!-- layer -->
     <h2 id="layer"><span class="pn">01</span>A neuron, a layer, a network</h2>
     <p>A neuron takes a weighted sum of its inputs plus a bias, then applies a non-linear <strong>activation</strong>. A layer is many neurons side by side, so the weights become a matrix:</p>
-    <div class="mj">\[ z = W x + b \qquad a = f(z) \]</div>
+    <div class="mj">\[ \begin{aligned} z &amp;= W x + b \\ a &amp;= f(z) \end{aligned} \]</div>
     <div class="tbl"><table>
       <thead><tr><th>Thing</th><th>Shape</th><th>Note</th></tr></thead>
       <tbody>
@@ -296,12 +296,12 @@ footer .site-nav { display: block; margin-top: 10px; }
         <tr><td>Parameters</td><td>\(d_{out}(d_{in} + 1)\)</td><td></td></tr>
       </tbody>
     </table></div>
-    <p><strong>Why the non-linearity is essential:</strong> two linear layers make one, since \(W_2(W_1 x) = (W_2 W_1) x\). Only the bend between layers lets depth build curved decision boundaries. With it, a single hidden layer that's wide enough can approximate any continuous function (the universal approximation theorem); depth makes that far more efficient.</p>
+    <p><strong>Why the non-linearity is essential:</strong> two linear layers make one, since \(W_2(W_1 x) = (W_2 W_1) x\). Only the bend between layers lets depth build curved decision boundaries. With it, a single hidden layer that's wide enough can approximate any continuous function (the universal approximation theorem); depth makes that far more efficient. Why: with ReLU the network is piecewise linear, and each layer folds the pieces made by the layer before, so the number of linear pieces can grow exponentially with depth but only polynomially with width.</p>
 
     <!-- forward -->
     <h2 id="forward"><span class="pn">02</span>The forward pass</h2>
     <p>Run the layers in order and keep every intermediate result, because the backward pass will need them. For a two-layer classifier:</p>
-    <div class="mj">\[ z_1 = W_1 x + b_1 \qquad a_1 = \text{ReLU}(z_1) \qquad z_2 = W_2 a_1 + b_2 \qquad \hat y = \text{softmax}(z_2) \qquad L = -\sum_k y_k \log \hat y_k \]</div>
+    <div class="mj">\[ \begin{aligned} z_1 &amp;= W_1 x + b_1 \\ a_1 &amp;= \text{ReLU}(z_1) \\ z_2 &amp;= W_2 a_1 + b_2 \\ \hat y &amp;= \text{softmax}(z_2) \\ L &amp;= -\textstyle\sum_k y_k \log \hat y_k \end{aligned} \]</div>
     <figure>
       <div class="plate">
         <svg class="dg" viewBox="0 0 700 240" role="img" aria-label="A two-layer network. Forward, left to right: x, then W1 x plus b1, ReLU, W2 a1 plus b2, softmax, loss. Backward, right to left in orange: delta 2 equals y hat minus y, times W2 transpose, times the ReLU slope, with weight gradients delta 2 a1 transpose and delta 1 x transpose.">
@@ -340,10 +340,9 @@ footer .site-nav { display: block; margin-top: 10px; }
     <!-- backprop -->
     <h2 id="backprop"><span class="pn">03</span>Backpropagation</h2>
     <p>The question backprop answers: for every weight, how much would the loss change if that weight moved a little? Define the <strong>error</strong> at layer \(l\) as the gradient at its pre-activation, \(\delta_l = \partial L / \partial z_l\). Everything follows from four equations:</p>
-    <div class="mj">\[ \text{(1)}\ \ \delta_{\text{out}} = \hat y - y \qquad\qquad \text{(2)}\ \ \delta_l = \big(W_{l+1}^\top \delta_{l+1}\big) \odot f'(z_l) \]</div>
-    <div class="mj">\[ \text{(3)}\ \ \frac{\partial L}{\partial W_l} = \delta_l\, a_{l-1}^\top \qquad\qquad \text{(4)}\ \ \frac{\partial L}{\partial b_l} = \delta_l \]</div>
+    <div class="mj">\[ \begin{aligned} \text{(1)}\quad \delta_{\text{out}} &amp;= \hat y - y \\ \text{(2)}\quad \delta_l &amp;= \big(W_{l+1}^\top \delta_{l+1}\big) \odot f'(z_l) \\ \text{(3)}\quad \frac{\partial L}{\partial W_l} &amp;= \delta_l\, a_{l-1}^\top \\ \text{(4)}\quad \frac{\partial L}{\partial b_l} &amp;= \delta_l \end{aligned} \]</div>
     <ul>
-      <li><strong>(1) Start at the output.</strong> For softmax with cross-entropy (or sigmoid with log loss), the gradient at the logits is prediction minus truth. For MSE on a linear output it's \(\hat y - y\) too.</li>
+      <li><strong>(1) Start at the output.</strong> For softmax with cross-entropy (or sigmoid with log loss), the gradient at the logits is prediction minus truth. For a linear output with the loss \(\tfrac12 (\hat y - y)^2\) it's \(\hat y - y\) too (without the ½ it's twice that).</li>
       <li><strong>(2) Pass the error back one layer.</strong> \(W_{l+1}^\top\) sends each unit's error back along the same weights it used going forward (unit \(j\) collects \(\sum_i W_{ij}\, \delta_i\)). Then multiply by the activation's slope, \(f'(z_l)\), slot by slot, because the error has to pass back through the non-linearity. For ReLU that slope is 1 where the unit was on and 0 where it was off.</li>
       <li><strong>(3) Read off the weight gradient.</strong> \(W_l[i,j]\) multiplied \(a_{l-1}[j]\) into \(z_l[i]\), so its gradient is \(\delta_l[i] \cdot a_{l-1}[j]\): an outer product, the same shape as \(W_l\).</li>
       <li><strong>(4) The bias gradient</strong> is just the error, since the bias is added with slope 1.</li>
@@ -376,7 +375,8 @@ for p, g in [(W1, dW1), (b1, db1), (W2, dW2), (b2, db2)]:
 
     <h3>Why it's cheap, and what it costs</h3>
     <ul>
-      <li><strong>Reverse mode.</strong> The loss is one number and there are millions of weights. Going backward from that one number reuses every intermediate result, so one backward pass (about twice the cost of a forward pass) gives <em>all</em> the gradients. Nudging each weight and re-running the forward pass would cost one pass per weight.</li>
+      <li><strong>Reverse mode.</strong> The loss is one number and there are millions of weights. Going backward from that one number reuses every intermediate result, so one backward pass (about twice the cost of a forward pass) gives <em>all</em> the gradients. Nudging each weight and re-running the forward pass would cost one pass per weight. Forward-mode differentiation has the same problem: it needs one pass per input direction, while reverse mode needs one per output, and there's only one loss.</li>
+      <li><strong>Why about twice.</strong> Going forward, each layer does one matrix multiply, \(W a\). Going back it does two: \(W^\top \delta\) to pass the error on, and \(\delta\, a^\top\) for the weight gradient. So a full training step costs about three forward passes.</li>
       <li><strong>Memory.</strong> The backward pass needs every stored activation, so memory grows with depth × batch × width. Gradient checkpointing stores only some and recomputes the rest, trading compute for memory.</li>
       <li><strong>Gradient checking:</strong> compare with \((L(w + \varepsilon) - L(w - \varepsilon)) / 2\varepsilon\) on a few weights when you write a backward pass by hand.</li>
     </ul>
@@ -384,15 +384,21 @@ for p, g in [(W1, dW1), (b1, db1), (W2, dW2), (b2, db2)]:
 
     <!-- optim -->
     <h2 id="optim"><span class="pn">04</span>Gradient descent and optimizers</h2>
-    <div class="mj">\[ \text{SGD: } \theta \leftarrow \theta - \eta\, g \qquad \text{Momentum: } v \leftarrow \beta v + g,\ \ \theta \leftarrow \theta - \eta\, v \]</div>
-    <div class="mj">\[ \text{Adam: } m \leftarrow \beta_1 m + (1 - \beta_1) g, \quad v \leftarrow \beta_2 v + (1 - \beta_2) g^2, \quad \theta \leftarrow \theta - \eta\, \frac{\hat m}{\sqrt{\hat v} + \epsilon}, \quad \hat m = \frac{m}{1 - \beta_1^t},\ \hat v = \frac{v}{1 - \beta_2^t} \]</div>
+    <div class="mj">\[ \begin{aligned} \text{SGD:}\quad \theta &amp;\leftarrow \theta - \eta\, g \\ \text{Momentum:}\quad u &amp;\leftarrow \beta u + g \\ \theta &amp;\leftarrow \theta - \eta\, u \end{aligned} \]</div>
+    <div class="mj">\[ \begin{aligned} \text{Adam:}\quad m &amp;\leftarrow \beta_1 m + (1 - \beta_1)\, g \\ v &amp;\leftarrow \beta_2 v + (1 - \beta_2)\, g^2 \\ \hat m &amp;= m / (1 - \beta_1^t) \\ \hat v &amp;= v / (1 - \beta_2^t) \\ \theta &amp;\leftarrow \theta - \eta\, \hat m / (\sqrt{\hat v} + \epsilon) \end{aligned} \]</div>
     <ul>
       <li><strong>Mini-batch SGD:</strong> each step uses the gradient on a small batch, a noisy but cheap estimate of the full gradient. The noise even helps escape sharp minima.</li>
-      <li><strong>Momentum</strong> keeps a running average of gradients, so steps build up speed in consistent directions and zig-zags cancel out.</li>
+      <li><strong>Momentum</strong> keeps a decaying sum \(u\) of recent gradients (named \(u\) so it isn't confused with Adam's \(v\)), so steps build up speed in consistent directions and zig-zags cancel out.</li>
       <li><strong>RMSProp</strong> divides each weight's step by a running average of its squared gradient, so rarely-updated and steep directions get sensibly sized steps.</li>
-      <li><strong>Adam</strong> does both. The bias correction (\(\hat m, \hat v\)) matters early on: \(m\) and \(v\) start at 0, so without it the first steps would be too small.</li>
+      <li><strong>Adam</strong> does both. The bias correction (\(\hat m, \hat v\)) matters early on: \(m\) and \(v\) start at 0, so their early values are pulled towards 0, and dividing by \(1 - \beta^t\) removes that pull. \(v\) is pulled far more than \(m\), because \(\beta_2\) is closer to 1, so without the correction \(\sqrt{v}\) would be too small and the first steps too large.</li>
       <li><strong>AdamW</strong> applies weight decay directly to the weights (\(\theta \leftarrow \theta - \eta\lambda\theta\)) instead of adding \(\lambda\theta\) to the gradient, where Adam's scaling would distort it. It's the default for transformers.</li>
-      <li><strong>The learning rate</strong> is the most important hyperparameter: warm it up at the start, then decay it (step, cosine). A bigger batch can usually take a proportionally bigger learning rate.</li>
+      <li><strong>The learning rate</strong> is the most important hyperparameter: warm it up at the start, then decay it (step, cosine).
+        <ul>
+          <li><strong>Why warm up:</strong> at first Adam's \(\hat v\) is averaged over only a few gradients, so \(\hat m/\sqrt{\hat v}\) is close to \(\pm 1\) for every weight (exactly \(\pm 1\) on the first step), and even weights whose gradients are mostly noise take a full step \(\eta\). And right after initialization the gradients are large and change fast, so a full-size step can overshoot and diverge. A short ramp from near 0 lets the network reach a calmer region where big steps are safe.</li>
+          <li><strong>Why decay:</strong> mini-batch noise keeps the weights bouncing around a minimum by an amount that grows with the learning rate. Lowering it lets them settle.</li>
+        </ul>
+      </li>
+      <li><strong>Batch size.</strong> A mini-batch gradient averages \(B\) per-example gradients, so its variance falls as \(1/B\). A bigger batch can usually take a proportionally bigger learning rate (the linear scaling rule, for SGD; Adam usually needs a gentler increase): one step with a \(k\) times bigger batch and rate covers about the same ground as \(k\) small steps, as long as the gradient barely changes over them. Small-batch noise also helps generalization, by bouncing the weights out of sharp minima.</li>
     </ul>
 
     <h3>Adam / AdamW, in code</h3>
@@ -404,6 +410,7 @@ w -= lr * (m_hat / (sqrt(v_hat) + eps) + wd * w)   <span class="cm"># AdamW: dec
 
     <!-- activations -->
     <h2 id="activations"><span class="pn">05</span>Activations</h2>
+    <p class="deeper">The short version. The full note, <a href="./activation-functions.html">Activation functions</a>, covers derivatives, dead ReLUs, GELU and SwiGLU, output activations, pairing with initialization and 20 questions.</p>
     <div class="tbl"><table>
       <thead><tr><th>Activation</th><th>Formula</th><th>Slope</th><th>Notes</th></tr></thead>
       <tbody>
@@ -419,6 +426,7 @@ w -= lr * (m_hat / (sqrt(v_hat) + eps) + wd * w)   <span class="cm"># AdamW: dec
 
     <!-- losses -->
     <h2 id="losses"><span class="pn">06</span>Losses</h2>
+    <p class="deeper">The short version. The full note, <a href="./loss-functions.html">Loss functions</a>, covers where each loss comes from, gradients, numerical stability, imbalance and calibration, ranking, contrastive and generative losses, and 20 questions.</p>
     <div class="mj">\[ \text{MSE} = \tfrac{1}{n}\sum (y - \hat y)^2 \qquad \text{BCE} = -[y \log p + (1 - y)\log(1 - p)] \qquad \text{CE} = -\sum_k y_k \log \hat y_k \qquad \text{Focal} = -(1 - p_t)^\gamma \log p_t \]</div>
     <ul>
       <li><strong>Each loss is a likelihood:</strong> Gaussian noise gives MSE, Laplace noise gives MAE, Bernoulli labels give binary cross-entropy, categorical labels give cross-entropy. Huber is MSE near 0 and MAE in the tails, so it's robust to outliers.</li>
@@ -429,17 +437,21 @@ w -= lr * (m_hat / (sqrt(v_hat) + eps) + wd * w)   <span class="cm"># AdamW: dec
     <!-- init -->
     <h2 id="init"><span class="pn">07</span>Vanishing, exploding and initialization</h2>
     <p>The backward pass multiplies the error by one factor, \(W^\top \text{diag}(f')\), per layer. Over many layers that product shrinks or grows exponentially: vanishing or exploding gradients. Early layers stop learning, or training blows up.</p>
-    <p><strong>Initialization keeps the signal's size steady.</strong> A pre-activation \(z = \sum_j w_j x_j\) has variance \(n_{in}\,\text{Var}(w)\,\text{Var}(x)\). To keep it equal to \(\text{Var}(x)\) layer after layer:</p>
-    <div class="mj">\[ \text{Xavier (tanh, sigmoid): } \text{Var}(w) = \frac{2}{n_{in} + n_{out}} \qquad \text{He (ReLU): } \text{Var}(w) = \frac{2}{n_{in}} \]</div>
+    <div class="mj">\[ \begin{aligned} \delta_1 &amp;= D_1 W_2^\top\, D_2 W_3^\top \cdots D_{L-1} W_L^\top\, \delta_L, \qquad D_l = \text{diag}\big(f'(z_l)\big) \\ \lVert \delta_1 \rVert &amp;\le \prod_{l=1}^{L-1} \big(\max \lvert f' \rvert \cdot \lVert W_{l+1} \rVert\big)\, \lVert \delta_L \rVert \end{aligned} \]</div>
+    <p>In words: unroll backprop's equation (2) and the error at the first layer is the output error times one (slope × weights) factor per layer, where \(\lVert W \rVert\) is the most \(W\) can stretch a vector. If every factor is below 1, the bound forces the product to decay exponentially with depth. The bound is only a ceiling, so it can't prove explosion, but when the typical stretch is above 1 the product usually grows exponentially. Sigmoid's slope is at most 1/4, so a sigmoid layer shrinks the gradient unless its weights are large, and large weights push units into saturation, where the slope is even smaller.</p>
+    <p><strong>Initialization keeps the signal's size steady.</strong> A pre-activation \(z = \sum_j w_j x_j\) has variance \(n_{in}\,\text{Var}(w)\,\mathbb{E}[x^2]\), where \(\mathbb{E}[x^2]\) is the average squared input. It equals \(\text{Var}(x)\) only when the inputs average 0, and ReLU outputs don't. To keep the signal's size the same layer after layer:</p>
+    <div class="mj">\[ \begin{aligned} \text{Xavier (tanh):}\quad \text{Var}(w) &amp;= \frac{2}{n_{in} + n_{out}} \\ \text{He (ReLU):}\quad \text{Var}(w) &amp;= \frac{2}{n_{in}} \end{aligned} \]</div>
     <ul>
-      <li>He has the extra factor 2 because ReLU zeroes half its inputs, halving the variance.</li>
+      <li>Xavier balances two needs: the forward pass sums over \(n_{in}\) inputs (so it wants \(\text{Var}(w) = 1/n_{in}\)), and the backward pass sums over the \(n_{out}\) units a layer feeds (so it wants \(1/n_{out}\)). It uses one over their average, and assumes the activation has slope 1 near 0, which holds for tanh; sigmoid fits only roughly, since its slope at 0 is 1/4.</li>
+      <li>He has the extra factor 2 because ReLU zeroes the negative half of its inputs: for a pre-activation symmetric around 0, \(\mathbb{E}[\text{ReLU}(z)^2] = \tfrac12 \text{Var}(z)\), so the next layer's \(\mathbb{E}[x^2]\) is halved.</li>
       <li><strong>All-zero (or all-equal) initialization fails:</strong> every unit in a layer computes the same thing and gets the same gradient, so they stay identical forever. Random initialization breaks the symmetry.</li>
       <li><strong>The full toolkit against vanishing/exploding:</strong> ReLU-family activations, He/Xavier initialization, normalization layers, residual connections, gradient clipping (for exploding), and gated cells in RNNs.</li>
+      <li><strong>Gradient clipping</strong> rescales the whole gradient when its norm goes over a threshold \(c\): \(g \leftarrow g \cdot \min(1, c / \lVert g \rVert)\). The direction is kept. With plain SGD every step is then at most \(\eta c\); with Adam, which divides by \(\sqrt{\hat v}\) anyway, it mainly stops one spike from inflating \(m\) and \(v\). Clipping each value separately would change the direction. It does nothing for vanishing gradients.</li>
     </ul>
 
     <!-- norm -->
     <h2 id="norm"><span class="pn">08</span>BatchNorm and LayerNorm</h2>
-    <div class="mj">\[ \hat x = \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}} \qquad y = \gamma \hat x + \beta \]</div>
+    <div class="mj">\[ \begin{aligned} \hat x &amp;= \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}} \\ y &amp;= \gamma\, \hat x + \beta \end{aligned} \]</div>
     <figure>
       <div class="plate">
         <svg class="dg" viewBox="0 0 600 210" role="img" aria-label="BatchNorm versus LayerNorm on a batch-by-features grid. BatchNorm normalizes one feature column across the batch; LayerNorm normalizes one example row across its features.">
@@ -458,19 +470,27 @@ w -= lr * (m_hat / (sqrt(v_hat) + eps) + wd * w)   <span class="cm"># AdamW: dec
       <figcaption>Same formula, different axis. BatchNorm computes \(\mu, \sigma\) down a column (one feature, all examples); LayerNorm across a row (one example, all its features).</figcaption>
     </figure>
     <ul>
-      <li><strong>BatchNorm</strong> (CNNs): statistics per feature over the batch. At inference there may be one example, so it uses running averages saved during training; the train/eval switch is a classic bug. It struggles with small batches and padded sequences.</li>
+      <li><strong>BatchNorm</strong> (CNNs): statistics per feature over the batch. At inference there may be one example, so it uses running averages saved during training; the train/eval switch is a classic bug. It struggles with small batches (noisy statistics) and padded sequences (padding pollutes them). CNNs with tiny batches use GroupNorm instead, which normalizes groups of channels within one example.</li>
       <li><strong>LayerNorm</strong> (transformers, RNNs): statistics per example over its features. It doesn't depend on the batch and behaves the same in training and inference.</li>
-      <li><strong>Why they help:</strong> they keep each layer's inputs at a steady scale, which allows bigger learning rates and smooths the loss landscape. The learned \(\gamma, \beta\) let the network undo the normalization if that's better.</li>
+      <li><strong>Why they help:</strong> they keep each layer's inputs at a steady scale, which allows bigger learning rates and smooths the loss landscape. The learned \(\gamma, \beta\) let the network undo the normalization if that's better.
+        <ul>
+          <li><strong>No moving target:</strong> without them, an update to an early layer shifts the scale of everything after it. (This “internal covariate shift” was the original motivation; later work found the smoother loss surface matters more.)</li>
+          <li><strong>Scale invariance:</strong> scaling the weights that feed a normalization layer by any \(c > 0\) leaves its output unchanged, so only the weights' direction matters and growing weights can't blow up the activations. A step turns that direction by about (step size) ÷ (weight norm). Changing only the length doesn't change the loss, so the gradient has no component along the weights, and each step slightly lengthens them; longer weights then turn less on later steps. The effective step size steadies itself.</li>
+          <li><strong>Out of saturation:</strong> centred, unit-scale inputs keep sigmoid and tanh units in their sloped region.</li>
+        </ul>
+      </li>
+      <li><strong>Where it sits in a transformer:</strong> pre-norm, \(x + F(\text{Norm}(x))\), normalizes only the branch and leaves a clean identity path through the residual stream, so it trains stably. Post-norm, \(\text{Norm}(x + F(x))\), the original design, puts the norm on that path and starts with large gradients near the output, so it needs warmup.</li>
     </ul>
 
     <!-- reg -->
     <h2 id="reg"><span class="pn">09</span>Regularization</h2>
-    <div class="mj">\[ \text{Dropout (training): } \tilde h = \frac{h \odot m}{1 - p},\ \ m_i \sim \text{Bernoulli}(1 - p) \qquad \text{L2: } L + \frac{\lambda}{2}\lVert w \rVert^2 \]</div>
+    <div class="mj">\[ \begin{aligned} \text{Dropout (training):}\quad \tilde h &amp;= \frac{h \odot m}{1 - p}, \qquad m_i \sim \text{Bernoulli}(1 - p) \\ \text{L2:}\quad L_{\text{total}} &amp;= L + \frac{\lambda}{2}\lVert w \rVert^2 \end{aligned} \]</div>
     <ul>
-      <li><strong>Weight decay (L2)</strong> shrinks weights every step, favouring simpler functions. <strong>L1</strong> pushes weights to exactly 0 (sparsity).</li>
-      <li><strong>Dropout</strong> zeroes each unit with probability \(p\) during training and scales the survivors by \(1/(1-p)\), so the expected activation is unchanged and nothing needs rescaling at inference, where it's off. It stops units relying on each other and acts like averaging many thinned networks.</li>
+      <li><strong>Weight decay (L2)</strong> shrinks weights every step, favouring simpler functions. <strong>L1</strong> pushes weights to exactly 0 (sparsity). Why the difference: L2's pull on a weight, \(\lambda w\), fades as the weight nears 0, so weights get small but stay non-zero; L1's pull, \(\lambda\, \text{sign}(w)\), is the same size however small the weight, so whenever the data's pull on a weight is weaker than \(\lambda\), the best value is exactly 0.</li>
+      <li><strong>Dropout</strong> zeroes each unit with probability \(p\) during training (each \(m_i\) is 1 with probability \(1 - p\), else 0) and scales the survivors by \(1/(1-p)\), so the expected activation is unchanged and nothing needs rescaling at inference, where it's off. It stops units relying on each other and acts like averaging many thinned networks.</li>
       <li><strong>Early stopping</strong> keeps the checkpoint with the best validation loss. <strong>Data augmentation</strong> adds realistic variations. <strong>Label smoothing</strong> softens one-hot targets so the model isn't pushed to infinite confidence.</li>
-      <li><strong>Bias–variance:</strong> big gap between train and validation → overfitting (high variance): regularize, add data, shrink the model. Both bad → underfitting (high bias): bigger model, longer training, better features.</li>
+      <li><strong>Bias–variance:</strong> big gap between train and validation → overfitting (high variance): regularize, add data, shrink the model. Both bad → underfitting (high bias): bigger model, longer training, better features. A learning curve over training-set size shows whether more data will help: if validation is still improving as the data grows, collect more.</li>
+      <li><strong>Double descent:</strong> for big models, the U-shaped test-error curve has a second half. Test error peaks near the size where the model can only just fit every training point, since there's essentially one way to fit them and it has to contort to fit the noise. Bigger still, many weight settings fit the data exactly, and gradient descent from a small initialization tends to find a smooth one, so test error falls again. The same peak can appear over training epochs. So for large networks, many parameters isn't by itself overfitting.</li>
     </ul>
 
     <h3>BatchNorm, LayerNorm and dropout, in code</h3>
@@ -496,16 +516,19 @@ def dropout(h, p, training):
 
     <!-- residual -->
     <h2 id="residual"><span class="pn">10</span>Residual connections</h2>
-    <div class="mj">\[ y = x + F(x) \qquad \frac{\partial y}{\partial x} = I + \frac{\partial F}{\partial x} \]</div>
+    <div class="mj">\[ \begin{aligned} x_{l+1} &amp;= x_l + F_l(x_l) \\ \frac{\partial x_{l+1}}{\partial x_l} &amp;= I + \frac{\partial F_l}{\partial x_l} \end{aligned} \]</div>
+    <p>In words: each block adds a learned correction \(F_l\) to its input. \(I\) is the identity, the matrix that leaves a vector unchanged, so the gradient always has a path back that isn't shrunk.</p>
     <ul>
-      <li><strong>The gradient gets a straight path.</strong> The identity term means the error reaches early layers even when \(\partial F/\partial x\) is small. That's what made 100+ layer networks trainable (ResNet, 2015).</li>
-      <li><strong>Doing nothing is easy.</strong> A block only has to learn a correction to its input; if a layer isn't useful, \(F \to 0\) leaves the input unchanged. Without the skip, it would have to learn the identity mapping, which is surprisingly hard.</li>
+      <li><strong>The gradient gets a straight path.</strong> The identity term means the error reaches early layers even when \(\partial F/\partial x\) is small. That's what made 100+ layer networks trainable (ResNet, 2015). Loss-landscape plots also show skip connections make the loss surface much smoother, which makes optimization easier.</li>
+      <li><strong>Doing nothing is easy.</strong> A block only has to learn a correction to its input; if a layer isn't useful, \(F \to 0\) leaves the input unchanged. Without the skip, it would have to learn the identity mapping, which is surprisingly hard. That's why, before ResNet, deeper plain networks had higher <em>training</em> error than shallower ones (the degradation problem): an optimization failure, not overfitting.</li>
+      <li><strong>Shapes must match</strong> for the add. When a block changes the width or resolution, the skip uses a 1×1 convolution or a linear projection.</li>
       <li>The same idea appears as the <a href="./sequence-models.html#lstm">LSTM's cell update</a> through time and as the <a href="./transformers.html#tf">transformer's residual stream</a> through depth.</li>
     </ul>
 
     <!-- addcat -->
     <h2 id="addcat"><span class="pn">11</span>Adding vs concatenating vectors</h2>
-    <div class="mj">\[ W\,[x;\ y] = W_1 x + W_2 y \qquad \text{(concatenate, then a linear layer} = \text{project each separately, then add)} \]</div>
+    <div class="mj">\[ W\,[x;\ y] = W_1 x + W_2 y \]</div>
+    <p>In words: split \(W = [W_1\ \ W_2]\) into the columns that read \(x\) and those that read \(y\). Concatenating and then applying a linear layer is the same as projecting each input separately and adding.</p>
     <figure>
       <div class="plate">
         <svg class="dg" viewBox="0 0 660 210" role="img" aria-label="Adding versus concatenating. Left: a residual block where x passes through F and is added back to x, keeping width d. Right: x of width d1 and y of width d2 are concatenated into one vector of width d1 plus d2, which a linear layer then reads.">
@@ -538,6 +561,7 @@ def dropout(h, p, training):
       </tbody>
     </table></div>
     <p><strong>Rule of thumb:</strong> add when it's an update to the same representation and you want a fixed width; concatenate when the inputs are different things the next layer should weigh separately, and you can afford the width. A sum is also order-free, which is right for sets.</p>
+    <p><strong>The cost of adding:</strong> the two signals share coordinates, so the next layer can't pull them apart unless training learns to keep them in different directions. In high dimensions there's plenty of room for that, which is why adding token and position embeddings works.</p>
 
     <!-- cnn -->
     <h2 id="cnn"><span class="pn">12</span>Convolutions in one page</h2>
@@ -555,11 +579,12 @@ def dropout(h, p, training):
       </div>
       <figcaption>A convolution is one small weighted window slid across the input: local (each output sees a 3×3 patch) and shared (the same 9 weights everywhere).</figcaption>
     </figure>
-    <div class="mj">\[ \text{output size} = \frac{n + 2p - k}{s} + 1 \qquad \text{parameters} = k \cdot k \cdot C_{in} \cdot C_{out} + C_{out} \]</div>
+    <div class="mj">\[ \begin{aligned} \text{output size} &amp;= \Big\lfloor \frac{n + 2p - k}{s} \Big\rfloor + 1 \\ \text{parameters} &amp;= k \cdot k \cdot C_{in} \cdot C_{out} + C_{out} \end{aligned} \]</div>
     <ul>
       <li><strong>Why not a dense layer:</strong> parameter sharing (a 3×3×64→64 conv has about 37K weights, whatever the image size) and locality (neighbouring pixels matter together). A pattern learned in one place is detected everywhere: translation equivariance. Pooling adds some invariance and shrinks the map.</li>
+      <li><strong>The output size, term by term:</strong> padding adds \(p\) cells on each side (\(n + 2p\)). The window's first cell starts at 0, \(s\), \(2s\), …, and the last start must be at most \(n + 2p - k\), or the window would run off the edge. That's \(\lfloor (n + 2p - k)/s \rfloor\) steps after the first start, plus 1 for the first. For odd \(k\), “same” padding \(p = (k - 1)/2\) keeps the size at stride 1. Parameters don't depend on \(n\), because the same filter is reused at every position.</li>
       <li><strong>Receptive field</strong> grows with depth, stride, pooling and dilation: early layers see edges, deep layers see objects.</li>
-      <li><strong>1×1 convolution:</strong> a dense layer across channels at every pixel. It changes the channel count cheaply (bottlenecks) and adds a non-linearity; it's the CNN version of the transformer's per-token FFN.</li>
+      <li><strong>1×1 convolution:</strong> a dense layer across channels at every pixel. It changes the channel count cheaply (bottlenecks) and adds a cheap extra layer, and so another activation (the 1×1 convolution itself is linear); it's the CNN version of the transformer's per-token FFN.</li>
       <li>Tensor shape in PyTorch: \(B \times C \times H \times W\); the weights are \(C_{out} \times C_{in} \times k \times k\).</li>
     </ul>
 
@@ -578,9 +603,10 @@ for o in range(C_out):
     </ol>
     <ul>
       <li><strong>First, overfit one small batch.</strong> If the loss can't go near 0, there's a bug, not a modelling problem.</li>
+      <li><strong>Check the first loss.</strong> A fresh classifier predicts roughly uniformly, so with \(K\) balanced classes the loss should start near \(\log K\). Far higher points to the initialization or output scale.</li>
       <li><strong>Loss flat from the start:</strong> learning rate far off, labels misaligned, forgot <code>zero_grad</code> or <code>step</code>, dead ReLUs, inputs not normalized.</li>
       <li><strong>Loss is NaN:</strong> learning rate too high, exploding gradients, <code>log(0)</code>; use log-softmax with NLL loss and clip gradients.</li>
-      <li><strong>Train good, validation bad:</strong> overfitting or leakage between the splits; regularize, stop early, check the split.</li>
+      <li><strong>Train good, validation bad:</strong> overfitting, or a feature that leaks the label in training only; regularize, stop early, check the features and the split.</li>
       <li>Plot training and validation loss together, with the gradient norm and the learning rate underneath.</li>
     </ul>
 
@@ -598,6 +624,14 @@ for o in range(C_out):
     with torch.no_grad():
         val_loss = mean(loss_fn(model(xb), yb) for xb, yb in val_loader)
     <span class="cm"># early stopping: keep the checkpoint with the best val_loss</span></code></pre>
+
+    <h3>Mixed precision</h3>
+    <p>Most of the maths runs in 16-bit floats (fp16 or bf16): activations take half the memory, and GPU tensor cores multiply 16-bit matrices several times faster. Three things stay in 32-bit:</p>
+    <ul>
+      <li><strong>A master copy of the weights.</strong> An update \(\eta g\) is often tiny next to the weight, and fp16 keeps only about three significant digits, so \(w + \eta g\) would round back to \(w\).</li>
+      <li><strong>Sums of many numbers</strong> (softmax, normalization statistics, the loss), which lose precision in 16-bit.</li>
+      <li><strong>With fp16, loss scaling.</strong> fp16's range is narrow, so small gradients underflow to 0. Multiplying the loss by a large \(S\) multiplies every gradient by \(S\) (the chain rule is linear), lifting them into range; they're divided by \(S\) before the update. If a gradient overflows, the step is skipped and \(S\) lowered. bf16 has fp32's range, so it underflows no more than fp32 and needs no scaling.</li>
+    </ul>
 
     <!-- curves -->
     <h2 id="curves"><span class="pn">14</span>Training dynamics and loss curves</h2>
@@ -623,6 +657,7 @@ for o in range(C_out):
       <li><strong>Adam vs AdamW:</strong> Adam's L2 penalty gets rescaled by its per-parameter step size. AdamW applies weight decay directly to the weights, decoupled from the gradient, which regularizes as intended.</li>
       <li><strong>Loss landscapes</strong> (Li et al., 2018): plot the loss along one or two random directions around the trained weights, with each filter's direction scaled to match its weights (“filter normalization”) so different networks are comparable. Skip connections make the landscape much smoother, and flatter minima tend to generalize better.</li>
       <li><strong>Double descent:</strong> as model size grows, test error can fall, rise near the point where the model just fits the training data, then fall again.</li>
+      <li><strong>Loss and metric can disagree.</strong> Validation loss can rise while accuracy or AUC still improves: the model grows overconfident on a few examples it gets wrong, and cross-entropy punishes confident mistakes heavily. Decide when to stop on the metric you actually care about.</li>
     </ul>
 
     <!-- odds -->
@@ -651,35 +686,277 @@ for o in range(C_out):
     <!-- questions -->
     <h2 id="questions"><span class="pn">16</span>Interview questions</h2>
     <p>Answer out loud first, then open the answer.</p>
-    <details class="qa"><summary><span class="qn">1</span>Why do we need non-linear activations?</summary><div class="ans"><p>Without them, any stack of layers is one linear map, since \(W_2 W_1 x = (W_2 W_1) x\). It can only draw straight decision boundaries. The non-linearity between layers is what lets depth build complex functions.</p></div></details>
-    <details class="qa"><summary><span class="qn">2</span>Walk through forward and backward propagation for a two-layer network.</summary><div class="ans"><p>Forward, storing every value for the backward pass:</p><div class="mj">\[ \begin{aligned} z_1 &amp;= W_1 x + b_1 \\ a_1 &amp;= \text{ReLU}(z_1) \\ z_2 &amp;= W_2 a_1 + b_2 \\ \hat y &amp;= \text{softmax}(z_2), \qquad L = -\textstyle\sum_k y_k \log \hat y_k \end{aligned} \]</div><p>Backward, from the output down:</p><div class="mj">\[ \begin{aligned} \delta_2 &amp;= \hat y - y \\ \partial L/\partial W_2 &amp;= \delta_2\, a_1^\top, \qquad \partial L/\partial b_2 = \delta_2 \\ \delta_1 &amp;= (W_2^\top \delta_2) \odot \text{ReLU}'(z_1) \\ \partial L/\partial W_1 &amp;= \delta_1\, x^\top, \qquad \partial L/\partial b_1 = \delta_1 \end{aligned} \]</div><p>Then a gradient step on every weight.</p></div></details>
-    <details class="qa"><summary><span class="qn">3</span>Why is backprop efficient compared with numerical gradients?</summary><div class="ans"><p>Reverse-mode differentiation: from one scalar loss, one backward pass (about two forward passes of compute) reuses all the stored intermediates and yields every weight's gradient. Finite differences need a forward pass per weight, so millions of passes. The price is memory for the stored activations.</p></div></details>
-    <details class="qa"><summary><span class="qn">4</span>Derive the gradient of softmax with cross-entropy.</summary><div class="ans"><p>For a one-hot label \(y\):</p><div class="mj">\[ \begin{aligned} \hat y_k &amp;= \frac{e^{z_k}}{\sum_j e^{z_j}}, \qquad L = -\sum_k y_k \log \hat y_k \\ \frac{\partial L}{\partial z_i} &amp;= \hat y_i - y_i \end{aligned} \]</div><p>The softmax's Jacobian and the log cancel neatly, which is why the pair is always used together.</p></div></details>
-    <details class="qa"><summary><span class="qn">5</span>Why use cross-entropy rather than MSE for classification?</summary><div class="ans"><p>Cross-entropy is the maximum-likelihood loss for categorical labels, and its gradient at the logits is \(\hat y - y\): big when confidently wrong. MSE through a sigmoid or softmax multiplies by the activation's slope, which is near 0 when the output is saturated, so learning stalls exactly when the model is most wrong.</p></div></details>
-    <details class="qa"><summary><span class="qn">6</span>What causes vanishing and exploding gradients, and how do you fix them?</summary><div class="ans"><p>The backward pass multiplies one Jacobian per layer (weights times activation slopes), so the product shrinks or grows exponentially with depth. Fixes: ReLU-family activations (slope 1), He/Xavier initialization, BatchNorm/LayerNorm, residual connections, gradient clipping for explosions, gated cells (LSTM/GRU) in recurrent nets.</p></div></details>
-    <details class="qa"><summary><span class="qn">7</span>Xavier vs He initialization? What if you initialize everything to zero?</summary><div class="ans"><p>Both keep the variance of activations (and gradients) roughly constant across layers: Xavier \(\text{Var}(w) = 2/(n_{in} + n_{out})\) for tanh/sigmoid, He \(2/n_{in}\) for ReLU, which zeroes half its inputs. All zeros (or all equal) makes every unit in a layer identical with identical gradients, so they never differentiate (symmetry).</p></div></details>
-    <details class="qa"><summary><span class="qn">8</span>BatchNorm vs LayerNorm. What changes at inference?</summary><div class="ans"><p>Same formula, different axis: BatchNorm normalizes each feature over the batch (CNNs), LayerNorm each example over its features (transformers, RNNs). At inference BatchNorm uses running means and variances saved during training, so forgetting <code>model.eval()</code> is a bug. LayerNorm needs no batch and behaves the same both ways.</p></div></details>
-    <details class="qa"><summary><span class="qn">9</span>How does dropout work? Why scale by \(1/(1-p)\)? What happens at inference?</summary><div class="ans"><p>During training each unit is zeroed with probability \(p\), which stops units co-adapting and acts like averaging many thinned networks. Scaling the survivors by \(1/(1-p)\) keeps the expected activation unchanged (inverted dropout), so at inference dropout is simply switched off with no rescaling.</p></div></details>
-    <details class="qa"><summary><span class="qn">10</span>L1 vs L2 vs weight decay. Why AdamW?</summary><div class="ans"><p>L2 penalizes squared weights, shrinking them smoothly; L1 penalizes absolute values, pushing some exactly to 0. With plain SGD, L2 and weight decay are the same. With Adam, an L2 term in the gradient gets rescaled per weight, weakening it for weights with large gradient history. AdamW decays the weights directly, decoupled from the gradient, so regularization works as intended.</p></div></details>
-    <details class="qa"><summary><span class="qn">11</span>Adam vs SGD with momentum. Why does Adam need bias correction?</summary><div class="ans"><p>Momentum averages gradients to smooth the path; Adam also scales each weight's step by its recent gradient size, so it needs less tuning and handles uneven scales. SGD with momentum sometimes generalizes a bit better on vision tasks. \(m\) and \(v\) start at 0, so early averages are biased toward 0; dividing by \(1 - \beta^t\) corrects that.</p></div></details>
-    <details class="qa"><summary><span class="qn">12</span>Why do residual connections help?</summary><div class="ans"><div class="mj">\[ y = x + F(x) \quad\Longrightarrow\quad \frac{\partial y}{\partial x} = I + \frac{\partial F}{\partial x} \]</div><p>The \(I\) is an identity path for the gradient through any depth. The block only has to learn a correction, and doing nothing (\(F = 0\)) is easy. They made very deep networks trainable, and the same idea underlies the transformer's residual stream and the LSTM's cell.</p></div></details>
-    <details class="qa"><summary><span class="qn">13</span>When do you add vectors and when do you concatenate them?</summary><div class="ans"><p>Concatenation followed by a linear layer equals separate projections then a sum, \(W[x;y] = W_1 x + W_2 y\). So concatenating gives each input its own weights, at the cost of width. Adding forces a shared space and keeps the width fixed. Add for updates to the same representation (residuals, positional encodings, the residual stream); concatenate for different sources (LSTM inputs, bi-LSTM outputs, attention heads, U-Net skips, feature fusion).</p></div></details>
-    <details class="qa"><summary><span class="qn">14</span>Why a CNN instead of a dense network for images? What does a 1×1 convolution do?</summary><div class="ans"><p>Parameter sharing and locality: a small filter reused everywhere has few weights, uses neighbourhood structure and detects a pattern anywhere. A dense layer would need a weight per pixel per unit and relearn each pattern at each position. A 1×1 convolution mixes channels at each pixel: cheap channel reduction or expansion (bottlenecks) plus a non-linearity, the CNN version of a per-token FFN.</p></div></details>
-    <details class="qa"><summary><span class="qn">15</span>Compute the output size and parameters of a convolution layer.</summary><div class="ans"><p>Output side \((n + 2p - k)/s + 1\): a 32×32 input, 3×3 kernel, padding 1, stride 1 stays 32×32; stride 2 gives 16×16. Parameters: \(k^2 C_{in} C_{out} + C_{out}\), so 3×3, 64→128 has \(9 \times 64 \times 128 + 128 = 73{,}856\), independent of image size.</p></div></details>
-    <details class="qa"><summary><span class="qn">16</span>Your loss isn't decreasing. How do you debug it?</summary><div class="ans"><p>Overfit a tiny batch first; if that fails it's a bug. Check the data (labels aligned, inputs normalized), the loop (<code>zero_grad</code>, <code>backward</code>, <code>step</code>, <code>train()</code>/<code>eval()</code>), and the loss (log-softmax with NLL, not softmax twice). Then sweep the learning rate on a log scale, check gradient norms per layer for vanishing or exploding, and look for dead ReLUs.</p></div></details>
-    <details class="qa"><summary><span class="qn">17</span>How does batch size affect training?</summary><div class="ans"><p>Bigger batches give less noisy gradients and better hardware use, and usually allow a proportionally larger learning rate (with warmup). Very large batches can generalize slightly worse (sharper minima) and need more epochs' worth of tuning. Small batches are noisier, which acts as a mild regularizer, but they're slower per example.</p></div></details>
+    <details class="qa"><summary><span class="qn">1</span>Why do we need non-linear activations?</summary><div class="ans">
+      <p><strong>Without a non-linearity between layers, any stack of layers collapses into one linear layer, so depth adds parameters but no power.</strong></p>
+      <div class="mj">\[ \begin{aligned} a_1 &amp;= W_1 x + b_1 \\ a_2 &amp;= W_2 a_1 + b_2 = (W_2 W_1)\,x + (W_2 b_1 + b_2) \end{aligned} \]</div>
+      <p>In words: two linear layers are one linear layer with weights \(W_2 W_1\), and a hundred of them are still one.</p>
+      <ul>
+        <li><strong>Why that's a problem:</strong> a linear model can only draw a flat boundary (a hyperplane) or fit a flat surface. It can't represent interactions, thresholds or XOR-like patterns, which most real problems have.</li>
+        <li><strong>What the bend buys:</strong> with ReLU each unit adds a kink, so the network is piecewise linear. Each layer folds the pieces made by the layer before, so the number of linear pieces can grow exponentially with depth but only polynomially with width. That's why depth is efficient.</li>
+        <li><strong>Universal approximation:</strong> one hidden layer with a non-polynomial activation, if wide enough, can approximate any continuous function on a bounded region. “Wide enough” can be impractically wide; depth gets there with far fewer units.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> the output layer's activation is chosen by the loss, not for expressiveness: identity for regression, sigmoid for yes/no, softmax for classes.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">2</span>Walk through forward and backward propagation for a two-layer network.</summary><div class="ans">
+      <p><strong>Forward: compute each layer from the input to the loss and store every intermediate. Backward: apply the chain rule from the loss back down, turning the stored values into a gradient for every weight.</strong></p>
+      <div class="mj">\[ \begin{aligned} z_1 &amp;= W_1 x + b_1 \\ a_1 &amp;= \text{ReLU}(z_1) \\ z_2 &amp;= W_2 a_1 + b_2 \\ \hat y &amp;= \text{softmax}(z_2) \\ L &amp;= -\textstyle\sum_k y_k \log \hat y_k \end{aligned} \]</div>
+      <p>In words: each layer is a weighted sum, then a bend. Keep \(x\), \(z_1\) and \(a_1\); the backward pass needs them.</p>
+      <div class="mj">\[ \begin{aligned} \delta_2 &amp;= \hat y - y \\ \partial L/\partial W_2 &amp;= \delta_2\, a_1^\top \\ \partial L/\partial b_2 &amp;= \delta_2 \\ \delta_1 &amp;= (W_2^\top \delta_2) \odot \text{ReLU}'(z_1) \\ \partial L/\partial W_1 &amp;= \delta_1\, x^\top \\ \partial L/\partial b_1 &amp;= \delta_1 \end{aligned} \]</div>
+      <ul>
+        <li>\(\delta_2 = \hat y - y\) is the gradient at the logits for softmax with cross-entropy (Q4): how far each predicted probability is from the truth.</li>
+        <li>\(\delta_2\, a_1^\top\): weight \(W_2[i,j]\) multiplied \(a_1[j]\) into \(z_2[i]\), so its gradient is \(\delta_2[i]\, a_1[j]\). A weight moves in proportion to its input's activity times its output's error; the outer product has \(W_2\)'s shape.</li>
+        <li>\(W_2^\top \delta_2\): each hidden unit collects the errors of every output it fed, through the same weights it used going forward.</li>
+        <li>\(\odot\, \text{ReLU}'(z_1)\): the error flows back only through units that were on; units that were off get zero gradient.</li>
+        <li>A bias is added with slope 1, so its gradient is just \(\delta\).</li>
+      </ul>
+      <p>Then step every weight, \(W \leftarrow W - \eta\, \partial L/\partial W\). For a batch, stack each example's \(\delta_l\) as a row of \(\Delta_l\) and its \(a_{l-1}\) as a row of \(A_{l-1}\); then \(\partial L/\partial W_l = \Delta_l^\top A_{l-1}\) sums every example's outer product.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">3</span>Why is backprop efficient compared with numerical gradients?</summary><div class="ans">
+      <p><strong>One backward pass gives every weight's gradient for about twice the cost of a forward pass. Numerical gradients need two forward passes per weight.</strong></p>
+      <div class="mj">\[ \begin{aligned} \frac{\partial L}{\partial w_i} &amp;\approx \frac{L(w + \varepsilon e_i) - L(w - \varepsilon e_i)}{2\varepsilon} \\ \text{cost} &amp;= 2P \text{ forward passes for } P \text{ weights} \end{aligned} \]</div>
+      <p>In words: nudge one weight up and down, watch the loss, and repeat for every weight. With millions of weights that's millions of passes per step, and the result is only approximate: a large \(\varepsilon\) biases it, a tiny one drowns it in rounding error.</p>
+      <ul>
+        <li><strong>Why backprop is cheap:</strong> the loss is a single number, so the chain rule can run backwards from it (reverse-mode differentiation). Each layer's error \(\delta_l\) is computed once and shared by every weight in that layer and every layer below. Nothing is recomputed per weight.</li>
+        <li><strong>Why about 2×:</strong> going forward, a layer does one matrix multiply, \(W a\). Going back it does two: \(W^\top \delta\) to pass the error on, and \(\delta\, a^\top\) for the weight gradient.</li>
+        <li><strong>Why backwards:</strong> forward-mode differentiation needs one pass per input direction (here, per weight); reverse mode needs one per output, and there's only one loss.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> every forward activation has to be kept, so memory grows with depth × batch × width. Gradient checkpointing keeps only some and recomputes the rest during the backward pass. <strong>Follow-up:</strong> numerical gradients are still the way to check a hand-written backward pass on a few weights.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">4</span>Derive the gradient of softmax with cross-entropy.</summary><div class="ans">
+      <p><strong>The gradient at the logits is \(\partial L/\partial z_i = \hat y_i - y_i\): the predicted probability minus the true one.</strong></p>
+      <div class="mj">\[ \begin{aligned} \hat y_k &amp;= \frac{e^{z_k}}{\sum_j e^{z_j}} \\ L &amp;= -\sum_k y_k \log \hat y_k \\ \frac{\partial \hat y_k}{\partial z_i} &amp;= \hat y_k\, (\mathbf{1}[k = i] - \hat y_i) \\ \frac{\partial L}{\partial z_i} &amp;= -\sum_k \frac{y_k}{\hat y_k}\, \hat y_k\, (\mathbf{1}[k = i] - \hat y_i) \\ &amp;= -y_i + \hat y_i \sum_k y_k = \hat y_i - y_i \end{aligned} \]</div>
+      <ul>
+        <li><strong>Line 3, softmax's slope (quotient rule):</strong> \(\mathbf{1}[k = i]\) is 1 when \(k = i\) and 0 otherwise. Raising \(z_i\) raises \(\hat y_i\) at rate \(\hat y_i (1 - \hat y_i)\) and, because the probabilities must still sum to 1, lowers every other \(\hat y_k\) at rate \(\hat y_k \hat y_i\).</li>
+        <li><strong>Line 4, chain rule:</strong> the log's derivative \(1/\hat y_k\) cancels the \(\hat y_k\) in softmax's slope. That cancellation is why the result is so clean.</li>
+        <li><strong>Line 5:</strong> the labels sum to 1, so the second term is just \(\hat y_i\).</li>
+      </ul>
+      <p>A shortcut: write \(\log \hat y_k = z_k - \log \sum_j e^{z_j}\) and use labels that sum to 1.</p>
+      <div class="mj">\[ \begin{aligned} L &amp;= -\textstyle\sum_k y_k z_k + \log \textstyle\sum_j e^{z_j} \\ \partial L/\partial z_i &amp;= -y_i + \hat y_i \end{aligned} \]</div>
+      <p>In words: the log undoes the exponential, and the slope of \(\log \sum_j e^{z_j}\) with respect to \(z_i\) is the softmax itself.</p>
+      <p><strong>Why it matters:</strong> the gradient lies between −1 and 1 and is largest when the model is confidently wrong, with no saturating factor to shrink it. Frameworks fuse the pair (PyTorch's <code>CrossEntropyLoss</code> takes logits) and compute it with log-softmax, which avoids \(\log 0\) and overflow. <strong>Follow-up:</strong> sigmoid with log loss gives the same “prediction minus target” form, and so does a linear output with the loss \(\tfrac12 (\hat y - y)^2\) (without the ½ it's twice that).</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">5</span>Why use cross-entropy rather than MSE for classification?</summary><div class="ans">
+      <p><strong>Cross-entropy keeps a strong gradient when the model is confidently wrong and punishes confident mistakes hard. MSE through a sigmoid or softmax loses its gradient in exactly that case.</strong></p>
+      <p>For one example with \(p = \sigma(z)\) and a label \(y\) of 0 or 1:</p>
+      <div class="mj">\[ \begin{aligned} \text{MSE:}\quad \frac{\partial}{\partial z}\, \tfrac12 (p - y)^2 &amp;= (p - y)\, p\, (1 - p) \\ \text{log loss:}\quad \frac{\partial}{\partial z} \big[-y \log p - (1 - y) \log(1 - p)\big] &amp;= p - y \end{aligned} \]</div>
+      <p>In words: MSE's gradient carries the sigmoid's slope \(p(1 - p)\), which is near 0 whenever the output is saturated, including when \(p \approx 0\) but \(y = 1\), the worst possible mistake. The log in cross-entropy cancels that slope.</p>
+      <ul>
+        <li><strong>Penalty shape:</strong> cross-entropy grows without limit as the true class's probability goes to 0, so confident mistakes cost a lot. MSE's penalty is capped, so even the worst mistake costs only a fixed amount.</li>
+        <li><strong>Convexity:</strong> for logistic regression, log loss is convex in the weights (bowl-shaped: one minimum, no flat traps). MSE through a sigmoid isn't, so it has flat regions and can have local minima.</li>
+        <li><strong>What isn't the difference:</strong> both are minimized by the true probabilities (MSE on probabilities is the Brier score), and cross-entropy is simply the negative log-likelihood of a class label. Neither guarantees calibration; deep nets trained with cross-entropy are often overconfident.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> the unbounded penalty makes cross-entropy sensitive to mislabelled examples; label smoothing helps.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">6</span>What causes vanishing and exploding gradients, and how do you fix them?</summary><div class="ans">
+      <p><strong>The gradient at an early layer is a product of one factor per layer above it, so with depth it tends to shrink or grow exponentially.</strong></p>
+      <div class="mj">\[ \begin{aligned} \delta_l &amp;= D_l\, W_{l+1}^\top\, \delta_{l+1}, \qquad D_l = \text{diag}\big(f'(z_l)\big) \\ \delta_1 &amp;= D_1 W_2^\top\, D_2 W_3^\top \cdots D_{L-1} W_L^\top\, \delta_L \\ \lVert \delta_1 \rVert &amp;\le \prod_{l=1}^{L-1} \big(\max \lvert f' \rvert \cdot \lVert W_{l+1} \rVert\big)\, \lVert \delta_L \rVert \end{aligned} \]</div>
+      <p>In words: each layer multiplies the error by its activation's slope and by its weights, where \(\lVert W \rVert\) is the most \(W\) can stretch a vector. If every factor is below 1, the bound forces the gradient at the first layers towards 0 and they stop learning (vanishing). The bound is only a ceiling, so it can't prove explosion, but when the typical stretch is above 1 the product usually grows into huge steps and NaNs (exploding).</p>
+      <p>Sigmoid is the classic culprit: its slope is at most 1/4, so each sigmoid layer shrinks the gradient unless the weights are large, and large weights push units into saturation, where the slope is even smaller.</p>
+      <p><strong>Fixes, and why each works:</strong></p>
+      <ul>
+        <li>ReLU-family activations: slope exactly 1 where active, so the activation doesn't shrink the gradient.</li>
+        <li>He or Xavier initialization: sets the weight scale so each layer's factor starts near 1.</li>
+        <li>BatchNorm or LayerNorm: holds each layer's inputs at a steady scale, out of saturation.</li>
+        <li>Residual connections: each factor becomes \(I + \partial F/\partial x\), so one path is never shrunk.</li>
+        <li>Gradient clipping: caps exploding steps; it does nothing for vanishing.</li>
+        <li>LSTM or GRU in recurrent nets: the LSTM's cell (the GRU's hidden state) is updated additively through a gate near 1.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> to detect it, log each layer's gradient norm; early layers far smaller than late ones means vanishing.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">7</span>Xavier vs He initialization? What if you initialize everything to zero?</summary><div class="ans">
+      <p><strong>Both pick the weights' variance so a signal keeps the same size from layer to layer. Xavier suits tanh (sigmoid only roughly); He doubles it because ReLU zeroes half its inputs. All-zero weights never break symmetry, so every unit in a layer stays a copy of the others.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{Var}(z) &amp;= n_{in}\, \text{Var}(w)\, \mathbb{E}[x^2] \\ \text{Xavier:}\quad \text{Var}(w) &amp;= \frac{2}{n_{in} + n_{out}} \\ \text{He:}\quad \text{Var}(w) &amp;= \frac{2}{n_{in}} \end{aligned} \]</div>
+      <p>In words: \(z = \sum_j w_j x_j\) adds up \(n_{in}\) independent terms, so its variance is \(n_{in}\) times one term's, which is \(\text{Var}(w)\) times \(\mathbb{E}[x^2]\), the average squared input. That equals \(\text{Var}(x)\) only when the inputs average 0; ReLU outputs don't, which is why the He argument uses \(\mathbb{E}[x^2]\). To keep the size steady, \(\text{Var}(w)\) must be about \(1/n_{in}\): smaller and the signal shrinks every layer, larger and it grows.</p>
+      <ul>
+        <li><strong>Xavier:</strong> the backward pass sums over the \(n_{out}\) units a layer feeds, so gradients want \(1/n_{out}\); Xavier compromises with one over the average of \(n_{in}\) and \(n_{out}\). It assumes the activation has slope 1 near 0, which holds for tanh; sigmoid fits only roughly, since its slope at 0 is 1/4.</li>
+        <li><strong>He:</strong> ReLU outputs 0 for the negative half, so for a pre-activation symmetric around 0, \(\mathbb{E}[\text{ReLU}(z)^2] = \tfrac12 \text{Var}(z)\): the next layer's \(\mathbb{E}[x^2]\) is halved. Doubling the weights' variance makes up for it.</li>
+        <li><strong>Zero init:</strong> every unit in a layer computes the same output and gets the same gradient, so after any number of steps they're still identical, and the layer acts like a single unit. Random weights break the symmetry; biases can start at 0.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> normalization and residual connections make the exact scale matter less, but a bad scale still slows the start of training.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">8</span>What is gradient clipping, and why clip the norm rather than each value?</summary><div class="ans">
+      <p><strong>Gradient clipping caps how big the gradient can be before the update. Clipping by the norm shrinks the whole gradient vector when it's too long and keeps its direction.</strong></p>
+      <div class="mj">\[ g \leftarrow g \cdot \min\!\Big(1,\ \frac{c}{\lVert g \rVert}\Big) \]</div>
+      <p>In words: if the gradient's length is under the threshold \(c\), leave it alone; if it's over, rescale it to length exactly \(c\), pointing the same way. The norm is usually taken over all parameters together.</p>
+      <ul>
+        <li><strong>Why it's needed:</strong> exploding gradients come in bursts: a steep cliff in the loss surface, a long chain of repeated multiplications in an RNN, or one odd batch. A single huge step can throw the weights far from where training was heading, undo a lot of progress, or overflow to NaN.</li>
+        <li><strong>What it bounds:</strong> with plain SGD, every step is then at most \(\eta c\). With Adam, which divides by \(\sqrt{\hat v}\) anyway, it mainly stops one spike from inflating \(m\) and \(v\) and distorting the steps that follow.</li>
+        <li><strong>Why the norm, not each value:</strong> clipping each entry to \([-c, c]\) cuts big components more than small ones, so the step no longer points the way the gradient did. Norm clipping changes only the length.</li>
+        <li><strong>What it doesn't fix:</strong> vanishing gradients. It treats a symptom of explosion, not the cause.</li>
+      </ul>
+      <p><strong>In practice:</strong> it's standard for RNNs and transformers. Plot the gradient norm: if nearly every step is clipped, the update has become a fixed-length step, which usually means the learning rate is too high or the threshold too low.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">9</span>BatchNorm vs LayerNorm. What changes at inference?</summary><div class="ans">
+      <p><strong>Same formula, different axis: BatchNorm normalizes each feature across the batch, LayerNorm normalizes each example across its own features. At inference BatchNorm switches to running averages saved during training; LayerNorm doesn't change.</strong></p>
+      <div class="mj">\[ \begin{aligned} \hat x &amp;= \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}} \\ y &amp;= \gamma\, \hat x + \beta \end{aligned} \]</div>
+      <p>In words: subtract the mean and divide by the spread, then let the learned \(\gamma, \beta\) set whatever scale and shift suit the next layer (they can even undo the normalization).</p>
+      <ul>
+        <li><strong>BatchNorm in training:</strong> \(\mu, \sigma^2\) for each feature come from the current batch (for each channel in a CNN, over the batch and all positions), and running averages of them are updated every step.</li>
+        <li><strong>BatchNorm at inference:</strong> there may be a single example, and a prediction mustn't depend on what else is in the batch, so it uses the running averages. It becomes a fixed scale and shift, which can be folded into the previous layer's weights. Forgetting <code>model.eval()</code> makes predictions depend on the batch.</li>
+        <li><strong>Where BatchNorm struggles:</strong> small batches give noisy statistics, padding in sequences pollutes them, and generating one token at a time has no batch at all.</li>
+        <li><strong>LayerNorm:</strong> statistics come from one example (one token's vector in a transformer), so it's identical in training and inference and works at batch size 1 and any length. That's why transformers and RNNs use it.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> CNNs with tiny batches use GroupNorm, which normalizes groups of channels within one example.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">10</span>Why do normalization layers make training faster and more stable?</summary><div class="ans">
+      <p><strong>They keep every layer's inputs at a steady scale and make the loss surface smoother, so gradients stay well-sized and a larger learning rate is safe.</strong></p>
+      <ul>
+        <li><strong>A moving target:</strong> without normalization, an update to an early layer shifts the scale of everything after it, so later layers keep re-adapting. This “internal covariate shift” was the original motivation, but later experiments suggest it isn't the main effect.</li>
+        <li><strong>A smoother surface:</strong> with BatchNorm, the loss and its gradient change more gently as the weights move (Santurkar et al., 2018), so a step along the gradient stays good for longer and bigger steps don't overshoot.</li>
+        <li><strong>Out of saturation:</strong> centred, unit-scale inputs keep sigmoid and tanh units in their sloped region and stop ReLUs being all on or all off.</li>
+        <li><strong>Scale invariance:</strong> scaling the weights that feed a normalization layer doesn't change its output.</li>
+      </ul>
+      <div class="mj">\[ \begin{aligned} \text{Norm}(c\, W x) &amp;= \text{Norm}(W x) \quad \text{for any } c > 0 \\ \nabla L \big\rvert_{cW} &amp;= \tfrac{1}{c}\, \nabla L \big\rvert_{W} \end{aligned} \]</div>
+      <p>In words: only the weights' direction matters, not their length, so growing weights can't blow up the activations. A gradient step turns that direction by about (step size) ÷ (weight norm). Changing only the length doesn't change the loss, so the gradient has no component along the weights, and each step slightly lengthens them; longer weights then turn less on later steps. The effective step size steadies itself.</p>
+      <p><strong>Trade-off:</strong> BatchNorm ties the examples in a batch together (Q9). In transformers, where the norm sits matters. Pre-norm, \(x + F(\text{Norm}(x))\), normalizes only the branch and leaves a clean identity path through the residual stream, so it trains stably. Post-norm, \(\text{Norm}(x + F(x))\), the original design, puts the norm on that path and starts with large gradients near the output, so it needs warmup.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">11</span>How does dropout work? Why scale by \(1/(1-p)\)? What happens at inference?</summary><div class="ans">
+      <p><strong>During training each unit is zeroed at random with probability \(p\), and the survivors are scaled up by \(1/(1-p)\). At inference dropout is switched off and nothing is rescaled.</strong></p>
+      <div class="mj">\[ \begin{aligned} \tilde h_i &amp;= \frac{m_i\, h_i}{1 - p}, \qquad m_i \sim \text{Bernoulli}(1 - p) \\ \mathbb{E}[\tilde h_i] &amp;= \frac{(1 - p)\, h_i}{1 - p} = h_i \end{aligned} \]</div>
+      <p>In words: \(m_i\) is a coin flip, 1 with probability \(1 - p\), else 0. A unit survives with probability \(1 - p\), so scaling it by \(1/(1 - p)\) makes its average output exactly what it is with dropout off. The next layer sees the same expected input in training and inference, so inference needs no change (“inverted dropout”).</p>
+      <p><strong>Why it regularizes:</strong></p>
+      <ul>
+        <li><strong>No co-adaptation:</strong> a unit can't count on any particular other unit being there, so each has to be useful on its own, and features become redundant and robust.</li>
+        <li><strong>An implicit ensemble:</strong> each step trains a different random sub-network, all sharing weights. Inference with every unit on, at matched scale, approximates averaging their predictions.</li>
+        <li><strong>Noise:</strong> random multiplicative noise penalizes leaning on any single large activation; for a linear model it works out like an L2 penalty that is stronger on weights whose inputs are large.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> noisier gradients and slower convergence. It clashes with BatchNorm (activation variance differs between training and inference), so CNNs with BatchNorm often skip it. <strong>Follow-up:</strong> leaving it on at inference and averaging several passes (MC dropout) gives a rough uncertainty estimate.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">12</span>L1 vs L2 vs weight decay. Why AdamW?</summary><div class="ans">
+      <p><strong>L2 shrinks weights in proportion to their size, L1 pushes small weights to exactly 0, and weight decay shrinks the weights directly in the update. L2 and weight decay are the same thing for SGD but not for Adam, which is why AdamW exists.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{SGD + L2:}\quad w &amp;\leftarrow w - \eta\, (g + \lambda w) \\ &amp;= (1 - \eta\lambda)\, w - \eta\, g \\ \text{Adam + L2:}\quad w &amp;\leftarrow w - \eta\, \frac{\hat m}{\sqrt{\hat v} + \epsilon} \\ \text{AdamW:}\quad w &amp;\leftarrow w - \eta \Big( \frac{\hat m}{\sqrt{\hat v} + \epsilon} + \lambda w \Big) \end{aligned} \]</div>
+      <p>In words: with SGD, the L2 term multiplies every weight by \(1 - \eta\lambda\) each step, which is exactly weight decay. With Adam + L2, \(\lambda w\) is added into \(g\) before \(m\) and \(v\) are formed, so it gets divided by \(\sqrt{\hat v}\): weights with large past gradients are barely decayed and the strength becomes uneven. AdamW keeps the decay out of the gradient, so every weight shrinks by the same fraction.</p>
+      <ul>
+        <li><strong>Why L1 gives zeros and L2 doesn't:</strong> L2's pull is \(\lambda w\), which fades as the weight nears 0, so weights get small but stay non-zero. L1's pull is \(\lambda\, \text{sign}(w)\), the same size however small the weight. So whenever the data's pull on a weight is weaker than \(\lambda\), the best value is exactly 0: moving it either way costs more penalty than it saves in loss.</li>
+        <li><strong>Why decay at all:</strong> smaller weights give a smoother function that changes less when the input changes a little, which tends to generalize better.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> biases and normalization gains are usually left out of weight decay; there are few of them, they don't drive overfitting, and decaying the gains just fights the normalization.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">13</span>Adam vs SGD with momentum. Why does Adam need bias correction?</summary><div class="ans">
+      <p><strong>Momentum smooths the gradient's direction; Adam also gives every weight its own step size by dividing by the root of its recent squared gradients. Bias correction undoes the fact that Adam's running averages start at zero.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{momentum:}\quad u_t &amp;= \beta u_{t-1} + g_t \\ \theta &amp;\leftarrow \theta - \eta\, u_t \\ \text{Adam:}\quad m_t &amp;= \beta_1 m_{t-1} + (1 - \beta_1)\, g_t \\ v_t &amp;= \beta_2 v_{t-1} + (1 - \beta_2)\, g_t^2 \\ \hat m_t &amp;= m_t / (1 - \beta_1^t) \\ \hat v_t &amp;= v_t / (1 - \beta_2^t) \\ \theta &amp;\leftarrow \theta - \eta\, \hat m_t / (\sqrt{\hat v_t} + \epsilon) \end{aligned} \]</div>
+      <p>In words: momentum keeps a decaying sum \(u\) of recent gradients (named \(u\) so it isn't confused with Adam's \(v\)), so consistent directions build speed and zig-zags cancel. In Adam, \(m\) is the average direction and \(v\) the average squared size; the step is direction divided by typical size, so every weight moves by roughly \(\eta\) or less, whatever its gradient's scale. Once the averages have settled, a weight whose gradient is mostly noise has \(\hat m\) near 0 and barely moves.</p>
+      <ul>
+        <li><strong>Why per-weight steps help:</strong> gradient sizes differ hugely across weights (rare embeddings, layers at different depths), so one global learning rate is too big for some and too small for others. Adam evens this out, needs less tuning, and is the default for transformers.</li>
+        <li><strong>Where SGD wins:</strong> with a tuned schedule, SGD with momentum often generalizes slightly better on image classification. Adam also stores two extra numbers per weight.</li>
+      </ul>
+      <p><strong>Why bias correction:</strong> \(m_0 = v_0 = 0\), so early averages are pulled towards 0. With \(\mathbb{E}\) the average over random batches, and gradients that hover around a fixed mean:</p>
+      <div class="mj">\[ \begin{aligned} \mathbb{E}[m_t] &amp;= (1 - \beta_1^t)\, \mathbb{E}[g] \\ \mathbb{E}[\hat m_t] &amp;= \mathbb{E}[g] \end{aligned} \]</div>
+      <p>In words: dividing by \(1 - \beta^t\) removes the pull. Without it, \(v\) (whose \(\beta_2\) is closer to 1) is shrunk far more than \(m\), so \(\sqrt{v}\) is too small and the first steps too large. Even with it, \(\hat v\) is averaged over only a few gradients at first, so \(\hat m/\sqrt{\hat v}\) is close to \(\pm 1\) for every weight (exactly \(\pm 1\) on the first step), and even noise-dominated weights take a full step \(\eta\). That's what warmup guards against (Q14).</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">14</span>Why warm up the learning rate, and why decay it later?</summary><div class="ans">
+      <p><strong>Warmup ramps the learning rate up from near 0 over the first steps, because the earliest updates are the least reliable. Decay lowers it later, so the weights settle into a minimum instead of jittering around it.</strong></p>
+      <div class="mj">\[ \begin{aligned} \eta_t &amp;= \eta_{\max}\, t / T_w \\ \eta_t &amp;= \eta_{\min} + \tfrac12 (\eta_{\max} - \eta_{\min}) \big(1 + \cos(\pi\, \tfrac{t - T_w}{T - T_w})\big) \end{aligned} \]</div>
+      <p>In words: the first line is a straight ramp up, used for the first \(T_w\) steps; the second, used after that, is a smooth cosine glide down to a floor by the last step \(T\).</p>
+      <ul>
+        <li><strong>Adam's estimates are poor at first:</strong> \(\hat v\) is averaged over only a few gradients, so \(\hat m/\sqrt{\hat v}\) is close to \(\pm 1\) for every weight (exactly \(\pm 1\) on the first step). Even weights whose gradients are mostly noise take a full step \(\eta\). A small learning rate limits the damage until the averages settle.</li>
+        <li><strong>Early training is unstable:</strong> right after initialization the gradients are large and change fast, so a full-size step can overshoot and diverge. A short ramp lets the network reach a calmer region where big steps are safe.</li>
+        <li><strong>Transformers and big batches:</strong> post-norm transformers, \(\text{Norm}(x + F(x))\), start with large gradients in the layers near the output, so they diverge without warmup. The linear scaling rule (bigger batch, bigger learning rate) also only holds after a warmup.</li>
+        <li><strong>Why decay:</strong> mini-batch noise keeps the weights bouncing around a minimum by an amount that grows with the learning rate. Lowering it shrinks the bounce, so the loss keeps dropping late in training.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> skipping warmup shows up as loss spikes or NaNs in the first few hundred steps, most often with Adam, large batches and transformers.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">15</span>Why do residual connections help?</summary><div class="ans">
+      <p><strong>A residual block outputs its input plus a learned correction, \(x_{l+1} = x_l + F_l(x_l)\). That gives the gradient a direct path through any depth, and makes “do nothing” the easy default for a block.</strong></p>
+      <div class="mj">\[ \begin{aligned} x_{l+1} &amp;= x_l + F_l(x_l) \\ \frac{\partial x_{l+1}}{\partial x_l} &amp;= I + \frac{\partial F_l}{\partial x_l} \\ \frac{\partial L}{\partial x_l} &amp;= \frac{\partial L}{\partial x_L} \Big(I + \frac{\partial F_{L-1}}{\partial x_{L-1}}\Big) \cdots \Big(I + \frac{\partial F_l}{\partial x_l}\Big) \end{aligned} \]</div>
+      <p>In words: \(I\) is the identity, the matrix that leaves a vector unchanged. Multiply out the product and one term is just \(I\), so the error at the top reaches every lower layer unchanged, plus extra terms through the blocks. The gradient can't vanish merely because some blocks have small slopes.</p>
+      <ul>
+        <li><strong>Doing nothing is easy:</strong> if a block isn't useful, its weights only need to go to 0, which weight decay already encourages. A plain stack would have to learn an exact identity map through non-linearities, which is hard. That's why, before ResNet, deeper plain networks had higher <em>training</em> error than shallower ones (the degradation problem): an optimization failure, not overfitting.</li>
+        <li><strong>A smoother loss surface:</strong> loss-landscape plots show skip connections remove much of the sharp, chaotic structure, so optimization is easier.</li>
+        <li><strong>Shapes must match:</strong> when a block changes the width or resolution, the skip uses a 1×1 convolution or a linear projection.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> the same idea is the LSTM's additive cell update through time and the transformer's residual stream through depth.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">16</span>When do you add vectors and when do you concatenate them?</summary><div class="ans">
+      <p><strong>Concatenate when the inputs are different kinds of information that the next layer should weigh separately; add when they're contributions to the same representation and you want to keep the width fixed.</strong></p>
+      <div class="mj">\[ \begin{aligned} W\, [x;\, y] &amp;= W_1 x + W_2 y \\ W\, (x + y) &amp;= W x + W y \end{aligned} \]</div>
+      <p>In words: split \(W = [W_1\ \ W_2]\) into the columns that read \(x\) and those that read \(y\); then concatenating and applying a linear layer is the same as giving each input its own weights and summing. Adding first forces both through the same weights, so they must already share a space: coordinate \(i\) has to mean the same thing in both.</p>
+      <ul>
+        <li><strong>Concatenate:</strong> sizes can differ and nothing is mixed yet, so the next layer decides how to combine; the cost is width \(d_1 + d_2\) and more parameters downstream. Uses: the LSTM's \([h_{t-1}, x_t]\), bi-LSTM outputs, attention heads before \(W_O\), U-Net skips, feature fusion.</li>
+        <li><strong>Add:</strong> sizes must match and the width stays \(d\) at no cost, but the two signals share coordinates and can't be pulled apart later unless training keeps them in different directions. That works when the network is trained end to end to share the space: residuals, token plus position embeddings, a bag of embeddings.</li>
+        <li><strong>Sets:</strong> a sum ignores order and handles any count; a concatenation depends on both.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> positional encodings are added, not concatenated, to keep the model width fixed at no cost; in high dimensions the model can keep position and meaning in nearly separate directions.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">17</span>Why a CNN instead of a dense network for images? What does a 1×1 convolution do?</summary><div class="ans">
+      <p><strong>Images have local patterns that repeat across positions, and a convolution builds both facts in: each output looks at a small patch (locality), and the same filter is used everywhere (weight sharing).</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{dense weights} &amp;= (H W C_{in}) \cdot (H W C_{out}) \\ \text{conv weights} &amp;= k^2\, C_{in}\, C_{out} \end{aligned} \]</div>
+      <p>In words: for a layer mapping an \(H \times W\) image to a same-sized output, a dense layer's weight count grows with the image area squared, while a convolution's doesn't depend on the image size at all.</p>
+      <ul>
+        <li><strong>Locality:</strong> neighbouring pixels are strongly related (edges, textures) and distant ones weakly, so a small window captures what matters early on. Stacking layers grows the receptive field, from edges to parts to objects.</li>
+        <li><strong>Sharing:</strong> an edge detector that's useful in one corner is useful everywhere. Reusing it means far fewer parameters (less data needed, less overfitting) and translation equivariance: shift the input and the feature map shifts the same way. A dense layer would have to relearn each pattern at every position.</li>
+      </ul>
+      <p><strong>1×1 convolution:</strong> a linear map from \(C_{in}\) to \(C_{out}\) channels at each pixel, with no mixing across space: a small dense layer applied to every pixel's channel vector. It's linear, so it doesn't bend anything itself. It changes the channel count cheaply (bottlenecks squeeze channels before an expensive 3×3 and expand them after), and it adds a cheap extra layer, and so another activation after it. It's the CNN version of the linear layers in a transformer's per-token FFN.</p>
+      <p><strong>Trade-off:</strong> these built-in assumptions help when data is limited; vision transformers assume less, so they need more data but scale further.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">18</span>Compute the output size and parameters of a convolution layer.</summary><div class="ans">
+      <p><strong>Output side \(\lfloor (n + 2p - k)/s \rfloor + 1\); parameters \(k^2 C_{in} C_{out} + C_{out}\), whatever the image size.</strong></p>
+      <div class="mj">\[ \begin{aligned} n_{out} &amp;= \Big\lfloor \frac{n + 2p - k}{s} \Big\rfloor + 1 \\ \text{params} &amp;= k \cdot k \cdot C_{in} \cdot C_{out} + C_{out} \end{aligned} \]</div>
+      <p>In words: count the start positions of a \(k\)-wide window that moves \(s\) cells at a time along the padded input; then count one \(k \times k \times C_{in}\) filter and one bias per output channel.</p>
+      <ul>
+        <li><strong>\(n + 2p\):</strong> padding adds \(p\) cells on each side.</li>
+        <li><strong>Where the window can start:</strong> its first cell sits at 0, \(s\), \(2s\), …, and the last start must be at most \(n + 2p - k\), or the window would run off the edge.</li>
+        <li><strong>Counting the starts:</strong> that's \(\lfloor (n + 2p - k)/s \rfloor\) steps after the first start, plus 1 for the first. The floor drops a final step that wouldn't fit.</li>
+        <li><strong>Parameters:</strong> each output channel has one filter spanning all input channels, \(k \cdot k \cdot C_{in}\) weights plus a bias, and there are \(C_{out}\) of them. Nothing depends on \(n\), because the same filter is reused at every position.</li>
+      </ul>
+      <p><strong>Rules of thumb:</strong> for odd \(k\), “same” padding \(p = (k - 1)/2\) keeps the size at stride 1, and stride 2 then halves it (rounding up). <strong>Follow-up:</strong> compute, unlike parameters, does grow with the output: about \(k^2 C_{in} C_{out}\, n_{out}^2\) multiply-adds.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">19</span>Your loss isn't decreasing. How do you debug it?</summary><div class="ans">
+      <p><strong>First tell a bug from a modelling problem by overfitting one small batch. Then check the data, the training loop, the loss and the learning rate, in that order.</strong></p>
+      <ol>
+        <li><strong>Overfit a tiny batch</strong> with regularization off. Any working network can memorize a few examples, so the loss should approach 0. If it can't, the problem is a bug, not capacity or data.</li>
+        <li><strong>Check the first loss.</strong> A fresh classifier predicts roughly uniformly, so with \(K\) balanced classes the loss should start near \(\log K\). Far higher means a bad initialization or output scale; stuck there means nothing is learning.</li>
+        <li><strong>The data:</strong> labels aligned with inputs (shuffling one but not the other leaves the loss at chance forever), inputs normalized (large raw scales saturate units and make gradients badly scaled), augmentation not destroying the label. Look at a few batches.</li>
+        <li><strong>The loop:</strong> <code>zero_grad</code> (otherwise gradients pile up across steps), <code>backward</code>, <code>step</code>, the right parameters handed to the optimizer, <code>train()</code> and <code>eval()</code>. Check that the weights actually change between steps.</li>
+        <li><strong>The loss:</strong> pass raw logits to <code>CrossEntropyLoss</code>. It applies log-softmax itself, and adding a softmax first squashes the gradients.</li>
+        <li><strong>The learning rate:</strong> sweep it on a log scale. Too high is noisy or NaN; too low is flat.</li>
+        <li><strong>The gradients:</strong> per-layer gradient norms show vanishing or exploding; the share of ReLUs that are always 0 shows dead units.</li>
+      </ol>
+    </div></details>
+    <details class="qa"><summary><span class="qn">20</span>How do you tell overfitting from underfitting? What is double descent?</summary><div class="ans">
+      <p><strong>Compare training and validation loss. Low training loss with a much higher validation loss is overfitting (high variance); both high and close together is underfitting (high bias). Double descent: growing a model past the size where it fits the training data exactly can bring test error back down.</strong></p>
+      <ul>
+        <li><strong>Underfitting:</strong> the model can't fit even the training data. Use a bigger model, train longer, add features, regularize less, check the learning rate.</li>
+        <li><strong>Overfitting:</strong> training loss keeps falling while validation loss turns up, because the model is fitting noise specific to the training set. Add data or augmentation, regularize, stop early, or shrink the model.</li>
+        <li><strong>Will more data help:</strong> plot a learning curve over training-set size. If validation still improves as data grows, collect more; if both curves have flattened out high, the model is the bottleneck.</li>
+        <li><strong>A gap from step 0</strong> isn't overfitting: the splits differ (another time period or class mix) or are measured differently (dropout on for the training loss, off for validation). Duplicates or leakage across the splits do the opposite: they make validation look too good.</li>
+      </ul>
+      <p><strong>Double descent:</strong> test error first follows the classic U with model size. It peaks near the size that can only just fit every training point: there's essentially one way to fit them, and it must contort to fit the noise. Bigger still, many weight settings fit exactly, and gradient descent from a small initialization tends to find a smooth one, so test error falls again. <strong>Why it matters:</strong> for large networks, many parameters isn't by itself overfitting.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">21</span>How does batch size affect training?</summary><div class="ans">
+      <p><strong>Batch size sets how noisy each gradient is and how much work each step does. Bigger batches give smoother gradients and better hardware use, but fewer updates per epoch and, past a point, worse generalization unless the learning rate and schedule are adjusted.</strong></p>
+      <div class="mj">\[ \begin{aligned} \hat g_B &amp;= \frac{1}{B} \sum_{i=1}^{B} \nabla \ell_i \\ \text{Var}(\hat g_B) &amp;= \frac{\sigma^2}{B} \end{aligned} \]</div>
+      <p>In words: a mini-batch gradient is an average of \(B\) per-example gradients, so its variance falls as \(1/B\), where \(\sigma^2\) is the variance of a single example's gradient.</p>
+      <ul>
+        <li><strong>The learning rate scales with it (for SGD):</strong> a batch \(k\) times bigger takes \(k\) times fewer steps per epoch. Raising the learning rate \(k\) times makes one big step cover about the same ground as \(k\) small ones, as long as the gradient barely changes over them (the linear scaling rule). Early in training it changes fast, so this needs warmup. Adam usually needs a gentler increase.</li>
+        <li><strong>Generalization:</strong> small-batch noise acts as a regularizer, kicking the weights out of sharp, narrow minima towards flatter ones, which tend to generalize better. Very large batches lose that.</li>
+        <li><strong>Diminishing returns:</strong> beyond some batch size the gradient is already accurate, so a bigger batch barely speeds up progress per step and wastes compute.</li>
+      </ul>
+      <p><strong>In practice:</strong> use the largest batch that fits and gives good throughput, and retune the learning rate with it. To emulate a bigger batch, use gradient accumulation: sum the gradients over several small batches before taking one step. BatchNorm needs batches big enough for stable statistics.</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">22</span>What is mixed-precision training, and why does fp16 need loss scaling?</summary><div class="ans">
+      <p><strong>Mixed precision runs most of the maths in 16-bit floats (fp16 or bf16) for speed and memory, while keeping a 32-bit master copy of the weights. With fp16 the loss is also scaled up, so small gradients don't round to zero.</strong></p>
+      <ul>
+        <li><strong>16-bit matrix multiplies:</strong> activations take half the memory, and GPU tensor cores multiply 16-bit matrices several times faster.</li>
+        <li><strong>fp32 master weights:</strong> an update \(\eta g\) is often tiny next to the weight, and fp16 keeps only about three significant digits, so \(w + \eta g\) would round back to \(w\) and the update would be lost. Sums of many numbers (softmax, normalization statistics, the loss) also stay in fp32 for precision.</li>
+        <li><strong>Loss scaling:</strong> fp16 has few exponent bits, so its range is narrow and many gradients underflow to 0. Multiply the loss by a large \(S\) before the backward pass, and divide the gradients by \(S\) before the update.</li>
+      </ul>
+      <div class="mj">\[ \begin{aligned} \nabla (S L) &amp;= S\, \nabla L \\ g &amp;= \tfrac{1}{S}\, \nabla (S L) \end{aligned} \]</div>
+      <p>In words: the chain rule is linear, so scaling the loss scales every gradient by \(S\), lifting them into range, and dividing back gives exactly the true gradient. If a gradient overflows, the step is skipped and \(S\) lowered.</p>
+      <p><strong>bf16</strong> keeps fp32's exponent range with fewer precision bits, so it underflows no more than fp32 and needs no loss scaling. That's why it's the default on recent GPUs and TPUs.</p>
+    </div></details>
 
     <!-- sheet -->
     <h2 id="sheet"><span class="pn">17</span>Cheat sheet</h2>
     <div class="sheet">
       <h3>Layer and backprop</h3>
-      <div class="mj">\[ z_l = W_l a_{l-1} + b_l,\ a_l = f(z_l) \qquad \delta_{\text{out}} = \hat y - y \qquad \delta_l = (W_{l+1}^\top \delta_{l+1}) \odot f'(z_l) \qquad \partial L/\partial W_l = \delta_l a_{l-1}^\top \]</div>
+      <div class="mj">\[ \begin{aligned} z_l &amp;= W_l a_{l-1} + b_l \\ a_l &amp;= f(z_l) \\ \delta_{\text{out}} &amp;= \hat y - y \\ \delta_l &amp;= (W_{l+1}^\top \delta_{l+1}) \odot f'(z_l) \\ \partial L/\partial W_l &amp;= \delta_l\, a_{l-1}^\top \end{aligned} \]</div>
       <h3>Optimizers</h3>
-      <div class="mj">\[ \text{Adam: } \theta \leftarrow \theta - \eta\, \hat m / (\sqrt{\hat v} + \epsilon) \qquad \text{AdamW: } \ldots - \eta \lambda \theta \]</div>
+      <div class="mj">\[ \begin{aligned} \text{Adam:}\quad \theta &amp;\leftarrow \theta - \eta\, \hat m / (\sqrt{\hat v} + \epsilon) \\ \text{AdamW:}\quad \theta &amp;\leftarrow \theta - \eta\, \hat m / (\sqrt{\hat v} + \epsilon) - \eta \lambda \theta \end{aligned} \]</div>
       <h3>Initialization, normalization, dropout</h3>
-      <div class="mj">\[ \text{He: } 2/n_{in} \quad \text{Xavier: } 2/(n_{in} + n_{out}) \qquad y = \gamma \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}} + \beta \qquad \tilde h = \frac{h \odot m}{1 - p} \]</div>
+      <div class="mj">\[ \begin{aligned} \text{He:}\quad \text{Var}(w) &amp;= 2/n_{in} \\ \text{Xavier:}\quad \text{Var}(w) &amp;= 2/(n_{in} + n_{out}) \\ \text{norm:}\quad y &amp;= \gamma\, \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}} + \beta \\ \text{dropout:}\quad \tilde h &amp;= \frac{h \odot m}{1 - p} \end{aligned} \]</div>
       <h3>Residual, concatenation, convolution</h3>
-      <div class="mj">\[ \frac{\partial (x + F(x))}{\partial x} = I + \frac{\partial F}{\partial x} \qquad W[x; y] = W_1 x + W_2 y \qquad \text{out} = \frac{n + 2p - k}{s} + 1 \]</div>
+      <div class="mj">\[ \begin{aligned} \frac{\partial (x + F(x))}{\partial x} &amp;= I + \frac{\partial F}{\partial x} \\ W[x; y] &amp;= W_1 x + W_2 y \\ \text{out} &amp;= \Big\lfloor \frac{n + 2p - k}{s} \Big\rfloor + 1 \end{aligned} \]</div>
     </div>
 
     <footer><a href="./">More study notes</a> · <a href="../">Deepam Minda</a></footer>
