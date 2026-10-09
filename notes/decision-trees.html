@@ -1,0 +1,1569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070707">
+<title>Decision trees · Deepam Minda</title>
+<meta name="description" content="What happens at every node: impurity, the split search, categorical and regression splits, leaf predictions, pruning, missing values, feature importance and what-ifs.">
+<meta property="og:title" content="Decision trees">
+<meta property="og:description" content="What happens at every node: impurity, the split search, categorical and regression splits, leaf predictions, pruning, missing values, feature importance and what-ifs.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem("deepam-theme"); } catch (e) {}
+  if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<link rel="stylesheet" href="../assets/design/tokens.css?v=1">
+<link rel="stylesheet" href="../assets/design/components.css?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<style>
+/* Green graph-paper theme for the recurrent-notebook content.
+   Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
+   One sans for text, one mono for labels; MathJax draws the maths. Green = the cell / notebook,
+   slate = the hidden state, orange only for gradients. */
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
+body {
+  margin: 0; color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: 50% 0;
+  font: 16.5px/1.7 var(--sans); letter-spacing: -.003em;
+  padding-inline: 20px; padding-block: 44px 88px;
+  -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 640px) { body { font-size: 16px; padding-inline: 16px; padding-block: 24px 80px; } }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+table, button { font: inherit; }
+code { font: .86em var(--mono); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; }
+
+.page { max-width: 1200px; margin: 0 auto; display: grid; gap: 52px; grid-template-columns: 220px minmax(0, 860px); justify-content: center; }
+@media (max-width: 1080px) { .page { grid-template-columns: minmax(0, 860px); gap: 0; } }
+
+/* contents */
+.toc { position: sticky; top: 28px; align-self: start; font: 13.5px/1.4 var(--sans); max-height: calc(100vh - 56px); overflow-y: auto; }
+.toc summary { display: none; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--ink-2); text-decoration: none; }
+.toc a:hover { background: var(--surface); color: var(--ink); }
+.toc a.on { color: var(--ink); background: var(--surface); box-shadow: inset 2px 0 0 var(--cell); }
+.toc .n { font: 500 11px var(--mono); color: var(--ink-3); margin-right: 8px; }
+.toc .label { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 10px 10px; }
+.toc li.part { font: 500 10.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 14px 10px 4px; }
+@media (max-width: 1080px) {
+  .toc { position: static; margin-bottom: 26px; max-height: none; }
+  .toc .label { display: none; }
+  .toc details { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  .toc summary { display: block; cursor: pointer; padding: 12px 14px; font: 500 14px var(--sans); list-style: none; }
+  .toc summary::-webkit-details-marker { display: none; }
+  .toc summary::after { content: "+"; float: right; color: var(--ink-3); }
+  .toc details[open] summary::after { content: "–"; }
+  .toc details ol { padding: 0 6px 10px; }
+}
+.jump {
+  display: none; position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+  font: 500 13px var(--sans); color: var(--ink); background: var(--surface); text-decoration: none;
+  border: 1px solid var(--rule); border-radius: 999px; padding: 9px 14px;
+}
+@media (max-width: 1080px) { .jump { display: block; } }
+
+/* article */
+article { min-width: 0; }
+header.hero { display: grid; gap: 10px; margin-bottom: 26px; }
+.kicker { font: 500 12px/1 var(--mono); color: var(--ink-3); letter-spacing: .02em; }
+h1 { margin: 0; font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.6rem); line-height: 1.1; font-weight: 600; letter-spacing: -.028em; text-wrap: balance; }
+.dek { margin: 0; font-size: 1.1rem; line-height: 1.55; color: var(--ink-2); max-width: 40em; }
+.meta { font: 12px/1.5 var(--mono); color: var(--ink-3); }
+.key { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.key span::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--c); margin-right: 6px; vertical-align: middle; }
+
+h2 { font-size: 1.36rem; line-height: 1.25; font-weight: 600; letter-spacing: -.018em; margin: 56px 0 12px; text-wrap: balance; scroll-margin-top: 16px; }
+h2 .pn { font: 500 .74em/1 var(--mono); color: var(--ink-3); margin-right: .7em; letter-spacing: 0; }
+h3 { font-size: 1.04rem; font-weight: 600; letter-spacing: -.01em; margin: 30px 0 6px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 1.25em; }
+li { margin-bottom: 5px; }
+li::marker { color: var(--ink-3); }
+strong { font-weight: 600; }
+.mj { overflow-x: auto; overflow-y: hidden; margin: 4px 0 16px; padding: 2px 0; }
+mjx-container[display="true"] { margin: 0 !important; }
+
+/* plan and summary panels */
+.tldr { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 22px 6px; margin-bottom: 14px; }
+.tldr h2 { margin: 0 0 10px; font: 500 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.tldr ol { padding-left: 1.3em; }
+.tldr li { margin-bottom: 8px; }
+.tldr p { margin: 0 0 12px; font-size: 15.5px; }
+.tldr .tbl { margin: 4px 0 12px; }
+
+/* notes: quote-style, coloured by kind */
+.note { margin: 16px 0 20px; padding: 2px 0 2px 16px; border-left: 2px solid var(--c); color: var(--ink-2); font-size: .97em; }
+.note > .nl { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); margin: 4px 0 8px; }
+.note strong { color: var(--ink); }
+.note.ask { --c: var(--cell); }
+.note.say { --c: var(--hid); }
+.note.trap { --c: var(--grad); }
+.note.lab { --c: var(--cell); }
+.note .q { font-style: italic; color: var(--ink); }
+.note ul { margin: 0 0 10px; }
+.note li { margin-bottom: 5px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 6px 0 20px; }
+table { border-collapse: collapse; width: 100%; font-size: .93em; line-height: 1.5; }
+th { text-align: left; vertical-align: bottom; font: 500 11px/1.4 var(--mono); color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; padding: 0 14px 8px 0; border-bottom: 1px solid var(--ink-3); }
+td { padding: 8px 14px 8px 0; vertical-align: top; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+td .src { display: block; font: 11.5px/1.4 var(--mono); color: var(--ink-3); margin-top: 2px; }
+
+/* gate cards */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0 20px; }
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.gc { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 4px; font-size: 15.5px; line-height: 1.6; }
+.gc h4 { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.gc h4 .tag { font: 500 11px var(--mono); color: var(--c); }
+.gc.g1 { --c: var(--cell); }
+.gc.g2 { --c: var(--ink-3); }
+.gc p { margin-bottom: 10px; }
+
+/* figures */
+figure { margin: 18px 0 24px; }
+.plate { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 10px; overflow-x: auto; }
+.plate svg { display: block; width: 100%; height: auto; min-width: 460px; max-width: 700px; margin: 0 auto; }
+@media (max-width: 500px) { .plate svg { max-width: none; } }
+figcaption { font-size: .86rem; line-height: 1.5; color: var(--ink-3); margin-top: 10px; }
+.dg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink-2); }
+.dg .v { font-family: var(--serif); font-style: italic; font-size: 19px; fill: var(--ink); }
+.dg .v .s { font-size: 12.5px; }
+.dg .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; fill: var(--ink-3); }
+.dg .gl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--gate); }
+.dg .gs { font-family: var(--serif); font-style: normal; font-size: 12px; fill: var(--ink-3); }
+.dg .cl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--ink); }
+.dg .cs { font-family: var(--sans); font-size: 12px; fill: var(--ink-2); }
+.dg .optx { font: 500 17px var(--sans); fill: var(--ink); }
+.dg .cell { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.dg .hid { stroke: var(--hid); stroke-width: 2.4; fill: none; }
+.dg .hid.thick { stroke-width: 3.6; }
+.dg .in { stroke: var(--ink-3); stroke-width: 1.5; fill: none; }
+.dg .gw { stroke: var(--gate); stroke-width: 1.6; fill: none; }
+.dg .cw { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+.dg .grad { stroke: var(--grad); fill: none; stroke-linecap: round; }
+.dg .gbox { fill: var(--gate-wash); stroke: var(--gate); stroke-width: 1.3; }
+.dg .box { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .op { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.3; }
+.dg .dot { fill: var(--ink-2); }
+.dg .cellon { fill: var(--cell-wash); stroke: var(--cell); stroke-width: 1; }
+.dg .celloff { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.dg .stream { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.mk-cell { fill: var(--cell); } .mk-hid { fill: var(--hid); } .mk-in { fill: var(--ink-3); }
+.mk-gate { fill: var(--gate); } .mk-cw { fill: var(--ink-2); } .mk-grad { fill: var(--grad); }
+
+/* questions */
+details.qa { border-bottom: 1px solid var(--rule); }
+details.qa:first-of-type { border-top: 1px solid var(--rule); }
+details.qa summary { cursor: pointer; padding: 11px 2px; font-weight: 500; font-size: 15.5px; line-height: 1.45; list-style: none; display: flex; gap: 12px; }
+details.qa summary::-webkit-details-marker { display: none; }
+details.qa summary .qn { font: 500 11.5px/1.9 var(--mono); color: var(--ink-3); flex: none; min-width: 1.9em; }
+details.qa summary::after { content: "+"; margin-left: auto; color: var(--ink-3); flex: none; }
+details.qa[open] summary::after { content: "–"; }
+details.qa .ans { padding: 0 4px 12px 32px; font-size: 15.5px; color: var(--ink-2); }
+summary:focus-visible, a:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+
+.sheet { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 6px; }
+.sheet h3 { margin: 4px 0 6px; font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: .9rem; color: var(--ink-3); }
+
+/* code blocks */
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; margin: 8px 0 20px; overflow-x: auto; font: 12.8px/1.6 var(--mono); color: var(--ink); white-space: pre; }
+pre.code code { font: inherit; background: none; border: 0; padding: 0; }
+pre.code .cm { color: var(--ink-3); }
+@media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
+
+/* public copy: colours, fonts and sizes come from the site's tokens.css; this maps the notebook's
+   token names onto them (green_theme.css's own token block is left out of public pages). */
+:root {
+  --paper: var(--void); --ink: var(--text); --ink-2: var(--soft); --ink-3: var(--muted);
+  --accent: var(--amber);
+  --cell: var(--green); --cell-wash: var(--green-wash); --hid: var(--blue); --hid-wash: var(--blue-wash);
+  --gate: var(--neutral); --gate-wash: var(--neutral-wash); --grad: var(--orange); --grad-wash: var(--orange-wash);
+  --sans: var(--font-sans); --mono: var(--font-mono);
+  --serif: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
+}
+body { padding-block-start: 0; letter-spacing: 0; }
+/* the shared header sits inside the notebook's side padding */
+.site-header { width: min(100%, 1260px); margin-bottom: 40px; }
+.site-header a:hover { text-decoration: none; }
+@media (max-width: 720px) { .site-header { width: 100%; margin-bottom: 26px; } }
+/* the site's type scale */
+h1 { font-weight: 600; font-size: var(--fs-title); line-height: 1.12; letter-spacing: -.02em; }
+h2 { font-size: var(--fs-h2); letter-spacing: -.01em; }
+h3 { font-size: var(--fs-h3); }
+.dek { font-size: 18px; }
+.toc a.on { box-shadow: inset 2px 0 0 var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline-color: var(--accent); }
+footer .site-nav { display: block; margin-top: 10px; }
+.next { margin-top: 36px; font-weight: 500; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="a-cell" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path class="mk-cell" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-hid" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto"><path class="mk-hid" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-in" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-in" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-gate" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-cw" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-cw" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-grad" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path class="mk-grad" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">study notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
+<div class="page">
+  <nav class="toc" aria-label="Contents">
+    <details id="tocd" open>
+      <summary>Contents</summary>
+      <div class="label">Contents</div>
+      <ol>
+        <li><a href="#tldr"><span class="n">00</span>In short</a></li>
+        <li><a href="#tree"><span class="n">01</span>A tree, and the running example</a></li>
+        <li><a href="#impurity"><span class="n">02</span>Impurity: how mixed a node is</a></li>
+        <li><a href="#gain"><span class="n">03</span>Scoring a split</a></li>
+        <li><a href="#search"><span class="n">04</span>Searching for the split at a node</a></li>
+        <li><a href="#categorical"><span class="n">05</span>Categorical features</a></li>
+        <li><a href="#regression"><span class="n">06</span>Regression trees</a></li>
+        <li><a href="#grow"><span class="n">07</span>Growing the tree, greedily</a></li>
+        <li><a href="#leaves"><span class="n">08</span>What a leaf predicts</a></li>
+        <li><a href="#calibration"><span class="n">09</span>Are the probabilities calibrated?</a></li>
+        <li><a href="#prepruning"><span class="n">10</span>Overfitting, and stopping early</a></li>
+        <li><a href="#pruning"><span class="n">11</span>Cost-complexity pruning</a></li>
+        <li><a href="#missing"><span class="n">12</span>Missing values</a></li>
+        <li><a href="#behaviour"><span class="n">13</span>How trees behave</a></li>
+        <li><a href="#importance"><span class="n">14</span>Feature importance</a></li>
+        <li><a href="#whatif"><span class="n">15</span>What-ifs</a></li>
+        <li><a href="#pseudocode"><span class="n">16</span>The algorithm in pseudocode</a></li>
+        <li><a href="#when"><span class="n">17</span>When to use one tree, and when not</a></li>
+        <li><a href="#questions"><span class="n">18</span>Interview questions</a></li>
+        <li><a href="#sheet"><span class="n">19</span>Cheat sheet</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <article>
+    <header class="hero">
+      <div class="tag">Study notes · Trees</div>
+      <h1>Decision trees</h1>
+      <p class="dek">What happens at every node of a decision tree: how the split is searched and scored, what a leaf predicts and how far to trust it, how growth is stopped and pruned, where missing values and categories go, and why trees behave as they do.</p>
+      <div class="meta">About 45 minutes, plus the questions · one small credit dataset, worked node by node</div>
+    </header>
+
+    <section class="tldr" id="tldr" aria-labelledby="tldr-h">
+      <h2 id="tldr-h">In short</h2>
+      <ol>
+        <li>A tree asks one-feature yes/no questions and predicts a constant in each leaf: the class shares for classification, the mean for regression. The model is piecewise constant on axis-parallel boxes.</li>
+        <li>At every node it tries every feature and every threshold. Sort the feature, put one candidate in each gap between distinct values, and sweep once with running counts, scoring each candidate by the size-weighted drop in impurity. That's \(O(d\,n\log n)\) per node, dominated by the sort.</li>
+        <li>Gini \(1 - \sum_k p_k^2\) and entropy \(-\sum_k p_k \log p_k\) are nearly the same curve, so they almost always pick the same split. Regression uses variance. Misclassification error is a bad criterion: it's straight-sided, so a split that sharpens the class shares without flipping a majority scores zero.</li>
+        <li>Growth is greedy: the best split now, never revisited. It can't see a pattern like XOR, where no single split helps, and finding the optimal tree is NP-complete.</li>
+        <li>Left alone, a tree grows until its leaves are pure and memorizes the noise. Stop it early (<code>min_samples_leaf</code>, <code>max_depth</code>) or grow it fully and prune with \(R(T) + \alpha\lvert T\rvert\), choosing \(\alpha\) by cross-validation.</li>
+        <li>A leaf's probability is its training share \(k/n\): noisy in small leaves, pushed towards 0 and 1 because the tree picked those leaves for looking extreme, and exactly 0 or 1 when pure. Use bigger leaves, smooth, or calibrate.</li>
+        <li>Trees need no scaling, find interactions, shrug off outliers in the features and learn where to send missing values. They can't extrapolate, they draw diagonals as staircases, they're high-variance, and they favour features with many distinct values, in splits and in impurity importance.</li>
+      </ol>
+    </section>
+
+    <!-- tree -->
+    <h2 id="tree"><span class="pn">01</span>A tree, and the running example</h2>
+    <p>Every number on this page comes from one made-up dataset of 5,000 loan applicants, so the true rule is known and every result can be checked against it.</p>
+    <ul>
+      <li><strong>income</strong>: monthly income, ₹15k to ₹150k.</li>
+      <li><strong>emi</strong>: the share of that income already going to loan EMIs, 0 to 0.8.</li>
+      <li><strong>late</strong>: late payments in the last year (0, 1, 2, …).</li>
+      <li><strong>age</strong>: 21 to 60. It has <em>no effect</em> on default: a decoy.</li>
+    </ul>
+    <p><strong>The truth is a set of flat steps.</strong> Everyone starts at a 3% chance of default. Being <em>stressed</em> (EMIs over half of income <em>and</em> income under ₹40k) adds 45 points, and 2 or more late payments add 25. So the true chance takes only four values:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>True chance</th><th>Who</th><th>Applicants</th></tr></thead>
+      <tbody>
+        <tr><td>3%</td><td>neither</td><td>4,145</td></tr>
+        <tr><td>28%</td><td>2+ late payments only</td><td>529</td></tr>
+        <tr><td>48%</td><td>stressed only</td><td>293</td></tr>
+        <tr><td>73%</td><td>both</td><td>33</td></tr>
+      </tbody>
+    </table></div>
+    <p>8.7% of applicants default. Models train on 3,500 rows and are scored on the other 1,500 by two numbers.</p>
+    <p><strong>AUC</strong> is the chance that a random defaulter scores above a random payer (0.5 is a coin flip, 1 is perfect): it judges the ranking. <strong>Log loss</strong> averages \(-\log\) of the probability given to what actually happened (lower is better; confident mistakes cost a lot): it judges the probabilities.</p>
+    <p>Predicting the true chances gets an AUC of 0.817 and a log loss of 0.212, the best any model can do on average, since defaults are random (on one test set a model can edge past it by luck; see <a href="#when">section 17</a>). A second target, the <strong>credit limit</strong>, is \(2 \times \text{income} \times (1 - \text{emi})\) plus noise with spread 10; it's used for regression.</p>
+
+    <h3>Questions, nodes and leaves</h3>
+    <p>A decision tree predicts by asking one yes/no question at a time, each about a single feature: “is <code>late</code> at most 1?” That question is a <strong>split</strong>, and the number it compares against is the <strong>threshold</strong>. Rows that answer yes go left, the rest go right, and each group gets its own next question.</p>
+    <ul>
+      <li>Each group along the way is a <strong>node</strong>; the first, holding everyone, is the <strong>root</strong>.</li>
+      <li>A node that asks no further question is a <strong>leaf</strong>. It holds the prediction.</li>
+      <li>The number of questions on the longest root-to-leaf path is the <strong>depth</strong>.</li>
+    </ul>
+    <p>A tree with depth limited to 3, fitted to the training applicants:</p>
+    <figure>
+      <div class="plate"><svg class="dg" viewBox="0 0 720 300" role="img" aria-label="The depth-3 tree drawn out. Root: late at most 1.5, 3,500 applicants, 8.7 percent default. Left child: income at most 39.46, 3,106 applicants, 5.9 percent. Right child: income at most 40.51, 394 applicants, 30.5 percent. Eight leaves, left to right: 3.7, 49.3, 2.5, 6.7, 30.2, 90, 55.6 and 25.2 percent default, holding 382, 213, 2,436, 75, 43, 20, 18 and 313 applicants. The splits income at most 146.44 and age at most 23.18 are drawn dashed: they are noise."><path class="in" d="M360 50 L180 86"/><path class="in" d="M360 50 L540 86"/><path class="in" d="M180 128 L90 164"/><path class="in" d="M180 128 L270 164"/><path class="in" d="M540 128 L450 164"/><path class="in" d="M540 128 L630 164"/><path class="in" d="M90 206 L45 246"/><path class="in" d="M90 206 L135 246"/><path class="in" d="M270 206 L225 246"/><path class="in" d="M270 206 L315 246"/><path class="in" d="M450 206 L405 246"/><path class="in" d="M450 206 L495 246"/><path class="in" d="M630 206 L585 246"/><path class="in" d="M630 206 L675 246"/><rect class="box" x="285.0" y="8" width="150" height="42" rx="7" /><text x="360" y="26" text-anchor="middle" style="fill:var(--ink)">late ≤ 1.5</text><text class="lbl" x="360" y="42" text-anchor="middle">3,500 · 8.7%</text><rect class="box" x="105.0" y="86" width="150" height="42" rx="7" /><text x="180" y="104" text-anchor="middle" style="fill:var(--ink)">income ≤ 39.46</text><text class="lbl" x="180" y="120" text-anchor="middle">3,106 · 5.9%</text><rect class="box" x="465.0" y="86" width="150" height="42" rx="7" /><text x="540" y="104" text-anchor="middle" style="fill:var(--ink)">income ≤ 40.51</text><text class="lbl" x="540" y="120" text-anchor="middle">394 · 30.5%</text><rect class="box" x="15.0" y="164" width="150" height="42" rx="7" /><text x="90" y="182" text-anchor="middle" style="fill:var(--ink)">emi ≤ 0.50</text><text class="lbl" x="90" y="198" text-anchor="middle">595 · 20.0%</text><rect class="box" x="195.0" y="164" width="150" height="42" rx="7" style="stroke-dasharray:5 4"/><text x="270" y="182" text-anchor="middle" style="fill:var(--ink)">income ≤ 146.44</text><text class="lbl" x="270" y="198" text-anchor="middle">2,511 · 2.6%</text><rect class="box" x="375.0" y="164" width="150" height="42" rx="7" /><text x="450" y="182" text-anchor="middle" style="fill:var(--ink)">emi ≤ 0.53</text><text class="lbl" x="450" y="198" text-anchor="middle">63 · 49.2%</text><rect class="box" x="555.0" y="164" width="150" height="42" rx="7" style="stroke-dasharray:5 4"/><text x="630" y="182" text-anchor="middle" style="fill:var(--ink)">age ≤ 23.18</text><text class="lbl" x="630" y="198" text-anchor="middle">331 · 26.9%</text><rect class="box" x="5.0" y="246" width="80" height="44" rx="7" /><text x="45" y="265" text-anchor="middle" style="fill:var(--ink);font-weight:600">3.7%</text><text class="lbl" x="45" y="282" text-anchor="middle">382 rows</text><rect class="box" x="95.0" y="246" width="80" height="44" rx="7" style="fill:var(--grad-wash);stroke:var(--grad)"/><text x="135" y="265" text-anchor="middle" style="fill:var(--ink);font-weight:600">49.3%</text><text class="lbl" x="135" y="282" text-anchor="middle">213 rows</text><rect class="box" x="185.0" y="246" width="80" height="44" rx="7" /><text x="225" y="265" text-anchor="middle" style="fill:var(--ink);font-weight:600">2.5%</text><text class="lbl" x="225" y="282" text-anchor="middle">2,436 rows</text><rect class="box" x="275.0" y="246" width="80" height="44" rx="7" /><text x="315" y="265" text-anchor="middle" style="fill:var(--ink);font-weight:600">6.7%</text><text class="lbl" x="315" y="282" text-anchor="middle">75 rows</text><rect class="box" x="365.0" y="246" width="80" height="44" rx="7" /><text x="405" y="265" text-anchor="middle" style="fill:var(--ink);font-weight:600">30.2%</text><text class="lbl" x="405" y="282" text-anchor="middle">43 rows</text><rect class="box" x="455.0" y="246" width="80" height="44" rx="7" style="fill:var(--grad-wash);stroke:var(--grad)"/><text x="495" y="265" text-anchor="middle" style="fill:var(--ink);font-weight:600">90%</text><text class="lbl" x="495" y="282" text-anchor="middle">20 rows</text><rect class="box" x="545.0" y="246" width="80" height="44" rx="7" style="fill:var(--grad-wash);stroke:var(--grad)"/><text x="585" y="265" text-anchor="middle" style="fill:var(--ink);font-weight:600">55.6%</text><text class="lbl" x="585" y="282" text-anchor="middle">18 rows</text><rect class="box" x="635.0" y="246" width="80" height="44" rx="7" /><text x="675" y="265" text-anchor="middle" style="fill:var(--ink);font-weight:600">25.2%</text><text class="lbl" x="675" y="282" text-anchor="middle">313 rows</text><text class="lbl" x="250" y="74" text-anchor="middle">yes</text><text class="lbl" x="470" y="74" text-anchor="middle">no</text></svg></div>
+      <figcaption>The depth-3 tree. Each box shows its question, then the training rows that reach it and their default share; left is “yes”. Leaves show the share they predict. The dashed splits are noise; the shaded leaves are the high-risk ones.</figcaption>
+    </figure>
+    <p>The same tree as rules, each leaf's default share next to the truth:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Rule</th><th>Rows</th><th>Share</th><th>Truth</th></tr></thead>
+      <tbody>
+        <tr><td>late ≤ 1, income ≤ 39.46, emi ≤ 0.50</td><td>382</td><td>3.7%</td><td>3%</td></tr>
+        <tr><td>late ≤ 1, income ≤ 39.46, emi &gt; 0.50</td><td>213</td><td>49.3%</td><td>48%</td></tr>
+        <tr><td>late ≤ 1, income 39.46–146.44</td><td>2,436</td><td>2.5%</td><td>3%</td></tr>
+        <tr><td>late ≤ 1, income &gt; 146.44</td><td>75</td><td>6.7%</td><td>3% (noise split)</td></tr>
+        <tr><td>late ≥ 2, income ≤ 40.51, emi ≤ 0.53</td><td>43</td><td>30.2%</td><td>about 30%</td></tr>
+        <tr><td>late ≥ 2, income ≤ 40.51, emi &gt; 0.53</td><td>20</td><td>90%</td><td>73%</td></tr>
+        <tr><td>late ≥ 2, income &gt; 40.51, age ≤ 23.18</td><td>18</td><td>55.6%</td><td>28% (noise split)</td></tr>
+        <tr><td>late ≥ 2, income &gt; 40.51, age &gt; 23.18</td><td>313</td><td>25.2%</td><td>28%</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>The tree found the truth without being told it:</strong> late payments first, then income near ₹40k, then EMI share near 0.5. It also made two <strong>noise splits</strong>. <code>income ≤ 146.44</code> separates 6.7% from 2.5% by chance. <code>age ≤ 23.18</code> is worse: age has no effect, but in a branch of 331 applicants, 10 of the 18 youngest happened to default. Small branches are where trees fool themselves; <a href="#lottery">section 04</a> shows why such splits win.</p>
+    <p><strong>The whole model is 8 numbers.</strong> A new applicant follows the questions to one leaf and gets that leaf's training share of defaults as their probability. As a formula, with leaves \(R_1, \dots, R_J\) (the boxes) and leaf values \(c_j\):</p>
+    <div class="mj">\[ f(x) = \sum_{j=1}^{J} c_j\, \mathbf 1\{x \in R_j\} \]</div>
+    <p>Exactly one indicator is 1 for any \(x\), so the prediction is flat inside each box and jumps between boxes: the model is <strong>piecewise constant</strong>. Each question cuts one axis at one value, so every box has sides parallel to the axes. The tree is <strong>non-parametric</strong>: the number of splits grows with the data, with no fixed set of weights. On the test set it scores an AUC of 0.808 and a log loss of 0.216, close to the best possible (0.817, 0.212).</p>
+    <ul>
+      <li><strong>Prediction is cheap:</strong> one root-to-leaf path, at most depth comparisons, \(O(\text{depth})\). A depth-3 tree is three nested <code>if</code> statements, easy to port to SQL or a rules engine.</li>
+      <li><strong>CART vs ID3/C4.5:</strong> CART (Breiman and others, 1984) is the algorithm sklearn follows: binary splits, Gini or entropy for classification, squared error for regression, cost-complexity pruning. ID3 and C4.5 (Quinlan) use entropy-based gain (C4.5 the gain ratio, <a href="#gain-ratio">section 03</a>) and split a category into one branch per value.</li>
+      <li><strong>Why binary splits:</strong> a multiway split cuts the rows into many small pieces at once and inflates the gain of many-valued features. Any multiway split can be written as a sequence of binary ones, so binary trees lose nothing in what they can express, and the data decides how finely to cut.</li>
+    </ul>
+
+    <!-- impurity -->
+    <h2 id="impurity"><span class="pn">02</span>Impurity: how mixed a node is</h2>
+    <p>A good question separates defaulters from payers. To score questions, first measure how mixed one group is: the node's <strong>impurity</strong>. It's 0 when the node is <strong>pure</strong> (everyone had the same outcome) and largest at an even mix. Write \(p_k\) for the share of class \(k\) in the node.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Measure</th><th>Formula</th><th>In plain words</th></tr></thead>
+      <tbody>
+        <tr><td>Gini</td><td>\(1 - \sum_k p_k^2\)</td><td>The chance that two rows drawn at random from the node (with replacement) have different classes</td></tr>
+        <tr><td>Entropy</td><td>\(-\sum_k p_k \log_2 p_k\)</td><td>How many yes/no questions per row it takes to learn the classes, averaged over many rows (asking cleverly about batches)</td></tr>
+        <tr><td>Misclassification error</td><td>\(1 - \max_k p_k\)</td><td>The share you'd get wrong by predicting the node's majority for everyone</td></tr>
+      </tbody>
+    </table></div>
+    <p>With two classes and \(p\) the share of defaults, Gini is \(1 - p^2 - (1 - p)^2 = 2p(1 - p)\). For a node with 1 default among 4 rows (\(p = 0.25\)):</p>
+    <div class="mj">\[ \begin{aligned} \text{Gini} &amp;= 1 - 0.25^2 - 0.75^2 = 0.375 \\ \text{entropy} &amp;= -0.25\log_2 0.25 - 0.75\log_2 0.75 \\ &amp;= 0.5 + 0.311 = 0.811 \\ \text{misclass.} &amp;= 1 - 0.75 = 0.25 \end{aligned} \]</div>
+    <ul>
+      <li><strong>At a 50/50 node</strong> the three are 0.5, 1 and 0.5, their maxima. With \(K\) equally common classes Gini peaks at \(1 - 1/K\) and entropy at \(\log_2 K\).</li>
+      <li><strong>The whole training set</strong> (8.7% defaults) has Gini 0.159 and entropy 0.426 bits: fairly pure, because the answer is usually “repaid”.</li>
+      <li><strong>Gini as two random picks:</strong> both picks are class \(k\) with probability \(p_k^2\), so they match with probability \(\sum_k p_k^2\) and differ with probability \(1 - \sum_k p_k^2\).</li>
+      <li><strong>A common slip:</strong> “the tree maximizes entropy.” It looks for children with <em>low</em> entropy, so it maximizes the <em>drop</em> in entropy.</li>
+    </ul>
+    <p>Plotted against \(p\), all three are hills: 0 at both ends, highest at 0.5. Gini and entropy are smooth curves of almost the same shape; misclassification error is a tent with straight sides. That shape difference decides which of them can find good splits (the figure in <a href="#gain">section 03</a>).</p>
+
+    <!-- gain -->
+    <h2 id="gain"><span class="pn">03</span>Scoring a split</h2>
+    <p>A split is good if its two children are purer than the parent. Score it by the drop in impurity, with the children's impurities averaged <strong>by size</strong>: a child holding 90% of the rows counts for 90%. The drop is the split's <strong>gain</strong> (sklearn's “impurity decrease”); with entropy it's called <strong>information gain</strong>, which is also the mutual information between the split's answer and the label.</p>
+    <div class="mj">\[ \text{gain} = I(P) - \frac{n_L}{n}\, I(L) - \frac{n_R}{n}\, I(R) \]</div>
+    <p>\(I\) is the impurity of the parent \(P\) and the left and right children \(L, R\); \(n\) is the parent's rows, and \(n_L, n_R\) the rows sent left and right.</p>
+
+    <h3>By hand: ten applicants, “late ≤ 1”</h3>
+    <p>Ten made-up applicants with late payments 0 0 0 1 1 1 2 2 3 3 and outcomes 0 0 0 0 1 0 1 1 1 0 (1 = default). The split “late ≤ 1” sends six left and four right:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Node</th><th>Defaults</th><th>Gini</th><th>Entropy</th></tr></thead>
+      <tbody>
+        <tr><td>Parent</td><td>4 of 10</td><td>\(2(0.4)(0.6) = 0.480\)</td><td>0.971</td></tr>
+        <tr><td>Left (late ≤ 1)</td><td>1 of 6</td><td>\(2(\tfrac16)(\tfrac56) = 0.278\)</td><td>0.650</td></tr>
+        <tr><td>Right (late ≥ 2)</td><td>3 of 4</td><td>\(2(0.75)(0.25) = 0.375\)</td><td>0.811</td></tr>
+      </tbody>
+    </table></div>
+    <p>With Gini:</p>
+    <div class="mj">\[ \begin{aligned} \text{children} &amp;= 0.6(0.278) + 0.4(0.375) = 0.317 \\ \text{gain} &amp;= 0.480 - 0.317 = 0.163 \end{aligned} \]</div>
+    <p>With entropy, the information gain (IG) in bits:</p>
+    <div class="mj">\[ \begin{aligned} \text{children} &amp;= 0.6(0.650) + 0.4(0.811) = 0.715 \\ \text{IG} &amp;= 0.971 - 0.715 = 0.256 \end{aligned} \]</div>
+
+    <h3 id="count-form">What the code actually computes</h3>
+    <p>Write \(n_{Lk}\) for the rows of class \(k\) on the left (and \(n_{Rk}\) on the right). Since \(n_L\, \text{Gini}_L = n_L - \sum_k n_{Lk}^2 / n_L\), the children's weighted Gini is</p>
+    <div class="mj">\[ \begin{aligned} \text{children} &amp;= \frac{n_L}{n}\text{Gini}_L + \frac{n_R}{n}\text{Gini}_R \\ &amp;= 1 - \frac{1}{n}\Big( \sum_k \frac{n_{Lk}^2}{n_L} + \sum_k \frac{n_{Rk}^2}{n_R} \Big) \end{aligned} \]</div>
+    <p>So the best split simply maximizes \(\sum_k n_{Lk}^2/n_L + \sum_k n_{Rk}^2/n_R\), which needs only the class counts on each side. For the toy split (5 payers and 1 default left, 1 and 3 right):</p>
+    <div class="mj">\[ \begin{aligned} \tfrac{5^2 + 1^2}{6} + \tfrac{1^2 + 3^2}{4} &amp;= 6.833 \\ 1 - 6.833/10 &amp;= 0.317 \end{aligned} \]</div>
+    <p>the same 0.317 as above. Counts are what the sweep in <a href="#search">section 04</a> updates in \(O(1)\) per row.</p>
+
+    <h3>Why weight by size</h3>
+    <p>Take a split that isolates a single payer (on an ID column, say). That one-row child is pure and the other nine barely change. Weighted, the gain is 0.036, almost useless. Unweighted (a plain average of the two children), the gain is 0.233, which would beat the real split scored the same way (0.154). Without the weights, peeling off one pure row would win every time.</p>
+
+    <h3 id="misclass">Why not misclassification error</h3>
+    <p>Score the real root split, late ≤ 1, on all 3,500 training applicants. It moves the default share from 8.7% to 5.9% on the left and 30.5% on the right: the most useful split there is.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Criterion</th><th>Gain of late ≤ 1 at the root</th></tr></thead>
+      <tbody>
+        <tr><td>Gini</td><td>0.012</td></tr>
+        <tr><td>Entropy</td><td>0.038</td></tr>
+        <tr><td>Misclassification</td><td>0 (exactly)</td></tr>
+      </tbody>
+    </table></div>
+    <p>Both children still have a payer majority, so “predict the majority” makes the same mistakes before and after the split. Over every feature and threshold at the root, the best misclassification gain is one applicant in 3,500. A tree grown on it would barely start.</p>
+    <figure>
+      <div class="plate"><svg class="dg" viewBox="0 0 700 290" role="img" aria-label="Gini, half the entropy and misclassification error plotted against the class share p: three hills, zero at both ends, highest at 0.5. Gini and entropy are smooth curves; misclassification is a tent with straight sides. For a parent at p = 0.2 split into children at 0.05 and 0.45, the size-weighted average of the children lies on the chord between them: below the Gini curve, so the gain is positive, but exactly on the tent, so misclassification gain is zero."><path d="M50 250 H450" style="stroke:var(--ink-3);stroke-width:1;fill:none"/><path d="M50 250 V34" style="stroke:var(--ink-3);stroke-width:1;fill:none"/><text class="lbl" x="50" y="266" text-anchor="middle">0</text><text class="lbl" x="250.0" y="266" text-anchor="middle">0.5</text><text class="lbl" x="450" y="266" text-anchor="middle">1</text><text class="lbl" x="250.0" y="284" text-anchor="middle">share of class 1 in the node, p</text><text class="lbl" x="42" y="149.0" text-anchor="end">0.25</text><text class="lbl" x="42" y="44.0" text-anchor="end">0.5</text><path d="M50.4 247.6 L52.1 240.2 L53.7 234.0 L55.4 228.4 L57.1 223.1 L58.7 218.2 L60.4 213.5 L62.0 209.1 L63.7 204.8 L65.4 200.6 L67.0 196.7 L68.7 192.8 L70.4 189.1 L72.0 185.4 L73.7 181.9 L75.3 178.5 L77.0 175.1 L78.7 171.8 L80.3 168.6 L82.0 165.5 L83.7 162.5 L85.3 159.5 L87.0 156.6 L88.7 153.8 L90.3 151.0 L92.0 148.3 L93.6 145.6 L95.3 143.0 L97.0 140.4 L98.6 137.9 L100.3 135.4 L102.0 133.0 L103.6 130.6 L105.3 128.3 L107.0 126.0 L108.6 123.8 L110.3 121.6 L111.9 119.4 L113.6 117.3 L115.3 115.2 L116.9 113.2 L118.6 111.2 L120.3 109.2 L121.9 107.3 L123.6 105.4 L125.2 103.5 L126.9 101.7 L128.6 99.9 L130.2 98.1 L131.9 96.4 L133.6 94.7 L135.2 93.1 L136.9 91.4 L138.6 89.8 L140.2 88.3 L141.9 86.7 L143.5 85.2 L145.2 83.7 L146.9 82.3 L148.5 80.9 L150.2 79.5 L151.9 78.1 L153.5 76.8 L155.2 75.4 L156.9 74.2 L158.5 72.9 L160.2 71.7 L161.8 70.5 L163.5 69.3 L165.2 68.1 L166.8 67.0 L168.5 65.9 L170.2 64.8 L171.8 63.8 L173.5 62.7 L175.2 61.7 L176.8 60.8 L178.5 59.8 L180.1 58.9 L181.8 58.0 L183.5 57.1 L185.1 56.2 L186.8 55.4 L188.5 54.6 L190.1 53.8 L191.8 53.0 L193.4 52.3 L195.1 51.6 L196.8 50.9 L198.4 50.2 L200.1 49.5 L201.8 48.9 L203.4 48.3 L205.1 47.7 L206.8 47.1 L208.4 46.6 L210.1 46.1 L211.7 45.6 L213.4 45.1 L215.1 44.6 L216.7 44.2 L218.4 43.8 L220.1 43.4 L221.7 43.0 L223.4 42.7 L225.0 42.4 L226.7 42.1 L228.4 41.8 L230.0 41.5 L231.7 41.3 L233.4 41.0 L235.0 40.8 L236.7 40.7 L238.4 40.5 L240.0 40.4 L241.7 40.3 L243.3 40.2 L245.0 40.1 L246.7 40.0 L248.3 40.0 L250.0 40.0 L251.7 40.0 L253.3 40.0 L255.0 40.1 L256.7 40.2 L258.3 40.3 L260.0 40.4 L261.6 40.5 L263.3 40.7 L265.0 40.8 L266.6 41.0 L268.3 41.3 L270.0 41.5 L271.6 41.8 L273.3 42.1 L274.9 42.4 L276.6 42.7 L278.3 43.0 L279.9 43.4 L281.6 43.8 L283.3 44.2 L284.9 44.6 L286.6 45.1 L288.3 45.6 L289.9 46.1 L291.6 46.6 L293.2 47.1 L294.9 47.7 L296.6 48.3 L298.2 48.9 L299.9 49.5 L301.6 50.2 L303.2 50.9 L304.9 51.6 L306.6 52.3 L308.2 53.0 L309.9 53.8 L311.5 54.6 L313.2 55.4 L314.9 56.2 L316.5 57.1 L318.2 58.0 L319.9 58.9 L321.5 59.8 L323.2 60.8 L324.9 61.7 L326.5 62.7 L328.2 63.8 L329.8 64.8 L331.5 65.9 L333.2 67.0 L334.8 68.1 L336.5 69.3 L338.2 70.5 L339.8 71.7 L341.5 72.9 L343.1 74.2 L344.8 75.4 L346.5 76.8 L348.1 78.1 L349.8 79.5 L351.5 80.9 L353.1 82.3 L354.8 83.7 L356.5 85.2 L358.1 86.7 L359.8 88.3 L361.4 89.8 L363.1 91.4 L364.8 93.1 L366.4 94.7 L368.1 96.4 L369.8 98.1 L371.4 99.9 L373.1 101.7 L374.8 103.5 L376.4 105.4 L378.1 107.3 L379.7 109.2 L381.4 111.2 L383.1 113.2 L384.7 115.2 L386.4 117.3 L388.1 119.4 L389.7 121.6 L391.4 123.8 L393.0 126.0 L394.7 128.3 L396.4 130.6 L398.0 133.0 L399.7 135.4 L401.4 137.9 L403.0 140.4 L404.7 143.0 L406.4 145.6 L408.0 148.3 L409.7 151.0 L411.3 153.8 L413.0 156.6 L414.7 159.5 L416.3 162.5 L418.0 165.5 L419.7 168.6 L421.3 171.8 L423.0 175.1 L424.7 178.5 L426.3 181.9 L428.0 185.4 L429.6 189.1 L431.3 192.8 L433.0 196.7 L434.6 200.6 L436.3 204.8 L438.0 209.1 L439.6 213.5 L441.3 218.2 L442.9 223.1 L444.6 228.4 L446.3 234.0 L447.9 240.2 L449.6 247.6" style="stroke:var(--ink-3);stroke-width:1.6;fill:none;stroke-dasharray:4 3"/><path d="M50.4 249.2 L52.1 245.7 L53.7 242.2 L55.4 238.8 L57.1 235.4 L58.7 232.1 L60.4 228.8 L62.0 225.5 L63.7 222.2 L65.4 219.0 L67.0 215.8 L68.7 212.6 L70.4 209.4 L72.0 206.3 L73.7 203.2 L75.3 200.1 L77.0 197.1 L78.7 194.1 L80.3 191.1 L82.0 188.2 L83.7 185.3 L85.3 182.4 L87.0 179.5 L88.7 176.7 L90.3 173.9 L92.0 171.1 L93.6 168.3 L95.3 165.6 L97.0 162.9 L98.6 160.3 L100.3 157.7 L102.0 155.1 L103.6 152.5 L105.3 149.9 L107.0 147.4 L108.6 144.9 L110.3 142.5 L111.9 140.1 L113.6 137.7 L115.3 135.3 L116.9 133.0 L118.6 130.7 L120.3 128.4 L121.9 126.1 L123.6 123.9 L125.2 121.7 L126.9 119.5 L128.6 117.4 L130.2 115.3 L131.9 113.2 L133.6 111.2 L135.2 109.2 L136.9 107.2 L138.6 105.2 L140.2 103.3 L141.9 101.4 L143.5 99.5 L145.2 97.6 L146.9 95.8 L148.5 94.0 L150.2 92.3 L151.9 90.6 L153.5 88.9 L155.2 87.2 L156.9 85.6 L158.5 83.9 L160.2 82.4 L161.8 80.8 L163.5 79.3 L165.2 77.8 L166.8 76.3 L168.5 74.9 L170.2 73.5 L171.8 72.1 L173.5 70.7 L175.2 69.4 L176.8 68.1 L178.5 66.9 L180.1 65.6 L181.8 64.4 L183.5 63.2 L185.1 62.1 L186.8 61.0 L188.5 59.9 L190.1 58.8 L191.8 57.8 L193.4 56.8 L195.1 55.8 L196.8 54.9 L198.4 54.0 L200.1 53.1 L201.8 52.2 L203.4 51.4 L205.1 50.6 L206.8 49.8 L208.4 49.1 L210.1 48.4 L211.7 47.7 L213.4 47.0 L215.1 46.4 L216.7 45.8 L218.4 45.2 L220.1 44.7 L221.7 44.2 L223.4 43.7 L225.0 43.3 L226.7 42.8 L228.4 42.5 L230.0 42.1 L231.7 41.8 L233.4 41.5 L235.0 41.2 L236.7 40.9 L238.4 40.7 L240.0 40.5 L241.7 40.4 L243.3 40.2 L245.0 40.1 L246.7 40.1 L248.3 40.0 L250.0 40.0 L251.7 40.0 L253.3 40.1 L255.0 40.1 L256.7 40.2 L258.3 40.4 L260.0 40.5 L261.6 40.7 L263.3 40.9 L265.0 41.2 L266.6 41.5 L268.3 41.8 L270.0 42.1 L271.6 42.5 L273.3 42.8 L274.9 43.3 L276.6 43.7 L278.3 44.2 L279.9 44.7 L281.6 45.2 L283.3 45.8 L284.9 46.4 L286.6 47.0 L288.3 47.7 L289.9 48.4 L291.6 49.1 L293.2 49.8 L294.9 50.6 L296.6 51.4 L298.2 52.2 L299.9 53.1 L301.6 54.0 L303.2 54.9 L304.9 55.8 L306.6 56.8 L308.2 57.8 L309.9 58.8 L311.5 59.9 L313.2 61.0 L314.9 62.1 L316.5 63.2 L318.2 64.4 L319.9 65.6 L321.5 66.9 L323.2 68.1 L324.9 69.4 L326.5 70.7 L328.2 72.1 L329.8 73.5 L331.5 74.9 L333.2 76.3 L334.8 77.8 L336.5 79.3 L338.2 80.8 L339.8 82.4 L341.5 83.9 L343.1 85.6 L344.8 87.2 L346.5 88.9 L348.1 90.6 L349.8 92.3 L351.5 94.0 L353.1 95.8 L354.8 97.6 L356.5 99.5 L358.1 101.4 L359.8 103.3 L361.4 105.2 L363.1 107.2 L364.8 109.2 L366.4 111.2 L368.1 113.2 L369.8 115.3 L371.4 117.4 L373.1 119.5 L374.8 121.7 L376.4 123.9 L378.1 126.1 L379.7 128.4 L381.4 130.7 L383.1 133.0 L384.7 135.3 L386.4 137.7 L388.1 140.1 L389.7 142.5 L391.4 144.9 L393.0 147.4 L394.7 149.9 L396.4 152.5 L398.0 155.1 L399.7 157.7 L401.4 160.3 L403.0 162.9 L404.7 165.6 L406.4 168.3 L408.0 171.1 L409.7 173.9 L411.3 176.7 L413.0 179.5 L414.7 182.4 L416.3 185.3 L418.0 188.2 L419.7 191.1 L421.3 194.1 L423.0 197.1 L424.7 200.1 L426.3 203.2 L428.0 206.3 L429.6 209.4 L431.3 212.6 L433.0 215.8 L434.6 219.0 L436.3 222.2 L438.0 225.5 L439.6 228.8 L441.3 232.1 L442.9 235.4 L444.6 238.8 L446.3 242.2 L447.9 245.7 L449.6 249.2" class="hid"/><path d="M50 250.0 L250.0 40.0 L450 250.0" style="stroke:var(--grad);stroke-width:2;fill:none"/><path d="M70.0 210.1 L230.0 42.1" style="stroke:var(--hid);stroke-width:1.4;fill:none;stroke-dasharray:5 3"/><circle cx="70.0" cy="210.1" r="4" style="fill:var(--hid)"/><circle cx="70.0" cy="229.0" r="4" style="fill:var(--grad)"/><circle cx="230.0" cy="42.1" r="4" style="fill:var(--hid)"/><circle cx="230.0" cy="61.0" r="4" style="fill:var(--grad)"/><path d="M130.0 115.6 V147.1" style="stroke:var(--hid);stroke-width:3;fill:none"/><circle cx="130.0" cy="115.6" r="4" style="fill:var(--surface);stroke:var(--hid);stroke-width:2"/><circle cx="130.0" cy="166.0" r="4" style="fill:var(--surface);stroke:var(--grad);stroke-width:2"/><path d="M130.0 107.6 V48" style="stroke:var(--ink-3);stroke-width:1;fill:none;stroke-dasharray:2 3"/><text class="lbl" x="130.0" y="42" text-anchor="middle">parent p = 0.2</text><text x="140.0" y="135.3" style="fill:var(--hid);font-size:12px">gain 0.075</text><path d="M480 70 h26" class="hid"/><text x="514" y="74">Gini, 2p(1 − p)</text><path d="M480 96 h26" style="stroke:var(--ink-3);stroke-width:1.6;stroke-dasharray:4 3"/><text x="514" y="100">entropy ÷ 2</text><path d="M480 122 h26" style="stroke:var(--grad);stroke-width:2"/><text x="514" y="126">misclassification</text><text class="lbl" x="480" y="164">children at p = 0.05, 0.45</text><text class="lbl" x="480" y="182">Gini: chord below the</text><text class="lbl" x="480" y="198">curve, gain 0.075</text><text class="lbl" x="480" y="220">misclassification: chord</text><text class="lbl" x="480" y="236">on the straight side, gain 0</text></svg></div>
+      <figcaption>The three impurities against the class share. The parent's share is the size-weighted average of the children's, so the children's weighted impurity lies on the straight chord between them. Under a curve that bends down (Gini, entropy) the chord is below the parent's point; on the tent's straight side it's on it.</figcaption>
+    </figure>
+    <p><strong>The geometry.</strong> The parent's share is the weighted average of the children's, \(p = \frac{n_L}{n}p_L + \frac{n_R}{n}p_R\), and the children's weighted impurity is the same weighted average of two points on the impurity curve: a point on the chord between them, directly below the parent's point on the curve (or on it, for the tent).</p>
+    <ul>
+      <li>Gini and entropy are <strong>strictly concave</strong> (they bend down everywhere), so the chord lies strictly below the curve: any split that changes the shares at all has a positive gain. That's also why a gain can never be negative (Jensen's inequality: for a curve that bends down, the weighted average of two heights is at most the height at their weighted average); a printout like −2.8e−17 is rounding.</li>
+      <li>Misclassification error is straight on each side of 0.5, so it's concave but not strictly. When both children fall on the same side, the chord lies on the line and the gain is exactly zero, however much the shares moved.</li>
+      <li>Misclassification error is still fine for pruning and for reporting; it's only blind as a split criterion.</li>
+    </ul>
+
+    <h3 id="gini-entropy">Gini vs entropy: why they agree, and where they don't</h3>
+    <p>Both are the expected “surprise” at a row's class, with a different surprise function:</p>
+    <div class="mj">\[ \begin{aligned} \text{Gini} &amp;= \sum_k p_k\,(1 - p_k) \\ \text{entropy (nats)} &amp;= \sum_k p_k\,(-\ln p_k) \end{aligned} \]</div>
+    <p>And \(1 - p\) is the tangent line of \(-\ln p\) at \(p = 1\): Gini is entropy with the log replaced by its first-order approximation. The two curves have nearly the same shape, so they rank candidate splits the same way almost always. On this data, depth-3 trees grown with each share six of their seven splits; the one difference is a noise split (<code>age ≤ 58.20</code> for entropy, <code>income ≤ 146.44</code> for Gini).</p>
+    <ul>
+      <li><strong>Where they differ:</strong> nodes where one class is rare. \(-\ln p\) blows up as \(p \to 0\), so entropy is steeper near the ends. A node with 2% defaults sits at 14% of entropy's peak (0.141 of 1) but only 8% of Gini's (0.039 of 0.5), so entropy gives more credit for cleaning up a nearly pure node, such as a small fraud pocket.</li>
+      <li><strong>Why Gini is the default:</strong> it was CART's original choice and skips the logarithm (a small speed gain). In practice depth and leaf size matter far more than this choice.</li>
+      <li>sklearn's <code>criterion="log_loss"</code> is entropy: a leaf's entropy is its log loss when it predicts its own share.</li>
+      <li>A credit team asking “what's the model's Gini?” means the <strong>Gini coefficient</strong>, \(2\,\text{AUC} - 1\) (0.617 for this tree), a ranking score unrelated to Gini impurity.</li>
+    </ul>
+
+    <h3 id="gain-ratio">Gain ratio (C4.5)</h3>
+    <p>A split of a category into one branch per value (one per customer ID, say) makes every branch pure, so plain information gain loves it. C4.5 divides the gain by the entropy of the branch sizes, the <strong>split information</strong>, which grows with the number of branches:</p>
+    <div class="mj">\[ \begin{aligned} \text{SplitInfo} &amp;= -\sum_{j} \frac{n_j}{n} \log_2 \frac{n_j}{n} \\ \text{GainRatio} &amp;= \frac{\text{information gain}}{\text{SplitInfo}} \end{aligned} \]</div>
+    <ul>
+      <li><strong>On the ten applicants:</strong> late ≤ 1 splits 6/4, so SplitInfo is 0.971 and the gain ratio is \(0.256 / 0.971 = 0.264\). A ten-way ID split gains the parent's full 0.971 bits, with SplitInfo \(\log_2 10 = 3.32\): ratio 0.292. On ten rows the ID split still wins.</li>
+      <li><strong>On the 3,500 training rows,</strong> a 3,500-way ID split has SplitInfo \(\log_2 3500 = 11.77\):
+        <div class="mj">\[ \begin{aligned} \text{late} \le 1 &amp;:\ 0.038/0.508 = 0.075 \\ \text{ID split} &amp;:\ 0.426/11.77 = 0.036 \end{aligned} \]</div>
+        With enough rows the penalty works. C4.5 also only considers attributes whose gain is at least the average, which blocks splits that score well only because SplitInfo is tiny.</li>
+      <li>CART sidesteps the problem with binary splits only, which is why sklearn has no gain ratio.</li>
+    </ul>
+
+
+    <!-- search -->
+    <h2 id="search"><span class="pn">04</span>Searching for the split at a node</h2>
+    <p>This is what happens at every node, from the root to the last split. The node holds \(n\) training rows and there are \(d\) features.</p>
+    <ol>
+      <li><strong>Summarize the node:</strong> its class counts (or, for regression, the sum of its targets), its value (what it would predict as a leaf) and its impurity. If a stop rule fires (depth, too few rows, already pure), it becomes a leaf.</li>
+      <li><strong>For each feature</strong> (all of them, or a random subset if <code>max_features</code> is set), in a random order:
+        <ol>
+          <li>sort the node's rows by that feature;</li>
+          <li>put one candidate threshold in each gap between consecutive distinct values, at the midpoint: at most \(n - 1\) candidates, fewer when values repeat;</li>
+          <li>sweep left to right, moving one row at a time from the right side to the left and updating the class counts on each side in \(O(1)\);</li>
+          <li>at each real gap where both sides keep at least <code>min_samples_leaf</code> rows (the minimum leaf size, <a href="#prepruning">section 10</a>), score the split from the counts (<a href="#count-form">section 03</a>) and remember the best.</li>
+        </ol>
+      </li>
+      <li><strong>Keep the best feature and threshold</strong> over all features. If no valid split exists, or its weighted gain is below <code>min_impurity_decrease</code>, the node becomes a leaf.</li>
+      <li><strong>Partition</strong> the rows into the two children and repeat the whole procedure inside each (<a href="#grow">section 07</a>).</li>
+    </ol>
+    <p>Within one node the search is exhaustive: it finds the single best axis-parallel split there. What's greedy is that each node's split is chosen for its own gain alone, without asking what splits it would make possible below, and is never revisited.</p>
+
+    <h3>By hand: the sweep over “late”</h3>
+    <figure>
+      <div class="plate"><svg class="dg" viewBox="0 0 700 260" role="img" aria-label="Ten applicants sorted by late payments. Late 0: three repaid. Late 1: two repaid, one default. Late 2: two defaults. Late 3: one default, one repaid. Three candidate cuts sit in the gaps: 0.5 with gain 0.137, 1.5 with gain 0.163, the best, and 2.5 with gain 0.005. Running counts on the left: 3 rows and 0 defaults, 6 rows and 1 default, 8 rows and 3 defaults."><path d="M60 164 H640" style="stroke:var(--ink-3);stroke-width:1;fill:none"/><text class="lbl" x="110" y="182" text-anchor="middle">late = 0</text><circle cx="110" cy="150" r="8" style="fill:var(--surface);stroke:var(--ink-2);stroke-width:1.6"/><circle cx="110" cy="128" r="8" style="fill:var(--surface);stroke:var(--ink-2);stroke-width:1.6"/><circle cx="110" cy="106" r="8" style="fill:var(--surface);stroke:var(--ink-2);stroke-width:1.6"/><text class="lbl" x="270" y="182" text-anchor="middle">late = 1</text><circle cx="270" cy="150" r="8" style="fill:var(--surface);stroke:var(--ink-2);stroke-width:1.6"/><circle cx="270" cy="128" r="8" style="fill:var(--grad)"/><circle cx="270" cy="106" r="8" style="fill:var(--surface);stroke:var(--ink-2);stroke-width:1.6"/><text class="lbl" x="430" y="182" text-anchor="middle">late = 2</text><circle cx="430" cy="150" r="8" style="fill:var(--grad)"/><circle cx="430" cy="128" r="8" style="fill:var(--grad)"/><text class="lbl" x="590" y="182" text-anchor="middle">late = 3</text><circle cx="590" cy="150" r="8" style="fill:var(--grad)"/><circle cx="590" cy="128" r="8" style="fill:var(--surface);stroke:var(--ink-2);stroke-width:1.6"/><path d="M190 40 V168" style="stroke:var(--ink-3);stroke-width:1.2;fill:none;stroke-dasharray:5 4"/><text x="190" y="22" text-anchor="middle" style="fill:var(--ink-2)">cut 0.5: gain 0.137</text><text class="lbl" x="190" y="204" text-anchor="middle">left: 3 rows</text><text class="lbl" x="190" y="218" text-anchor="middle">0 defaults</text><path d="M350 40 V168" style="stroke:var(--hid);stroke-width:2.2;fill:none;stroke-dasharray:5 4"/><text x="350" y="22" text-anchor="middle" style="fill:var(--hid)">cut 1.5: gain 0.163 best</text><text class="lbl" x="350" y="204" text-anchor="middle">left: 6 rows</text><text class="lbl" x="350" y="218" text-anchor="middle">1 default</text><path d="M510 40 V168" style="stroke:var(--ink-3);stroke-width:1.2;fill:none;stroke-dasharray:5 4"/><text x="510" y="22" text-anchor="middle" style="fill:var(--ink-2)">cut 2.5: gain 0.005</text><text class="lbl" x="510" y="204" text-anchor="middle">left: 8 rows</text><text class="lbl" x="510" y="218" text-anchor="middle">3 defaults</text><circle cx="80" cy="242" r="6" style="fill:var(--grad)"/><text x="92" y="246">default</text><circle cx="180" cy="242" r="6" style="fill:var(--surface);stroke:var(--ink-2);stroke-width:1.6"/><text x="192" y="246">repaid</text><text class="lbl" x="640" y="246" text-anchor="end">total: 10 rows · 4 defaults</text></svg></div>
+      <figcaption>The ten applicants sorted by late payments. One candidate cut per gap between distinct values; the running counts to the left of each cut are all the sweep needs.</figcaption>
+    </figure>
+    <div class="tbl"><table>
+      <thead><tr><th>Cut</th><th>Left</th><th>Right</th><th>Weighted Gini</th><th>Gain</th></tr></thead>
+      <tbody>
+        <tr><td>0.5</td><td>0 of 3</td><td>4 of 7</td><td>\(0.3(0) + 0.7(0.490)\)<br>= 0.343</td><td>0.137</td></tr>
+        <tr><td>1.5</td><td>1 of 6</td><td>3 of 4</td><td>\(0.6(0.278) + 0.4(0.375)\)<br>= 0.317</td><td><strong>0.163</strong></td></tr>
+        <tr><td>2.5</td><td>3 of 8</td><td>1 of 2</td><td>\(0.8(0.469) + 0.2(0.5)\)<br>= 0.475</td><td>0.005</td></tr>
+      </tbody>
+    </table></div>
+    <p>Each row of the table needs only the running count of defaults on the left (0, 1 or 3) and the node's total (4). The right side is the total minus the left. The best cut is 1.5, the split scored in <a href="#gain">section 03</a>.</p>
+    <ul>
+      <li><strong>Why only between distinct values:</strong> a threshold can't separate two rows with the same value, so a “gap” inside a run of equal values isn't a candidate.</li>
+      <li><strong>Why the midpoint:</strong> any threshold inside a gap sends the same training rows left, so the training gain can't choose among them. The midpoint hedges for unseen values that fall in the gap. (Histogram methods use bin edges instead.)</li>
+    </ul>
+    <p>In NumPy, <code>cumsum</code> does the whole sweep at once:</p>
+    <pre class="code"><code>def best_split(x, y):
+    <span class="cm">"""Best Gini threshold for one feature, 0/1 labels."""</span>
+    order = np.argsort(x)
+    xs, ys = x[order], y[order]
+    n = len(ys)
+    n_l = np.arange(1, n)       <span class="cm"># rows left of each gap</span>
+    k_l = np.cumsum(ys)[:-1]    <span class="cm"># defaults left of it</span>
+    p_l = k_l / n_l
+    p_r = (ys.sum() - k_l) / (n - n_l)
+    kids = (n_l * 2 * p_l * (1 - p_l)
+            + (n - n_l) * 2 * p_r * (1 - p_r)) / n
+    kids[xs[1:] == xs[:-1]] = np.inf  <span class="cm"># not a gap</span>
+    i = np.argmin(kids)
+    p = ys.mean()
+    t = (xs[i] + xs[i + 1]) / 2       <span class="cm"># the midpoint</span>
+    return t, 2 * p * (1 - p) - kids[i]</code></pre>
+    <p><strong>At the root of the credit data</strong> the four features' best cuts are:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Feature</th><th>Best threshold</th><th>Gini gain</th></tr></thead>
+      <tbody>
+        <tr><td>late</td><td>1.5</td><td><strong>0.012</strong></td></tr>
+        <tr><td>income</td><td>39.46</td><td>0.009</td></tr>
+        <tr><td>emi</td><td>0.50</td><td>0.0025</td></tr>
+        <tr><td>age</td><td>21.03</td><td>0.0005</td></tr>
+      </tbody>
+    </table></div>
+    <p><code>late</code> wins at 1.5, exactly sklearn's root. EMI share finds the true 0.5 but gains little here, because EMIs matter only for low incomes: it's half of an AND. Run the same search inside the left child (late ≤ 1) and income wins at 39.455, sklearn's second split.</p>
+
+    <h3 id="cost">What it costs</h3>
+    <div class="mj">\[ \begin{aligned} \text{per feature} &amp;= O(n_t \log n_t) + O(n_t) \\ \text{per node} &amp;= O(d\, n_t \log n_t) \\ \text{per level} &amp;= O(d\, n \log n) \\ \text{per tree} &amp;= O(D\, d\, n \log n) \end{aligned} \]</div>
+    <ul>
+      <li>Per feature, the sort costs \(O(n_t \log n_t)\) and the sweep \(O(n_t)\). \(n_t\) is the node's rows, \(D\) the depth. Each training row sits in exactly one node per level, so a level's nodes add up to \(n\) rows.</li>
+      <li>A balanced tree has \(D \approx \log_2 n\), so about \(O(d\, n \log^2 n)\). A lopsided tree is deeper: the unconstrained tree on this data reaches depth 25.</li>
+      <li>With \(K\) classes, each row move updates \(K\) counts and each candidate is scored in \(O(K)\).</li>
+      <li>Rescoring every threshold from scratch instead of sweeping costs \(O(n_t)\) per candidate, so \(O(n_t^2)\) per feature: 3,500 passes over the rows at the root, for the same answer.</li>
+      <li><strong>Prediction</strong> costs \(O(D)\) per row.</li>
+    </ul>
+    <p><strong>Histograms: how large-data libraries skip the sort.</strong> LightGBM, XGBoost's <code>hist</code> method and sklearn's <code>HistGradientBoosting</code> cut each feature into at most about 256 quantile bins once, before training. At each node they add up the counts (or gradients) per bin in \(O(n_t\, d)\) and try only the bin edges in \(O(256\, d)\). A sibling's histogram is the parent's minus the other child's, so only the smaller child needs a pass over its rows. The price is resolution: no threshold between two bin edges.</p>
+
+    <h3>Ties and randomness</h3>
+    <p>sklearn tries the features in a random order at every node, even when it uses all of them. When two features give exactly the same gain, the first one tried wins, so <code>random_state</code> can change a tree. This matters most for duplicated or perfectly correlated features (<a href="#whatif">section 15</a>). On this data, seeds 0 to 4 all give the same depth-3 tree.</p>
+
+    <h3 id="lottery">Why noise splits win: more thresholds, more lottery tickets</h3>
+    <p>A feature with 3,500 distinct values offers 3,499 candidate cuts; a yes/no feature offers one. Even when both are pure noise, the many-valued one has far more chances at a lucky gain. In 200 simulations with 1,000 rows, a pure-noise target with 10% positives, one continuous noise feature and one binary noise feature, the continuous one won the root 96% of the time.</p>
+    <p>That's how <code>age ≤ 23.18</code> got into the tree:</p>
+    <ul>
+      <li><strong>The truth in that branch is flat.</strong> All 331 applicants there (2+ late payments, income over ₹40.5k) have a true chance of 28%, so every candidate cut is noise: about 330 each for income, EMI share and age, and 3 for late, some 990 in all.</li>
+      <li><strong>A depth limit never refuses a split.</strong> With only <code>max_depth=3</code>, every impure node above depth 3 must split, even when all its candidates are noise.</li>
+      <li><strong>So the luckiest cut wins.</strong> The best gains there were age 0.0095, EMI 0.0044, income 0.0027 and late 0.0009. The <code>income ≤ 146.44</code> node is the same story: its truth is a flat 3% and its best gain is 0.0001.</li>
+    </ul>
+    <p>Defences: leaf-size limits and pruning, which refuse or remove splits that gain too little (sections <a href="#prepruning">10</a> and <a href="#pruning">11</a>). Conditional-inference trees and CHAID pick the feature by a significance test first, which removes the bias towards many-valued features. The same bias inflates impurity-based importance (<a href="#importance">section 14</a>).</p>
+
+    <!-- categorical -->
+    <h2 id="categorical"><span class="pn">05</span>Categorical features</h2>
+    <p>A numeric feature has an order, so a split is a cut in that order. A categorical feature (state, employer type, loan purpose) has none: a split sends some <em>subset</em> of the categories left. With \(K\) categories there are \(2^{K-1} - 1\) ways to split them into two non-empty groups: 127 for 8 states, about \(5.6 \times 10^{14}\) for 50. Three ways to search them:</p>
+    <ul>
+      <li><strong>Exhaustive:</strong> try every subset. Only feasible for small \(K\).</li>
+      <li><strong>One-vs-rest:</strong> try the \(K\) splits that peel off one category. This is all a tree can do with one-hot columns.</li>
+      <li><strong>Sort by the mean target:</strong> order the categories by their share of class 1 (or their mean target, for regression) and try only the \(K - 1\) cuts in that order, as if it were a numeric feature.</li>
+    </ul>
+    <p><strong>Sorting is exactly optimal for a binary or regression target.</strong> For a 0/1 target with Gini or entropy (Breiman and others, 1984), and for squared error (Fisher, 1958), the best of all \(2^{K-1} - 1\) groupings is always one of the \(K - 1\) cuts in sorted order.</p>
+    <p>The intuition is an exchange argument: if a riskier category sat on the safe side while a safer one of the same size sat on the risky side, swapping them pushes the two sides' shares further apart while the parent's share stays put, and under a concave impurity that can only raise the gain. So the optimal groups are contiguous in the sorted order.</p>
+    <p><strong>By hand.</strong> Categories A, B, C, D, 100 applicants each, with 5, 30, 8 and 25 defaults. Sorted by rate: A (5%), C (8%), D (25%), B (30%).</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Split</th><th>How it's found</th><th>Gini gain</th></tr></thead>
+      <tbody>
+        <tr><td>{A, C} | {D, B}</td><td>sorted cut 2</td><td><strong>0.0221</strong></td></tr>
+        <tr><td>{A, C, D} | {B}</td><td>sorted cut 3, and one-vs-rest</td><td>0.0113</td></tr>
+        <tr><td>{A} | {C, D, B}</td><td>sorted cut 1, and one-vs-rest</td><td>0.0096</td></tr>
+        <tr><td>{C} | rest; {D} | rest</td><td>one-vs-rest</td><td>0.0054; 0.0043</td></tr>
+        <tr><td>{A, D} | {B, C}</td><td>exhaustive only</td><td>0.0008</td></tr>
+        <tr><td>{A, B} | {C, D}</td><td>exhaustive only</td><td>0.00005</td></tr>
+      </tbody>
+    </table></div>
+    <p>Three sorted cuts find the best of all seven groupings. One-vs-rest's best, {B} alone, gains half as much: it needs two levels of splits to build {A, C} vs {D, B}, and each level costs rows. {A, B} | {C, D}, which mixes a safe and a risky category on each side, gains almost nothing (0.00005): both sides land near the overall 17%.</p>
+    <ul>
+      <li><strong>More than two classes:</strong> there's no single order to sort by, and no such shortcut. Libraries fall back on heuristics: one-vs-rest, or sorting by a gradient statistic, as LightGBM does.</li>
+      <li><strong>The catch:</strong> the sort order is learned from the labels. With many rare categories it's mostly noise, and the split overfits. LightGBM guards it with a minimum count per category (<code>min_data_per_group</code>) and smoothing (<code>cat_smooth</code>).</li>
+    </ul>
+
+    <h3>In sklearn's decision tree: encode first</h3>
+    <p>sklearn's <code>DecisionTreeClassifier</code> splits only on numbers (its <code>HistGradientBoosting</code> models do have native categorical splits). A made-up example: 8 states whose default rates alternate low and high in code order (3%, 25%, 4%, 22%, 2%, 28%, 5%, 20%), trained on 2,000 rows and tested on 2,000:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Encoding</th><th>Depth 1</th><th>Depth 2</th><th>Depth 4</th></tr></thead>
+      <tbody>
+        <tr><td>Codes 0–7 as a number</td><td>0.547</td><td>0.599</td><td>0.656</td></tr>
+        <tr><td>One-hot (one-vs-rest)</td><td>0.555</td><td>0.618</td><td>0.714</td></tr>
+        <tr><td>The state's default rate (sorted)</td><td><strong>0.707</strong></td><td>0.720</td><td>0.716</td></tr>
+      </tbody>
+    </table></div>
+    <p>Test AUC; the best possible is 0.718 on average (0.720 edges past it by test-set luck). Arbitrary codes invent an order that a cut can use only once. One-hot needs four levels to peel the states apart. Replacing each state by its default rate turns the sort-by-mean trick into a numeric feature, and one split gets there.</p>
+    <p><strong>That encoding used the labels: target encoding.</strong> With 8 states of 250 rows each it's fine. With thousands of rare categories (merchant IDs, pin codes), a rate from 3 rows is mostly noise, and when it's computed on the rows the tree trains on, each row's own label leaks into its feature: brilliant in training, poor on new data. Compute it <strong>out-of-fold</strong> (each row's rate comes only from the other folds) and shrink rare categories towards the overall rate \(\bar p\):</p>
+    <div class="mj">\[ \text{rate}_c = \frac{k_c + m\,\bar p}{n_c + m} \]</div>
+    <p>A category with \(n_c\) rows and \(k_c\) positives is pulled towards \(\bar p\) as if it had \(m\) extra rows at the overall rate. sklearn's <code>TargetEncoder</code> does both; CatBoost uses ordered target statistics. A category never seen in training gets the overall rate with a target encoder, all zeros with one-hot (<code>handle_unknown="ignore"</code>), and an arbitrary position with codes: decide it explicitly and test it.</p>
+
+    <!-- regression -->
+    <h2 id="regression"><span class="pn">06</span>Regression trees</h2>
+    <p>For a numeric target, like the credit limit, the same machinery works with a different impurity: the node's <strong>variance</strong>, the mean squared distance from the node's mean. A leaf predicts the <strong>mean</strong> of its training targets, because the mean is the single number with the smallest squared error: the total squared error \(\sum_i (y_i - c)^2\) has slope \(-2\sum_i (y_i - c)\), which is zero exactly at \(c = \bar y\). A split's gain is the drop in size-weighted variance, the <strong>variance reduction</strong>:</p>
+    <div class="mj">\[ \text{gain} = \text{Var}(P) - \tfrac{n_L}{n}\,\text{Var}(L) - \tfrac{n_R}{n}\,\text{Var}(R) \]</div>
+    <p><strong>By hand.</strong> Four applicants with incomes 20, 30, 60, 90 and limits 30, 50, 110, 170 (₹k). All four: mean 90, variance 3,000.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Cut</th><th>Left | right limits</th><th>Variances</th><th>Weighted</th><th>Gain</th></tr></thead>
+      <tbody>
+        <tr><td>25</td><td>30 | 50, 110, 170</td><td>0 and 2,400</td><td>\(0.25(0) + 0.75(2400)\)<br>= 1,800</td><td>1,200</td></tr>
+        <tr><td>45</td><td>30, 50 | 110, 170</td><td>100 and 900</td><td>\(0.5(100) + 0.5(900)\)<br>= 500</td><td><strong>2,500</strong></td></tr>
+        <tr><td>75</td><td>30, 50, 110 | 170</td><td>1,156 and 0</td><td>\(0.75(1156) + 0.25(0)\)<br>= 867</td><td>2,133</td></tr>
+      </tbody>
+    </table></div>
+    <p>The best cut is at ₹45k, and its leaves predict 40 and 140.</p>
+
+    <h3>The regression sweep: running sums</h3>
+    <p>A node's total squared error needs only the sum of the targets, \(S\), and the sum of their squares:</p>
+    <div class="mj">\[ \begin{aligned} \text{SSE} &amp;= \sum_i (y_i - \bar y)^2 = \sum_i y_i^2 - \frac{S^2}{n} \\ \text{SSE}_L + \text{SSE}_R &amp;= \sum_i y_i^2 - \Big( \tfrac{S_L^2}{n_L} + \tfrac{S_R^2}{n_R} \Big) \end{aligned} \]</div>
+    <p>(Expand the square: \(\sum y_i^2 - 2\bar y \sum y_i + n\bar y^2\), and with \(\bar y = S/n\) the last two terms combine to \(-S^2/n\).) The \(\sum y_i^2\) is the same for every split, so the sweep just maximizes \(S_L^2/n_L + S_R^2/n_R\), updating \(S_L\) by one addition per row. On the toy:</p>
+    <div class="mj">\[ \begin{aligned} \text{cut 25:}\ &amp; 30^2/1 + 330^2/3 = 37{,}200 \\ \text{cut 45:}\ &amp; 80^2/2 + 280^2/2 = 42{,}400 \ (\text{best}) \\ \text{cut 75:}\ &amp; 190^2/3 + 170^2/1 = 40{,}933 \end{aligned} \]</div>
+    <p>With \(\sum y_i^2 = 44{,}400\), cut 45's children have SSE \(44{,}400 - 42{,}400 = 2{,}000\), which is \(n = 4\) times the weighted variance of 500 in the table.</p>
+
+    <h3>Depth on the credit limits</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Model</th><th>Test RMSE (₹k)</th></tr></thead>
+      <tbody>
+        <tr><td>Tree, depth 2</td><td>33.7</td></tr>
+        <tr><td>Tree, depth 4</td><td>18.4</td></tr>
+        <tr><td>Tree, depth 6</td><td>12.5</td></tr>
+        <tr><td>Tree, depth 8</td><td><strong>11.3</strong></td></tr>
+        <tr><td>Tree, unlimited</td><td>13.9</td></tr>
+        <tr><td>Linear regression</td><td>20.2</td></tr>
+      </tbody>
+    </table></div>
+    <p>The noise has spread 10, so no model can beat an RMSE of about 10; depth 8 reaches 11.3. A straight line can't get close, because the truth multiplies two features. The unlimited tree has one applicant per leaf, so each prediction carries that neighbour's noise on top of the test applicant's own, about \(10\sqrt 2 \approx 14\).</p>
+    <p><strong>Classification trees are regression trees in disguise.</strong> For a 0/1 label with share \(p\), the variance is \(p(1 - p)\) and Gini is \(2p(1 - p)\), exactly twice as big. Every gain doubles, the same split wins, and a squared-error tree on the 0/1 label gives exactly the same predictions as the Gini tree.</p>
+
+    <h3>The loss decides what a leaf predicts</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Loss</th><th>Leaf predicts</th><th>In sklearn's trees</th></tr></thead>
+      <tbody>
+        <tr><td>Squared error</td><td>the mean</td><td><code>squared_error</code> (default)</td></tr>
+        <tr><td>Absolute error</td><td>the median</td><td><code>absolute_error</code> (slower)</td></tr>
+        <tr><td>Quantile (pinball)</td><td>a chosen quantile</td><td>not in sklearn's trees; use quantile boosting or quantile forests</td></tr>
+        <tr><td>Poisson deviance</td><td>the mean, for counts</td><td><code>poisson</code></td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Why the median for absolute error:</strong> nudge a guess up. Every target above it gets closer by the nudge and every target below gets further by the same amount, so the total falls while more than half the targets are above the guess. The best guess has half on each side.</li>
+      <li><strong>Why absolute error is slower:</strong> a mean updates from running sums with one addition per row moved; a median can't, so after every move the new middle value must be found again.</li>
+      <li><strong>Heavy-tailed targets</strong> (loan amounts): squared error lets a few huge values dominate both the splits and the leaf means. Model the log, or use absolute error.</li>
+      <li><strong>Counts</strong> (transactions per month): Poisson deviance, \(2[y\ln(y/\mu) - (y - \mu)]\) per row, judges a miss relative to the mean. A miss of 5 costs 7.54 on a node averaging 2 (\(y = 7\)), but only 0.12 on one averaging 200 (\(y = 205\)); squared error charges 25 for both, so the heavy users dominate its splits.</li>
+    </ul>
+
+
+    <!-- grow -->
+    <h2 id="grow"><span class="pn">07</span>Growing the tree, greedily</h2>
+    <p>A whole tree is <a href="#search">section 04</a> on repeat. Find the best split of all the rows; that makes two groups. Treat each group as a new, smaller dataset and do the same, until a stop rule fires or no split is possible. This is <strong>recursive partitioning</strong> (the full pseudocode is in <a href="#pseudocode">section 16</a>):</p>
+    <pre class="code"><code>grow(rows):
+    if a stop rule fires or no split is possible:
+        return leaf(value of rows)     <span class="cm"># shares or mean</span>
+    feature, threshold = best split of rows
+    left  = grow(rows with feature &lt;= threshold)
+    right = grow(the other rows)
+    return node(feature, threshold, left, right)</code></pre>
+    <p><strong>The ten applicants, down to the last leaf:</strong></p>
+    <pre class="code"><code>root: 10 rows, 4 defaults, Gini 0.48
+  best cut late ≤ 1.5, gain 0.163
+
+left: late 0 0 0 1 1 1 | defaults 0 0 0 0 1 0
+  Gini 0.278. One gap to try, at 0.5:
+  0/3 | 1/3 → 0.5(0) + 0.5(0.444) = 0.222
+  gain 0.278 − 0.222 = 0.056   → split
+
+right: late 2 2 3 3 | defaults 1 1 1 0
+  Gini 0.375. One gap to try, at 2.5:
+  2/2 | 1/2 → 0.5(0) + 0.5(0.5) = 0.25
+  gain 0.375 − 0.25 = 0.125    → split
+
+leaves: late 0 → 0 of 3    late 1 → 1 of 3
+        late 2 → 2 of 2    late 3 → 1 of 2</code></pre>
+    <p>Two leaves are still mixed, but each holds a single <code>late</code> value, so no threshold can separate its rows and growth stops. Rows with identical features but different labels always end in a mixed leaf, so even an unlimited tree can't always reach 100% training accuracy.</p>
+
+    <h3 id="greedy">Greedy, and where that fails</h3>
+    <p>Each split is the best one <em>right now</em>, chosen without looking ahead and never revisited. Searching all possible trees is hopeless: building an optimal tree is NP-complete (Hyafil and Rivest, 1976, for the tree that needs the fewest questions on average; finding the smallest tree is NP-hard too), so every standard library grows trees greedily.</p>
+    <p><strong>Where it fails: XOR.</strong> Two features on \([0, 1]\); the label is 1 when exactly one of them is above 0.5. Each feature alone says nothing: split on either at 0.5 and both halves are still 50/50. A depth-2 tree would be perfect (split one feature at 0.5, then the other at 0.5 on each side), but greedy growth can't see that the first split pays off only after the second. On 1,000 rows:</p>
+    <ul>
+      <li>the correct first split, \(x_1 \le 0.5\), has a Gini gain of 0.000003;</li>
+      <li>with nothing useful available, the root grabs noise: it peels off the 28 rows whose second feature is below 0.039, where a chance imbalance gives a sliver of gain;</li>
+      <li>training accuracy by depth 1 to 5 is 52%, 53%, 56%, 89% and 100%: three levels are wasted before the real cuts appear;</li>
+      <li>a stop rule of “split only if the gain is at least 0.005” gives up at the root: a single leaf.</li>
+    </ul>
+    <p><strong>Why greedy still found the credit rule.</strong> An AND leaves a trace in each feature alone; an XOR leaves none. At the root, income's best gain was 0.009 and EMI's 0.0025: each half of “income under 40 AND EMIs over half” already separates defaulters a little by itself, so greedy picked up income one level down and EMI beneath it.</p>
+    <ul>
+      <li><strong>Lookahead</strong> would solve the XOR, by scoring pairs of splits together. But every candidate must then be tried with every candidate in both children, roughly \((d\,n)^2\) work per node instead of \(d\,n\), so it's rarely done.</li>
+      <li><strong>Growing deep and pruning back</strong> fixes the stop-rule failure: pruning judges whole branches, so it keeps a weak split with strong children (<a href="#pruning">section 11</a>). It won't replace a wasted noise split at the top with the right one, so the tree stays bigger than it needs to be.</li>
+      <li><strong>Averaging many trees</strong> is cheaper still. A 200-tree random forest capped at depth 3 scores 96.9% on fresh XOR data, where one depth-3 tree scores 53%: random feature choices and resampling let some trees start with a useful cut.</li>
+    </ul>
+
+    <!-- leaves -->
+    <h2 id="leaves"><span class="pn">08</span>What a leaf predicts</h2>
+    <p>A leaf's value is the single number that minimizes the training loss over the rows in it:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Tree</th><th>Leaf value</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Classification (Gini, entropy)</td><td>the class shares \(k/n\)</td><td>The shares minimize log loss (and squared error on the 0/1 labels) over the leaf's rows</td></tr>
+        <tr><td>Regression, squared error</td><td>the mean</td><td>Minimizes the sum of squares</td></tr>
+        <tr><td>Regression, absolute error</td><td>the median</td><td>Half the targets on each side</td></tr>
+      </tbody>
+    </table></div>
+    <p>With sample weights every count becomes a weighted count, so the leaf holds weighted shares. For the impurities, gains and leaf values, a weight of 2 is the same as putting the row in twice (but sklearn's <code>min_samples_leaf</code> and <code>min_samples_split</code> still count rows; <code>min_weight_fraction_leaf</code> counts weight). (In gradient boosting a leaf holds something else, a step that lowers the ensemble's loss, but the routing is the same.)</p>
+    <p>An applicant with income ₹30k, EMIs at 60% of income, no late payments and age 35 lands in the 213-row leaf. 105 of those 213 training applicants defaulted, so the tree says 49.3%, exactly their share.</p>
+    <ul>
+      <li><strong><code>predict</code> vs <code>predict_proba</code>:</strong> <code>predict</code> takes each leaf's majority, a 0.5 cut-off. Only the two small leaves with a default majority vote “default”, so it flags 18 of the 1,500 test applicants while 130 actually defaulted. With a 9% default rate, 0.5 is almost never the right cut-off.</li>
+      <li><strong>Only as many scores as leaves.</strong> This tree gives 8 distinct probabilities, so its ROC curve has only 8 straight segments and an approval cut-off can only fall between leaves. Declining the two riskiest leaves turns away 1.2% of applicants; the next leaf jumps that to 6.4%. “Decline exactly the riskiest 5%” is impossible, and score deciles can't be formed.</li>
+      <li><strong>Inside a leaf, everyone is the same.</strong> An applicant earning ₹45k and one earning ₹140k, both with no late payments, both get 2.5%.</li>
+      <li><strong>Far outside the data,</strong> say ₹5 lakh a month with no late payments, an applicant follows the richest applicants seen into the <code>income &gt; 146.44</code> leaf: 6.7%. A tree can't say anything new beyond its data (<a href="#extrapolate">section 13</a>).</li>
+    </ul>
+
+    <h3 id="reason-codes">Explaining one prediction: walk the path</h3>
+    <p>Each question on the applicant's path moves the default share of the node they're in. The steps add up exactly to the leaf's score minus the overall rate:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Node on the path</th><th>Default share</th><th>Step</th></tr></thead>
+      <tbody>
+        <tr><td>Everyone</td><td>8.7%</td><td></td></tr>
+        <tr><td>late ≤ 1</td><td>5.9%</td><td>−2.8 points</td></tr>
+        <tr><td>income ≤ 39.46</td><td>20.0%</td><td>+14.1</td></tr>
+        <tr><td>emi &gt; 0.50</td><td>49.3%</td><td>+29.3</td></tr>
+        <tr><td>Total</td><td></td><td>+40.6 = 49.3 − 8.7</td></tr>
+      </tbody>
+    </table></div>
+    <p>Rank only the steps that raised the risk: reason 1 is the EMI share, reason 2 is income. A counterfactual comes free: with EMIs under half of income, this applicant would be at 3.7%. This readability is a single tree's biggest selling point in lending. The catch is that the credit depends on the order the questions were asked; SHAP removes that (<a href="#shap">section 14</a>).</p>
+
+    <!-- calibration -->
+    <h2 id="calibration"><span class="pn">09</span>Are the probabilities calibrated?</h2>
+    <p>A probability is <strong>calibrated</strong> if, among all applicants given 20%, about 20% default. A leaf's probability is its training share, \(\hat p = k/n\), and three things make it rough:</p>
+    <ul>
+      <li><strong>Small leaves are noisy.</strong> A share from \(n\) rows typically misses the truth by its standard error, \(\sqrt{\hat p(1 - \hat p)/n}\). The 20-row leaf says 90%; one standard error is \(\sqrt{0.9 \times 0.1/20} = 0.067\), so two (roughly a 95% range) give 77% to 100%.</li>
+      <li><strong>Small leaves are pushed towards the extremes.</strong> That leaf's truth, 73%, sits outside even that range. It isn't bad luck: the tree chose this leaf <em>because</em> its share looked extreme, out of many candidate cuts, so selected leaves are biased towards 0 and 1, not just noisy.</li>
+      <li><strong>Pure leaves say exactly 0% or 100%</strong>, the far end of the same effect, and log loss punishes a confident wrong answer without limit.</li>
+    </ul>
+    <p>The depth-3 tree's leaves (L = late payments, inc = income in ₹k), training share against the share on fresh test data and the truth:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Leaf</th><th>Train rows</th><th>Train share</th><th>Test share</th><th>Truth</th></tr></thead>
+      <tbody>
+        <tr><td>L≤1, inc 39–146</td><td>2,436</td><td>2.5%</td><td>3.0%</td><td>3%</td></tr>
+        <tr><td>L≤1, low inc, emi≤.5</td><td>382</td><td>3.7%</td><td>2.9%</td><td>3%</td></tr>
+        <tr><td>L≥2, inc&gt;40, age&gt;23</td><td>313</td><td>25.2%</td><td>27.4%</td><td>28%</td></tr>
+        <tr><td>L≤1, low inc, emi&gt;.5</td><td>213</td><td>49.3%</td><td>53.8%</td><td>48%</td></tr>
+        <tr><td>L≤1, inc&gt;146 (noise)</td><td>75</td><td>6.7%</td><td>0% (33 rows)</td><td>3%</td></tr>
+        <tr><td>L≥2, low inc, emi≤.53</td><td>43</td><td>30.2%</td><td>33.3% (15)</td><td>30%</td></tr>
+        <tr><td>L≥2, low inc, emi&gt;.53</td><td>20</td><td>90%</td><td>80% (10)</td><td>73%</td></tr>
+        <tr><td>L≥2, inc&gt;40, age≤23 (noise)</td><td>18</td><td>55.6%</td><td>12.5% (8)</td><td>28%</td></tr>
+      </tbody>
+    </table></div>
+    <p>The big leaves are close to the truth. The small ones, and above all the two noise splits, promised shares that fresh data doesn't deliver. So a shallow tree with big leaves is roughly calibrated; a deep tree is overconfident.</p>
+    <p><strong>Bigger leaves help, but don't fix it.</strong> With <code>min_samples_leaf=30</code> the tree ranks well (test AUC 0.804) but its log loss is 0.731, against 0.216 for depth 3: 51.5% of test applicants get exactly 0% or 100%. Most applicants have a true chance of 3%, and 30 of them all repaying is common (\(0.97^{30} \approx 0.4\)), so many 30-row leaves are pure.</p>
+
+    <h3>Fixing the probabilities</h3>
+    <ul>
+      <li><strong>Smooth towards the base rate</strong> (an m-estimate): pretend each leaf also holds \(m\) extra rows that default at the overall rate \(\bar p\).
+        <div class="mj">\[ \hat p = \frac{k + m\,\bar p}{n + m} \]</div>
+        With \(m = 10\), a pure leaf of 30 says 2.2% instead of 0%, and the <code>min_samples_leaf=30</code> tree's log loss falls from 0.731 to 0.241 with the same leaves. Choose \(m\) by cross-validation; too large pulls every leaf to 8.7% and loses the spread.</li>
+      <li><strong>Honest leaves:</strong> the shares lean to the extremes because the same rows chose the leaves and then filled them. Grow the tree on one half of the training rows and fill the leaf shares from the other half. For a <code>min_samples_leaf=30</code> tree grown on half the training rows, filling the leaves from the other half and smoothing gives a log loss of 0.227, against 0.725 when it uses its own shares.</li>
+      <li><strong>Calibrate on held-out data</strong> with Platt scaling (a logistic fit on the score) or isotonic regression (a monotone step fit). Isotonic can merge neighbouring leaves into one score but can never split one, so the tree still has at most as many scores as leaves.</li>
+      <li><strong>Average many trees,</strong> as a random forest does: leaves that disagree average into smoother, less extreme probabilities.</li>
+    </ul>
+
+    <h3 id="class-weight">Class weights inflate the probabilities</h3>
+    <p><code>class_weight="balanced"</code> makes each class count equally in total: the training set has 3,196 payers and 304 defaulters, so each defaulter counts \(r = 3196/304 \approx 10.5\) times as much as a payer. That changes which splits win, and it multiplies every leaf's odds of default by \(r\): a leaf with \(k\) defaulters among \(n\) rows reports \(p_w = rk/(rk + n - k)\). The depth-3 tree's average prediction becomes 32.7% against a real 8.7%, and its log loss 0.466. Solving for \(k/n\) undoes it exactly:</p>
+    <div class="mj">\[ p = \frac{p_w}{p_w + r\,(1 - p_w)} \]</div>
+    <p>That brings the log loss back to 0.236 (not 0.216, because the splits stay as the weighted tree chose them). The ranking barely moves: multiplying every leaf's odds by the same \(r\) keeps the leaves in order, so only the changed splits move the AUC (0.823 here, against 0.808). Oversampling the rare class \(r\) times does the same and is undone the same way.</p>
+    <p><strong>Three separate questions:</strong> does the model rank well (AUC), do its probabilities mean what they say (calibration, log loss), and where do you cut to approve? A tree can pass the first and fail the second.</p>
+
+    <!-- prepruning -->
+    <h2 id="prepruning"><span class="pn">10</span>Overfitting, and stopping early</h2>
+    <p>With no stop rule (sklearn's default: <code>max_depth=None</code>, <code>min_samples_leaf=1</code>), the tree keeps splitting until every leaf is pure or can't be split. It then answers every training question perfectly, noise included.</p>
+    <ul>
+      <li>On the credit data it reaches depth 25 with 327 leaves, 139 of them holding a single applicant.</li>
+      <li>Training accuracy is 100%; test accuracy is 89%, worse than the 91.3% of predicting that nobody defaults.</li>
+      <li>Test AUC is 0.623 and log loss 3.965. Every leaf is pure, so every prediction is 0% or 100%: 165 of the 1,500 test applicants got 0% and defaulted, or 100% and repaid. Each costs \(-\ln(2.2 \times 10^{-16}) \approx 36\) (sklearn clips 0 to machine precision), and \(165 \times 36/1500 \approx 3.97\) is the whole log loss.</li>
+    </ul>
+    <div class="tbl"><table>
+      <thead><tr><th>Max depth</th><th>Leaves</th><th>Train AUC</th><th>Test AUC</th><th>Test log loss</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>2</td><td>0.655</td><td>0.653</td><td>0.269</td></tr>
+        <tr><td>2</td><td>4</td><td>0.791</td><td>0.777</td><td>0.243</td></tr>
+        <tr><td>3</td><td>8</td><td>0.834</td><td><strong>0.808</strong></td><td><strong>0.216</strong></td></tr>
+        <tr><td>4</td><td>16</td><td>0.849</td><td>0.788</td><td>0.273</td></tr>
+        <tr><td>6</td><td>44</td><td>0.878</td><td>0.791</td><td>0.600</td></tr>
+        <tr><td>8</td><td>85</td><td>0.914</td><td>0.683</td><td>1.318</td></tr>
+        <tr><td>12</td><td>197</td><td>0.974</td><td>0.621</td><td>2.673</td></tr>
+        <tr><td>None</td><td>327</td><td>1.000</td><td>0.623</td><td>3.965</td></tr>
+      </tbody>
+    </table></div>
+    <p>Training AUC rises with every level; test AUC peaks at depth 3, the depth of the true rule. Depths 1–2 are too simple to express the rule: that's <strong>bias</strong>. Deep trees change a lot from one training sample to the next (<a href="#variance">section 13</a>): that's <strong>variance</strong>. (Comparing on the test set is for teaching only; choose settings by cross-validation.)</p>
+
+    <h3>Pre-pruning: the knobs</h3>
+    <p>Rules that stop growth early are <strong>pre-pruning</strong>. Each refuses a split under some condition:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Knob</th><th>Refuses a split when…</th><th>Watch out</th></tr></thead>
+      <tbody>
+        <tr><td><code>max_<wbr>depth</code></td><td>the node is already this deep</td><td>Blunt: big and small branches get the same limit</td></tr>
+        <tr><td><code>min_<wbr>samples_<wbr>leaf</code></td><td>either child would get fewer rows than this</td><td>Can hide a real but rare group</td></tr>
+        <tr><td><code>min_<wbr>samples_<wbr>split</code></td><td>the node has fewer rows than this</td><td>Doesn't protect the children: 20 rows can split into 1 and 19</td></tr>
+        <tr><td><code>max_<wbr>leaf_<wbr>nodes</code></td><td>the tree already has this many leaves</td><td>Splits are then made best-first, anywhere in the tree</td></tr>
+        <tr><td><code>min_<wbr>impurity_<wbr>decrease</code></td><td>the weighted gain is below this</td><td>Kills weak splits that would have led to strong ones (XOR)</td></tr>
+      </tbody>
+    </table></div>
+    <p><code>min_impurity_decrease</code> compares against the gain scaled by the node's share of all \(N\) training rows, so a split deep in a small branch must be proportionally purer to pass:</p>
+    <div class="mj">\[ \frac{N_t}{N}\Big( I_t - \frac{N_{tL}}{N_t}\, I_L - \frac{N_{tR}}{N_t}\, I_R \Big) \ge \text{threshold} \]</div>
+    <p>One knob at a time on the credit data:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Setting</th><th>Leaves</th><th>Smallest leaf</th><th>Test AUC</th><th>Log loss</th></tr></thead>
+      <tbody>
+        <tr><td>none (full tree)</td><td>327</td><td>1</td><td>0.623</td><td>3.965</td></tr>
+        <tr><td><code>max_<wbr>depth=<wbr>3</code></td><td>8</td><td>18</td><td>0.808</td><td>0.216</td></tr>
+        <tr><td><code>min_<wbr>samples_<wbr>split=<wbr>20</code></td><td>169</td><td>1</td><td>0.694</td><td>2.024</td></tr>
+        <tr><td><code>min_<wbr>samples_<wbr>leaf=<wbr>30</code></td><td>66</td><td>30</td><td>0.804</td><td>0.731</td></tr>
+        <tr><td><code>min_<wbr>samples_<wbr>leaf=<wbr>200</code></td><td>12</td><td>200</td><td><strong>0.824</strong></td><td>0.239</td></tr>
+        <tr><td><code>max_<wbr>leaf_<wbr>nodes=<wbr>6</code></td><td>6</td><td>20</td><td>0.814</td><td><strong>0.213</strong></td></tr>
+        <tr><td><code>min_<wbr>impurity_<wbr>decrease=<wbr>0.001</code></td><td>8</td><td>4</td><td>0.812</td><td>0.238</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><code>min_samples_split=20</code> still leaves one-row leaves; <code>min_samples_leaf=30</code> ranks well but has pure leaves (<a href="#calibration">section 09</a>).</li>
+      <li><strong><code>max_depth</code></strong> when people must read the tree: 3–5 levels stay readable.</li>
+      <li><strong><code>min_samples_leaf</code></strong> when you'll use the probabilities: it's the most direct control over leaf noise.</li>
+      <li><strong><code>max_leaf_nodes</code></strong> caps the size but lets the tree go deep where the data supports it (LightGBM grows leaf-wise like this).</li>
+      <li><strong><code>min_impurity_decrease</code></strong> last: it trips on XOR-like patterns.</li>
+      <li>Set together, every limit applies and whichever binds first stops that branch.</li>
+    </ul>
+    <p>Tuning depth and leaf size together by 5-fold cross-validation on log loss picks <code>max_depth=3</code>, <code>min_samples_leaf=30</code> (test AUC 0.809, log loss 0.218): it found the true depth. When the model will score future applicants, use folds split by time: train on earlier months, validate on later ones.</p>
+    <p><strong>Monotonic constraints.</strong> <code>monotonic_cst</code> forces predictions to only rise (or only fall) with a feature, for example “more late payments never lowers the risk”, which credit models often need. sklearn enforces it bluntly: at each split on a constrained feature it caps every leaf on the low side, and floors every leaf on the high side, at the midpoint of the two children's values.</p>
+    <p>Constraining <code>late</code> here caps the whole late ≤ 1 side at 18.2%, so the stressed applicant from <a href="#leaves">section 08</a> drops from 49.3% to 18.2%, though late payments were never their problem, and test AUC falls to 0.791.</p>
+
+    <!-- pruning -->
+    <h2 id="pruning"><span class="pn">11</span>Cost-complexity pruning</h2>
+    <p>Grow a big tree, then cut back the branches that don't earn their keep: <strong>post-pruning</strong>. A <strong>branch</strong> is a node plus everything below it; cutting it turns the node back into a leaf. Unlike stopping early, pruning judges a whole branch, not one split, so it can keep a weak split whose children are strong.</p>
+    <p>CART gives every leaf a price \(\alpha\) and, among all trees obtained by cutting branches off the big one, keeps the one with the lowest</p>
+    <div class="mj">\[ \begin{aligned} R_\alpha(T) &amp;= R(T) + \alpha\,\lvert T\rvert \\ R(T) &amp;= \sum_{\text{leaves } t} \frac{n_t}{N}\, I(t) \end{aligned} \]</div>
+    <p>\(R(T)\) is the tree's training impurity (each leaf's impurity times its share of the rows) and \(\lvert T\rvert\) its number of leaves. \(\alpha = 0\) keeps the full tree; a large \(\alpha\) leaves only the root. In sklearn it's <code>ccp_alpha</code>.</p>
+    <p><strong>The weakest link.</strong> You don't have to search all subtrees. For each branch \(T_t\) under node \(t\), ask how much training impurity it removes per extra leaf:</p>
+    <div class="mj">\[ g(t) = \frac{R(t) - R(T_t)}{\lvert T_t\rvert - 1} \]</div>
+    <p>\(R(t)\) is node \(t\)'s impurity if it were a leaf, \(R(T_t)\) the total over the leaves beneath it. Once \(\alpha\) passes \(g(t)\), those leaves aren't worth their price. So cut the branch with the smallest \(g\), recompute \(g\) for the branches above it, and repeat. That gives a short list of <strong>nested</strong> trees, each the previous one with one more branch cut, each optimal over a range of \(\alpha\). Breiman showed that for every \(\alpha\) there's a unique smallest optimal subtree and that these are nested, so this list contains every tree pruning could ever pick.</p>
+    <p><strong>By hand, on the ten-applicant tree</strong> from <a href="#grow">section 07</a>. Each node's \(R\) is (its rows / 10) × its Gini:</p>
+    <pre class="code"><code>leaves   late 0: 0.3 × 0     = 0
+         late 1: 0.3 × 0.444 = 0.133
+         late 2: 0.2 × 0     = 0
+         late 3: 0.2 × 0.5   = 0.1
+
+left branch (late ≤ 1), 2 leaves
+  as one leaf: 0.6 × 0.278 = 0.167
+  g = (0.167 − 0.133) / (2 − 1) = 0.033  ← weakest
+right branch (late ≥ 2), 2 leaves
+  as one leaf: 0.4 × 0.375 = 0.15
+  g = (0.15 − 0.1) / (2 − 1)    = 0.05
+root, 4 leaves
+  as one leaf: 1.0 × 0.48  = 0.48
+  leaves total: 0 + 0.133 + 0 + 0.1 = 0.233
+  g = (0.48 − 0.233) / (4 − 1)  = 0.082
+
+cut the left branch (α = 0.033), recompute the root:
+  its leaves now 0.167 + 0.1 = 0.267
+  g = (0.48 − 0.267) / (3 − 1)  = 0.107
+the right branch (0.05) is now weakest: cut it.
+root, 2 leaves: g = (0.48 − 0.317) / 1 = 0.163
+  (the root split's gain): cut last.</code></pre>
+    <p>sklearn's <code>cost_complexity_pruning_path</code> returns exactly these: \(\alpha\) = 0, 0.033, 0.05, 0.163. For a branch with two leaves, \(g(t)\) is just that split's gain times its share of the rows: the right branch's 0.05 is \(0.4 \times 0.125\).</p>
+    <figure>
+      <div class="plate"><svg class="dg" viewBox="0 0 700 290" role="img" aria-label="Cost-complexity of the four nested subtrees of the ten-applicant tree as straight lines in alpha: intercept is the training impurity, slope is the number of leaves. The lowest line at each alpha is the tree pruning keeps. The 4-leaf tree is lowest until alpha 0.033, the 3-leaf tree until 0.05, the 2-leaf tree until 0.163, and the root alone after that."><path d="M70 250 H410" style="stroke:var(--ink-3);stroke-width:1;fill:none"/><path d="M70 250 V30" style="stroke:var(--ink-3);stroke-width:1;fill:none"/><text class="lbl" x="70.0" y="266" text-anchor="middle">0</text><text class="lbl" x="138.0" y="266" text-anchor="middle">0.05</text><text class="lbl" x="206.0" y="266" text-anchor="middle">0.1</text><text class="lbl" x="274.0" y="266" text-anchor="middle">0.15</text><text class="lbl" x="342.0" y="266" text-anchor="middle">0.2</text><text class="lbl" x="410.0" y="266" text-anchor="middle">0.25</text><text class="lbl" x="240.0" y="284" text-anchor="middle">α, the price per leaf</text><text class="lbl" x="62" y="199.0" text-anchor="end">0.4</text><text class="lbl" x="62" y="144.0" text-anchor="end">0.6</text><text class="lbl" x="62" y="89.0" text-anchor="end">0.8</text><text class="lbl" x="62" y="34.0" text-anchor="end">1</text><text class="lbl" x="26" y="140.0" text-anchor="middle" transform="rotate(-90 26 140.0)">R(T) + α|T|</text><path d="M70.0 240.8 L330.7 30.0" style="stroke:var(--ink-3);stroke-width:1.3;fill:none;stroke-dasharray:4 3"/><text class="lbl" x="330.7" y="24" text-anchor="middle">4 leaves</text><path d="M70.0 231.7 L402.4 30.0" style="stroke:var(--ink-3);stroke-width:1.3;fill:none;stroke-dasharray:4 3"/><text class="lbl" x="402.4" y="24" text-anchor="middle">3 leaves</text><path d="M70.0 217.9 L410.0 80.4" style="stroke:var(--ink-3);stroke-width:1.3;fill:none;stroke-dasharray:4 3"/><text class="lbl" x="416.0" y="84.4">2 leaves</text><path d="M70.0 173.0 L410.0 104.2" style="stroke:var(--ink-3);stroke-width:1.3;fill:none;stroke-dasharray:4 3"/><text class="lbl" x="416.0" y="108.2">1 leaf</text><path d="M70.0 240.8 L115.3 204.2 L115.3 204.2 L138.0 190.4 L138.0 190.4 L292.1 128.1 L292.1 128.1 L410.0 104.2" class="hid thick"/><circle cx="115.3" cy="204.2" r="4" style="fill:var(--hid)"/><path d="M115.3 210.2 V250" style="stroke:var(--hid);stroke-width:1;fill:none;stroke-dasharray:2 3"/><circle cx="138.0" cy="190.4" r="4" style="fill:var(--hid)"/><path d="M138.0 196.4 V250" style="stroke:var(--hid);stroke-width:1;fill:none;stroke-dasharray:2 3"/><circle cx="292.1" cy="128.1" r="4" style="fill:var(--hid)"/><path d="M292.1 134.1 V250" style="stroke:var(--hid);stroke-width:1;fill:none;stroke-dasharray:2 3"/><text x="111.3" y="242" text-anchor="end" style="fill:var(--hid);font-size:12px">0.033</text><text x="142.0" y="242" style="fill:var(--hid);font-size:12px">0.05</text><text x="296.1" y="242" style="fill:var(--hid);font-size:12px">0.163</text><path d="M492 120 h26" class="hid thick"/><text x="526" y="124">best tree at each α</text><path d="M492 146 h26" style="stroke:var(--ink-3);stroke-width:1.3;stroke-dasharray:4 3"/><text x="526" y="150">one subtree</text><text class="lbl" x="492" y="180">slope = its number of leaves</text><text class="lbl" x="492" y="195">intercept = its training</text><text class="lbl" x="492" y="210">impurity R(T)</text><text class="lbl" x="492" y="225"></text><text class="lbl" x="492" y="240">the crossings are where the</text><text class="lbl" x="492" y="255">next branch is cut: left,</text><text class="lbl" x="492" y="270">then right, then the root</text></svg></div>
+      <figcaption>Each nested subtree's \(R_\alpha\) is a straight line in \(\alpha\): its training impurity plus \(\alpha\) times its leaf count. Pruning keeps whichever line is lowest. The crossings are the weakest-link values.</figcaption>
+    </figure>
+    <p><strong>On the credit data.</strong> The depth-3 tree's path cuts the two noise splits first (<code>income ≤ 146.44</code> at \(\alpha = 0.00007\), then <code>age ≤ 23.18</code> at 0.00089): they bought almost nothing for their extra leaf. Then the whole late ≥ 2 branch goes at 0.00215, and only the root is left after 0.0122. The full 327-leaf tree's path has 110 values of \(\alpha\). Choosing among the 20 largest by 5-fold cross-validation on log loss picks \(\alpha = 0.00215\) and a 4-leaf tree:</p>
+    <pre class="code"><code>late ≤ 1.5
+  income ≤ 39.46
+    emi ≤ 0.50   →  3.7%   (382 rows)
+    emi &gt; 0.50   → 49.3%   (213)
+  income &gt; 39.46 →  2.6%   (2,511)
+late &gt; 1.5       → 30.5%   (394)</code></pre>
+    <p>From 327 leaves to 4, with no noise splits, scoring like the depth-3 tree (test AUC 0.810, log loss 0.216). It keeps all of 2+ late payments in one leaf at 30.5%, though the truth splits them (28% vs 73%): only 63 training applicants had both 2+ late payments and low income, and cross-validation judged that split not worth a leaf.</p>
+    <ul>
+      <li><strong>\(\alpha\) must be chosen on held-out data.</strong> Training impurity always prefers more leaves, so on the training data the best \(\alpha\) is always 0.</li>
+      <li><strong>Pruning can only remove splits;</strong> it can't bring back one that growth never made. So grow the big tree with no early stopping (or very light).</li>
+      <li><strong>Pre vs post:</strong> they differ when a weak split has strong children, as in the XOR. A gain threshold refuses the first split; pruning sees the whole branch's value and keeps it.</li>
+      <li><strong>The scale of \(\alpha\)</strong> is “impurity per leaf”, because sklearn measures \(R\) as row-share-weighted impurity. Other pruning methods: reduced-error pruning (cut while a validation set's error doesn't rise) and C4.5's pessimistic pruning (an upper confidence bound on each leaf's error).</li>
+    </ul>
+
+
+    <!-- missing -->
+    <h2 id="missing"><span class="pn">12</span>Missing values</h2>
+    <p>At a split on income, a row with a blank income has no side to go to. There are four standard answers: learn a direction, surrogate splits, C4.5's fractional rows, or impute.</p>
+
+    <h3>Learn a direction for the blanks (sklearn, XGBoost, LightGBM)</h3>
+    <p>sklearn's trees accept <code>NaN</code> (since version 1.3). During the sweep at a node, the rows whose value is missing are set aside, and every candidate threshold is scored twice: once with all the blanks sent left, once with them sent right. The better option wins, and the node stores the direction (<code>tree_.missing_go_to_left</code>). It also scores one extra candidate: all blanks on one side, every present row on the other. So blanks learn their own route at every split. XGBoost's “default direction” and LightGBM work the same way.</p>
+    <p>If a feature had <em>no</em> blanks at that node in training, a blank at prediction time goes to the child that had more training rows. That's a silent guess, not a learned rule.</p>
+
+    <h3>Surrogate splits (classic CART)</h3>
+    <ol>
+      <li>Choose the primary split, say income ≤ 39.46, using the rows where income is present.</li>
+      <li>For every other feature, find the split (threshold and direction) that best <em>mimics</em> the primary one: the one that sends the most rows the same way, measured on rows where both features are present.</li>
+      <li>Keep only surrogates that agree better than the “majority rule” (sending everyone to the primary split's bigger side), ranked by agreement.</li>
+      <li>For a row missing income, at training or prediction time, use the best surrogate whose feature is present. If all are missing, follow the majority.</li>
+    </ol>
+    <p>Surrogates help only when features are correlated: a loan amount can stand in for income. In this dataset the features were drawn independently, so a surrogate could beat the majority rule only by chance. R's <code>rpart</code> does this; sklearn doesn't.</p>
+
+    <h3>Fractional rows (C4.5)</h3>
+    <p>C4.5 sends a row with a blank down both branches, weighted by the share of training rows that went each way, and averages the leaves it reaches by those weights.</p>
+
+    <h3>Impute, or encode the blank</h3>
+    <ul>
+      <li><strong>Mean or median:</strong> simple, but the blank now looks like a typical value, so any signal in being blank is lost.</li>
+      <li><strong>Imputation plus a “was blank” indicator column</strong> (<code>SimpleImputer(add_indicator=True)</code>): works with any model, and the tree can split on the indicator.</li>
+      <li><strong>An out-of-range constant</strong> such as −999: one split can isolate the blanks, but until it does they travel with the lowest values.</li>
+      <li><strong>Blank as its own category</strong> for categorical features.</li>
+    </ul>
+    <p>Fit any imputation on training data only.</p>
+
+    <h3>When a blank is information</h3>
+    <p>Suppose stressed applicants often skip the income field: half of them leave it blank, against 5% of everyone else. Blank-income applicants then default 23.4% of the time, against 7.4% for the rest. Take an applicant with a blank income, EMIs at 60%, no late payments, age 35:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Approach</th><th>Their predicted risk</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Native NaN handling</td><td>40%</td><td>The blanks learned to go to the low-income side</td></tr>
+        <tr><td>Median imputation</td><td>7.2%</td><td>The blank became ₹84k and looks safe</td></tr>
+        <tr><td>Median + indicator</td><td>33.7%</td><td>The indicator brings the signal back</td></tr>
+        <tr><td>A tree that never saw a blank</td><td>2.5%</td><td>Sent to the bigger child: the safe side</td></tr>
+      </tbody>
+    </table></div>
+    <p>Native handling also scores best overall here (test AUC 0.804, against 0.785 with median imputation). Why values go missing decides how safe it is to lean on the blank:</p>
+    <ul>
+      <li><strong>Missing completely at random:</strong> the blank tells you nothing.</li>
+      <li><strong>Missing at random</strong> (for reasons visible in other columns): other features can stand in.</li>
+      <li><strong>Missing not at random</strong> (because of the value itself, as here): the blank carries the most signal, and the model is most fragile when the process creating blanks changes. A pipeline bug that blanks a field would silently move applicants to whichever side blanks learned; a form that makes income mandatory removes the signal overnight. Monitor missing rates, and make serving treat blanks exactly as training did.</li>
+    </ul>
+
+    <!-- behaviour -->
+    <h2 id="behaviour"><span class="pn">13</span>How trees behave</h2>
+    <p>Almost everything here follows from one fact: a tree only ever asks “is this one value above or below a cut?”</p>
+
+    <h3 id="invariance">No scaling: invariant to monotone transforms</h3>
+    <p>Standardizing, taking logs or square roots all keep the values of a feature in the same order, so the same rows fall on each side of every possible cut, and the split search sees exactly the same candidates and gains. The tree comes out the same; only the printed thresholds change units. Refitting with log income gives identical test predictions, and \(e^{\text{threshold}}\) of its income split is 39.455, the same cut.</p>
+    <ul>
+      <li>A strictly increasing transform gives the same tree. A decreasing one (multiply by −1) gives the same partitions with left and right swapped.</li>
+      <li>One subtlety: the midpoint of a gap moves under a non-linear transform, so a new value inside that tiny gap could in principle fall the other way.</li>
+      <li>Mixing features is not free. Rotating them (PCA) or replacing income and EMI share by their sum and difference changes the tree, and can turn an axis-parallel rule into a diagonal one.</li>
+      <li>Standardizing anyway is harmless, and convenient when the same pipeline feeds a linear model.</li>
+    </ul>
+
+    <h3>Interactions come free, if each part helps a little</h3>
+    <p>The truth has an AND: high EMIs matter only for low incomes. The tree found it by splitting on income, then on EMI share inside the low-income branch; a split inside a branch applies only there. Logistic regression adds one effect per feature, so it can't express the AND unless handed it: it scores a test AUC of 0.756 alone and 0.822 once given the two true rules as columns, while the tree got 0.808 on its own.</p>
+    <p>Two limits: a pure XOR defeats greedy growth (<a href="#greedy">section 07</a>), and depth caps the interaction order, since a path of depth \(D\) involves at most \(D\) features.</p>
+
+    <h3>Outliers: harmless in the features, harmful in the target</h3>
+    <p>An income typed with three extra zeros just moves that applicant further to the right of cuts it was already right of. But a regression tree with squared error chases a typo in the <em>target</em>, because one huge value drags a leaf's mean: one ₹10 crore limit in the training data changes every test prediction of a depth-3 tree, whose first two splits only wall off that row. With absolute error (leaf = median) the typo can't drag a leaf: no split chases it, and at most one leaf's median shifts by one row (here, no prediction changed at all).</p>
+
+    <h3 id="axis">Axis-parallel boundaries: diagonals become staircases</h3>
+    <p>Every split cuts one feature at one value, so a tree's boundaries are made of horizontal and vertical pieces. A diagonal boundary has to be built as a staircase, and every step costs leaves. Take a toy with two features where the label is “feature 2 &gt; feature 1”:</p>
+    <figure>
+      <div class="plate"><svg class="dg" viewBox="0 0 700 300" role="img" aria-label="Two panels of the unit square with the true boundary, the diagonal where feature 2 equals feature 1, drawn dashed. Left: the depth-2 tree, four axis-parallel rectangles, a coarse staircase, 86.1 percent accuracy on fresh data. Right: the depth-4 tree, sixteen leaves, a finer staircase hugging the diagonal, 94 percent."><rect x="60.0" y="207.1" width="99.0" height="62.9" style="fill:var(--surface);stroke:var(--rule);stroke-width:0.8"/><rect x="60.0" y="40.0" width="99.0" height="167.1" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:0.8"/><rect x="159.0" y="116.0" width="131.0" height="154.0" style="fill:var(--surface);stroke:var(--rule);stroke-width:0.8"/><rect x="159.0" y="40.0" width="131.0" height="76.0" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:0.8"/><path d="M60 270 L290 40" style="stroke:var(--ink);stroke-width:1.6;fill:none;stroke-dasharray:6 4"/><rect x="60" y="40" width="230" height="230" style="fill:none;stroke:var(--ink-3);stroke-width:1"/><text x="175.0" y="26" text-anchor="middle" style="fill:var(--ink);font-weight:600">depth 2: 4 leaves, 86.1%</text><text class="lbl" x="175.0" y="288" text-anchor="middle">feature 1 →</text><rect x="400.0" y="251.3" width="26.5" height="18.7" style="fill:var(--surface);stroke:var(--rule);stroke-width:0.8"/><rect x="400.0" y="207.1" width="26.5" height="44.2" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:0.8"/><rect x="426.5" y="229.3" width="72.5" height="40.7" style="fill:var(--surface);stroke:var(--rule);stroke-width:0.8"/><rect x="426.5" y="207.1" width="72.5" height="22.3" style="fill:var(--surface);stroke:var(--rule);stroke-width:0.8"/><rect x="400.0" y="184.2" width="77.7" height="22.8" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:0.8"/><rect x="477.7" y="184.2" width="21.3" height="22.8" style="fill:var(--surface);stroke:var(--rule);stroke-width:0.8"/><rect x="400.0" y="177.6" width="99.0" height="6.7" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:0.8"/><rect x="400.0" y="40.0" width="99.0" height="137.6" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:0.8"/><rect x="499.0" y="161.6" width="131.0" height="108.4" style="fill:var(--surface);stroke:var(--rule);stroke-width:0.8"/><rect x="499.0" y="158.9" width="131.0" height="2.6" style="fill:var(--surface);stroke:var(--rule);stroke-width:0.8"/><rect x="499.0" y="116.0" width="32.4" height="42.9" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:0.8"/><rect x="531.5" y="116.0" width="98.5" height="42.9" style="fill:var(--surface);stroke:var(--rule);stroke-width:0.8"/><rect x="499.0" y="40.0" width="70.9" height="76.0" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:0.8"/><rect x="570.0" y="40.0" width="28.3" height="76.0" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:0.8"/><rect x="598.3" y="65.7" width="31.7" height="50.4" style="fill:var(--surface);stroke:var(--rule);stroke-width:0.8"/><rect x="598.3" y="40.0" width="31.7" height="25.7" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:0.8"/><path d="M400 270 L630 40" style="stroke:var(--ink);stroke-width:1.6;fill:none;stroke-dasharray:6 4"/><rect x="400" y="40" width="230" height="230" style="fill:none;stroke:var(--ink-3);stroke-width:1"/><text x="515.0" y="26" text-anchor="middle" style="fill:var(--ink);font-weight:600">depth 4: 16 leaves, 94.0%</text><text class="lbl" x="515.0" y="288" text-anchor="middle">feature 1 →</text></svg></div>
+      <figcaption>Two trees on the diagonal toy, shaded where they predict class 1; the dashed line is the truth. Every boundary is a horizontal or vertical segment, so the diagonal is approximated by a staircase that refines only as leaves are added.</figcaption>
+    </figure>
+    <div class="tbl"><table>
+      <thead><tr><th>Model</th><th>Leaves</th><th>Accuracy on fresh data</th></tr></thead>
+      <tbody>
+        <tr><td>Tree, depth 2</td><td>4</td><td>86.1%</td></tr>
+        <tr><td>Tree, depth 4</td><td>16</td><td>94.0%</td></tr>
+        <tr><td>Tree, depth 8</td><td>53</td><td>97.5%</td></tr>
+        <tr><td>Tree, unlimited</td><td>54</td><td>97.7%</td></tr>
+        <tr><td>Logistic regression</td><td></td><td>99.85%</td></tr>
+        <tr><td>Stump on feature 2 − feature 1</td><td>2</td><td>100%</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>The error falls only like 1/leaves.</strong> A staircase of \(k\) equal steps along the diagonal leaves small triangles on the wrong side, of total area about \(1/(4k)\), and each step costs about 2 leaves. Halving the error doubles the leaves.</li>
+      <li><strong>Give the tree the combination.</strong> With the difference as a feature, one split is perfect. The credit data shows the same thing: hand the tree the EMI <em>amount</em> in rupees instead of the share, and “EMIs over half of income” becomes the diagonal “amount &gt; 0.5 × income”. The depth-3 tree's test AUC drops from 0.808 to 0.789. Ratios like debt-to-income are worth building by hand, even for trees.</li>
+      <li><strong>Smooth additive effects waste leaves too.</strong> Giving each of two features 4 steps of effect needs the 4 steps of one repeated inside each of the 4 ranges of the other, 16 leaves, where an additive model needs 4 + 4 numbers.</li>
+      <li><strong>Oblique trees</strong> split on a weighted sum of features and draw the diagonal in one split, but finding the weights at every node is much harder than a sorted sweep and the rules are harder to read, so they're rare. Ensembles average many staircases into a smoother edge.</li>
+    </ul>
+
+    <h3 id="extrapolate">No extrapolation</h3>
+    <p>A leaf predicts the mean of its training targets, so a regression tree can never predict outside the range of training targets, and every input beyond the outermost cut lands in the same edge leaf. A straight line keeps going.</p>
+    <figure>
+      <div class="plate"><svg class="dg" viewBox="0 0 700 290" role="img" aria-label="Predicted credit limit against income for an applicant with 20 percent EMIs. The truth is a straight line, 1.6 times income. The linear model is a straight line close to it. The depth-6 tree is a staircase that follows the truth up to income 150, the edge of the training data, and then stays flat at 217.6 all the way to 300."><path d="M60 250 H520" style="stroke:var(--ink-3);stroke-width:1;fill:none"/><path d="M60 250 V24" style="stroke:var(--ink-3);stroke-width:1;fill:none"/><text class="lbl" x="60.0" y="266" text-anchor="middle">0</text><text class="lbl" x="136.7" y="266" text-anchor="middle">50</text><text class="lbl" x="213.3" y="266" text-anchor="middle">100</text><text class="lbl" x="290.0" y="266" text-anchor="middle">150</text><text class="lbl" x="366.7" y="266" text-anchor="middle">200</text><text class="lbl" x="443.3" y="266" text-anchor="middle">250</text><text class="lbl" x="520.0" y="266" text-anchor="middle">300</text><text class="lbl" x="290.0" y="284" text-anchor="middle">income, ₹k a month</text><text class="lbl" x="52" y="208.8" text-anchor="end">100</text><text class="lbl" x="52" y="163.6" text-anchor="end">200</text><text class="lbl" x="52" y="118.4" text-anchor="end">300</text><text class="lbl" x="52" y="73.2" text-anchor="end">400</text><text class="lbl" x="52" y="28.0" text-anchor="end">500</text><rect x="290.0" y="24" width="230.0" height="226" style="fill:var(--rule);opacity:.45"/><text class="lbl" x="405.0" y="40" text-anchor="middle">beyond the training data</text><path d="M83.0 239.2 L520.0 33.0" style="stroke:var(--ink);stroke-width:1.4;fill:none;stroke-dasharray:6 4"/><path d="M83.0 227.1 L520.0 72.1" style="stroke:var(--ink-3);stroke-width:1.8;fill:none"/><path d="M83.0 238.2 H96.0 V227.9 H111.4 V220.1 H125.2 V212.1 H143.6 V203.3 H157.4 V196.7 H169.6 V189.8 H194.9 V182.3 H217.9 V169.6 H247.1 V162.3 H263.2 V151.7 H520.0" class="hid"/><path d="M540 70 h26" class="hid"/><text x="574" y="74">tree, depth 6</text><path d="M540 96 h26" style="stroke:var(--ink-3);stroke-width:1.8"/><text x="574" y="100">linear</text><path d="M540 122 h26" style="stroke:var(--ink);stroke-width:1.4;stroke-dasharray:6 4"/><text x="574" y="126">truth, 1.6 × income</text><text class="lbl" x="540" y="164">emi 20%, no late</text><text class="lbl" x="540" y="180">payments, age 35</text></svg></div>
+      <figcaption>Predicted credit limit as income grows, for an applicant with 20% EMIs. The training incomes stop at ₹150k; beyond that, the tree is flat.</figcaption>
+    </figure>
+    <div class="tbl"><table>
+      <thead><tr><th>Income (₹k)</th><th>100</th><th>150</th><th>200</th><th>300</th></tr></thead>
+      <tbody>
+        <tr><td>Truth, \(2 \times \text{income} \times 0.8\)</td><td>160</td><td>240</td><td>320</td><td>480</td></tr>
+        <tr><td>Tree, depth 6</td><td>149.7</td><td>217.6</td><td>217.6</td><td>217.6</td></tr>
+        <tr><td>Linear regression</td><td>152.9</td><td>213.0</td><td>273.2</td><td>393.5</td></tr>
+        <tr><td>Tree on limit ÷ income</td><td>162.6</td><td>243.8</td><td>325.1</td><td>487.7</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>No tree model extrapolates.</strong> A random forest averages flat trees and boosting adds them up, so both go flat outside the data: for incomes of 150, 200 and 300, sklearn's gradient boosting predicts 240 for all three and a 100-tree random forest 236.</li>
+      <li><strong>Predict something that stays in range.</strong> The limit per rupee of income is about \(2(1 - \text{emi})\), between 0.4 and 2 whatever the income. Model that and multiply back: the last row of the table. It even wins inside the data (test RMSE 10.4, against 11.3 for the best plain tree), because the ratio depends only on <code>emi</code>.</li>
+      <li>Other fixes: remove the trend first, or add a linear part (LightGBM's <code>linear_tree</code> fits a line inside each leaf).</li>
+      <li><strong>Where it bites:</strong> a new segment of richer applicants, amounts that grow over time, any forecast with a trend. When incomes drift up in production, more and more applicants pile into the edge leaves; tracking each leaf's share of traffic against training is a cheap drift monitor.</li>
+    </ul>
+
+    <h3 id="variance">High variance: small changes, a different tree</h3>
+    <p>Each split wins by some margin over the runner-up, often a small one, so resampling the rows can change the winner. Every split below depends on the ones above, so one change near the top rewrites the whole branch under it. Refitting the depth-3 tree on 20 bootstrap samples of the training rows (3,500 drawn with replacement):</p>
+    <ul>
+      <li><strong>The root is stable:</strong> <code>late ≤ 1.5</code> wins 18 times out of 20 (<code>income ≤ 40.5</code> the other 2).</li>
+      <li><strong>The small branch is not.</strong> Right of the root sit only about 390 applicants, and its question takes 17 different forms in 20 refits: income at 44, at 47.6, at 122.3, age at 25.1, EMI share at 0.1…</li>
+      <li><strong>So are the predictions.</strong> One high-risk applicant (true chance 73%) gets anything from 27% to 100%, a standard deviation of 0.23. With full-depth trees it's worse: 100% in 17 refits and 0% in 3, a standard deviation of 0.36.</li>
+    </ul>
+    <p>Averaging many trees fitted on bootstrap samples (bagging, random forests) cancels much of this variance. It's also a warning: before presenting one tree's rules as policy, refit on a few resamples and keep only the rules that survive.</p>
+
+    <h3 id="cardinality">A bias towards many-valued features</h3>
+    <p>A feature with more distinct values offers more candidate thresholds, so it wins more often by luck (<a href="#lottery">section 04</a>): a continuous noise feature beat a binary one 96% of the time. The bias lives in the split search, so it shows up wherever splits are counted, most of all in impurity importance (next section). Leaf-size limits, pruning, and significance-test trees (CHAID, conditional inference) are the defences.</p>
+
+    <!-- importance -->
+    <h2 id="importance"><span class="pn">14</span>Feature importance</h2>
+    <h3 id="mdi">Impurity importance (MDI)</h3>
+    <p>sklearn's <code>feature_importances_</code> is the <strong>mean decrease in impurity</strong>: for every split, take its gain weighted by the share of all training rows that reach it, add these up per feature, and scale the totals to sum to 1.</p>
+    <div class="mj">\[ \text{importance}_j \propto \sum_{\text{splits } t \text{ on } j} \frac{n_t}{N}\, \text{gain}_t \]</div>
+    <div class="tbl"><table>
+      <thead><tr><th>Split</th><th>Rows</th><th>Share</th><th>Gain</th><th>× share</th></tr></thead>
+      <tbody>
+        <tr><td>late ≤ 1.5</td><td>3,500</td><td>1.00</td><td>0.0120</td><td>0.0120</td></tr>
+        <tr><td>income ≤ 39.46</td><td>3,106</td><td>0.89</td><td>0.0094</td><td>0.0083</td></tr>
+        <tr><td>emi ≤ 0.50</td><td>595</td><td>0.17</td><td>0.0957</td><td>0.0163</td></tr>
+        <tr><td>income ≤ 146.44</td><td>2,511</td><td>0.72</td><td>0.0001</td><td>0.0001</td></tr>
+        <tr><td>income ≤ 40.51</td><td>394</td><td>0.11</td><td>0.0134</td><td>0.0015</td></tr>
+        <tr><td>emi ≤ 0.53</td><td>63</td><td>0.02</td><td>0.1548</td><td>0.0028</td></tr>
+        <tr><td>age ≤ 23.18</td><td>331</td><td>0.09</td><td>0.0095</td><td>0.0009</td></tr>
+      </tbody>
+    </table></div>
+    <p>Totals: emi 0.0191, late 0.0120, income 0.0099, age 0.0009, together 0.0419. Dividing by 0.0419 gives the importances <strong>emi 0.455, late 0.287, income 0.237, age 0.021</strong>. EMI share outranks late payments although late is the root: the EMI split reaches only 17% of the rows, but it turns a 20%-default group into 3.7% and 49%, a gain eight times late's. Impurity importance measures how much training impurity a feature's splits removed, not how early it was asked.</p>
+    <p><strong>Its pitfalls:</strong></p>
+    <ul>
+      <li><strong>It favours many-valued features.</strong> In the unconstrained tree, <code>age</code>, pure noise but continuous, gets 0.205, more than twice the 0.096 of <code>late</code>, a real cause with only a handful of distinct values. Add a column of uniform random numbers and it gets 0.200, on a par with income (and age drops to 0.185, because the extra column changes the tree); a random yes/no column gets 0.014.</li>
+      <li><strong>It's measured on the training data,</strong> so splits that only fit noise count as much as real ones. That's how the noise columns above earn their share in a deep tree.</li>
+      <li><strong>Correlated features share it arbitrarily.</strong> Add an exact copy of income: predictions don't change, but income's 0.237 is split between the twins by <code>random_state</code> (0.036 and 0.201 with seed 0; 0.237 and 0 with seed 4). Neither number says which one “matters”.</li>
+      <li>It's relative (it sums to 1) and says nothing about direction.</li>
+    </ul>
+
+    <h3 id="permutation">Permutation importance</h3>
+    <p>Shuffle one feature's column in held-out data, which breaks its link to the target while keeping its distribution, and measure how much the model's score drops. Repeat a few times and average. On the test set, the drop in AUC (20 shuffles each):</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Feature</th><th>Depth-3 tree: AUC drop</th><th>MDI</th></tr></thead>
+      <tbody>
+        <tr><td>income</td><td>0.160</td><td>0.237</td></tr>
+        <tr><td>late</td><td>0.135</td><td>0.287</td></tr>
+        <tr><td>emi</td><td>0.050</td><td>0.455</td></tr>
+        <tr><td>age</td><td>−0.001</td><td>0.021</td></tr>
+      </tbody>
+    </table></div>
+    <p>The two answer different questions. MDI asks how much training impurity a feature's splits removed; permutation asks how much the model's held-out predictions depend on it. Shuffling income scrambles the question that 89% of rows pass through and that decides who even reaches the EMI split; shuffling EMI only reshuffles the 17% low-income branch. And on the unconstrained tree with the random column added, permutation gives the random column −0.003 and age −0.015, where MDI gave them 0.200 and 0.185.</p>
+    <ul>
+      <li><strong>Correlated features:</strong> shuffle one and its twin still carries the signal, so both look unimportant. Shuffling also creates impossible rows (a high income with a tiny loan amount), and the model is scored on inputs it never saw.</li>
+      <li>It measures what <em>this model</em> uses, not what causes the outcome. It costs one prediction pass per feature per repeat.</li>
+    </ul>
+
+    <h3 id="shap">SHAP and TreeSHAP</h3>
+    <p>SHAP explains one prediction as a sum: base rate plus one contribution per feature. A feature's <strong>Shapley value</strong> is its average marginal contribution over every order in which features could be revealed, where “the prediction knowing only the features in set \(S\)” is estimated by following the tree for features in \(S\) and averaging over both children, weighted by their training rows, for the rest. <strong>TreeSHAP</strong> computes this exactly in polynomial time, \(O(T L D^2)\) for \(T\) trees with \(L\) leaves and depth \(D\), instead of over all \(2^d\) subsets. For the stressed applicant from <a href="#reason-codes">section 08</a>:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Feature</th><th>Path walk</th><th>SHAP</th></tr></thead>
+      <tbody>
+        <tr><td>emi</td><td>+29.3</td><td>+17.7</td></tr>
+        <tr><td>income</td><td>+14.1</td><td>+26.4</td></tr>
+        <tr><td>late</td><td>−2.8</td><td>−3.5</td></tr>
+        <tr><td>age</td><td>0</td><td>−0.05</td></tr>
+        <tr><td>Base + total</td><td>8.7 + 40.6 = 49.3</td><td>8.7 + 40.6 = 49.3</td></tr>
+      </tbody>
+    </table></div>
+    <p>Both add up to the prediction. The path walk gives the big jump to whichever feature was asked when it happened, EMI, because income was asked first; SHAP averages over orders and gives income the larger share, since without a low income the EMI question is never reached. Averaging \(\lvert\text{SHAP}\rvert\) over many rows gives a global importance with direction and per-row detail. It doesn't fix the many-valued bias, though: SHAP explains the model, so if a deep tree split on noise, SHAP credits the noise too. On the unconstrained tree with a random column, mean \(\lvert\text{SHAP}\rvert\) on test rows gives the random column 17% of the total. Compute it on held-out rows, for a regularized model. Correlated features still share credit.</p>
+
+    <!-- whatif -->
+    <h2 id="whatif"><span class="pn">15</span>What-ifs</h2>
+    <p>The follow-ups that test whether you know what happens inside the tree.</p>
+    <ul>
+      <li><strong>Depth 1, a stump.</strong> One split, <code>late ≤ 1.5</code>, and two scores, 5.9% and 30.5%: test AUC 0.653. It can't express the AND (high bias), and it combines no features, so a sum of stumps (boosting with depth 1) is an additive model with no interactions.</li>
+      <li><strong>Unlimited depth.</strong> Splits until every leaf is pure: depth 25, 327 leaves, 100% training accuracy, test AUC 0.623, log loss 3.97, every probability 0 or 1 (<a href="#prepruning">section 10</a>).</li>
+      <li><strong><code>min_samples_leaf=1</code>.</strong> That's the default, and it means the leaf-size limit is off: a split may peel off a single row. With no depth limit it gives the unlimited tree above. Raising it to 200 gave the best ranking of any single setting here (12 leaves, test AUC 0.824).</li>
+      <li><strong>Duplicating a feature.</strong> Predictions don't change, since a split on the copy is the same split. Importance is split between the copies by <code>random_state</code>, which decides which copy is tried first when they tie. Correlated features do the same more softly.</li>
+      <li><strong>Adding a noise feature with many unique values</strong> (a random number, an ID). In the depth-3 tree it can still win the nodes where the truth is flat: over 20 random columns it took the <code>income ≤ 146.44</code> noise split in 10, because the real features' best gain there is only 0.0001; where real signal exists, a real feature wins. In a deep tree it wins splits in small branches, gets an impurity importance of 0.200 (on a par with income) and a permutation importance of about 0, and test performance barely moves. A yes/no noise feature gets 0.014. Many values, many lottery tickets.</li>
+      <li><strong>Scaling a feature</strong> (standardizing, rupees to dollars): the same tree, thresholds in new units. Trees need no scaling.</li>
+      <li><strong>A monotone transform</strong> (log, square root, rank): the same tree (log income gives identical predictions). A non-monotone one (squaring a centred feature) or mixing features (PCA) changes it.</li>
+      <li><strong>Class imbalance, 1:100</strong> as in fraud. The root's Gini is only \(2 \times 0.01 \times 0.99 \approx 0.02\), so every gain is tiny and a <code>min_impurity_decrease</code> tuned on balanced data blocks every split. A 30-row leaf of ordinary users holds no fraud about three times in four (\(0.99^{30} \approx 0.74\)) and says exactly 0%. <code>predict</code> flags almost nobody. Use leaf sizes big enough to hold some positives, class weights if needed (then correct the probabilities, <a href="#class-weight">section 09</a>), and judge by precision-recall, not accuracy.</li>
+      <li><strong>Some labels are wrong.</strong> A deep tree memorizes each wrong label as its own tiny leaf and passes the mistake on to every similar new row.</li>
+      <li><strong>The same customers in training and test</strong> (repeat borrowers). A memorizing tree scores them well because it has seen them, so the test score is too optimistic. Split by customer, not by row.</li>
+      <li><strong>An outlier in the target.</strong> Under squared error it moves leaf means and can capture the top splits; under absolute error it's ignored (<a href="#behaviour">section 13</a>).</li>
+    </ul>
+
+    <!-- pseudocode -->
+    <h2 id="pseudocode"><span class="pn">16</span>The algorithm in pseudocode</h2>
+    <p>The full CART build for classification, with the split search, missing values, categories, prediction and pruning. Regression swaps class counts for the running sum of targets and \(\sum_k n_k^2/n\) for \(S^2/n\).</p>
+    <pre class="code"><code><span class="cm"># ---- building ------------------------------------------</span>
+def build(rows, depth):
+    node = Node(value=class_shares(y[rows]))
+    if (depth == max_depth or len(rows) &lt; min_samples_split
+            or is_pure(y[rows])):
+        return node                       <span class="cm"># a leaf</span>
+    best = None
+    <span class="cm"># sklearn keeps drawing past max_features until</span>
+    <span class="cm"># it has found at least one valid split</span>
+    for j in shuffled(features)[:max_features]:
+        cand = (best_categorical(rows, j) if categorical(j)
+                else best_numeric(rows, j))
+        if cand and (best is None or cand.gain &gt; best.gain):
+            best = cand
+    if best is None:
+        return node                       <span class="cm"># no valid split</span>
+    w_gain = best.gain * len(rows) / N
+    if w_gain &lt; min_decrease:
+        return node                       <span class="cm"># no split pays</span>
+    left, right = partition(rows, best)
+    node.split = best
+    node.left = build(left, depth + 1)
+    node.right = build(right, depth + 1)
+    return node
+
+<span class="cm"># ---- the split search for one numeric feature ----------</span>
+def best_numeric(rows, j):
+    present = [r for r in rows if not isnan(X[r, j])]
+    blank = [r for r in rows if isnan(X[r, j])]
+    present.sort(key=lambda r: X[r, j])   <span class="cm"># O(n log n)</span>
+    L = zeros(K); R = counts(y[present])  <span class="cm"># class counts</span>
+    M = counts(y[blank])
+    best = None
+    for i in range(len(present) - 1):     <span class="cm"># one sweep</span>
+        L[y[present[i]]] += 1             <span class="cm"># O(1) per row</span>
+        R[y[present[i]]] -= 1
+        a, b = X[present[i], j], X[present[i + 1], j]
+        if a == b:
+            continue                      <span class="cm"># not a real gap</span>
+        for nan_left in (True, False):    <span class="cm"># try both</span>
+            l = L + M if nan_left else L
+            r = R if nan_left else R + M
+            if min(l.sum(), r.sum()) &lt; min_samples_leaf:
+                continue
+            g = gain(l, r)                <span class="cm"># from counts</span>
+            if best is None or g &gt; best.gain:
+                best = Split(j, (a + b) / 2, nan_left, g)
+    return best
+
+def gain(l, r):                           <span class="cm"># Gini from counts</span>
+    n = l.sum() + r.sum()
+    parent = 1 - ((l + r) ** 2).sum() / n ** 2
+    kids = 1 - ((l ** 2).sum() / l.sum()
+                + (r ** 2).sum() / r.sum()) / n
+    return parent - kids
+
+<span class="cm"># ---- a categorical feature, binary target --------------</span>
+def best_categorical(rows, j):
+    rate = lambda c: mean(y[rows where X[:, j] == c])
+    cats = sorted(levels(rows, j), key=rate)
+    <span class="cm"># then sweep the K - 1 cuts in this order, exactly as</span>
+    <span class="cm"># best_numeric does; the split is "category in cats[:i]"</span>
+
+<span class="cm"># ---- prediction: one path, O(depth) --------------------</span>
+def predict(node, x):
+    while node.split:
+        s = node.split
+        if isnan(x[s.feature]):
+            go_left = s.nan_left
+        else:
+            go_left = x[s.feature] &lt;= s.threshold
+        node = node.left if go_left else node.right
+    return node.value
+
+<span class="cm"># ---- cost-complexity pruning: the weakest link ---------</span>
+def pruning_path(tree):
+    alphas, trees = [0], [tree]
+    while tree.has_splits():
+        <span class="cm"># g(t) = (R(t) - R(T_t)) / (leaves(T_t) - 1)</span>
+        t = min(tree.internal_nodes(), key=g)
+        alphas.append(g(t))
+        tree = tree.with_branch_cut_at(t)
+        <span class="cm"># node t is now a leaf</span>
+        trees.append(tree)
+    return alphas, trees          <span class="cm"># pick alpha by CV</span></code></pre>
+    <p>One detail it glosses over: when a feature has no blanks at a node in training, both directions score the same, and sklearn stores “the child with more rows” as the route for blanks at prediction time.</p>
+
+    <!-- when -->
+    <h2 id="when"><span class="pn">17</span>When to use one tree, and when not</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Model, on the credit data</th><th>Test AUC</th><th>Test log loss</th></tr></thead>
+      <tbody>
+        <tr><td>The true chances (the best possible)</td><td>0.817</td><td>0.212</td></tr>
+        <tr><td>Logistic regression</td><td>0.756</td><td>0.261</td></tr>
+        <tr><td>One tree, full depth</td><td>0.623</td><td>3.965</td></tr>
+        <tr><td>One tree, depth 3</td><td>0.808</td><td>0.216</td></tr>
+        <tr><td>One tree, pruned by CV (4 leaves)</td><td>0.810</td><td>0.216</td></tr>
+        <tr><td>Random forest (300 trees, leaves ≥ 5)</td><td>0.824</td><td>0.224</td></tr>
+        <tr><td>Gradient boosting (sklearn defaults)</td><td>0.817</td><td>0.223</td></tr>
+      </tbody>
+    </table></div>
+    <p>Two caveats: the truth here <em>is</em> a small tree, so one tree does unusually well (on real data ensembles usually win clearly), and the forest “beating” the truth is luck: with 130 test defaulters, the AUC has a standard error of about 0.02.</p>
+    <p><strong>Use one tree when:</strong></p>
+    <ul>
+      <li>the rules must be read, audited or followed by people: a credit policy (“refer if 2+ late payments, or income under ₹40k with EMIs over half”), a fraud triage rule, a collections segmentation;</li>
+      <li>you want a quick first look or a leakage check: a depth-2 tree with an AUC of 0.99 means look for a leaked feature;</li>
+      <li>you need bins for a scorecard: a shallow tree per feature is a common way to choose the bins for weight-of-evidence logistic regression.</li>
+    </ul>
+    <p><strong>Use something else when:</strong></p>
+    <ul>
+      <li>accuracy matters most: a random forest or gradient boosting, which fix a single tree's instability, rough probabilities and staircases;</li>
+      <li>effects are smooth or additive, or boundaries diagonal: a linear model;</li>
+      <li>you must predict beyond the training range: no tree model can, so model a ratio or add a linear part;</li>
+      <li>you'll act on the probabilities: smooth or calibrate first;</li>
+      <li>the inputs are raw images, audio or text: neural networks.</li>
+    </ul>
+
+
+    <!-- questions -->
+    <h2 id="questions"><span class="pn">18</span>Interview questions</h2>
+    <p>Answer out loud first, then open the answer. Numbers in the answers come from the credit example above, but each answer stands on its own.</p>
+
+    <h3>Splitting</h3>
+    <details class="qa"><summary><span class="qn">1</span>Walk through how a tree decides its first split.</summary><div class="ans">
+      <p><strong>It tries every feature and every threshold on all the training rows, scores each candidate by how much it lowers the size-weighted impurity, and keeps the best one.</strong></p>
+      <ol>
+        <li><strong>Measure the root:</strong> its impurity, e.g. Gini \(2p(1 - p)\). With 8.7% defaults that's 0.159.</li>
+        <li><strong>For each feature, sort the rows by it.</strong> Candidate thresholds sit at the midpoints between consecutive distinct values: any threshold inside a gap sends the same rows left, so one per gap is enough.</li>
+        <li><strong>Sweep the sorted rows once,</strong> moving them one at a time from the right side to the left and updating the class counts on each side. At each gap, score the split from the counts:</li>
+      </ol>
+      <div class="mj">\[ \begin{aligned} \text{gain} &amp;= I(P) - \tfrac{n_L}{n} I(L) - \tfrac{n_R}{n} I(R) \\ \text{children} &amp;= \tfrac{n_L}{n}\text{Gini}_L + \tfrac{n_R}{n}\text{Gini}_R \\ &amp;= 1 - \tfrac{1}{n}\textstyle\sum_k \big(n_{Lk}^2/n_L + n_{Rk}^2/n_R\big) \end{aligned} \]</div>
+      <p>In words: the gain is the parent's impurity minus the children's, each child weighted by its share of the rows, and the weighted Gini needs only the class counts \(n_{Lk}, n_{Rk}\) on each side.</p>
+      <ol start="4">
+        <li><strong>Take the best threshold per feature, then the best feature.</strong> In the credit example, <code>late ≤ 1.5</code> gains 0.012, beating income (0.009), EMI share (0.0025) and age (0.0005).</li>
+      </ol>
+      <p><strong>Why it's done this way:</strong> sorting lets one sweep with running counts score each candidate in \(O(1)\), so a feature costs \(O(n \log n)\) instead of \(O(n^2)\); the size weights stop a tiny pure child from looking excellent. <strong>Follow-up:</strong> the search is exhaustive for this one split but greedy across levels, so the best first split isn't necessarily the start of the best tree.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">2</span>Gini or entropy: what's the difference, and does it matter?</summary><div class="ans">
+      <p><strong>They're nearly the same curve, so they almost always choose the same split. Entropy is steeper near pure nodes, so it gives more credit for cleaning up a nearly pure node; Gini is the default because it's CART's choice and skips the log.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{Gini} &amp;= \sum_k p_k (1 - p_k) \\ &amp;= 1 - \sum_k p_k^2 \\ \text{entropy} &amp;= \sum_k p_k (-\log p_k) \end{aligned} \]</div>
+      <p>In words: both are the expected “surprise” at a row's class. Gini uses \(1 - p\) where entropy uses \(-\ln p\), and \(1 - p\) is the tangent line of \(-\ln p\) at \(p = 1\), so Gini is entropy with the log replaced by its first-order approximation.</p>
+      <ul>
+        <li><strong>Where they differ:</strong> rare classes. \(-\ln p\) blows up near 0, so entropy rises steeply near the ends. A 2%-positive node sits at 14% of entropy's peak but only 8% of Gini's.</li>
+        <li><strong>In practice:</strong> on real data, trees grown with each typically differ in a split or two, often noise splits. Depth and leaf size matter far more.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> Gini is a little faster; entropy may suit very imbalanced problems slightly better. <strong>Follow-up:</strong> “the Gini” in credit scoring usually means the Gini coefficient, \(2\,\text{AUC} - 1\), a ranking metric unrelated to Gini impurity.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">3</span>Hand drill: a parent has 4 positives in 10. A split sends 1 of 6 left and 3 of 4 right. Compute the Gini gain and the information gain.</summary><div class="ans">
+      <p><strong>Gini gain 0.163; information gain 0.256 bits.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{Gini}_P &amp;= 2(0.4)(0.6) = 0.480 \\ \text{Gini}_L &amp;= 2(\tfrac16)(\tfrac56) = 0.278 \\ \text{Gini}_R &amp;= 2(0.75)(0.25) = 0.375 \\ \text{children} &amp;= 0.6(0.278) + 0.4(0.375) = 0.317 \\ \text{gain} &amp;= 0.480 - 0.317 = 0.163 \end{aligned} \]</div>
+      <div class="mj">\[ \begin{aligned} H_P &amp;= -0.4\log_2 0.4 - 0.6\log_2 0.6 \\ &amp;= 0.971 \\ H_L &amp;= 0.650 \\ H_R &amp;= 0.811 \\ \text{children} &amp;= 0.6(0.650) + 0.4(0.811) = 0.715 \\ \text{IG} &amp;= 0.971 - 0.715 = 0.256 \end{aligned} \]</div>
+      <p><strong>Check with counts</strong> (5 and 1 on the left, 1 and 3 on the right):</p>
+      <div class="mj">\[ \begin{aligned} \tfrac{5^2 + 1^2}{6} + \tfrac{1^2 + 3^2}{4} &amp;= 6.833 \\ 1 - 6.833/10 &amp;= 0.317 \end{aligned} \]</div>
+      <p><strong>Why the two numbers differ:</strong> entropy is in bits with a peak of 1 and Gini peaks at 0.5, so gains are only comparable within one criterion; what matters is which split each ranks first. <strong>Follow-up:</strong> the gain ratio divides the information gain by the entropy of the 6/4 split sizes, 0.971, giving 0.264.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">4</span>Why weight the children by size? Why not split on misclassification error?</summary><div class="ans">
+      <p><strong>Without the weights, peeling off one pure row would always look great. Misclassification error is a bad criterion because it's straight-sided: a split that sharpens the class shares without flipping a majority scores exactly zero.</strong></p>
+      <ul>
+        <li><strong>Size weights:</strong> a one-row child is pure (impurity 0). In a plain average it would count for half, so a useless split would beat a real one. Weighted, it counts for 1/\(n\).</li>
+        <li><strong>The geometry:</strong> the parent's class share is the size-weighted average of the children's, so the children's weighted impurity is a point on the chord between their two points on the impurity curve.</li>
+      </ul>
+      <div class="mj">\[ \begin{aligned} p &amp;= \tfrac{n_L}{n} p_L + \tfrac{n_R}{n} p_R \\ \text{gain} &amp;= I(p) - \tfrac{n_L}{n} I(p_L) - \tfrac{n_R}{n} I(p_R) \\ &amp;\ge 0 \end{aligned} \]</div>
+      <p>In words: for a strictly concave impurity (Gini, entropy) the chord lies below the curve, so any change in the shares gives a positive gain (Jensen's inequality). Misclassification error, \(1 - \max_k p_k\), is a straight line on each side of 0.5, so when both children keep the same majority the chord lies <em>on</em> it and the gain is 0.</p>
+      <p><strong>Example:</strong> a root split that moves the default share from 8.7% to 5.9% and 30.5% gains 0.012 in Gini and 0.038 in entropy, and exactly 0 in misclassification error, because both sides are still mostly payers. <strong>Follow-up:</strong> misclassification error is fine for pruning and for reporting accuracy; it's only blind as a split criterion.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">5</span>How is the best threshold for a numeric feature found efficiently, and what does building a tree cost?</summary><div class="ans">
+      <p><strong>Sort the node's rows by the feature, then sweep the gaps between distinct values with running class counts, scoring every midpoint in one pass: \(O(n \log n)\) per feature per node, dominated by the sort.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{per node} &amp;= O(d\, n_t \log n_t) \\ \text{per level} &amp;= O(d\, n \log n) \\ \text{whole tree} &amp;= O(D\, d\, n \log n) \end{aligned} \]</div>
+      <p>In words: \(n_t\) is the node's rows, \(d\) the features, \(D\) the depth. Each row sits in one node per level, so a level's nodes add up to \(n\) rows. A balanced tree has \(D \approx \log_2 n\), about \(O(d\, n \log^2 n)\) in all; prediction is \(O(D)\).</p>
+      <ul>
+        <li><strong>Why only distinct values:</strong> a threshold can't separate equal values. <strong>Why midpoints:</strong> every threshold in a gap gives the same training split; the midpoint hedges for unseen values.</li>
+        <li><strong>Why the sweep:</strong> moving one row across updates the counts in \(O(1)\) (\(O(K)\) for \(K\) classes). Rescoring each threshold from scratch would cost \(O(n^2)\) per feature.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> histogram methods (LightGBM, XGBoost <code>hist</code>) bin each feature into about 256 quantiles once, then each node adds up per-bin counts in \(O(n_t\, d)\) and tries only bin edges; a sibling's histogram is the parent's minus the other child's. Much faster, at the cost of threshold resolution.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">6</span>How do trees split categorical features?</summary><div class="ans">
+      <p><strong>A categorical split sends a subset of the categories left. For a binary or regression target, sorting the categories by their mean target and trying the \(K - 1\) cuts in that order is guaranteed to find the best of all \(2^{K-1} - 1\) subsets; otherwise use one-vs-rest or heuristics.</strong></p>
+      <ul>
+        <li><strong>The search space:</strong> \(K\) categories have \(2^{K-1} - 1\) two-group splits: 127 for 8, about \(5 \times 10^{14}\) for 50. Exhaustive search is out for large \(K\).</li>
+        <li><strong>One-vs-rest:</strong> the \(K\) splits that peel off one category, which is all a tree can do with one-hot columns. It needs several levels to build a good grouping, and each level costs rows.</li>
+        <li><strong>Sort by mean target:</strong> optimal for a 0/1 target with Gini or entropy (Breiman) and for squared error (Fisher). Intuition: if a riskier category sat on the safe side while a safer one of the same size sat on the risky side, swapping them pushes the two sides apart without moving the parent, which can only raise the gain of a concave impurity. So the best groups are contiguous in sorted order.</li>
+        <li><strong>Example:</strong> four categories of 100 rows each, at 5%, 8%, 25% and 30% default. The sorted cut {5%, 8%} vs {25%, 30%} gains 0.0221; the best one-vs-rest split gains 0.0113.</li>
+      </ul>
+      <p><strong>Trade-offs:</strong> with more than two classes there's no single order, so no shortcut. The sort order is learned from the labels, so rare categories make it noisy and the split overfits (LightGBM adds minimum counts and smoothing). sklearn's <code>DecisionTreeClassifier</code> needs numbers: one-hot for few categories, or target encoding computed out-of-fold and shrunk towards the overall rate, \((k_c + m\bar p)/(n_c + m)\), to avoid leaking each row's own label.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">7</span>What does a regression tree's leaf predict, how are its splits scored, and why is absolute error slower?</summary><div class="ans">
+      <p><strong>A leaf predicts the mean of its training targets, and a split is scored by variance reduction. With absolute error the leaf predicts the median, which can't be updated from running sums, so the sweep is slower.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{SSE} &amp;= \sum_i y_i^2 - \frac{S^2}{n} \\ \text{SSE}_L + \text{SSE}_R &amp;= \sum_i y_i^2 - \Big(\frac{S_L^2}{n_L} + \frac{S_R^2}{n_R}\Big) \end{aligned} \]</div>
+      <p>In words: \(S\) is the sum of the targets. The total \(\sum y_i^2\) is the same for every split, so the sweep just maximizes \(S_L^2/n_L + S_R^2/n_R\), updating \(S_L\) with one addition per row moved.</p>
+      <ul>
+        <li><strong>Why the mean:</strong> \(\sum_i (y_i - c)^2\) has slope \(-2\sum_i (y_i - c)\), zero at \(c = \bar y\).</li>
+        <li><strong>Why the median for absolute error:</strong> moving the guess up helps every target above it and hurts every target below by the same amount, so the best guess has half on each side. A median can't be maintained with one addition per row, so the sweep has to keep each side's values ordered.</li>
+        <li><strong>Classification is regression in disguise:</strong> for a 0/1 label, Gini \(2p(1 - p)\) is exactly twice the variance \(p(1 - p)\), so a squared-error tree on 0/1 labels is the same tree.</li>
+      </ul>
+      <p><strong>Follow-ups:</strong> heavy-tailed targets let a few huge values dominate the splits and leaf means, so model the log or use absolute error; counts suit Poisson deviance, which judges a miss relative to the mean.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">8</span>Why is greedy tree growth not globally optimal?</summary><div class="ans">
+      <p><strong>Each split is chosen as the best one now, without looking ahead and never revisited. A split that's useless alone but enables great splits below it, as in an XOR, is never chosen.</strong></p>
+      <ul>
+        <li><strong>XOR:</strong> label 1 when exactly one of two features is above 0.5. Splitting either feature at 0.5 leaves both halves 50/50, so its gain is about 0, although a depth-2 tree using exactly those cuts is perfect. Greedy grabs noise instead (on 1,000 rows it needed depth 5 for what depth 2 can do), and a minimum-gain stop rule never starts at all.</li>
+        <li><strong>Why it usually works:</strong> an AND leaves a trace in each feature alone (each half of “low income AND high EMIs” already separates defaulters a little), so greedy can follow it one feature at a time.</li>
+        <li><strong>Why not search properly:</strong> finding the optimal tree is NP-complete (Hyafil and Rivest, 1976). One-step lookahead costs roughly \((d\,n)^2\) per node instead of \(d\,n\).</li>
+      </ul>
+      <p><strong>Fixes:</strong> grow deep and prune (pruning judges whole branches, so it keeps a weak split with strong children), or average many randomized trees (a random forest of depth-3 trees solves the XOR that one depth-3 tree can't). Optimal-tree solvers exist for small data and shallow trees.</p>
+    </div></details>
+
+    <h3>Growing, stopping and pruning</h3>
+    <details class="qa"><summary><span class="qn">9</span>A tree gets 100% training accuracy and a test log loss near 4. What happened?</summary><div class="ans">
+      <p><strong>It grew without limits until every leaf was pure, so it memorized the training data, noise included, and every prediction is exactly 0 or 1.</strong></p>
+      <ul>
+        <li><strong>Mechanism:</strong> with sklearn's defaults (<code>max_depth=None</code>, <code>min_samples_leaf=1</code>) a node splits until it's pure or its rows are identical. On 3,500 credit applicants that's depth 25 and 327 leaves, 139 of them a single row.</li>
+        <li><strong>The log loss:</strong> a pure leaf predicts 0% or 100%. Every test row that lands in a leaf of the wrong class costs \(-\ln(2.2 \times 10^{-16}) \approx 36\) after clipping. 11% of test rows were such cases: \(0.11 \times 36 \approx 4\).</li>
+        <li><strong>Bias and variance:</strong> training AUC climbs with every level, while test AUC peaked at depth 3 (0.808) and fell to 0.62 at full depth. Shallow trees underfit; deep trees fit noise that changes with every sample.</li>
+      </ul>
+      <p><strong>Fix:</strong> limit depth or leaf size, prune, or use an ensemble, choosing the settings by cross-validation. <strong>Follow-up:</strong> a training score says nothing about a tree's quality.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">10</span>Which pre-pruning knobs exist, and what's the difference between min_samples_split and min_samples_leaf?</summary><div class="ans">
+      <p><strong><code>min_samples_split</code> says how many rows a node needs before it may split; its children can still be tiny. <code>min_samples_leaf</code> guarantees every leaf has at least that many rows, which directly limits how noisy a leaf's probability can be.</strong></p>
+      <ul>
+        <li><strong><code>max_depth</code>:</strong> readable, but blunt: big and small branches get the same limit.</li>
+        <li><strong><code>min_samples_split</code>:</strong> a 20-row node can still split into 1 and 19. In the credit example it left one-row leaves and a log loss of 2.0.</li>
+        <li><strong><code>min_samples_leaf</code>:</strong> every split must leave enough rows on both sides. The most direct control over leaf noise.</li>
+        <li><strong><code>max_leaf_nodes</code>:</strong> grows best-first, so it goes deep only where the data supports it.</li>
+        <li><strong><code>min_impurity_decrease</code>:</strong> refuses splits whose gain, weighted by the node's share of all rows, is too small.</li>
+      </ul>
+      <div class="mj">\[ \tfrac{N_t}{N}\big(I_t - \tfrac{N_{tL}}{N_t} I_L - \tfrac{N_{tR}}{N_t} I_R\big) \ge \text{threshold} \]</div>
+      <p><strong>Trade-off:</strong> every stop rule judges one split at a time, so it can refuse a weak split whose children would be strong (an XOR). Tune depth and leaf size together by cross-validation, with time-based folds when the model will score future data.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">11</span>How does cost-complexity pruning work, and how does it differ from stopping early?</summary><div class="ans">
+      <p><strong>Grow a full tree, then for a price \(\alpha\) per leaf keep the subtree that minimizes training impurity plus \(\alpha\) times its leaf count. As \(\alpha\) rises, branches are cut weakest-first, giving a short nested sequence of trees; pick \(\alpha\) by cross-validation.</strong></p>
+      <div class="mj">\[ \begin{aligned} R_\alpha(T) &amp;= R(T) + \alpha\,\lvert T\rvert \\ g(t) &amp;= \frac{R(t) - R(T_t)}{\lvert T_t\rvert - 1} \end{aligned} \]</div>
+      <p>In words: \(R(T)\) is the leaves' impurity weighted by their share of rows; \(g(t)\) is how much impurity the branch under node \(t\) removes per extra leaf. The branch with the smallest \(g\) is the weakest link: once \(\alpha\) passes \(g(t)\), its leaves aren't worth their price.</p>
+      <ul>
+        <li><strong>The loop:</strong> cut the weakest branch, recompute \(g\) for the branches above it, repeat. Each cut gives the next tree and the \(\alpha\) where it takes over. Breiman showed these optimal subtrees are nested, so this list contains every tree pruning could pick.</li>
+        <li><strong>Example:</strong> a 4-leaf tree on ten rows (leaves with 0 of 3, 1 of 3, 2 of 2 and 1 of 2 positives) has \(\alpha\) values 0.033, 0.05 and 0.163: cut the left branch, then the right, then the root split. On real data, a 327-leaf tree pruned by CV came down to 4 leaves with no noise splits.</li>
+        <li><strong>Why \(\alpha\) by CV:</strong> on training data more leaves always lowers \(R(T)\), so the best \(\alpha\) there is always 0.</li>
+      </ul>
+      <p><strong>Pre vs post:</strong> stopping early judges each split alone, so it refuses a weak split with strong children; pruning judges whole branches and keeps it. Pruning can only remove splits, never add one growth didn't make, and it costs growing the full tree first.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">12</span>Why are decision trees high-variance?</summary><div class="ans">
+      <p><strong>Splits often win by small margins, so a slightly different sample picks a different split, and every split below depends on the ones above, so one change near the top rewrites the whole branch.</strong></p>
+      <ul>
+        <li><strong>Hierarchy amplifies noise:</strong> a different root threshold changes which rows reach every node below, so their splits change too.</li>
+        <li><strong>Small branches are least stable:</strong> fewer rows, closer races. In 20 bootstrap refits of a depth-3 credit tree, the root was the same 18 times, but the question in a 390-row branch took 17 different forms.</li>
+        <li><strong>Leaves are small averages:</strong> one applicant's predicted risk ranged from 27% to 100% across the refits (standard deviation 0.23), and 0.36 with full-depth trees, whose pure leaves flip between 0 and 1.</li>
+      </ul>
+      <p><strong>Fixes:</strong> bagging and random forests average many trees on resampled data, which cancels much of the variance (decorrelating them with random feature subsets helps more). Bigger leaves and shallower trees reduce it at the cost of bias. <strong>Trade-off:</strong> an average of 300 trees is no longer a readable rule list; before trusting one tree's rules, refit on resamples and keep only the rules that survive.</p>
+    </div></details>
+
+    <h3>Behaviour</h3>
+    <details class="qa"><summary><span class="qn">13</span>How do trees handle missing values?</summary><div class="ans">
+      <p><strong>Four ways: learn which side blanks go at each split (sklearn ≥ 1.3, XGBoost, LightGBM), use surrogate splits (classic CART), send the row down both branches with fractional weights (C4.5), or impute first, ideally with a “was blank” indicator.</strong></p>
+      <ul>
+        <li><strong>Learned direction:</strong> during the sweep, rows with a missing value are set aside, and each candidate threshold is scored twice, with the blanks sent left and sent right. The better side is stored per node. If a feature had no blanks at that node in training, a blank at prediction goes to the child with more training rows: a guess, not a learned rule.</li>
+        <li><strong>Surrogate splits:</strong> after choosing the primary split, find for each other feature the split that best mimics it (sends the most rows the same way); keep those that beat sending everyone to the bigger side. A row missing the primary feature follows the best available surrogate. They help only when features are correlated.</li>
+        <li><strong>Fractional rows (C4.5):</strong> send the row down both branches, weighted by the share of training rows that went each way, and average the leaves it reaches.</li>
+        <li><strong>Imputation:</strong> mean or median makes a blank look typical and erases any signal; adding an indicator column restores it.</li>
+      </ul>
+      <p><strong>Why it matters:</strong> blanks are often informative (missing not at random). If risky applicants skip the income field, a native-NaN tree learns to send blanks to the risky side (40% for one such applicant), median imputation makes them look safe (7%), and a tree that never saw a blank sends them to the bigger, safer side (2.5%). <strong>Trade-off:</strong> a model that leans on blanks breaks when the process that creates them changes, so monitor missing rates and treat blanks identically in training and serving.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">14</span>Why don't trees need feature scaling?</summary><div class="ans">
+      <p><strong>A split only asks whether a value is above or below a threshold, so only the order of a feature's values matters, and scaling, logs and other monotone transforms keep that order.</strong></p>
+      <ul>
+        <li><strong>Mechanism:</strong> after a monotone increasing transform, sorting the node's rows gives the same order, so the sweep sees the same candidate partitions with the same gains, and the same split wins at every node. Only the printed thresholds change units (a log-income tree's threshold maps back to the same ₹39.46k).</li>
+        <li><strong>A decreasing transform</strong> gives the same partitions with left and right swapped.</li>
+        <li><strong>Contrast:</strong> gradient descent, regularization penalties and distances (k-NN, SVMs, PCA) all depend on scale, which is why linear models and neural nets need standardizing.</li>
+      </ul>
+      <p><strong>Caveats:</strong> mixing features (PCA rotation, sums and differences) does change the tree. A new value inside the gap between two training values could route differently, since the midpoint moves under a non-linear transform. Standardizing anyway is harmless.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">15</span>Why can't trees extrapolate?</summary><div class="ans">
+      <p><strong>Every prediction is a leaf's mean of training targets, so it can't leave the training range, and every input beyond the outermost threshold lands in the same edge leaf: the prediction goes flat.</strong></p>
+      <div class="mj">\[ \begin{aligned} f(x) &amp;= c_j \ \text{ for } x \in R_j \\ \min_i y_i \le c_j &amp;\le \max_i y_i \end{aligned} \]</div>
+      <p>In words: the leaf value \(c_j\) is an average of training targets, so it's bounded by them, and the edge boxes \(R_j\) stretch to infinity.</p>
+      <ul>
+        <li><strong>Example:</strong> credit limit grows with income, and training incomes stop at ₹150k. For an applicant with 20% EMIs (truth \(1.6 \times\) income), a depth-6 tree predicts 217.6 at incomes of 150, 200 and 300, where the truth is 240, 320 and 480; a linear model keeps rising.</li>
+        <li><strong>Ensembles too:</strong> a random forest averages flat trees and boosting adds them, so both go flat.</li>
+      </ul>
+      <p><strong>Fixes:</strong> model a quantity that stays in range (limit per rupee of income) and multiply back, remove the trend first, or add a linear component (LightGBM's <code>linear_tree</code>). <strong>Follow-up:</strong> in production this shows up as drift: new data piling into the edge leaves.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">16</span>Why do trees struggle with diagonal boundaries and smooth additive effects?</summary><div class="ans">
+      <p><strong>Every split is parallel to an axis, so a diagonal boundary must be built as a staircase, and every step costs leaves and data.</strong></p>
+      <ul>
+        <li><strong>The staircase:</strong> for the boundary “feature 2 &gt; feature 1”, a depth-2 tree (4 leaves) scores 86%, depth 4 (16 leaves) 94%, an unlimited tree (54 leaves) 97.7%, and logistic regression 99.85% with one line. A staircase of \(k\) steps leaves wrong-side triangles of area about \(1/(4k)\), so the error falls only like 1/leaves.</li>
+        <li><strong>Additive effects:</strong> giving each of two features 4 steps of effect needs the 4 steps of one repeated inside each of the 4 ranges of the other, 16 leaves, where an additive model needs 8 numbers.</li>
+      </ul>
+      <p><strong>Fixes:</strong> hand the tree the combination: with the difference as a feature, a single split is perfect; ratios like debt-to-income are worth building even for trees. Oblique trees split on weighted sums but are slow and hard to read; ensembles average many staircases into a smoother edge. <strong>Follow-up:</strong> rotating the features (PCA) can turn an axis-parallel rule into a diagonal one and hurt a tree.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">17</span>A split like “age ≤ 23.18” appears deep in a small branch. Is it real? Why do such splits appear?</summary><div class="ans">
+      <p><strong>Probably noise. In a small branch where the truth is flat, every candidate cut is noise, a depth limit still forces a split, and the luckiest of hundreds of cuts wins; features with many distinct values hold the most lottery tickets.</strong></p>
+      <ul>
+        <li><strong>Mechanism:</strong> in a 331-row branch with three continuous features there are about 990 candidate thresholds. The best of 990 random gains looks like a rule: 10 of the 18 youngest applicants happened to default.</li>
+        <li><strong>The bias:</strong> a continuous feature offers \(n - 1\) thresholds, a binary one 1. In 200 simulations (1,000 rows, a pure-noise target with 10% positives), a continuous noise feature beat a binary one at the root 96% of the time.</li>
+        <li><strong>How to tell:</strong> its leaf is tiny (18 rows), it's among the first branches pruning removes, bootstrap refits rarely repeat it, and on fresh data its leaf's share collapses (55.6% in training, 12.5% on test).</li>
+      </ul>
+      <p><strong>Defences:</strong> <code>min_samples_leaf</code>, cost-complexity pruning, and significance-test trees (CHAID, conditional inference) that pick the feature by a test before searching thresholds. <strong>Follow-up:</strong> the same bias inflates impurity-based feature importance.</p>
+    </div></details>
+
+    <h3>Importance and explanations</h3>
+    <details class="qa"><summary><span class="qn">18</span>How is a tree's feature importance computed, and what are its pitfalls?</summary><div class="ans">
+      <p><strong>sklearn's importance is the mean decrease in impurity (MDI): each split's gain weighted by the share of training rows reaching it, summed per feature and normalized to 1. It's biased towards many-valued features, computed on training data, and split arbitrarily between correlated features; permutation importance on held-out data and SHAP are the usual checks.</strong></p>
+      <div class="mj">\[ \text{importance}_j \propto \sum_{\text{splits } t \text{ on } j} \frac{n_t}{N}\, \text{gain}_t \]</div>
+      <ul>
+        <li><strong>It counts impurity removed, not order:</strong> a split deep in a 17% branch with a huge gain can outrank the root split.</li>
+        <li><strong>Many-valued bias:</strong> in an unconstrained credit tree, pure-noise <code>age</code> (continuous) got 0.205 against 0.096 for <code>late</code> (a real cause with few values); a column of random numbers got 0.200.</li>
+        <li><strong>Training data:</strong> splits that only fit noise count fully.</li>
+        <li><strong>Correlated features:</strong> an exact copy of a feature takes some or all of its importance depending on <code>random_state</code>.</li>
+      </ul>
+      <p><strong>Permutation importance</strong> shuffles one column in held-out data and measures the score drop: the random column scores about 0. But with correlated features, the twin still carries the signal so both look unimportant, and shuffling creates impossible rows. <strong>SHAP</strong> (TreeSHAP, exact in polynomial time for trees) splits each prediction into additive per-feature contributions averaged over all feature orders; mean \(\lvert\text{SHAP}\rvert\) is a global importance, but it inherits any noise splits the model made, so it's only as clean as the tree. None of them measures causation.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">19</span>How would you explain one prediction from a tree?</summary><div class="ans">
+      <p><strong>Walk the row's path: each question moves the node's predicted share, and the steps add up exactly to the prediction minus the base rate. SHAP gives an order-independent version of the same decomposition.</strong></p>
+      <div class="mj">\[ \begin{aligned} f(x) &amp;= \bar p + \sum_{\text{path}} \big(\hat p_{\text{child}} - \hat p_{\text{parent}}\big) \\ 49.3 &amp;= 8.7 - 2.8 + 14.1 + 29.3 \ (\text{points}) \end{aligned} \]</div>
+      <p>In words: everyone starts at the base rate 8.7%; “at most 1 late payment” lowers it to 5.9%, “income ≤ ₹39k” raises it to 20%, “EMIs over half” to 49.3%. The reasons to give are the steps that raised the risk, largest first; a counterfactual comes free (with EMIs under half, 3.7%).</p>
+      <ul>
+        <li><strong>The catch:</strong> the path walk credits whichever feature was asked when a jump happened, so it depends on the order of the questions. Here EMI gets +29.3 because income was asked first.</li>
+        <li><strong>SHAP</strong> averages each feature's contribution over all orders, using the tree's training counts for features not yet known. For the same applicant it gives income +26.4 and EMI +17.7: without a low income, the EMI question is never reached.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> before defending a single tree's decision to a customer, check that the rule survives refits on resampled data.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">20</span>What happens if you duplicate a feature, or add a random ID-like column?</summary><div class="ans">
+      <p><strong>A duplicate changes no prediction but splits the importance between the copies arbitrarily. A random many-valued column wins the splits where nothing real is left to find, rarely in a shallow tree and often in a deep one, which inflates its impurity importance while its permutation importance stays near zero.</strong></p>
+      <ul>
+        <li><strong>Duplicate:</strong> a split on the copy is the same split, so the gains tie exactly. sklearn tries features in a random order per node and the first one wins, so <code>random_state</code> decides which copy gets the credit (0.036 and 0.201 with one seed, 0.237 and 0 with another). Correlated near-copies share it the same way, more softly.</li>
+        <li><strong>Random column, shallow tree:</strong> it can't beat a real signal, but it competes for the noise splits. In 20 tries it took the depth-3 tree's <code>income ≤ 146.44</code> split half the time, with almost no effect on test AUC.</li>
+        <li><strong>Random column, deep tree:</strong> in small branches, where the real features are exhausted, its thousands of thresholds win by luck. Its MDI reached 0.200, on a par with income; its permutation importance was −0.003; test AUC barely moved. A random yes/no column got only 0.014.</li>
+      </ul>
+      <p><strong>Why it matters:</strong> a true ID column lets a deep tree memorize individuals, which looks good only if the same customers appear in training and test. Drop identifiers, limit leaf size, and judge importance on held-out data.</p>
+    </div></details>
+
+    <h3>Probabilities</h3>
+    <details class="qa"><summary><span class="qn">21</span>Are a tree's predicted probabilities calibrated?</summary><div class="ans">
+      <p><strong>Only roughly, and only for big leaves. A leaf's probability is its training share \(k/n\): noisy in small leaves, pushed towards 0 and 1 because the tree chose those leaves for looking extreme, and exactly 0 or 1 when pure. Deep trees are overconfident.</strong></p>
+      <div class="mj">\[ \begin{aligned} \hat p &amp;= \frac{k}{n} \\ \text{SE}(\hat p) &amp;= \sqrt{\frac{\hat p(1 - \hat p)}{n}} \end{aligned} \]</div>
+      <p>In words: a share from \(n\) rows typically misses by its standard error. A 20-row leaf at 90% has an SE of 6.7 points.</p>
+      <ul>
+        <li><strong>Selection bias:</strong> of hundreds of candidate cuts, the tree keeps the one whose children look most separated, so small leaves overstate how extreme they are. In the credit tree, an 18-row leaf said 55.6% and delivered 12.5% on test; a 2,436-row leaf said 2.5% and delivered 3.0%.</li>
+        <li><strong>Pure leaves:</strong> with <code>min_samples_leaf=30</code>, half the test rows got exactly 0% or 100%: AUC 0.804 but log loss 0.731. Ranking and calibration are different questions.</li>
+      </ul>
+      <p><strong>Fixes:</strong> bigger leaves; smoothing towards the base rate, \((k + m\bar p)/(n + m)\) (log loss 0.731 → 0.241 with the same leaves); honest leaves filled from held-out rows; Platt or isotonic calibration on a held-out set; or an ensemble. <strong>Check it</strong> with a reliability curve, log loss or Brier score on held-out data.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">22</span>What does class_weight="balanced" do to a tree?</summary><div class="ans">
+      <p><strong>It makes each minority row count \(r\) times as much in every impurity and every leaf share. That changes which splits win and multiplies every leaf's odds by \(r\), so the probabilities are inflated, while the ranking barely moves.</strong></p>
+      <div class="mj">\[ \begin{aligned} p_w &amp;= \frac{r k}{r k + (n - k)} \\ p &amp;= \frac{p_w}{p_w + r(1 - p_w)} \end{aligned} \]</div>
+      <p>In words: a leaf with \(k\) positives among \(n\) rows reports \(p_w\) under weights; solving for \(k/n\) gives the second line, which undoes it exactly. Here \(r\) is the ratio of negatives to positives in training.</p>
+      <ul>
+        <li><strong>Example:</strong> with 8.7% defaults, \(r \approx 10.5\); the balanced tree's average prediction is 32.7% and its log loss 0.466. The correction brings the log loss to 0.236, not to the unweighted tree's 0.216, because the splits stay as the weighted tree chose them.</li>
+        <li><strong>Why the ranking barely moves:</strong> multiplying every leaf's odds by the same \(r\) keeps the leaves in order; only changed splits move the AUC.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> weights can help a rare class win splits, but if you need probabilities, correct or recalibrate afterwards. Moving the decision threshold is often all that's needed. Oversampling behaves the same way.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">23</span>How does severe class imbalance (1:100) affect a tree?</summary><div class="ans">
+      <p><strong>Gains become tiny, leaves of the majority class become pure, <code>predict</code> flags almost nobody, and accuracy becomes meaningless.</strong></p>
+      <ul>
+        <li><strong>Tiny gains:</strong> the root's Gini is \(2 \times 0.01 \times 0.99 \approx 0.02\), so every gain is small, and a <code>min_impurity_decrease</code> tuned on balanced data blocks every split.</li>
+        <li><strong>Pure leaves:</strong> a 30-row leaf of ordinary users holds no positive with probability \(0.99^{30} \approx 0.74\), so most such leaves say exactly 0%.</li>
+        <li><strong>Majority votes:</strong> <code>predict</code> uses a 0.5 cut-off, and hardly any leaf has a positive majority.</li>
+      </ul>
+      <p><strong>What to do:</strong> use leaf sizes large enough to hold some positives, use <code>predict_proba</code> with a threshold chosen for the business cost, consider class weights (then correct the probabilities), smooth or calibrate the leaves, and judge by precision-recall or PR-AUC, not accuracy. <strong>Trade-off:</strong> entropy is slightly more sensitive than Gini to cleaning up rare-class pockets, but leaf size matters far more.</p>
+    </div></details>
+
+    <h3>Building and choosing</h3>
+    <details class="qa"><summary><span class="qn">24</span>Write the pseudocode for building a decision tree.</summary><div class="ans">
+      <p><strong>Recursive: at each node, check the stop rules, search every feature's sorted thresholds for the best gain, split, and recurse into both children.</strong></p>
+      <pre class="code"><code>def build(rows, depth):
+    node = Leaf(value=class_shares(y[rows]))
+    if depth == max_depth or is_pure(rows) \
+            or len(rows) &lt; min_samples_split:
+        return node
+    best = None
+    for j in features:
+        order = sorted(rows, key=lambda r: X[r, j])
+        L, R = zeros(K), counts(y[order])
+        for i in range(len(order) - 1):
+            L[y[order[i]]] += 1; R[y[order[i]]] -= 1
+            if X[order[i], j] == X[order[i + 1], j]:
+                continue                 <span class="cm"># not a gap</span>
+            if min(L.sum(), R.sum()) &lt; min_samples_leaf:
+                continue
+            g = gini_gain(L, R)          <span class="cm"># from counts</span>
+            if best is None or g &gt; best.gain:
+                a = X[order[i], j]
+                b = X[order[i + 1], j]
+                best = Split(j, (a + b) / 2, g)
+    if best is None:
+        return node
+    if best.gain * len(rows) / N &lt; min_gain:
+        return node
+    left = [r for r in rows if X[r, best.j] &lt;= best.t]
+    right = [r for r in rows if X[r, best.j] &gt; best.t]
+    return Node(best, build(left, depth + 1),
+                build(right, depth + 1))</code></pre>
+      <p><strong>Points to say:</strong> sorting lets one sweep with running counts score each candidate in \(O(1)\), so a node costs \(O(d\, n \log n)\); the counts give the Gini gain directly; prediction walks one path, \(O(\text{depth})\). For regression, replace the class counts with running sums of \(y\) and the leaf value with the mean. Missing values add a second pass per threshold (blanks left, then right), and pruning is a separate weakest-link loop over the finished tree.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">25</span>When would you use a single tree rather than a random forest or boosting?</summary><div class="ans">
+      <p><strong>When the rules must be read, audited or followed by people, or as a quick baseline and leakage check. When accuracy or probabilities matter most, use an ensemble.</strong></p>
+      <ul>
+        <li><strong>Single tree:</strong> a credit policy or fraud triage rule people must follow, reason codes from the path, bins for a scorecard, a first look at the data. A depth-2 tree with an AUC of 0.99 is a leak alarm.</li>
+        <li><strong>Its weaknesses:</strong> high variance (rules change with the sample), rough probabilities, staircase boundaries, a ceiling on accuracy.</li>
+        <li><strong>Ensembles:</strong> forests average away the variance and smooth the probabilities; boosting fixes errors step by step and usually wins on tabular data. Explain them with SHAP, and add monotonic constraints where policy demands a direction.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> none of them extrapolates, so for trends add a linear part or model a ratio. If you need one readable tree that behaves like the ensemble, fit a shallow tree to the ensemble's predictions and check how often they disagree.</p>
+    </div></details>
+
+
+    <!-- sheet -->
+    <h2 id="sheet"><span class="pn">19</span>Cheat sheet</h2>
+    <div class="sheet">
+      <h3>Impurity</h3>
+      <div class="mj">\[ \begin{aligned} \text{Gini} &amp;= 1 - \textstyle\sum_k p_k^2 \\ \text{Gini, 2 classes} &amp;= 2p(1 - p) \\ \text{entropy} &amp;= -\textstyle\sum_k p_k \log_2 p_k \\ \text{misclass.} &amp;= 1 - \max_k p_k \\ \text{regression} &amp;= \tfrac{1}{n}\textstyle\sum_i (y_i - \bar y)^2 \end{aligned} \]</div>
+      <h3>Scoring a split</h3>
+      <div class="mj">\[ \begin{aligned} \text{gain} &amp;= I(P) - \tfrac{n_L}{n} I(L) - \tfrac{n_R}{n} I(R) \\ \text{Gini, kids} &amp;= 1 - \tfrac{1}{n}\textstyle\sum_k \big(n_{Lk}^2/n_L + n_{Rk}^2/n_R\big) \\ \text{SSE, kids} &amp;= \textstyle\sum_i y_i^2 - \big(S_L^2/n_L + S_R^2/n_R\big) \\ \text{SplitInfo} &amp;= -\textstyle\sum_j \tfrac{n_j}{n}\log_2 \tfrac{n_j}{n} \\ \text{GainRatio} &amp;= \text{IG} / \text{SplitInfo} \end{aligned} \]</div>
+      <h3>Search and cost</h3>
+      <div class="mj">\[ \begin{aligned} \text{per node} &amp;= O(d\, n_t \log n_t) \\ \text{per tree} &amp;= O(D\, d\, n \log n) \end{aligned} \]</div>
+      <ul>
+        <li>Candidates: midpoints of the gaps between consecutive distinct values; sweep with running counts.</li>
+        <li>Categories with a binary or numeric target: sort by mean target, try \(K - 1\) of the \(2^{K-1} - 1\) splits.</li>
+      </ul>
+      <h3>Leaves</h3>
+      <div class="mj">\[ \begin{aligned} \hat p &amp;= k/n \\ \text{SE} &amp;= \sqrt{\hat p(1 - \hat p)/n} \\ \text{smoothed} &amp;= \frac{k + m\bar p}{n + m} \\ \text{undo weight } r &amp;: \ p = \frac{p_w}{p_w + r(1 - p_w)} \end{aligned} \]</div>
+      <h3>Stopping and pruning</h3>
+      <div class="mj">\[ \begin{aligned} \text{min decrease} &amp;\le \tfrac{N_t}{N}\big(I_t - \tfrac{N_{tL}}{N_t} I_L - \tfrac{N_{tR}}{N_t} I_R\big) \\ R_\alpha(T) &amp;= R(T) + \alpha \lvert T\rvert \\ g(t) &amp;= \frac{R(t) - R(T_t)}{\lvert T_t\rvert - 1} \end{aligned} \]</div>
+      <h3>Importance</h3>
+      <div class="mj">\[ \begin{aligned} \text{MDI}_j &amp;\propto \textstyle\sum_{t \text{ on } j} \tfrac{n_t}{N}\, \text{gain}_t \\ \text{permutation}_j &amp;= \text{score} - \text{score}_{j \text{ shuffled}} \end{aligned} \]</div>
+      <h3>Behaviour in one line each</h3>
+      <ul>
+        <li>Monotone transforms change nothing; mixing features does.</li>
+        <li>Flat beyond the training range; diagonals as staircases; smooth additive effects need many leaves.</li>
+        <li>High variance, worst in small branches; averaging fixes it.</li>
+        <li>Many-valued features win more splits by luck, and inflate MDI.</li>
+        <li>Blanks: learned direction, surrogates, or impute plus an indicator.</li>
+      </ul>
+    </div>
+
+    <footer><a href="./">More study notes</a> · <a href="../">Deepam Minda</a></footer>
+  </article>
+</div>
+<a class="jump" href="#tldr">Contents ↑</a>
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+  svg: { fontCache: "global" },
+  options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script>
+(function () {
+  var d = document.getElementById("tocd");
+  var wide = window.matchMedia("(min-width: 1081px)");
+  function sync() { d.open = wide.matches; }
+  sync();
+  if (wide.addEventListener) wide.addEventListener("change", sync);
+  var jump = document.querySelector(".jump");
+  jump.addEventListener("click", function () { if (!wide.matches) d.open = true; });
+  d.addEventListener("click", function (e) {
+    if (!wide.matches && e.target.closest("a")) d.open = false;
+  });
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+  function spy() {
+    var y = window.scrollY + 120, cur = 0;
+    targets.forEach(function (t, i) { if (t && t.getBoundingClientRect().top + window.scrollY <= y) cur = i; });
+    links.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
+  }
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+})();
+</script>
+
+<script>
+(function () {
+  var root = document.documentElement, b = document.getElementById("theme-toggle");
+  function cur() { return root.getAttribute("data-theme") === "light" ? "light" : "dark"; }
+  function label() { b.setAttribute("aria-label", "Switch to " + (cur() === "dark" ? "light" : "dark") + " mode"); }
+  b.addEventListener("click", function () {
+    var n = cur() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", n);
+    try { localStorage.setItem("deepam-theme", n); } catch (e) {}
+    label();
+  });
+  label();
+})();
+</script>
+</body>
+</html>
