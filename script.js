@@ -245,44 +245,17 @@ async function renderPost() {
   const [meta, markdown] = parseFrontMatter(await response.text());
   document.title = `${meta.title || "Post"} · Deepam Minda`;
   target.innerHTML = `
-    <a class="back-link" href="./">Back to blog</a>
-    <button class="jump-button" type="button" data-jump="bottom" aria-label="Jump to bottom">
-      <span aria-hidden="true">↓</span>
-    </button>
     <article>
       <header>
+        <a class="tag" href="./">writing</a>
         <h1>${escapeHtml(meta.title || "Untitled")}</h1>
         <p class="article-meta">${escapeHtml(meta.date || "")}</p>
       </header>
       <div class="article-body">${markdownToHtml(markdown.replace(/^# .+$/m, "").trim())}</div>
-      <span id="post-bottom" tabindex="-1"></span>
     </article>
   `;
-  bindJumpControls();
   highlightCodeBlocks();
   renderMermaid();
-}
-
-function bindJumpControls() {
-  const button = document.querySelector("[data-jump]");
-  if (!button) return;
-
-  function syncDirection() {
-    const nearBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 160;
-    const nextDirection = nearBottom ? "top" : "bottom";
-    button.dataset.jump = nextDirection;
-    button.setAttribute("aria-label", nextDirection === "top" ? "Jump to top" : "Jump to bottom");
-    button.querySelector("span").textContent = nextDirection === "top" ? "↑" : "↓";
-  }
-
-  button.addEventListener("click", () => {
-    const target = button.dataset.jump === "bottom" ? document.querySelector("#post-bottom") : document.body;
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
-
-  window.addEventListener("scroll", syncDirection, { passive: true });
-  window.addEventListener("resize", syncDirection);
-  syncDirection();
 }
 
 function bindWorkPanels() {

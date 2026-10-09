@@ -1,0 +1,178 @@
+/* Shared components: the pieces every page reuses, so they look the same everywhere.
+   Loaded after tokens.css by the site pages and the study notes. See design.md. */
+
+/* The header: "> deepam" on the left, nav and the theme toggle on the right.
+   Markup (copy exactly; set aria-current on the section you are in):
+   <header class="site-header">
+     <a class="mark" href="/">deepam</a>
+     <nav aria-label="Primary navigation">
+       <a href="/blog/">blog</a> <a href="/notes/">study notes</a>
+       <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to light mode" title="Switch color mode">
+         <span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span>
+         <span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span>
+       </button>
+     </nav>
+   </header> */
+.site-header {
+  width: min(100% - 48px, 1260px);
+  min-height: 72px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid var(--ink-line);
+  font-family: var(--font-mono);
+}
+
+.site-header a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.site-header a:hover {
+  color: var(--amber);
+}
+
+.mark {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.mark::before {
+  content: ">";
+  margin-right: 8px;
+  color: var(--amber);
+}
+
+.site-header nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 28px;
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.site-header nav a {
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.site-header nav a:hover {
+  transform: translateY(-1px);
+}
+
+.theme-toggle {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  margin: -5px 0;
+  padding: 0;
+  border: 1px solid var(--ink-line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--soft);
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--amber);
+  background: var(--panel);
+  color: var(--amber);
+  transform: rotate(10deg);
+}
+
+.theme-icon {
+  grid-area: 1 / 1;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.theme-icon-moon {
+  display: none;
+}
+
+html[data-theme="light"] .theme-icon-sun {
+  display: none;
+}
+
+html[data-theme="light"] .theme-icon-moon {
+  display: inline;
+}
+
+@media (max-width: 720px) {
+  .site-header {
+    width: min(100% - 32px, 1260px);
+    min-height: 64px;
+  }
+
+  .site-header nav {
+    gap: 16px;
+    font-size: 14px;
+  }
+}
+
+/* The tag: a green dot and a short mono label. It names a section ("learning", "writing")
+   and is the only heading on list pages. Amber by default; .tag-muted for status lines
+   like the home page's "applied ML engineer". */
+.tag {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  margin: 0;
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-size: var(--fs-tag);
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0;
+  text-decoration: none;
+}
+
+.tag::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.tag-muted {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* Graph paper: the background of reading pages (study notes and blog posts). */
+.graph-paper {
+  background-color: var(--void);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: 50% 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle {
+    transition: none;
+  }
+
+  .theme-toggle:hover,
+  .site-header nav a:hover {
+    transform: none;
+  }
+}

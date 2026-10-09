@@ -1,0 +1,107 @@
+/* Design tokens: the one source for fonts, type sizes and colours on every page of the site,
+   study notes included. Read design.md before changing anything here.
+
+   Dark is the default; html[data-theme="light"] switches. Every page sets data-theme before
+   first paint (the saved "deepam-theme" choice, else the OS preference), so these two blocks
+   are the only theme logic. Pages never use a literal colour: add a token here instead. */
+
+:root {
+  /* type: one family, IBM Plex. Sans for text, mono for the mark, nav, tags, dates and code. */
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, ui-monospace, monospace;
+
+  /* type scale: the only font sizes pages may use */
+  --fs-label: 12px;   /* dates, metadata, table heads */
+  --fs-tag: 13px;     /* the dot tag */
+  --fs-small: 15px;   /* nav, list descriptions */
+  --fs-body: 16.5px;  /* reading text */
+  --fs-row: 19px;     /* list titles */
+  --fs-h3: 18px;
+  --fs-h2: 22px;
+  --fs-title: clamp(30px, 3.2vw, 40px);  /* page and note titles */
+  --fs-hero: clamp(40px, 5vw, 60px);     /* the home page name only */
+
+  /* ground and ink */
+  --void: #070707;        /* page background */
+  --surface: #121210;     /* code, contents panel, raised boxes */
+  --panel: rgba(255, 255, 255, 0.035);  /* hover fills */
+  --text: #f3f2ee;
+  --soft: #b8b5ad;        /* secondary text */
+  --muted: #8f8d87;       /* labels, dates, captions */
+
+  /* lines */
+  --rule: #262522;        /* borders and table rules */
+  --ink-line: rgba(255, 255, 255, 0.1);  /* the header rule, section dividers */
+  --subtle-line: rgba(255, 255, 255, 0.07);
+  --line: rgba(255, 255, 255, 0.12);
+  --line-strong: rgba(255, 255, 255, 0.22);
+
+  /* accents: amber marks what you can act on, green is the dot */
+  --amber: #ffc400;
+  --amber-soft: rgba(255, 196, 0, 0.36);
+  --link: #ffc400;
+  --green: #00a884;
+
+  /* diagrams in the study notes: forward values, gradients, gates */
+  --green-wash: #0a1d18;
+  --blue: #8fb6d2;
+  --blue-wash: #121a20;
+  --orange: #ef7d47;
+  --orange-wash: #26170e;
+  --neutral: #cfccc4;
+  --neutral-wash: #171714;
+
+  /* graph paper behind reading pages (notes and blog posts) */
+  --grid: rgba(255, 255, 255, 0.02);
+  --grid-major: rgba(255, 255, 255, 0.04);
+
+  /* home: GitHub activity grid */
+  --github-empty: rgba(255, 255, 255, 0.05);
+  --github-cell-border: rgba(255, 255, 255, 0.02);
+  --heat-1: rgba(255, 196, 0, 0.16);
+  --heat-2: rgba(255, 196, 0, 0.28);
+  --heat-3: rgba(255, 196, 0, 0.46);
+  --heat-4: rgba(255, 196, 0, 0.72);
+
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  --void: #f6f7f3;
+  --surface: #fbfcf9;
+  --panel: rgba(19, 22, 19, 0.045);
+  --text: #141714;
+  --soft: #30352f;
+  --muted: #62675f;
+
+  --rule: #dadcd4;
+  --ink-line: rgba(20, 23, 20, 0.13);
+  --subtle-line: rgba(20, 23, 20, 0.09);
+  --line: rgba(20, 23, 20, 0.16);
+  --line-strong: rgba(20, 23, 20, 0.3);
+
+  --amber: #9b6700;
+  --amber-soft: rgba(155, 103, 0, 0.38);
+  --link: #8a5c00;
+  --green: #007b62;
+
+  --green-wash: #e1efe9;
+  --blue: #2f5470;
+  --blue-wash: #e4ecf1;
+  --orange: #ad4c22;
+  --orange-wash: #f6e6dc;
+  --neutral: #3d4a42;
+  --neutral-wash: #e9efe6;
+
+  --grid: rgba(20, 23, 20, 0.03);
+  --grid-major: rgba(20, 23, 20, 0.055);
+
+  --github-empty: rgba(20, 23, 20, 0.075);
+  --github-cell-border: rgba(20, 23, 20, 0.04);
+  --heat-1: rgba(155, 103, 0, 0.16);
+  --heat-2: rgba(155, 103, 0, 0.28);
+  --heat-3: rgba(155, 103, 0, 0.46);
+  --heat-4: rgba(155, 103, 0, 0.72);
+
+  color-scheme: light;
+}

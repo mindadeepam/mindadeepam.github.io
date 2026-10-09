@@ -18,54 +18,16 @@
   document.documentElement.setAttribute("data-theme", t);
 })();
 </script>
+<link rel="stylesheet" href="../assets/design/tokens.css?v=1">
+<link rel="stylesheet" href="../assets/design/components.css?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
 <style>
 /* Green graph-paper theme for the recurrent-notebook content.
    Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
    One sans for text, one mono for labels; MathJax draws the maths. Green = the cell / notebook,
    slate = the hidden state, orange only for gradients. */
-:root {
-  --paper: #f5f7f2;
-  --grid: #edf1e9;
-  --grid-major: #e4eadf;
-  --surface: #fcfdfb;
-  --ink: #141b17;
-  --ink-2: #46524a;
-  --ink-3: #6f7c73;
-  --rule: #d3dccf;
-  --link: #1c6a43;
-  --cell: #1c6a43;
-  --cell-wash: #e2eee4;
-  --hid: #2f5470;
-  --hid-wash: #e4ecf1;
-  --gate: #3d4a42;
-  --gate-wash: #e9efe6;
-  --grad: #c75a1a;
-  --grad-wash: #f8e7db;
-  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --serif: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --paper: #0d1310; --grid: #111813; --grid-major: #151e18; --surface: #151d18;
-    --ink: #e3eae4; --ink-2: #a8b4ab; --ink-3: #76837a; --rule: #26332b; --link: #7ccc9b;
-    --cell: #7ccc9b; --cell-wash: #1a2a20; --hid: #8fb6d2; --hid-wash: #17232b;
-    --gate: #c9d3cb; --gate-wash: #1b241e; --grad: #f0975a; --grad-wash: #2e1f16;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --paper: #0d1310; --grid: #111813; --grid-major: #151e18; --surface: #151d18;
-  --ink: #e3eae4; --ink-2: #a8b4ab; --ink-3: #76837a; --rule: #26332b; --link: #7ccc9b;
-  --cell: #7ccc9b; --cell-wash: #1a2a20; --hid: #8fb6d2; --hid-wash: #17232b;
-  --gate: #c9d3cb; --gate-wash: #1b241e; --grad: #f0975a; --grad-wash: #2e1f16;
-  color-scheme: dark;
-}
-
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
 body {
@@ -90,16 +52,6 @@ code { font: .86em var(--mono); background: var(--surface); border: 1px solid va
 
 .page { max-width: 1200px; margin: 0 auto; display: grid; gap: 52px; grid-template-columns: 220px minmax(0, 860px); justify-content: center; }
 @media (max-width: 1080px) { .page { grid-template-columns: minmax(0, 860px); gap: 0; } }
-
-/* theme toggle */
-.theme-toggle {
-  position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); right: 16px; z-index: 6;
-  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
-  font: 500 12px/1 var(--mono); color: var(--ink-2);
-  background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; padding: 8px 12px;
-}
-.theme-toggle:hover { color: var(--ink); border-color: var(--ink-3); }
-.theme-toggle .dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(90deg, var(--ink) 50%, var(--surface) 50%); border: 1px solid var(--ink-3); }
 
 /* contents */
 .toc { position: sticky; top: 28px; align-self: start; font: 13.5px/1.4 var(--sans); max-height: calc(100vh - 56px); overflow-y: auto; }
@@ -241,64 +193,28 @@ pre.code code { font: inherit; background: none; border: 0; padding: 0; }
 pre.code .cm { color: var(--ink-3); }
 @media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
 
-/* public copy: the main site's palette (near-black void, warm ink, amber accent), header,
-   type scale and mono, over the notebook layout. Graph paper stays, fainter. Token blocks
-   repeat green_theme.css's selectors so they win by order. */
+/* public copy: colours, fonts and sizes come from the site's tokens.css; this maps the notebook's
+   token names onto them (green_theme.css's own token block is left out of public pages). */
 :root {
-  --paper: #f6f7f3; --grid: rgba(20, 23, 20, .03); --grid-major: rgba(20, 23, 20, .055); --surface: #fbfcf9;
-  --ink: #141714; --ink-2: #3f453e; --ink-3: #62675f; --rule: #dadcd4;
-  --accent: #9b6700; --link: #8a5c00;
-  --cell: #007b62; --cell-wash: #e1efe9; --grad: #ad4c22; --grad-wash: #f6e6dc;
-  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --paper: var(--void); --ink: var(--text); --ink-2: var(--soft); --ink-3: var(--muted);
+  --accent: var(--amber);
+  --cell: var(--green); --cell-wash: var(--green-wash); --hid: var(--blue); --hid-wash: var(--blue-wash);
+  --gate: var(--neutral); --gate-wash: var(--neutral-wash); --grad: var(--orange); --grad-wash: var(--orange-wash);
+  --sans: var(--font-sans); --mono: var(--font-mono);
+  --serif: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --paper: #080807; --grid: rgba(255, 255, 255, .02); --grid-major: rgba(255, 255, 255, .04); --surface: #121210;
-    --ink: #f3f2ee; --ink-2: #b8b5ad; --ink-3: #8f8d87; --rule: #262522;
-    --accent: #ffc400; --link: #ffc400;
-    --cell: #00a884; --cell-wash: #0a1d18; --hid: #8fb6d2; --hid-wash: #121a20;
-    --gate: #cfccc4; --gate-wash: #171714; --grad: #ef7d47; --grad-wash: #26170e;
-  }
-}
-:root[data-theme="dark"] {
-  --paper: #080807; --grid: rgba(255, 255, 255, .02); --grid-major: rgba(255, 255, 255, .04); --surface: #121210;
-  --ink: #f3f2ee; --ink-2: #b8b5ad; --ink-3: #8f8d87; --rule: #262522;
-  --accent: #ffc400; --link: #ffc400;
-  --cell: #00a884; --cell-wash: #0a1d18; --hid: #8fb6d2; --hid-wash: #121a20;
-  --gate: #cfccc4; --gate-wash: #171714; --grad: #ef7d47; --grad-wash: #26170e;
-}
-body { padding-block-start: 0; }
-/* the site's type scale: title, section and lede sizes match its pages */
-h1 { font-weight: 600; font-size: clamp(30px, 3.2vw, 40px); line-height: 1.08; letter-spacing: -.035em; }
-h2 { font-size: 22px; }
+body { padding-block-start: 0; letter-spacing: 0; }
+/* the shared header sits inside the notebook's side padding */
+.site-header { width: min(100%, 1260px); margin-bottom: 40px; }
+.site-header a:hover { text-decoration: none; }
+@media (max-width: 720px) { .site-header { width: 100%; margin-bottom: 26px; } }
+/* the site's type scale */
+h1 { font-weight: 600; font-size: var(--fs-title); line-height: 1.12; letter-spacing: -.02em; }
+h2 { font-size: var(--fs-h2); letter-spacing: -.01em; }
+h3 { font-size: var(--fs-h3); }
 .dek { font-size: 18px; }
-/* the site's tag: a green dot and a mono label */
-.kicker { display: flex; align-items: center; gap: 12px; font-size: 13px; line-height: 1.3; color: var(--accent); letter-spacing: 0; }
-.kicker::before { content: ""; width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--cell); }
 .toc a.on { box-shadow: inset 2px 0 0 var(--accent); }
 a:focus-visible, button:focus-visible, summary:focus-visible { outline-color: var(--accent); }
-
-/* the site's header */
-.site-head { max-width: 1260px; margin: 0 auto 40px; min-height: 72px; display: flex; align-items: center;
-  justify-content: space-between; gap: 24px; border-bottom: 1px solid var(--rule); font-family: var(--mono); }
-.site-head .mark { color: var(--ink); font-size: 14px; font-weight: 700; letter-spacing: -.02em; }
-.site-head .mark::before { content: ">"; margin-right: 8px; color: var(--accent); }
-.site-head nav { display: flex; align-items: center; flex-wrap: wrap; gap: 28px; font-size: 15px; color: var(--ink-3); }
-.site-head a { color: inherit; }
-.site-head a:hover { color: var(--accent); text-decoration: none; }
-.site-toggle { width: 32px; height: 32px; display: inline-grid; place-items: center; margin: -5px 0; padding: 0;
-  border: 1px solid var(--rule); border-radius: 50%; background: transparent; color: var(--ink-2); cursor: pointer;
-  transition: border-color .16s ease, color .16s ease, transform .16s ease; }
-.site-toggle:hover { border-color: var(--accent); color: var(--accent); transform: rotate(10deg); }
-.site-toggle span { grid-area: 1 / 1; font-size: 16px; line-height: 1; }
-.site-toggle .moon { display: none; }
-:root[data-theme="light"] .site-toggle .sun { display: none; }
-:root[data-theme="light"] .site-toggle .moon { display: inline; }
-@media (max-width: 720px) {
-  .site-head { min-height: 64px; margin-bottom: 26px; }
-  .site-head nav { gap: 16px; font-size: 14px; }
-}
-@media (prefers-reduced-motion: reduce) { .site-toggle { transition: none; } .site-toggle:hover { transform: none; } }
 footer .site-nav { display: block; margin-top: 10px; }
 .next { margin-top: 36px; font-weight: 500; }
 </style>
@@ -315,7 +231,7 @@ footer .site-nav { display: block; margin-top: 10px; }
   </defs>
 </svg>
 
-<header class="site-head"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">study notes</a><button type="button" class="site-toggle" id="theme-toggle" title="Switch color mode"><span class="sun" aria-hidden="true">☀</span><span class="moon" aria-hidden="true">☾</span></button></nav></header>
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">study notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
 <div class="page">
   <nav class="toc" aria-label="Contents">
     <details id="tocd" open>
@@ -336,7 +252,7 @@ footer .site-nav { display: block; margin-top: 10px; }
 
   <article>
     <header class="hero">
-      <div class="kicker">Study notes · Tabular foundation models</div>
+      <div class="tag">Study notes · Tabular foundation models</div>
       <h1>TabFM: in-context learning for tables</h1>
       <p class="dek">Google's tabular foundation model, from 30 June 2026: hand it your labelled rows and the rows to predict, and it answers in a forward pass, with no training on your data. What it is, how it works, where it beats gradient-boosted trees and where it doesn't.</p>
       <div class="meta">About 12 minutes · builds on the <a href="./transformers.html#tf">attention and transformer notes</a> ·
