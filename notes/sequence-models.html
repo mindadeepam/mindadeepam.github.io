@@ -241,6 +241,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <li><a href="#tldr"><span class="n">00</span>In short</a></li>
         <li class="part">Recurrent networks</li>
         <li><a href="#rnn"><span class="n">01</span>The plain RNN’s problem</a></li>
+        <li><a href="#tokens"><span class="n">↳</span>Where x<sub>t</sub> comes from</a></li>
         <li><a href="#gates"><span class="n">02</span>What a gate is</a></li>
         <li><a href="#lstm"><span class="n">03</span>The LSTM</a></li>
         <li><a href="#head"><span class="n">↳</span>From h to a prediction</a></li>
@@ -301,6 +302,30 @@ footer .site-nav { display: block; margin-top: 10px; }
       </tbody>
     </table></div>
     <p><strong>In code</strong> everything gets a leading batch dimension, and rows are examples, so a step is \(h_t = \tanh(x_t W_x^\top + h_{t-1} W_h^\top + b)\) with \(x_t\) of shape \(B \times d\) and \(h_t\) of shape \(B \times H\). PyTorch's <code>nn.RNN(d, H, batch_first=True)</code> takes \(B \times T \times d\) and returns all states as \(B \times T \times H\), plus the last one as \(\text{layers} \times B \times H\). Parameters: \(H(d + H) + H\) for the cell, plus \(KH + K\) for the head.</p>
+    <h3 id="tokens">Where \(x_t\) comes from: tokens to vectors</h3>
+    <p>For text, \(x_t\) is a learned embedding, exactly as in a transformer. The text is split into tokens, each token is an id in a vocabulary of size \(V\), and the id picks one row of an embedding table \(E\):</p>
+    <div class="mj">\[ \begin{aligned} X &amp;= E[\text{ids}] \\ h_t &amp;= \text{RNN}(x_t,\ h_{t-1}) \\ z_t &amp;= W_y h_t + b_y \end{aligned} \]</div>
+    <div class="tbl"><table>
+      <thead><tr><th>Thing</th><th>Shape</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>Token ids</td><td>\(B \times T\)</td><td>Integers in \([0, V)\)</td></tr>
+        <tr><td>Embedding table \(E\)</td><td>\(V \times d\)</td><td>One learned row per token</td></tr>
+        <tr><td>\(X = E[\text{ids}]\)</td><td>\(B \times T \times d\)</td><td>The cell reads \(x_t\), one \(B \times d\) slice per step</td></tr>
+        <tr><td>\(h_t\)</td><td>\(B \times H\)</td><td>The state after step \(t\)</td></tr>
+        <tr><td>\(W_y\) / logits \(z_t\)</td><td>\(V \times H\) / \(B \times V\)</td><td>Next-token scores for a language model</td></tr>
+      </tbody>
+    </table></div>
+    <p>In PyTorch that's <code>nn.Embedding(V, d)</code> → <code>nn.LSTM(d, H)</code> → <code>nn.Linear(H, V)</code>, the same embedding layer a transformer uses.</p>
+    <ul>
+      <li><strong>An embedding is the first weight matrix.</strong> With a one-hot input, \(W_x\,\text{onehot}(i)\) is just column \(i\) of \(W_x\). The embedding table does that lookup directly, without building a \(V\)-dimensional vector, and the cell's own \(W_x\) then maps \(d \to H\).</li>
+      <li><strong>No position signal.</strong> Nothing is added for position: order comes from the recurrence itself, since step \(t\) only runs after step \(t-1\). A transformer needs position embeddings because attention ignores order.</li>
+      <li><strong>Vocabularies.</strong> In the LSTM era they were usually whole words (30k–100k) with an <code>&lt;UNK&gt;</code> token for unseen ones, or characters. Transformers use subwords (BPE, WordPiece), so no word is unknown.</li>
+      <li><strong>Initialization.</strong> The table was often filled with pretrained word2vec or GloVe vectors, then frozen or fine-tuned. Those give one vector per word type (“bank” is the same in every sentence); the recurrence adds the context in \(h_t\).</li>
+      <li><strong>Weight tying.</strong> A language model's output layer \(W_y\) (\(V \times H\)) can share weights with \(E\) when \(H = d\), or with a projection in between (Press &amp; Wolf, 2017): fewer parameters and usually lower perplexity. GPT and BERT do the same.</li>
+      <li><strong>Cost.</strong> \(V \cdot d\) is often the largest block of parameters in a small word-level model, another reason to tie weights or use subwords.</li>
+      <li><strong>Padding.</strong> Batches pad every sequence to one length with a pad id. <code>padding_idx</code> keeps that row at zero, and packing (<code>pack_padded_sequence</code>) stops the RNN stepping through the padding.</li>
+      <li><strong>Not text?</strong> For time series or sensor data there's no vocabulary: \(x_t\) is the feature vector itself, or a linear projection of it. Only categorical features (a store id, the day of the week) get embedding tables, concatenated with the numeric ones.</li>
+    </ul>
     <h3>In code</h3>
     <pre class="code"><code><span class="cm"># one sequence x: (T, d);  W_x: (H, d)  W_h: (H, H)  b: (H,)</span>
 h = zeros(H)                          <span class="cm"># h_0</span>
