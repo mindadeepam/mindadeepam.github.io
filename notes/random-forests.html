@@ -1,0 +1,1616 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070707">
+<title>Random forests and bagging · Deepam Minda</title>
+<meta name="description" content="Why averaging decorrelated trees cuts variance: bootstrap samples, per-split feature menus, out-of-bag error, each knob&#x27;s effect on bias, variance and correlation, importance traps.">
+<meta property="og:title" content="Random forests and bagging">
+<meta property="og:description" content="Why averaging decorrelated trees cuts variance: bootstrap samples, per-split feature menus, out-of-bag error, each knob&#x27;s effect on bias, variance and correlation, importance traps.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem("deepam-theme"); } catch (e) {}
+  if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<link rel="stylesheet" href="../assets/design/tokens.css?v=1">
+<link rel="stylesheet" href="../assets/design/components.css?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<style>
+/* Green graph-paper theme for the recurrent-notebook content.
+   Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
+   One sans for text, one mono for labels; MathJax draws the maths. Green = the cell / notebook,
+   slate = the hidden state, orange only for gradients. */
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
+body {
+  margin: 0; color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: 50% 0;
+  font: 16.5px/1.7 var(--sans); letter-spacing: -.003em;
+  padding-inline: 20px; padding-block: 44px 88px;
+  -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 640px) { body { font-size: 16px; padding-inline: 16px; padding-block: 24px 80px; } }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+table, button { font: inherit; }
+code { font: .86em var(--mono); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; }
+
+.page { max-width: 1200px; margin: 0 auto; display: grid; gap: 52px; grid-template-columns: 220px minmax(0, 860px); justify-content: center; }
+@media (max-width: 1080px) { .page { grid-template-columns: minmax(0, 860px); gap: 0; } }
+
+/* contents */
+.toc { position: sticky; top: 28px; align-self: start; font: 13.5px/1.4 var(--sans); max-height: calc(100vh - 56px); overflow-y: auto; }
+.toc summary { display: none; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--ink-2); text-decoration: none; }
+.toc a:hover { background: var(--surface); color: var(--ink); }
+.toc a.on { color: var(--ink); background: var(--surface); box-shadow: inset 2px 0 0 var(--cell); }
+.toc .n { font: 500 11px var(--mono); color: var(--ink-3); margin-right: 8px; }
+.toc .label { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 10px 10px; }
+.toc li.part { font: 500 10.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 14px 10px 4px; }
+@media (max-width: 1080px) {
+  .toc { position: static; margin-bottom: 26px; max-height: none; }
+  .toc .label { display: none; }
+  .toc details { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  .toc summary { display: block; cursor: pointer; padding: 12px 14px; font: 500 14px var(--sans); list-style: none; }
+  .toc summary::-webkit-details-marker { display: none; }
+  .toc summary::after { content: "+"; float: right; color: var(--ink-3); }
+  .toc details[open] summary::after { content: "–"; }
+  .toc details ol { padding: 0 6px 10px; }
+}
+.jump {
+  display: none; position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+  font: 500 13px var(--sans); color: var(--ink); background: var(--surface); text-decoration: none;
+  border: 1px solid var(--rule); border-radius: 999px; padding: 9px 14px;
+}
+@media (max-width: 1080px) { .jump { display: block; } }
+
+/* article */
+article { min-width: 0; }
+header.hero { display: grid; gap: 10px; margin-bottom: 26px; }
+.kicker { font: 500 12px/1 var(--mono); color: var(--ink-3); letter-spacing: .02em; }
+h1 { margin: 0; font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.6rem); line-height: 1.1; font-weight: 600; letter-spacing: -.028em; text-wrap: balance; }
+.dek { margin: 0; font-size: 1.1rem; line-height: 1.55; color: var(--ink-2); max-width: 40em; }
+.meta { font: 12px/1.5 var(--mono); color: var(--ink-3); }
+.key { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.key span::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--c); margin-right: 6px; vertical-align: middle; }
+
+h2 { font-size: 1.36rem; line-height: 1.25; font-weight: 600; letter-spacing: -.018em; margin: 56px 0 12px; text-wrap: balance; scroll-margin-top: 16px; }
+h2 .pn { font: 500 .74em/1 var(--mono); color: var(--ink-3); margin-right: .7em; letter-spacing: 0; }
+h3 { font-size: 1.04rem; font-weight: 600; letter-spacing: -.01em; margin: 30px 0 6px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 1.25em; }
+li { margin-bottom: 5px; }
+li::marker { color: var(--ink-3); }
+strong { font-weight: 600; }
+.mj { overflow-x: auto; overflow-y: hidden; margin: 4px 0 16px; padding: 2px 0; }
+mjx-container[display="true"] { margin: 0 !important; }
+
+/* plan and summary panels */
+.tldr { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 22px 6px; margin-bottom: 14px; }
+.tldr h2 { margin: 0 0 10px; font: 500 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.tldr ol { padding-left: 1.3em; }
+.tldr li { margin-bottom: 8px; }
+.tldr p { margin: 0 0 12px; font-size: 15.5px; }
+.tldr .tbl { margin: 4px 0 12px; }
+
+/* notes: quote-style, coloured by kind */
+.note { margin: 16px 0 20px; padding: 2px 0 2px 16px; border-left: 2px solid var(--c); color: var(--ink-2); font-size: .97em; }
+.note > .nl { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); margin: 4px 0 8px; }
+.note strong { color: var(--ink); }
+.note.ask { --c: var(--cell); }
+.note.say { --c: var(--hid); }
+.note.trap { --c: var(--grad); }
+.note.lab { --c: var(--cell); }
+.note .q { font-style: italic; color: var(--ink); }
+.note ul { margin: 0 0 10px; }
+.note li { margin-bottom: 5px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 6px 0 20px; }
+table { border-collapse: collapse; width: 100%; font-size: .93em; line-height: 1.5; }
+th { text-align: left; vertical-align: bottom; font: 500 11px/1.4 var(--mono); color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; padding: 0 14px 8px 0; border-bottom: 1px solid var(--ink-3); }
+td { padding: 8px 14px 8px 0; vertical-align: top; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+td .src { display: block; font: 11.5px/1.4 var(--mono); color: var(--ink-3); margin-top: 2px; }
+
+/* gate cards */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0 20px; }
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.gc { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 4px; font-size: 15.5px; line-height: 1.6; }
+.gc h4 { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.gc h4 .tag { font: 500 11px var(--mono); color: var(--c); }
+.gc.g1 { --c: var(--cell); }
+.gc.g2 { --c: var(--ink-3); }
+.gc p { margin-bottom: 10px; }
+
+/* figures */
+figure { margin: 18px 0 24px; }
+.plate { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 10px; overflow-x: auto; }
+.plate svg { display: block; width: 100%; height: auto; min-width: 460px; max-width: 700px; margin: 0 auto; }
+@media (max-width: 500px) { .plate svg { max-width: none; } }
+figcaption { font-size: .86rem; line-height: 1.5; color: var(--ink-3); margin-top: 10px; }
+.dg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink-2); }
+.dg .v { font-family: var(--serif); font-style: italic; font-size: 19px; fill: var(--ink); }
+.dg .v .s { font-size: 12.5px; }
+.dg .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; fill: var(--ink-3); }
+.dg .gl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--gate); }
+.dg .gs { font-family: var(--serif); font-style: normal; font-size: 12px; fill: var(--ink-3); }
+.dg .cl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--ink); }
+.dg .cs { font-family: var(--sans); font-size: 12px; fill: var(--ink-2); }
+.dg .optx { font: 500 17px var(--sans); fill: var(--ink); }
+.dg .cell { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.dg .hid { stroke: var(--hid); stroke-width: 2.4; fill: none; }
+.dg .hid.thick { stroke-width: 3.6; }
+.dg .in { stroke: var(--ink-3); stroke-width: 1.5; fill: none; }
+.dg .gw { stroke: var(--gate); stroke-width: 1.6; fill: none; }
+.dg .cw { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+.dg .grad { stroke: var(--grad); fill: none; stroke-linecap: round; }
+.dg .gbox { fill: var(--gate-wash); stroke: var(--gate); stroke-width: 1.3; }
+.dg .box { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .op { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.3; }
+.dg .dot { fill: var(--ink-2); }
+.dg .cellon { fill: var(--cell-wash); stroke: var(--cell); stroke-width: 1; }
+.dg .celloff { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.dg .stream { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.mk-cell { fill: var(--cell); } .mk-hid { fill: var(--hid); } .mk-in { fill: var(--ink-3); }
+.mk-gate { fill: var(--gate); } .mk-cw { fill: var(--ink-2); } .mk-grad { fill: var(--grad); }
+
+/* questions */
+details.qa { border-bottom: 1px solid var(--rule); }
+details.qa:first-of-type { border-top: 1px solid var(--rule); }
+details.qa summary { cursor: pointer; padding: 11px 2px; font-weight: 500; font-size: 15.5px; line-height: 1.45; list-style: none; display: flex; gap: 12px; }
+details.qa summary::-webkit-details-marker { display: none; }
+details.qa summary .qn { font: 500 11.5px/1.9 var(--mono); color: var(--ink-3); flex: none; min-width: 1.9em; }
+details.qa summary::after { content: "+"; margin-left: auto; color: var(--ink-3); flex: none; }
+details.qa[open] summary::after { content: "–"; }
+details.qa .ans { padding: 0 4px 12px 32px; font-size: 15.5px; color: var(--ink-2); }
+summary:focus-visible, a:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+
+.sheet { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 6px; }
+.sheet h3 { margin: 4px 0 6px; font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: .9rem; color: var(--ink-3); }
+
+/* code blocks */
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; margin: 8px 0 20px; overflow-x: auto; font: 12.8px/1.6 var(--mono); color: var(--ink); white-space: pre; }
+pre.code code { font: inherit; background: none; border: 0; padding: 0; }
+pre.code .cm { color: var(--ink-3); }
+@media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
+
+/* public copy: colours, fonts and sizes come from the site's tokens.css; this maps the notebook's
+   token names onto them (green_theme.css's own token block is left out of public pages). */
+:root {
+  --paper: var(--void); --ink: var(--text); --ink-2: var(--soft); --ink-3: var(--muted);
+  --accent: var(--amber);
+  --cell: var(--green); --cell-wash: var(--green-wash); --hid: var(--blue); --hid-wash: var(--blue-wash);
+  --gate: var(--neutral); --gate-wash: var(--neutral-wash); --grad: var(--orange); --grad-wash: var(--orange-wash);
+  --sans: var(--font-sans); --mono: var(--font-mono);
+  --serif: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
+}
+body { padding-block-start: 0; letter-spacing: 0; }
+/* the shared header sits inside the notebook's side padding */
+.site-header { width: min(100%, 1260px); margin-bottom: 40px; }
+.site-header a:hover { text-decoration: none; }
+@media (max-width: 720px) { .site-header { width: 100%; margin-bottom: 26px; } }
+/* the site's type scale */
+h1 { font-weight: 600; font-size: var(--fs-title); line-height: 1.12; letter-spacing: -.02em; }
+h2 { font-size: var(--fs-h2); letter-spacing: -.01em; }
+h3 { font-size: var(--fs-h3); }
+.dek { font-size: 18px; }
+.toc a.on { box-shadow: inset 2px 0 0 var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline-color: var(--accent); }
+footer .site-nav { display: block; margin-top: 10px; }
+.next { margin-top: 36px; font-weight: 500; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="a-cell" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path class="mk-cell" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-hid" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto"><path class="mk-hid" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-in" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-in" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-gate" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-cw" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-cw" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-grad" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path class="mk-grad" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">study notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
+<div class="page">
+  <nav class="toc" aria-label="Contents">
+    <details id="tocd" open>
+      <summary>Contents</summary>
+      <div class="label">Contents</div>
+      <ol>
+        <li><a href="#tldr"><span class="n">00</span>In short</a></li>
+        <li><a href="#tree"><span class="n">01</span>One deep tree: low bias, high variance</a></li>
+        <li><a href="#bootstrap"><span class="n">02</span>Bootstrap samples</a></li>
+        <li><a href="#bagging"><span class="n">03</span>Bagging: grow many, average</a></li>
+        <li><a href="#correlation"><span class="n">04</span>Why correlated trees cap the gain</a></li>
+        <li><a href="#forest"><span class="n">05</span>Random forests: a fresh feature menu at every split</a></li>
+        <li><a href="#depth"><span class="n">06</span>Deep, unpruned trees, and when to stop earlier</a></li>
+        <li><a href="#oob"><span class="n">07</span>Out-of-bag error: validation for free</a></li>
+        <li><a href="#knobs"><span class="n">08</span>Hyperparameters, knob by knob</a></li>
+        <li><a href="#extra-trees"><span class="n">09</span>Extra Trees: random thresholds</a></li>
+        <li><a href="#importance"><span class="n">10</span>Feature importance and its traps</a></li>
+        <li><a href="#behaviour"><span class="n">11</span>How a forest behaves</a></li>
+        <li><a href="#vs-boosting"><span class="n">12</span>Random forest vs gradient boosting</a></li>
+        <li><a href="#what-ifs"><span class="n">13</span>What if…</a></li>
+        <li><a href="#isolation"><span class="n">14</span>Isolation Forest, and other tree families</a></li>
+        <li><a href="#pseudocode"><span class="n">15</span>Pseudocode</a></li>
+        <li><a href="#questions"><span class="n">16</span>Interview questions</a></li>
+        <li><a href="#sheet"><span class="n">17</span>Cheat sheet</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <article>
+    <header class="hero">
+      <div class="tag">Study notes · Trees</div>
+      <h1>Random forests and bagging</h1>
+      <p class="dek">Why averaging many deep trees works, why the gain stops, and the one trick that raises the ceiling: a random feature menu at every split. Then every knob, the free validation score, the importance traps, and how a forest behaves at the edges.</p>
+      <div class="meta">About 40 minutes · one synthetic loan dataset carried all the way through, so every claim comes with a number checked against the truth</div>
+    </header>
+
+    <section class="tldr" id="tldr" aria-labelledby="tldr-h">
+      <h2 id="tldr-h">In short</h2>
+      <ol>
+        <li>A full-depth tree has <strong>low bias and high variance</strong>: its leaves memorize the rows it saw. <strong>Bagging</strong> grows \(B\) trees on bootstrap samples (\(n\) rows drawn with replacement, about 63.2% of them distinct) and averages them. Averaging keeps one tree's bias and cancels the part of the error the trees don't share.</li>
+        <li>The trees share one training set, so their errors correlate. With tree variance \(\sigma^2\) and pairwise correlation \(\rho\), the average has variance \(\rho\sigma^2 + (1-\rho)\sigma^2/B\). More trees remove only the second term; past a few hundred trees, only less alike trees (a smaller \(\rho\)) or steadier trees (a smaller \(\sigma^2\), from bigger leaves) help.</li>
+        <li>A <strong>random forest</strong> makes the trees less alike by offering every split a fresh random subset of <code>max_features</code> features. That lowers \(\rho\) but weakens each tree (raises \(\sigma^2\)), so it pays only when \(\rho\sigma^2\) falls. Rules of thumb: \(\sqrt p\) for classification, \(p/3\) for regression. Tune it.</li>
+        <li>Trees are grown <strong>deep and unpruned</strong>, because averaging fixes variance but never bias. Leaf size is the knob for smoother, better probabilities.</li>
+        <li>Each row is <strong>out of bag</strong> for about 37% of the trees. Scoring every row with only those trees gives a nearly free validation score, which breaks when rows repeat or time order matters.</li>
+        <li><strong>Impurity importance</strong> is computed on training rows and inflates high-cardinality and noise features. <strong>Permutation importance</strong> on held-out data doesn't, but both split the credit between correlated features, and neither is causal.</li>
+        <li>Forests never overfit by adding trees, can't extrapolate, squeeze probabilities away from 0 and 1, and shrug off feature outliers. Tuned boosting usually wins on accuracy; a forest wins on small or noisy data, or when there's no time to tune.</li>
+      </ol>
+    </section>
+
+    <!-- tree -->
+    <h2 id="tree"><span class="pn">01</span>One deep tree: low bias, high variance</h2>
+    <p>Every number in this note comes from one synthetic dataset, so it can be checked against a known truth: 5,000 loan applicants with four features.</p>
+    <ul>
+      <li><code>income</code>: ₹15k to ₹150k a month;</li>
+      <li><code>emi</code>: the share of income already going to loan repayments (EMIs), 0 to 0.8;</li>
+      <li><code>late</code>: late payments last year (mostly 0, 1 or 2);</li>
+      <li><code>age</code>: 21 to 60, a decoy with no effect.</li>
+    </ul>
+    <p>The true chance of default is built from flat steps. Everyone starts at 3%. Being <strong>stressed</strong> (EMIs over half of income <em>and</em> income under ₹40k) adds 45 points, and two or more late payments add 25. So the truth takes only four values:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>True chance</th><th>Who</th><th>Test applicants</th></tr></thead>
+      <tbody>
+        <tr><td>0.03</td><td>Neither</td><td>1,252</td></tr>
+        <tr><td>0.28</td><td>2+ late payments only</td><td>157</td></tr>
+        <tr><td>0.48</td><td>Stressed only</td><td>80</td></tr>
+        <tr><td>0.73</td><td>Both</td><td>11</td></tr>
+      </tbody>
+    </table></div>
+    <p>One fixed split keeps 3,500 rows for training (304 defaulters) and 1,500 for testing (130 defaulters). A second target, for regression, is the credit limit granted: \(2 \times \text{income} \times (1 - \text{emi})\), plus noise with a standard deviation of 10 (₹ thousand).</p>
+    <p>Every model is scored three ways on the test set:</p>
+    <ul>
+      <li><strong>AUC:</strong> how well it ranks defaulters above non-defaulters. Higher is better.</li>
+      <li><strong>Log loss:</strong> how much probability went to what actually happened. Lower is better.</li>
+      <li><strong>Gap:</strong> the mean squared difference between the predicted and the true chance, \(\frac1n \sum_i (\hat p_i - p_i)^2\). 0 is perfect. It can only be measured because the truth is known, and it ignores the noisy 0/1 labels, so it's the cleanest check here.</li>
+    </ul>
+    <p>Results are written as (AUC, log loss, gap). The truth itself scores (0.817, 0.212, 0). With only 130 test defaulters, a test AUC wobbles by about ±0.02, so a model can edge past the truth's AUC by luck. When AUC and the gap disagree, trust the gap.</p>
+
+    <h3>One tree memorizes; many trees disagree</h3>
+    <p>A decision tree (CART, the standard algorithm) splits the rows with yes/no questions such as <code>late &lt;= 1.5</code>. At each node it picks the question that most reduces <strong>impurity</strong>, how mixed the node's classes are. For a node where a share \(q\) of the rows defaulted, the <strong>Gini impurity</strong> is \(2q(1-q)\): 0 when the node is pure, largest at a 50/50 mix.</p>
+    <p>Grown to full depth, a tree keeps splitting until every leaf is pure, so each leaf holds one or a few applicants and answers a flat 0 or 1. Grow 100 such trees, each on a random half of the training rows, and ask eight of them about one applicant from each risk level:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>True chance</th><th>Eight trees' answers</th><th>Average of all 100</th></tr></thead>
+      <tbody>
+        <tr><td>0.03</td><td>0 0 0 0 0 0 0 0</td><td>0.05</td></tr>
+        <tr><td>0.28</td><td>0 0 0 1 1 0 0 1</td><td>0.45</td></tr>
+        <tr><td>0.48</td><td>1 1 1 0 0 0 0 0</td><td>0.30</td></tr>
+        <tr><td>0.73</td><td>1 1 1 0 1 1 1 0</td><td>0.81</td></tr>
+      </tbody>
+    </table></div>
+    <p>Each tree is confidently wrong for many applicants, but trees grown on different rows are wrong in different places. Over all 1,500 test applicants:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Model</th><th>AUC</th><th>Log loss</th><th>Gap</th></tr></thead>
+      <tbody>
+        <tr><td>One tree</td><td>0.593</td><td>4.542</td><td>0.0664</td></tr>
+        <tr><td>Average of 100 trees</td><td>0.833</td><td>0.371</td><td>0.0058</td></tr>
+      </tbody>
+    </table></div>
+    <p>The gap shrinks more than tenfold. In bias–variance terms, a full-depth tree has <strong>low bias</strong>: it isn't wrong in any systematic way, since it can carve out any shape. But it has <strong>high variance</strong>: its answer swings with the exact rows it saw. Averaging keeps the low bias and cancels much of the swing, the way the average of 100 people's guesses of a cow's weight beats most single guesses.</p>
+    <p>The middle two applicants are still off by about 0.17. All 100 trees learned from the same 3,500 rows, so any quirk those rows have near an applicant is shared by every tree, and averaging can't remove it. <a href="#correlation">Section 04</a> measures that shared part.</p>
+    <p><strong>Only different data helps.</strong> Ten full-depth trees on the <em>same</em> rows, differing only in their random seed, disagree on just 4% of test applicants: the seed only breaks ties between equally good splits. Their misses correlate about 0.84, and their average scores AUC 0.637 against 0.623 for one tree.</p>
+
+    <!-- bootstrap -->
+    <h2 id="bootstrap"><span class="pn">02</span>Bootstrap samples</h2>
+    <p>There's only one training set. To fake many, draw \(n\) rows from it <strong>with replacement</strong>: each picked row goes back in the pot and can be picked again. Some rows appear twice or more, some not at all. That's a <strong>bootstrap sample</strong>.</p>
+    <p>Each draw misses a given row with chance \(1 - 1/n\), so all \(n\) draws miss it with chance \((1 - 1/n)^n\):</p>
+    <div class="mj">\[ \begin{aligned} P(\text{a row is in the sample}) &amp;= 1 - \Big(1 - \frac1n\Big)^n \\ &amp;\to 1 - \frac1e \\ &amp;\approx 0.632 \end{aligned} \]</div>
+    <p>In words: a bootstrap sample holds about 63% of the distinct rows, with some repeated to make up the count. The other 37% are that sample's <strong>out-of-bag</strong> rows. The limit arrives fast:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Rows \(n\)</th><th>Share of distinct rows in the sample</th></tr></thead>
+      <tbody>
+        <tr><td>3</td><td>0.704</td></tr>
+        <tr><td>10</td><td>0.651</td></tr>
+        <tr><td>100</td><td>0.634</td></tr>
+        <tr><td>3,500</td><td>0.632 (one real draw: 0.626)</td></tr>
+      </tbody>
+    </table></div>
+    <p>By hand with \(n = 3\): each draw misses row A with chance 2/3, so</p>
+    <div class="mj">\[ \begin{aligned} P(\text{all three draws miss A}) &amp;= (2/3)^3 \\ &amp;= 8/27 \\ &amp;\approx 0.30 \\ P(\text{A is in the sample}) &amp;= 19/27 \\ &amp;\approx 0.70 \end{aligned} \]</div>
+    <p><strong>How many times is each row drawn?</strong> A row's count is the number of hits in \(n\) draws, each with chance \(1/n\). For large \(n\) that's a Poisson count with mean 1:</p>
+    <div class="mj">\[ P(\text{drawn } k \text{ times}) = \frac{e^{-1}}{k!} \]</div>
+    <div class="tbl"><table>
+      <thead><tr><th>Times drawn</th><th>Formula</th><th>One real draw of 3,500</th></tr></thead>
+      <tbody>
+        <tr><td>0 (out of bag)</td><td>0.368</td><td>0.374</td></tr>
+        <tr><td>1</td><td>0.368</td><td>0.365</td></tr>
+        <tr><td>2</td><td>0.184</td><td>0.178</td></tr>
+        <tr><td>3</td><td>0.061</td><td>0.062</td></tr>
+        <tr><td>4</td><td>0.015</td><td>0.015</td></tr>
+      </tbody>
+    </table></div>
+    <p>"Left out" and "drawn once" are equally likely. A bootstrap sample is really a <strong>random weighting</strong> of the rows, and sklearn's forests implement it exactly that way: each tree is fit on every row, with <code>sample_weight</code> set to the row's count.</p>
+    <ul>
+      <li><strong>Why with replacement:</strong> drawing all \(n\) rows <em>without</em> replacement just reorders the same data, so every tree would come out identical. Replacement changes both <em>which</em> rows a tree sees and <em>how much</em> each one counts.</li>
+      <li><strong>Subsampling</strong> draws \(k &lt; n\) rows without replacement (called pasting when used for bagging). It also makes trees differ, with no duplicates. Half-samples and bootstraps behave much alike here: gaps of 0.0058 and 0.0065.</li>
+      <li><strong>Smaller bootstraps:</strong> a forest's <code>max_samples</code> draws a fraction \(f\) of \(n\) per tree, so a row is in with chance \(1 - (1 - 1/n)^{fn}\), which is about \(1 - e^{-f}\). At \(f = 0.3\) each tree sees about 26% of the distinct rows.</li>
+      <li><strong>Duplicated rows break the picture.</strong> Two copies of one applicant can land one in the bag and one out, so the "left-out" copy isn't really unseen. The trees vary less than they seem, and the out-of-bag score turns optimistic (<a href="#oob-traps">section 07</a>).</li>
+      <li><strong>The bootstrap's day job</strong> is measuring uncertainty: resample, recompute a statistic, look at the spread. Bagging borrows the resampling to build many models instead.</li>
+    </ul>
+    <pre class="code"><code>idx = rng.integers(0, n, n)   <span class="cm"># n draws, with replacement</span>
+len(np.unique(idx)) / n       <span class="cm"># → about 0.632</span>
+counts = np.bincount(idx, minlength=n)  <span class="cm"># weights</span>
+oob = counts == 0             <span class="cm"># out-of-bag rows</span></code></pre>
+
+    <!-- bagging -->
+    <h2 id="bagging"><span class="pn">03</span>Bagging: grow many, average</h2>
+    <p><strong>Bagging</strong> (bootstrap aggregating; Breiman, 1996) is the averaging of section 01, with bootstrap samples:</p>
+    <ol>
+      <li>Draw a bootstrap sample of the training rows.</li>
+      <li>Grow a full-depth tree on it.</li>
+      <li>Repeat \(B\) times, and average the trees' predictions.</li>
+    </ol>
+    <div class="mj">\[ \hat p(x) = \frac{1}{B} \sum_{b=1}^{B} \hat p_b(x) \]</div>
+    <p>In words: the bagged prediction is the plain average of the \(B\) trees' predicted probabilities (for regression, of their predicted numbers). The trees never see each other, so they train in parallel. sklearn does the same in one line with <code>BaggingClassifier</code>; its random draws differ, so its numbers differ slightly.</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 360 318" style="min-width:0;max-width:440px" role="img" aria-label="Bagging with three trees and ten rows. Each of three bootstrap samples draws ten rows with replacement, so some rows appear more than once and some are left out. Each sample grows one tree, and the three trees are averaged. Row 5 is out of bag for trees 1 and 3; row 9 is in every bag.">
+          <text class="lbl" x="66" y="16">TRAINING ROWS</text>
+          <text class="lbl" x="73.0" y="38" text-anchor="middle">1</text>
+          <text class="lbl" x="89.0" y="38" text-anchor="middle">2</text>
+          <text class="lbl" x="105.0" y="38" text-anchor="middle">3</text>
+          <text class="lbl" x="121.0" y="38" text-anchor="middle">4</text>
+          <text class="lbl" x="137.0" y="38" text-anchor="middle">5</text>
+          <text class="lbl" x="153.0" y="38" text-anchor="middle">6</text>
+          <text class="lbl" x="169.0" y="38" text-anchor="middle">7</text>
+          <text class="lbl" x="185.0" y="38" text-anchor="middle">8</text>
+          <text class="lbl" x="201.0" y="38" text-anchor="middle">9</text>
+          <text class="lbl" x="217.0" y="38" text-anchor="middle">10</text>
+          <rect x="127" y="26" width="20" height="149" rx="4" style="fill:none;stroke:var(--grad);stroke-width:1.6;stroke-dasharray:4 3"/>
+          <text class="lbl" x="8" y="63">BAG 1</text>
+          <rect class="cellon" x="66" y="52" width="14" height="14"/>
+          <text x="73.0" y="63" text-anchor="middle" style="font-size:10px;fill:var(--hid)">2</text>
+          <rect class="celloff" x="82" y="52" width="14" height="14"/>
+          <rect class="cellon" x="98" y="52" width="14" height="14"/>
+          <rect class="cellon" x="114" y="52" width="14" height="14"/>
+          <rect class="celloff" x="130" y="52" width="14" height="14"/>
+          <rect class="cellon" x="146" y="52" width="14" height="14"/>
+          <rect class="cellon" x="162" y="52" width="14" height="14"/>
+          <text x="169.0" y="63" text-anchor="middle" style="font-size:10px;fill:var(--hid)">3</text>
+          <rect class="celloff" x="178" y="52" width="14" height="14"/>
+          <rect class="cellon" x="194" y="52" width="14" height="14"/>
+          <rect class="cellon" x="210" y="52" width="14" height="14"/>
+          <path class="cw" d="M228 59 H250" marker-end="url(#a-cw)"/>
+          <rect class="gbox" x="254" y="43" width="80" height="32" rx="8"/>
+          <text x="294" y="64" text-anchor="middle">tree 1</text>
+          <path d="M334 59 H346" style="stroke:var(--ink-2);stroke-width:1.8;fill:none"/>
+          <text class="lbl" x="8" y="115">BAG 2</text>
+          <rect class="celloff" x="66" y="104" width="14" height="14"/>
+          <rect class="cellon" x="82" y="104" width="14" height="14"/>
+          <rect class="cellon" x="98" y="104" width="14" height="14"/>
+          <text x="105.0" y="115" text-anchor="middle" style="font-size:10px;fill:var(--hid)">2</text>
+          <rect class="celloff" x="114" y="104" width="14" height="14"/>
+          <rect class="cellon" x="130" y="104" width="14" height="14"/>
+          <rect class="cellon" x="146" y="104" width="14" height="14"/>
+          <rect class="celloff" x="162" y="104" width="14" height="14"/>
+          <rect class="cellon" x="178" y="104" width="14" height="14"/>
+          <text x="185.0" y="115" text-anchor="middle" style="font-size:10px;fill:var(--hid)">2</text>
+          <rect class="cellon" x="194" y="104" width="14" height="14"/>
+          <rect class="cellon" x="210" y="104" width="14" height="14"/>
+          <text x="217.0" y="115" text-anchor="middle" style="font-size:10px;fill:var(--hid)">2</text>
+          <path class="cw" d="M228 111 H250" marker-end="url(#a-cw)"/>
+          <rect class="gbox" x="254" y="95" width="80" height="32" rx="8"/>
+          <text x="294" y="116" text-anchor="middle">tree 2</text>
+          <path d="M334 111 H346" style="stroke:var(--ink-2);stroke-width:1.8;fill:none"/>
+          <text class="lbl" x="8" y="167">BAG 3</text>
+          <rect class="cellon" x="66" y="156" width="14" height="14"/>
+          <rect class="cellon" x="82" y="156" width="14" height="14"/>
+          <rect class="celloff" x="98" y="156" width="14" height="14"/>
+          <rect class="cellon" x="114" y="156" width="14" height="14"/>
+          <text x="121.0" y="167" text-anchor="middle" style="font-size:10px;fill:var(--hid)">2</text>
+          <rect class="celloff" x="130" y="156" width="14" height="14"/>
+          <rect class="cellon" x="146" y="156" width="14" height="14"/>
+          <text x="153.0" y="167" text-anchor="middle" style="font-size:10px;fill:var(--hid)">2</text>
+          <rect class="cellon" x="162" y="156" width="14" height="14"/>
+          <rect class="cellon" x="178" y="156" width="14" height="14"/>
+          <rect class="cellon" x="194" y="156" width="14" height="14"/>
+          <text x="201.0" y="167" text-anchor="middle" style="font-size:10px;fill:var(--hid)">2</text>
+          <rect class="celloff" x="210" y="156" width="14" height="14"/>
+          <path class="cw" d="M228 163 H250" marker-end="url(#a-cw)"/>
+          <rect class="gbox" x="254" y="147" width="80" height="32" rx="8"/>
+          <text x="294" y="168" text-anchor="middle">tree 3</text>
+          <path d="M334 163 H346" style="stroke:var(--ink-2);stroke-width:1.8;fill:none"/>
+          <path class="cw" d="M346 59 V244 H338" marker-end="url(#a-cw)"/>
+          <rect class="box" x="254" y="226" width="80" height="36" rx="8"/>
+          <text x="294" y="249" text-anchor="middle">average</text>
+          <text class="lbl" x="8" y="242">ROW 5 (DASHED): OUT OF</text>
+          <text class="lbl" x="8" y="258">BAG FOR TREES 1 AND 3</text>
+          <text class="lbl" x="8" y="292">FILLED = IN THE BAG (DIGIT = TIMES DRAWN)</text>
+          <text class="lbl" x="8" y="308">EMPTY = OUT OF BAG</text>
+          </svg>
+      </div>
+      <figcaption>Bagging with three trees and ten rows. Each tree grows on its own bootstrap sample: filled cells are in its bag (a digit means drawn that many times), empty cells are its out-of-bag rows. The forest averages the trees; in a random forest, each tree also draws \(m\) features at every split. Row 5 (dashed) was left out by trees 1 and 3, so its out-of-bag prediction averages just those two; row 9 is in every bag and gets none.</figcaption>
+    </figure>
+    <div class="tbl"><table>
+      <thead><tr><th>Model</th><th>AUC</th><th>Log loss</th><th>Gap</th></tr></thead>
+      <tbody>
+        <tr><td>One bootstrapped tree</td><td>0.615</td><td>4.71</td><td>0.0715</td></tr>
+        <tr><td>200 trees, by hand</td><td>0.829</td><td>0.336</td><td>0.0065</td></tr>
+        <tr><td>200 trees, sklearn</td><td>0.823</td><td>0.378</td><td>0.0065</td></tr>
+      </tbody>
+    </table></div>
+    <pre class="code"><code>P = np.empty((B, len(X_te)))
+for b in range(B):
+    r = rng.integers(0, n, n)        <span class="cm"># bootstrap</span>
+    t = DecisionTreeClassifier().fit(X[r], y[r])
+    P[b] = t.predict_proba(X_te)[:, 1]
+bag = P.mean(axis=0)                 <span class="cm"># bagged prediction</span></code></pre>
+
+    <h3>Why one tree's log loss explodes, and what averaging fixes</h3>
+    <p>A full-depth tree's leaves are pure, so it predicts exactly 0 or 1. Log loss charges \(-\log \hat p\) for the probability given to what happened, and sklearn clips an exact 0 to \(2.2 \times 10^{-16}\), so every confident mistake costs about 36. This tree is confidently wrong on about 13% of test applicants, and \(0.13 \times 36 \approx 4.7\): that's the whole 4.71.</p>
+    <p>The average of 200 trees gives fractions like 37/200 instead, so most confident mistakes vanish. What's left of the bag's 0.336 comes from 5 defaulters that all 200 trees put in pure "no default" leaves, because the training data has no defaulters near them. They alone add \(5 \times 36 / 1500 \approx 0.12\); everyone else scores 0.216, against the truth's 0.212. Bigger leaves fix this (<a href="#depth">section 06</a>): each tree then averages a wider neighbourhood, so it becomes rare for every tree to say exactly 0.</p>
+
+    <h3 id="vote">Majority vote or averaged probabilities</h3>
+    <p>There are two ways to combine classifiers:</p>
+    <ul>
+      <li><strong>Majority vote</strong> (hard voting): each tree casts its predicted class, and the most common class wins. This was Breiman's original rule.</li>
+      <li><strong>Probability averaging</strong> (soft voting): average the trees' leaf probabilities, then apply a threshold. sklearn's forests and <code>BaggingClassifier</code> do this.</li>
+    </ul>
+    <p>With pure leaves the two carry the same information: each tree says 0 or 1, so the average <em>is</em> the vote share. With bigger leaves they can disagree. Say three trees report 0.45, 0.45 and 0.9 for one applicant:</p>
+    <div class="mj">\[ \begin{aligned} \text{tree votes} &amp;= (0,\ 0,\ 1) \\ \text{majority vote} &amp;= 0 \\ \text{average} &amp;= (0.45 + 0.45 + 0.9)/3 \\ &amp;= 0.6 \end{aligned} \]</div>
+    <p>Averaging keeps how sure each tree was, so it gives a ranking (which AUC and any threshold need) and has lower variance. A vote gives only a class: with 8.7% defaulters, just 61 of 1,500 test applicants get a "default" majority from the 200 bagged trees. Averaged probabilities can still be poorly calibrated (<a href="#calibration">section 11</a>).</p>
+
+    <h3>Averaging removes variance, never bias</h3>
+    <p>Every tree is grown the same way, on an equally random sample, so all trees have the same expected prediction, and so does their average:</p>
+    <div class="mj">\[ \begin{aligned} \mathbb E[\bar f(x)] &amp;= \frac1B \sum_{b=1}^{B} \mathbb E[f_b(x)] \\ &amp;= \mathbb E[f_1(x)] \end{aligned} \]</div>
+    <p>In words: the forest is exactly as biased as one of its trees. Averaging attacks only the spread, so a model that is wrong the same way on every sample stays wrong.</p>
+    <p>Logistic regression shows it. It is stable (its bootstrap refits barely differ), but its straight-line log-odds can't express "EMIs over half <em>and</em> income under ₹40k". Fit both models on the same 100 bootstrap samples and split each one's error into two parts:</p>
+    <ul>
+      <li>the <strong>wobble</strong>: how much the refits disagree with each other (their variance). Averaging removes it.</li>
+      <li>the <strong>shared miss</strong>: how far the <em>average</em> refit sits from the truth. Averaging keeps it. It holds the true bias, plus quirks of this one training set that every bootstrap inherits.</li>
+    </ul>
+    <div class="tbl"><table>
+      <thead><tr><th>Model</th><th>Five refits for one applicant (true chance 0.03)</th><th>Wobble</th><th>Shared miss</th></tr></thead>
+      <tbody>
+        <tr><td>Logistic regression</td><td>0.063 0.054 0.054 0.052 0.054</td><td>0.0002</td><td>0.0105</td></tr>
+        <tr><td>Full-depth tree</td><td>0 0 0 1 0</td><td>0.0529</td><td>0.0068</td></tr>
+      </tbody>
+    </table></div>
+    <p>The wobble and shared-miss columns are averages over all 1,500 test applicants; the five refits just show one applicant's spread. The two parts add up to one refit's mean squared miss: for the tree, \(0.0529 + 0.0068 \approx 0.060\), the \(\sigma^2\) of section 04.</p>
+    <p>Almost all of logistic regression's error is shared miss, so bagging 50 of them changes nothing: (0.756, 0.261, 0.0105) before and after. Most of a tree's error is wobble, so bagging cuts it to about 0.007.</p>
+    <ul>
+      <li><strong>Why logistic regression is stable:</strong> it fits one smooth formula through all 3,500 rows. Each row pulls the coefficients only slightly, and a bootstrap's dropped and doubled rows mostly cancel out, so predictions move by about 0.01.</li>
+      <li><strong>Why a tree is unstable:</strong> it makes hard, greedy yes/no choices. A resample that nudges the top threshold sends different rows down each branch, and every split below can change. At full depth a leaf is one or a few rows, so whether one particular defaulter made it into the sample flips the answer between 0 and 1.</li>
+    </ul>
+    <p>So bagging helps <strong>unstable</strong> learners (deep trees, neural nets on small data) and does nothing for <strong>stable</strong> ones (linear models, k-nearest neighbours with a large k), or even slightly hurts them, since each bootstrap holds only 63% of the distinct rows.</p>
+    <p><strong>Bagging stumps</strong> (depth-1 trees) shows the same limit from the other side. The bootstrap flips which single question wins: 160 of 200 stumps ask <code>late &lt;= 1.5</code>, and 40 ask about income near ₹40k. The average mixes two one-question rules, giving four score levels instead of two, so ranking improves (AUC from 0.653 to 0.781). But the gap barely moves (0.0115 to 0.0104): no mix of one-question rules can say "EMIs high <em>and</em> income low". That's bias.</p>
+
+    <!-- correlation -->
+    <h2 id="correlation"><span class="pn">04</span>Why correlated trees cap the gain</h2>
+    <p>If the trees' mistakes were independent, averaging 200 of them would cut the variance 200 times. They aren't: every tree grew from the same 3,500 rows. If those rows hold an unlucky cluster of defaulters somewhere, every tree sees it and errs the same way there. Averaging cancels the parts of the mistakes that differ between trees; the <strong>shared</strong> part survives.</p>
+    <p>Let each tree's prediction at a point have variance \(\sigma^2\), and any two trees have correlation \(\rho\). The variance of a sum is the sum of all the pairwise covariances: \(B\) terms \(\sigma^2\) (each tree with itself) and \(B(B-1)\) terms \(\rho\sigma^2\) (each tree with another one):</p>
+    <div class="mj">\[ \begin{aligned} \operatorname{Var}(\bar f) &amp;= \frac{1}{B^2} \Big[ B\sigma^2 + B(B-1)\rho\sigma^2 \Big] \\ &amp;= \rho\sigma^2 + \frac{1-\rho}{B}\sigma^2 \end{aligned} \]</div>
+    <p>In words:</p>
+    <ul>
+      <li>the second term is the part that differs from tree to tree, and it shrinks as trees are added;</li>
+      <li>the first term is the shared part, and it never shrinks. With infinitely many trees, \(\rho\sigma^2\) is what's left.</li>
+    </ul>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 420 268" style="min-width:0;max-width:560px" role="img" aria-label="Variance of an average of B trees against B on a log scale, for correlations 0, 0.1 and 0.3. With correlation 0 the curve keeps falling towards 0; with 0.1 and 0.3 it flattens onto floors at 0.1 and 0.3 of one tree's variance.">
+          <path class="in" d="M52 30 V220 H400.0"/>
+          <text class="lbl" x="44" y="224.0" text-anchor="end">0</text>
+          <text class="lbl" x="44" y="176.5" text-anchor="end">0.25</text>
+          <text class="lbl" x="44" y="129.0" text-anchor="end">0.5</text>
+          <text class="lbl" x="44" y="81.5" text-anchor="end">0.75</text>
+          <text class="lbl" x="44" y="34.0" text-anchor="end">1</text>
+          <text class="lbl" x="52.0" y="238" text-anchor="middle">1</text>
+          <path d="M52.0 220 v5" style="stroke:var(--ink-3);stroke-width:1"/>
+          <text class="lbl" x="168.0" y="238" text-anchor="middle">10</text>
+          <path d="M168.0 220 v5" style="stroke:var(--ink-3);stroke-width:1"/>
+          <text class="lbl" x="284.0" y="238" text-anchor="middle">100</text>
+          <path d="M284.0 220 v5" style="stroke:var(--ink-3);stroke-width:1"/>
+          <text class="lbl" x="400.0" y="238" text-anchor="end">1,000</text>
+          <path d="M400.0 220 v5" style="stroke:var(--ink-3);stroke-width:1"/>
+          <path d="M52 201.0 H400.0" style="stroke:var(--ink-3);stroke-width:1;stroke-dasharray:4 4;fill:none"/>
+          <path d="M52 163.0 H400.0" style="stroke:var(--ink-3);stroke-width:1;stroke-dasharray:4 4;fill:none"/>
+          <path d="M318.9 112 V220" style="stroke:var(--ink-3);stroke-width:1.2;stroke-dasharray:1 3;fill:none"/>
+          <text class="lbl" x="318.9" y="106" text-anchor="middle">200 TREES</text>
+          <path d="M52.0 30.0 L57.8 44.5 L63.6 57.4 L69.4 68.8 L75.2 79.1 L81.0 88.2 L86.8 96.3 L92.6 103.6 L98.4 110.1 L104.2 115.8 L110.0 120.9 L115.8 125.5 L121.6 129.6 L127.4 133.2 L133.2 136.5 L139.0 139.3 L144.8 141.9 L150.6 144.2 L156.4 146.3 L162.2 148.1 L168.0 149.7 L173.8 151.1 L179.6 152.4 L185.4 153.6 L191.2 154.6 L197.0 155.5 L202.8 156.3 L208.6 157.1 L214.4 157.7 L220.2 158.3 L226.0 158.8 L231.8 159.3 L237.6 159.7 L243.4 160.0 L249.2 160.3 L255.0 160.6 L260.8 160.9 L266.6 161.1 L272.4 161.3 L278.2 161.5 L284.0 161.7 L289.8 161.8 L295.6 161.9 L301.4 162.1 L307.2 162.2 L313.0 162.3 L318.8 162.3 L324.6 162.4 L330.4 162.5 L336.2 162.5 L342.0 162.6 L347.8 162.6 L353.6 162.7 L359.4 162.7 L365.2 162.7 L371.0 162.8 L376.8 162.8 L382.6 162.8 L388.4 162.8 L394.2 162.9 L400.0 162.9" style="stroke:var(--grad);stroke-width:2.4;fill:none"/>
+          <path d="M52.0 30.0 L57.8 48.6 L63.6 65.2 L69.4 79.9 L75.2 93.1 L81.0 104.8 L86.8 115.3 L92.6 124.6 L98.4 132.9 L104.2 140.3 L110.0 146.9 L115.8 152.8 L121.6 158.0 L127.4 162.7 L133.2 166.9 L139.0 170.6 L144.8 173.9 L150.6 176.8 L156.4 179.5 L162.2 181.8 L168.0 183.9 L173.8 185.8 L179.6 187.4 L185.4 188.9 L191.2 190.2 L197.0 191.4 L202.8 192.4 L208.6 193.4 L214.4 194.2 L220.2 194.9 L226.0 195.6 L231.8 196.2 L237.6 196.7 L243.4 197.2 L249.2 197.6 L255.0 198.0 L260.8 198.3 L266.6 198.6 L272.4 198.8 L278.2 199.1 L284.0 199.3 L289.8 199.5 L295.6 199.6 L301.4 199.8 L307.2 199.9 L313.0 200.0 L318.8 200.1 L324.6 200.2 L330.4 200.3 L336.2 200.4 L342.0 200.5 L347.8 200.5 L353.6 200.6 L359.4 200.6 L365.2 200.7 L371.0 200.7 L376.8 200.7 L382.6 200.8 L388.4 200.8 L394.2 200.8 L400.0 200.8" style="stroke:var(--hid);stroke-width:2.4;fill:none"/>
+          <path d="M52.0 30.0 L57.8 50.7 L63.6 69.1 L69.4 85.5 L75.2 100.1 L81.0 113.2 L86.8 124.8 L92.6 135.1 L98.4 144.4 L104.2 152.6 L110.0 159.9 L115.8 166.5 L121.6 172.3 L127.4 177.5 L133.2 182.1 L139.0 186.2 L144.8 189.9 L150.6 193.2 L156.4 196.1 L162.2 198.7 L168.0 201.0 L173.8 203.1 L179.6 204.9 L185.4 206.5 L191.2 208.0 L197.0 209.3 L202.8 210.5 L208.6 211.5 L214.4 212.4 L220.2 213.3 L226.0 214.0 L231.8 214.6 L237.6 215.2 L243.4 215.7 L249.2 216.2 L255.0 216.6 L260.8 217.0 L266.6 217.3 L272.4 217.6 L278.2 217.9 L284.0 218.1 L289.8 218.3 L295.6 218.5 L301.4 218.7 L307.2 218.8 L313.0 218.9 L318.8 219.0 L324.6 219.2 L330.4 219.2 L336.2 219.3 L342.0 219.4 L347.8 219.5 L353.6 219.5 L359.4 219.6 L365.2 219.6 L371.0 219.7 L376.8 219.7 L382.6 219.7 L388.4 219.8 L394.2 219.8 L400.0 219.8" style="stroke:var(--cell);stroke-width:2.4;fill:none"/>
+          <path d="M170 36 h20" style="stroke:var(--grad);stroke-width:2.4"/>
+          <text x="196" y="40">ρ = 0.3: floor 0.3σ²</text>
+          <path d="M170 56 h20" style="stroke:var(--hid);stroke-width:2.4"/>
+          <text x="196" y="60">ρ = 0.1: floor 0.1σ²</text>
+          <path d="M170 76 h20" style="stroke:var(--cell);stroke-width:2.4"/>
+          <text x="196" y="80">ρ = 0: σ²/B, no floor</text>
+          <text class="lbl" x="226" y="260" text-anchor="middle">TREES B (LOG SCALE)</text>
+          <text class="lbl" x="14" y="125" text-anchor="middle" transform="rotate(-90 14 125)">VARIANCE ÷ σ²</text>
+          </svg>
+      </div>
+      <figcaption>The variance of an average of \(B\) trees, in units of one tree's variance. Independent trees (\(\rho = 0\)) keep improving; correlated trees flatten onto a floor of \(\rho\sigma^2\). The bagged trees here have \(\rho \approx 0.1\), so 200 trees (dotted) are already on the floor.</figcaption>
+    </figure>
+    <p>A check with made-up guesses, each a shared part plus its own part, scaled so that \(\sigma^2 = 1\): at \(\rho = 0.3\), the average of 10 guesses has variance 0.377 (the formula says 0.370), and the average of 1,000 has 0.302 (formula 0.301). The floor of 0.3 holds however many you average.</p>
+
+    <h3>Measured on the 200 bagged trees</h3>
+    <p>Take each tree's miss against the true chance, applicant by applicant. One tree's mean squared miss is \(\sigma^2 = 0.0598\), and two trees' misses correlate \(\rho = 0.105\) on average:</p>
+    <div class="mj">\[ \begin{aligned} \rho\sigma^2 &amp;= 0.105 \times 0.0598 \\ &amp;\approx 0.0063 \\ \frac{1-\rho}{B}\sigma^2 &amp;= \frac{0.895 \times 0.0598}{200} \\ &amp;\approx 0.0003 \end{aligned} \]</div>
+    <p>The two add up to 0.0065, which is exactly the bag's real gap. The useful part is what the formula says next: the bag is already at its floor. 200 trees reach 0.0065, and infinitely many would reach 0.0063. 1,000 trees would get 0.00633: 3% better for five times the compute.</p>
+    <p><strong>When more trees stop paying.</strong> The part more trees can still remove, as a share of the floor, is</p>
+    <div class="mj">\[ \frac{(1-\rho)\,\sigma^2 / B}{\rho\,\sigma^2} = \frac{1-\rho}{\rho B} \]</div>
+    <p>In words: with \(\rho = 0.1\) it's 9% at 100 trees and under 1% at 1,000. Once \(B\) is well past \((1-\rho)/\rho\), decorrelation matters more than more trees. There are only two ways lower:</p>
+    <ul>
+      <li>make the trees <strong>less alike</strong> (a smaller \(\rho\)): the random forest's trick, next section;</li>
+      <li>make each tree <strong>less wobbly</strong> (a smaller \(\sigma^2\)), for example with bigger leaves (<a href="#depth">section 06</a>).</li>
+    </ul>
+
+    <h3>What \(\sigma^2\) and \(\rho\) really are</h3>
+    <ul>
+      <li><strong>The textbook meaning:</strong> fix one applicant \(x\). Imagine redrawing the whole training set many times and bootstrapping from each. \(\sigma^2\) is how much one tree's prediction at \(x\) varies over all that, and \(\rho\) is the correlation between two trees grown <em>from the same training set</em>. Given the training set, the bootstrap draws are independent, so all the correlation comes from sharing it.</li>
+      <li><strong>What was measured here:</strong> with only one training set, the numbers above are taken across applicants (each tree's vector of misses). The same algebra holds, so the match is close to bookkeeping; the useful reading is the floor.</li>
+      <li><strong>What the shared part holds:</strong> full-depth trees have almost no bias, so most of it here is noise in the 3,500 training labels. A bias common to every tree also sits in the shared part, and survives any amount of averaging.</li>
+      <li><strong>The extremes:</strong> \(\rho = 1\) gives \(\sigma^2\): averaging identical trees does nothing (the same-rows trees of section 01, with \(\rho \approx 0.84\), came close). \(\rho = 0\) gives \(\sigma^2/B\), which goes to 0, but that needs truly independent training sets, which you never have.</li>
+    </ul>
+    <p><strong>More trees make a forest repeatable, not right.</strong> Refit with a new seed and a bigger forest changes less, because a finite average sits closer to its limit. That limit can still be biased, or overfit the training set.</p>
+
+    <!-- forest -->
+    <h2 id="forest"><span class="pn">05</span>Random forests: a fresh feature menu at every split</h2>
+    <p>Why are bagged trees alike? Every tree sees roughly the same data, so every tree finds the same strong splits near the top: <code>late &lt;= 1.5</code> is the root of 160 of the 200 bagged trees. The top splits shape everything below them.</p>
+    <p>A <strong>random forest</strong> (Breiman, 2001) adds one rule. At <em>every</em> split, the tree may only choose among \(m\) features drawn at random (<code>max_features</code>), drawn fresh for that split. Sometimes the strongest feature isn't on the menu, so the tree splits on something else and grows differently from its neighbours. A given feature is on the menu with chance \(m/p\), for \(p\) features in all. Which feature roots each of 200 trees:</p>
+    <div class="tbl"><table>
+      <thead><tr><th><code>max_features</code></th><th>income</th><th>emi</th><th>late</th><th>age</th></tr></thead>
+      <tbody>
+        <tr><td>4, all (bagging)</td><td>40</td><td>0</td><td>160</td><td>0</td></tr>
+        <tr><td>2</td><td>76</td><td>34</td><td>90</td><td>0</td></tr>
+        <tr><td>1</td><td>46</td><td>53</td><td>45</td><td>56</td></tr>
+      </tbody>
+    </table></div>
+    <p>With 2 of 4 features on offer, <code>late</code> roots only 90 trees, and the rest start from income or EMIs. With 1, the roots spread evenly, even onto the decoy <code>age</code>. The effect on the forest (200 full-depth trees; the bagging row uses fresh random draws, so its \(\rho\) is 0.104 against section 04's 0.105):</p>
+    <div class="tbl"><table>
+      <thead><tr><th><code>max_features</code></th><th>\(\rho\)</th><th>One tree's gap \(\sigma^2\)</th><th>Forest AUC</th><th>Forest gap</th></tr></thead>
+      <tbody>
+        <tr><td>4 (bagging)</td><td>0.104</td><td>0.0598</td><td>0.827</td><td>0.0065</td></tr>
+        <tr><td>3</td><td>0.095</td><td>0.0594</td><td>0.830</td><td>0.0059</td></tr>
+        <tr><td>2</td><td>0.083</td><td>0.0580</td><td>0.820</td><td>0.0051</td></tr>
+        <tr><td>1</td><td>0.075</td><td>0.0594</td><td>0.811</td><td>0.0047</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>\(\rho\) drops</strong> from 0.104 to 0.075: the trees really are less alike.</li>
+      <li><strong>Each tree is about as good</strong> (\(\sigma^2\) stays near 0.059). With 3 of the 4 features useful, any menu of 2 or more holds a useful one, and even at \(m = 1\), where a quarter of the splits get only <code>age</code>, \(\sigma^2\) barely moves.</li>
+      <li>So <strong>the forest's gap falls</strong> by about 28%, from 0.0065 to 0.0047: the floor \(\rho\sigma^2\) coming down.</li>
+      <li>The AUC dip is small enough to be noise at this test size; the gap doesn't depend on the noisy labels.</li>
+    </ul>
+
+    <h3 id="node">What happens at one node</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Step</th><th>Single tree (CART)</th><th>Tree in a random forest</th></tr></thead>
+      <tbody>
+        <tr><td>Rows at the node</td><td>Training rows that reach it</td><td>Bootstrap rows that reach it, weighted by how often each was drawn</td></tr>
+        <tr><td>Candidate features</td><td>All \(p\)</td><td>\(m\) drawn at random without replacement, fresh at this node</td></tr>
+        <tr><td>Thresholds tried</td><td>Every midpoint between neighbouring values</td><td>The same, for the \(m\) candidates only</td></tr>
+        <tr><td>Choice</td><td>Biggest weighted impurity drop</td><td>Biggest drop among the \(m\)</td></tr>
+        <tr><td>Stopping</td><td>Depth or leaf-size limits, often then pruning</td><td>Until pure or a leaf-size limit; no pruning</td></tr>
+        <tr><td>Leaf value</td><td>Share of each class</td><td>Weighted share (bootstrap counts, class weights)</td></tr>
+        <tr><td>Prediction</td><td>One leaf's value</td><td>Average of \(B\) leaves' values</td></tr>
+      </tbody>
+    </table></div>
+    <p>Two details. Features that are constant in the node don't count towards \(m\), so sklearn keeps drawing until it has tried at least one that varies. And Extra Trees (<a href="#extra-trees">section 09</a>) change two rows: one uniform random cut per candidate instead of every midpoint, and, by default, all rows with no bootstrap.</p>
+    <p><strong>Per split, not per tree.</strong> A common misconception is that each tree gets one fixed feature subset. That's an older method, the <strong>random subspace method</strong> (Ho, 1998; in sklearn, <code>BaggingClassifier</code> with <code>max_features</code> below 1), and it locks a tree out of a feature everywhere: a tree that never sees <code>late</code> is weak all over.</p>
+    <p>A fresh draw at every node keeps every feature available somewhere in every tree while still forcing variety at each node, most importantly at the top splits that shape the whole tree.</p>
+
+    <h3 id="mtry">Why \(\sqrt p\) for classification and \(p/3\) for regression</h3>
+    <p>Neither number is derived. They're the defaults of Breiman and Cutler's original code and of R's <code>randomForest</code> (Breiman's 2001 paper itself tried \(m = 1\) and \(\lfloor \log_2 p \rfloor + 1\)), and <em>The Elements of Statistical Learning</em> repeats them, along with a minimum leaf size of 1 for classification and 5 for regression. sklearn's classifier uses \(\sqrt p\), but its regressor defaults to <em>all</em> features, which makes <code>RandomForestRegressor</code> plain bagging unless you change it. The reasoning for giving regression a bigger menu:</p>
+    <ul>
+      <li><strong>Classification accuracy forgives weak trees; squared error doesn't.</strong> For accuracy, only which side of 0.5 the forest's average lands on matters, so weaker, less alike trees still land it on the right side, and decorrelation buys a lot. (The argument is about accuracy, not the quality of the probabilities.) In regression, every tree's own error feeds straight into the forest's squared error (the \(\sigma^2\) in \(\rho\sigma^2\)), so a weaker tree costs more.</li>
+      <li><strong>Regression targets are often smooth.</strong> A tree copies a smooth surface as a staircase of many small steps, which needs useful features at split after split, so every wasted split makes the staircase coarser. Class boundaries are often a few sharp cuts, which a tree finds early.</li>
+      <li><strong>How fast the menu shrinks:</strong> with \(p = 100\), \(\sqrt p\) offers 10% of the features at each split, and \(p/3\) a third.</li>
+    </ul>
+    <p>Measured on the credit limit, which is smooth and depends on only 2 of the 4 features (300 trees, leaves of at least 5; \(\sigma^2\) and gaps in (₹ thousand)²). Here \(\rho\) and \(\sigma^2\) are averages over tree pairs and trees, so the floor matches the forest's gap only to within about ±1:</p>
+    <div class="tbl"><table>
+      <thead><tr><th><code>max_features</code></th><th>\(\rho\)</th><th>\(\sigma^2\)</th><th>Floor \(\rho\sigma^2\)</th><th>Forest gap</th><th>Test RMSE</th></tr></thead>
+      <tbody>
+        <tr><td>4, all (bagging)</td><td>0.186</td><td>56</td><td>10.4</td><td>10.6</td><td>10.18</td></tr>
+        <tr><td>2 (<code>"sqrt"</code>)</td><td>0.088</td><td>168</td><td>14.7</td><td>14.5</td><td>10.31</td></tr>
+        <tr><td>1 (\(p/3\), rounded down)</td><td>0.151</td><td>593</td><td>89.6</td><td>90.4</td><td>13.32</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong><code>"sqrt"</code></strong> halves \(\rho\) but triples \(\sigma^2\), so the floor rises and the forest gets worse.</li>
+      <li><strong>1 feature:</strong> \(\sigma^2\) is ten times bagging's, and \(\rho\) even climbs back up. Trees this crude all miss the same way (too flat where the limit changes fast), and a miss shared by every tree counts as correlation.</li>
+      <li><strong>Why \(\sigma^2\) jumps here and not for default risk:</strong> only 2 of the 4 features matter. With 2 on the menu, both are missing when the pair drawn is {<code>late</code>, <code>age</code>}: 1 of the 6 possible pairs. In 4 of the other 5 pairs only one of the two is offered, so the tree must cut on whichever it gets, even when the other would split better. With 1, half the splits miss them.</li>
+      <li><strong>Default risk is different:</strong> 3 of its 4 features matter, so every pair holds a useful one.</li>
+    </ul>
+    <p>Feature sampling helps only when \(\rho\) shrinks by a bigger factor than \(\sigma^2\) grows. For default risk it did; for the credit limit it didn't. That's why <code>max_features</code> is the first knob to tune, not a constant.</p>
+
+    <h3>The bootstrap already does most of the decorrelating</h3>
+    <p>Turn off both sources of randomness (no bootstrap, all features) and every tree sees the same rows and the same features, finds the same splits, and \(\rho = 1\). On the credit limit, all 300 trees are identical: \(\sigma^2 = 48\), a floor of 48.3, and RMSE 11.97. From there:</p>
+    <ul>
+      <li>the bootstrap alone takes \(\rho\) from 1 to 0.186, and \(\sigma^2\) from 48 to 56 (each tree sees only about 63% of the rows), so the floor falls from 48.3 to 10.4;</li>
+      <li>feature sampling at <code>"sqrt"</code> then takes \(\rho\) only from 0.186 to 0.088, and here pushes the floor back up to 14.7.</li>
+    </ul>
+    <p>Default risk shows the same pattern: same-rows trees correlate about 0.84, bootstrap trees 0.104, and feature sampling gets to 0.075 at best. The bootstrap moves \(\rho\) so far because small changes compound down the tree. The top income cut barely shifts, but each shift changes which rows go down each branch, and deep splits are chosen from a few dozen rows, where adding or dropping a couple changes the winner. By the leaves, two bootstrap trees look quite different.</p>
+
+    <h3 id="strength">Too much randomness: the strength–correlation trade-off</h3>
+    <p>Add 20 pure-noise columns, so only 3 of 24 features matter. With \(k\) useful features out of \(p\), the chance that a split's menu holds <em>no</em> useful feature is</p>
+    <div class="mj">\[ P(\text{no useful feature on the menu}) = \binom{p-k}{m} \Big/ \binom{p}{m} \]</div>
+    <p>In words: the number of menus made only of useless features, over the number of possible menus. Here \(p = 24\) and \(k = 3\) (100 trees, leaves of at least 5):</p>
+    <div class="tbl"><table>
+      <thead><tr><th><code>max_features</code></th><th>Splits with no useful feature on offer</th><th>AUC</th><th>Log loss</th><th>Gap</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>88%</td><td>0.800</td><td>0.257</td><td>0.0106</td></tr>
+        <tr><td>4 (<code>"sqrt"</code>)</td><td>56%</td><td>0.817</td><td>0.230</td><td>0.0041</td></tr>
+        <tr><td>12 (half)</td><td>11%</td><td>0.806</td><td>0.228</td><td>0.0025</td></tr>
+        <tr><td>24 (all)</td><td>0%</td><td>0.816</td><td>0.250</td><td>0.0031</td></tr>
+      </tbody>
+    </table></div>
+    <p>The gap is worst with 1 feature (weak trees, most splits forced onto noise), best in the middle, and worse again with all 24 (alike trees). Breiman put a bound on this for a forest classifier:</p>
+    <div class="mj">\[ \text{test error} \le \frac{\bar\rho\,(1 - s^2)}{s^2} \]</div>
+    <p>In words: \(\bar\rho\) is the average correlation between trees, and \(s\) is the trees' <strong>strength</strong>, how far on average the right class's vote share beats the best wrong class's. Less alike trees and stronger trees both lower the bound; <code>max_features</code> lowers \(\bar\rho\) but also lowers \(s\). The bound is loose, so use it for the direction of the effect, not for numbers.</p>
+
+    <!-- depth -->
+    <h2 id="depth"><span class="pn">06</span>Deep, unpruned trees, and when to stop earlier</h2>
+    <p>By default a forest grows every tree to full depth: it splits until the leaves are pure (often a single row), with no depth cap and no pruning. That would be reckless for a single tree. Here it's the design:</p>
+    <ul>
+      <li><strong>A division of labour.</strong> Averaging removes variance but never bias (<a href="#bagging">section 03</a>), so each tree should bring as little bias as possible, and a full-depth tree can carve out any shape. Pruning would add bias that no amount of averaging takes back.</li>
+      <li><strong>Deep trees decorrelate better.</strong> Deep splits are chosen from a few rows each, so they change most from one bootstrap to the next. Shallow trees agree more (a higher \(\rho\)).</li>
+      <li><strong>One less thing to tune:</strong> no pruning means no validation step to pick the pruning strength.</li>
+    </ul>
+    <p>Shallow trees can work when the truth is shallow. Averaging 100 depth-3 trees (each on a random half of the rows) takes the gap from 0.0047 for one tree to 0.0009, because the truth is only three questions deep. On real data you don't know how deep the truth is; a deep tree has little bias for any shape, and averaging handles its variance.</p>
+    <p><strong>The cost of full depth is noisy probabilities.</strong> Pure leaves answer 0 or 1, so the forest needs many trees to smooth them out, and regions with no training positives get exact zeros. A minimum leaf size makes each leaf an average over several rows: each tree is less wobbly (a smaller \(\sigma^2\)), at the price of a little bias. With 300 trees:</p>
+    <div class="tbl"><table>
+      <thead><tr><th><code>min_samples_leaf</code></th><th>AUC</th><th>Log loss</th><th>Gap</th></tr></thead>
+      <tbody>
+        <tr><td>1 (default)</td><td>0.829</td><td>0.271</td><td>0.0052</td></tr>
+        <tr><td>5</td><td>0.824</td><td>0.224</td><td>0.0026</td></tr>
+        <tr><td>20</td><td>0.819</td><td>0.218</td><td>0.0013</td></tr>
+        <tr><td>50</td><td>0.818</td><td>0.218</td><td>0.0013</td></tr>
+        <tr><td>200</td><td>0.828</td><td>0.234</td><td>0.0062</td></tr>
+        <tr><td>500</td><td>0.747</td><td>0.271</td><td>0.0143</td></tr>
+      </tbody>
+    </table></div>
+    <p>The gap falls fourfold by a leaf size of 20, and the log loss approaches the truth's 0.212. If the probability itself drives a decision (pricing a loan, an expected loss), this is the knob.</p>
+    <p>From 200 on the gap gets worse again, and at 500 the ranking collapses too. The stressed group has 235 training applicants, but a bootstrap holds only about \(0.632 \times 235 \approx 150\) distinct ones, and <code>min_samples_leaf</code> counts distinct rows, not bootstrap weights. So with leaves of 200 or more no tree can give the group a leaf of its own, and its risk is averaged with its neighbours': bias.</p>
+    <p><strong>A depth cap, or a leaf size?</strong> Capping the depth at 5 scores (0.814, 0.216, 0.0008) and at 8 (0.832, 0.215, 0.0018), which is good here only because the truth is three questions deep. In general prefer a leaf-size limit. It adapts to the data, stopping where rows run thin and letting dense regions keep splitting, while a depth cap stops every branch at the same depth whether it holds 5 rows or 5,000.</p>
+
+    <!-- oob -->
+    <h2 id="oob"><span class="pn">07</span>Out-of-bag error: validation for free</h2>
+    <p>Each tree never saw about 37% of the training rows, its <strong>out-of-bag (OOB)</strong> rows. So every training row has a set of trees that never saw it: about 110 of 300. Average only <em>those</em> trees' predictions and you get an honest prediction for that row, made exactly as for a new applicant. Score every row that way and you have the <strong>OOB score</strong>: a validation score with no held-out set and no refitting.</p>
+    <div class="mj">\[ \begin{aligned} O_i &amp;= \{\, b : \text{row } i \text{ is not in bootstrap sample } b \,\} \\ \hat p_{\text{OOB}}(x_i) &amp;= \frac{1}{|O_i|} \sum_{b \in O_i} \hat p_b(x_i) \\ \mathbb E\,|O_i| &amp;\approx 0.368\, B \end{aligned} \]</div>
+    <p>In words: \(O_i\) is the set of trees whose bag left row \(i\) out; row \(i\)'s OOB prediction averages only those trees; on average that's 37% of them.</p>
+
+    <h3>Step by step, on a whiteboard</h3>
+    <p>Five applicants, A to E. B and E defaulted; A, C and D didn't. Three trees:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Tree</th><th>Bootstrap sample</th><th>Out of bag</th><th>Its predictions for them</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>A, A, C, D, E</td><td>B</td><td>B: 0.2</td></tr>
+        <tr><td>2</td><td>B, C, C, E, E</td><td>A, D</td><td>A: 0.1, D: 0.6</td></tr>
+        <tr><td>3</td><td>A, D, D, E, E</td><td>B, C</td><td>B: 0.4, C: 0.0</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li>B is out of two bags, so its OOB prediction is \((0.2 + 0.4)/2 = 0.3\). A gets 0.1, C 0.0 and D 0.6, from one tree each.</li>
+      <li>E is in every bag, so it gets no OOB prediction at all. A row is in all \(B\) bags with chance \(0.632^B\): 25% with 3 trees, 1% with 10, effectively never with 300.</li>
+      <li>Score A to D. The one defaulter, B (0.3), ranks above A (0.1) and C (0.0) but below D (0.6), so the OOB AUC is 2 wins out of 3 pairs: 0.67.</li>
+    </ul>
+    <pre class="code"><code>tot = np.zeros(n)        <span class="cm"># per row: sum of OOB predictions</span>
+cnt = np.zeros(n)        <span class="cm"># per row: trees that left it out</span>
+for t, rows in zip(rf.estimators_,
+                   rf.estimators_samples_):
+    out = np.ones(n, bool)
+    out[rows] = False                 <span class="cm"># rows it never saw</span>
+    tot[out] += t.predict_proba(X[out])[:, 1]
+    cnt[out] += 1
+oob = tot / cnt          <span class="cm"># = rf.oob_decision_function_[:, 1]</span></code></pre>
+
+    <h3>Why it's almost a free validation set</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Estimate (300 trees, leaves of 5)</th><th>AUC</th></tr></thead>
+      <tbody>
+        <tr><td>OOB, which came with the fit</td><td>0.786</td></tr>
+        <tr><td>5-fold cross-validation (five refits)</td><td>0.784</td></tr>
+        <tr><td>Test set, 1,500 rows</td><td>0.824</td></tr>
+        <tr><td>100,000 fresh applicants (the real answer)</td><td>0.815</td></tr>
+        <tr><td>The forest's own training rows (never do this)</td><td>0.973</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>OOB and cross-validation agree</strong>, and OOB cost nothing. Each OOB prediction comes from trees that never saw that row, just like a held-out prediction. No refit is needed, because the bootstrap already held rows out.</li>
+      <li><strong>Why "almost":</strong> each row is scored by only about 37% of the trees, so OOB measures a smaller forest. With few trees that's noticeably worse, and some rows get no OOB trees at all.</li>
+      <li><strong>A small pessimism with tiny leaves.</strong> When a defaulter is out of bag, the trees predicting it were trained without <em>its</em> default, so its neighbourhood looks slightly safer than it is; a non-defaulter's looks slightly riskier. Within a group of look-alikes, defaulters then score a bit below non-defaulters, which costs AUC. Tiny leaves are neighbourhoods of a few rows, where one missing label matters most (Janitza and Hornung, 2018). Cross-validation has the same effect.</li>
+    </ul>
+    <div class="tbl"><table>
+      <thead><tr><th>Leaf size</th><th>OOB AUC</th><th>AUC on fresh applicants</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>0.784</td><td>0.808</td></tr>
+        <tr><td>5</td><td>0.786</td><td>0.815</td></tr>
+        <tr><td>50</td><td>0.807</td><td>0.816</td></tr>
+      </tbody>
+    </table></div>
+    <p>Even at leaf size 5, OOB trails fresh data by 0.03, and part of that may be this training sample's own luck. The pessimism shows in the trend: the shortfall shrinks as the leaves grow.</p>
+    <p><strong>Never judge a forest on its own training rows.</strong> Each training row was in the bootstrap of about 63% of the trees, which have partly memorized it. So "train 0.97, test 0.82" says nothing on its own. The OOB score is the forest's honest training-set score.</p>
+
+    <h3 id="oob-traps">When OOB misleads</h3>
+    <ul>
+      <li><strong>The default <code>oob_score_</code> is accuracy.</strong> It reports 0.917, but always predicting "no default" gets 0.913. Score <code>oob_decision_function_</code> with AUC or log loss instead. Passing <code>oob_score=roc_auc_score</code> doesn't help: sklearn hands the function hard 0/1 predictions.</li>
+      <li><strong>Repeated rows.</strong> If each applicant appears three times (three loans, one profile), a row can be out of bag while its copies are in, so the tree has effectively seen it. OOB AUC 0.993; real test AUC 0.828.</li>
+      <li><strong>Time order and drift.</strong> A bootstrap mixes months, so March's OOB prediction comes from trees that saw April. In a simulation where the late-payment effect grows every month, a forest trained on months 0–17 looks perfectly calibrated out of bag (7.6% predicted, 7.5% actual). On months 18–23 it predicts 7.3%, and 11.3% default. OOB measures how well the forest fills gaps inside the training period, not how well it forecasts.</li>
+      <li><strong>Too few trees.</strong> With 10 trees, about 1% of rows (\(0.632^{10}\)) are in every bag. sklearn warns and fills them with zeros, which corrupts the score.</li>
+      <li><strong>Tuning on OOB, then reporting it.</strong> Out of many settings you picked the one whose OOB rows happened to suit it, so its OOB score is optimistic. Keep a final test set, or use nested cross-validation.</li>
+    </ul>
+    <p>When customers repeat or the world drifts, validate the way you'll deploy: grouped folds for repeated customers, past-to-future splits for time.</p>
+
+    <h3 id="oob-importance">OOB permutation importance</h3>
+    <p>Breiman's original importance measure reuses the OOB rows. For each tree, shuffle feature \(j\) among that tree's OOB rows and measure how much the tree's error rises; then average over the trees:</p>
+    <div class="mj">\[ \text{VI}_j = \frac1B \sum_{b=1}^{B} \Big[ \text{err}_b\big(\text{OOB}_b,\ x_j \text{ shuffled}\big) - \text{err}_b\big(\text{OOB}_b\big) \Big] \]</div>
+    <p>In words: every tree is scored only on rows it never saw, so a feature it used only to memorize training rows earns nothing. R's <code>randomForest</code> reports it (<code>importance=TRUE</code>, "mean decrease in accuracy"). sklearn doesn't; its <code>permutation_importance</code> applies the same idea to the whole forest, on any held-out set you pass (<a href="#importance">section 10</a>). For regression forests, <code>oob_prediction_</code> holds the OOB predictions and <code>oob_score_</code> is their \(R^2\).</p>
+
+    <!-- knobs -->
+    <h2 id="knobs"><span class="pn">08</span>Hyperparameters, knob by knob</h2>
+    <p>Read every knob through the forest's expected error at a point:</p>
+    <div class="mj">\[ \begin{aligned} \text{error} &amp;= \text{bias}^2 + \text{forest variance} + \text{noise} \\ \text{forest variance} &amp;= \rho\sigma^2 + \frac{1-\rho}{B}\,\sigma^2 \end{aligned} \]</div>
+    <p>In words: the forest's bias is one tree's bias (<a href="#bagging">section 03</a>), \(\sigma^2\) is one tree's variance, and \(\rho\) is how alike two trees are. Each knob moves some of them:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Knob (default), move</th><th>Bias</th><th>Tree variance \(\sigma^2\)</th><th>Correlation \(\rho\)</th><th>Worth tuning?</th></tr></thead>
+      <tbody>
+        <tr><td><code>n_estimators</code> (100), up</td><td>Same</td><td>Same</td><td>Same</td><td>Only to "enough"</td></tr>
+        <tr><td><code>max_features</code> (<code>"sqrt"</code>; regressor 1.0), down</td><td>Up (a lot if few useful features)</td><td>Up</td><td>Down</td><td>Yes, first</td></tr>
+        <tr><td><code>min_samples_leaf</code> (1) up, or <code>max_depth</code> (none) down</td><td>Up</td><td>Down</td><td>Usually up</td><td>Second; key for probabilities</td></tr>
+        <tr><td><code>bootstrap</code> (True), off</td><td>Down slightly</td><td>Down slightly</td><td>Up sharply (1 with all features)</td><td>Rarely; loses OOB</td></tr>
+        <tr><td><code>max_samples</code> (all rows), down</td><td>Up slightly</td><td>Up</td><td>Down</td><td>For speed on big data</td></tr>
+        <tr><td><code>class_weight</code> (none), <code>"balanced"</code></td><td>Probabilities pushed up</td><td>Up</td><td>About the same</td><td>Rarely; recalibrate after</td></tr>
+      </tbody>
+    </table></div>
+    <p>Smoother trees agree more, which is why bigger leaves usually raise \(\rho\); with class weights, a few heavy rows decide each leaf, which raises \(\sigma^2\). <code>max_features</code> is covered in <a href="#forest">section 05</a>, and leaf size and depth in <a href="#depth">section 06</a>. The rest are below.</p>
+
+    <h3 id="trees">n_estimators: more trees never overfit</h3>
+    <p>Fit 500 trees (leaves of 5) once, then score the forest made of the first \(k\) trees:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Trees</th><th>AUC</th><th>Log loss</th><th>Gap</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>0.736</td><td>1.423</td><td>0.0220</td></tr>
+        <tr><td>5</td><td>0.801</td><td>0.694</td><td>0.0060</td></tr>
+        <tr><td>10</td><td>0.813</td><td>0.479</td><td>0.0044</td></tr>
+        <tr><td>25</td><td>0.821</td><td>0.330</td><td>0.0034</td></tr>
+        <tr><td>50</td><td>0.816</td><td>0.288</td><td>0.0029</td></tr>
+        <tr><td>100</td><td>0.822</td><td>0.266</td><td>0.0028</td></tr>
+        <tr><td>200</td><td>0.825</td><td>0.224</td><td>0.0026</td></tr>
+        <tr><td>500</td><td>0.826</td><td>0.223</td><td>0.0026</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Why it can't overfit:</strong> adding a tree doesn't make any tree more complex. It only brings the average closer to its limit, the expected prediction over all possible bootstraps and feature draws, which is fixed once the data and the other settings are. So the error falls towards the floor and stays there; wiggles like 0.821 at 25 trees and 0.816 at 50 are noise.</li>
+      <li><strong>Returns diminish like \(1/B\):</strong> fast over the first 10 trees, flat by about 100–200.</li>
+      <li><strong>Probabilities need more trees than ranking.</strong> AUC settles by 25–100 trees; log loss needs about 200 to smooth out the last exact zeros.</li>
+      <li><strong>A forest can still overfit</strong>, through tree size (leaves too small for noisy data), not tree count. More trees make it repeatable, not right.</li>
+      <li><strong>Boosting is different:</strong> each new tree fits the previous trees' mistakes, so too many rounds do overfit and need early stopping.</li>
+    </ul>
+    <p><code>warm_start=True</code> keeps the trees already grown when you raise <code>n_estimators</code> and refit, so a forest can be grown in steps until the OOB score flattens.</p>
+
+    <h3>bootstrap on or off</h3>
+    <ul>
+      <li><strong>Off, with all features:</strong> every tree is the same tree (\(\rho = 1\)), so the forest is one tree at many times the cost.</li>
+      <li><strong>Off, with <code>max_features</code> below \(p\):</strong> the feature draws are the only randomness. Each tree sees every row, so it's slightly stronger, but trees are more alike. Extra Trees default to this, and their random thresholds supply the missing variety.</li>
+      <li><strong>Off means no OOB score</strong>, since no row is ever left out.</li>
+    </ul>
+
+    <h3>max_samples</h3>
+    <p>Each tree's bootstrap draws a fraction \(f\) of the \(n\) rows, so it sees about \(1 - e^{-f}\) of the distinct rows: 26% at \(f = 0.3\), leaving 74% out of bag. The trees are smaller, weaker, less alike and faster to grow. With full-depth trees it improved the gap from 0.0052 to 0.0024 here (AUC 0.83, log loss 0.22). It's a cheap regularizer on big data, and it keeps each tree's cost fixed as the data grows. It only applies when <code>bootstrap=True</code>.</p>
+
+    <h3 id="class-weight">class_weight</h3>
+    <p><code>class_weight="balanced"</code> weights each row of class \(c\) by \(n/(2 n_c)\), so the two classes weigh the same in total. Here each of the 304 defaulters counts 5.76, and each of the 3,196 others 0.55. The weights act <strong>at fit time</strong>, in two places:</p>
+    <ul>
+      <li><strong>The splits:</strong> every candidate split is scored with weighted Gini, so the weights change which splits win. In a <code>"balanced_subsample"</code> forest (300 trees, leaves of 5), 13% of the trees choose a different root split than without weights, and the trees grow bigger (85,596 nodes against 79,646).</li>
+      <li><strong>The leaf values:</strong> a leaf stores the <em>weighted</em> share of defaulters. A test applicant who lands there reads back that stored number; <code>predict_proba</code> takes no weights.</li>
+    </ul>
+    <p>A real leaf from a weighted depth-2 tree holds 476 non-defaulters and 119 defaulters, a plain share of 0.20. It stores</p>
+    <div class="mj">\[ \begin{aligned} \frac{w_1 n_1}{w_1 n_1 + w_0 n_0} &amp;= \frac{5.76 \times 119}{5.76 \times 119 + 0.55 \times 476} \\ &amp;\approx 0.724 \end{aligned} \]</div>
+    <p>In words: weighting multiplies the leaf's odds by the weight ratio \(w_1/w_0 \approx 10.5\):</p>
+    <div class="mj">\[ \begin{aligned} \text{plain odds} &amp;= 119/476 \\ &amp;= 0.25 \\ \text{weighted odds} &amp;= 0.25 \times 10.5 \\ &amp;\approx 2.63 \\ \text{stored probability} &amp;= 2.63/3.63 \\ &amp;\approx 0.724 \end{aligned} \]</div>
+    <p>That's exactly the value the weighted log loss would choose for the leaf.</p>
+    <p>Across a whole forest (<code>"balanced_subsample"</code>, 300 trees, leaves of 5), the ranking survives: AUC 0.823 against 0.824, and the two forests' orderings correlate 0.96. The level doesn't: the mean prediction is 0.17 against a real default rate of 0.087, and the gap rises from 0.0026 to 0.0188.</p>
+    <p>Heavier defaulters push every mixed leaf's share up together, so the leaves keep their order. The mean only doubles, rather than rising tenfold, because most leaves are pure non-default, and odds of 0 stay 0 at any weight.</p>
+    <p>Use class weights only if you'll recalibrate or need only a ranking. <code>"balanced"</code> computes the weights once on the whole training set; <code>"balanced_subsample"</code> recomputes them on each tree's bootstrap.</p>
+
+    <h3>Other settings, and a tuning order</h3>
+    <ul>
+      <li><code>min_samples_split</code>, <code>max_leaf_nodes</code>, <code>min_impurity_decrease</code> and <code>ccp_alpha</code> are other ways to stop trees earlier; leaf size is the most direct.</li>
+      <li><code>criterion</code> (Gini, entropy or log loss) rarely changes much.</li>
+      <li><code>n_jobs=-1</code> trains and predicts trees in parallel on all cores (for a single-row prediction, starting threads can cost more than it saves), and <code>random_state</code> fixes the bootstraps and feature draws, so results repeat.</li>
+    </ul>
+    <p><strong>A tuning order that works:</strong> <code>max_features</code> over {<code>"sqrt"</code>, 0.2, 0.33, 0.5, 1.0}, then <code>min_samples_leaf</code> over {1, 5, 20, 50}, judged on OOB or cross-validation with the metric you actually care about. Then set <code>n_estimators</code> just high enough that the score stops moving. The defaults are already strong, so gains are usually modest.</p>
+
+    <!-- extra trees -->
+    <h2 id="extra-trees"><span class="pn">09</span>Extra Trees: random thresholds</h2>
+    <p><strong>Extremely randomized trees</strong> (Extra Trees; Geurts, Ernst and Wehenkel, 2006) push the randomness one step further. At each split a random forest searches every threshold of each candidate feature. Extra Trees draw <strong>one random threshold</strong> per candidate feature, uniformly between that feature's smallest and largest value in the node, and keep the best of those random cuts. sklearn's version also skips the bootstrap by default, so every tree sees every row.</p>
+    <p>The root split, with one random cut drawn on each feature and scored by Gini gain (the drop in impurity):</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Feature</th><th>Random cut</th><th>Gain</th></tr></thead>
+      <tbody>
+        <tr><td>income</td><td>132.43</td><td>0.0007</td></tr>
+        <tr><td>emi</td><td>0.23</td><td>0.0008</td></tr>
+        <tr><td>late</td><td>3.02</td><td>0.0004</td></tr>
+        <tr><td>age</td><td>51.32</td><td>0.0000</td></tr>
+        <tr><td>The searched best: late, at 1.5</td><td>1.5</td><td>0.0120</td></tr>
+      </tbody>
+    </table></div>
+    <p>Every random cut is far weaker than the searched one, so this Extra Tree's root is <code>emi &lt;= 0.23</code>. Each Extra Tree is cruder: more bias. But its steps sit at random places, so averaging 300 of them blurs the steps into a gentle slope, like stacking staircases whose steps are offset. A smoother average also moves less between training sets (less variance), and with no sort-and-scan, training is faster.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>300 trees, leaves of 5</th><th>Random forest</th><th>Extra Trees</th></tr></thead>
+      <tbody>
+        <tr><td>Default risk: AUC, log loss, gap</td><td>0.824, 0.224, 0.0026</td><td>0.821, 0.223, 0.0026</td></tr>
+        <tr><td>Credit limit: test RMSE (noise floor 10)</td><td>10.18</td><td>10.00</td></tr>
+        <tr><td>Nodes in all 300 trees (default risk)</td><td>79,646</td><td>135,066</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Sharp steps: a tie.</strong> Default risk is made of sharp cut-offs (income 40, EMI 0.5), which a searched split lands on exactly and random cuts only approximate.</li>
+      <li><strong>Smooth target: Extra Trees edge ahead.</strong> The noise alone has a standard deviation of 10, so both are close to the floor and the margin is small. (Both regressors use all features by default, so this is bagged trees against Extra Trees.) A single tree tuned to depth 6 gets 12.5.</li>
+      <li><strong>The bigger trees</strong> come from seeing every row, not from the random cuts: with the bootstrap on, Extra Trees shrink to 86,124 nodes, with the same scores.</li>
+      <li><strong>Speed:</strong> about twice as fast on one core here. The saving grows with the rows, since a full search sorts each candidate's values at every node.</li>
+    </ul>
+    <p><strong>When it helps:</strong> smooth targets, noisy data where extra smoothing pays, and large data where training time matters. <strong>When it doesn't:</strong> the truth has sharp thresholds, such as policy cut-offs, that a search finds exactly. It's cheap to try both.</p>
+
+    <!-- importance -->
+    <h2 id="importance"><span class="pn">10</span>Feature importance and its traps</h2>
+    <p>Two common ways to ask which features the forest relies on:</p>
+    <ul>
+      <li><strong>Impurity importance</strong> (MDI, mean decrease in impurity; sklearn's <code>feature_importances_</code>): credit every split's impurity drop to the feature it used, and add up over all splits in all trees. It comes free with the fit, but it's measured on the <em>training</em> rows.</li>
+      <li><strong>Permutation importance:</strong> on <em>held-out</em> data, shuffle one column, which breaks its link with the target while keeping its values, and measure how much the score drops.</li>
+    </ul>
+
+    <h3>Impurity importance, by hand</h3>
+    <p>A node with \(n_t\) rows, \(d\) of them defaulters, has Gini impurity \(G = 2q(1-q)\), where \(q = d/n_t\). Its <strong>total impurity</strong> is rows times Gini, which works out to \(2d(n_t - d)/n_t\). A split's weighted drop, as a share of all \(n\) training rows, is</p>
+    <div class="mj">\[ \Delta_t = \frac{n_t G_t - n_L G_L - n_R G_R}{n} \]</div>
+    <p>In words: the node's total impurity minus its two children's, over the training rows. Deep splits count little, because they hold few rows. A depth-2 tree on the 3,500 training rows:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Split</th><th>Rows (defaulters): node → children</th><th>Total impurity: node − children</th><th>Drop ÷ 3,500</th></tr></thead>
+      <tbody>
+        <tr><td>late ≤ 1.5 (root)</td><td>3,500 (304) → 3,106 (184), 394 (120)</td><td>555.2 − 346.2 − 166.9 = 42.1</td><td>0.0120</td></tr>
+        <tr><td>income ≤ 39.46</td><td>3,106 (184) → 595 (119), 2,511 (65)</td><td>346.2 − 190.4 − 126.6 = 29.2</td><td>0.0083</td></tr>
+        <tr><td>income ≤ 40.51</td><td>394 (120) → 63 (31), 331 (89)</td><td>166.9 − 31.5 − 130.1 = 5.3</td><td>0.0015</td></tr>
+      </tbody>
+    </table></div>
+    <p>Add up per feature: <code>late</code> has 0.0120 and <code>income</code> \(0.0083 + 0.0015 = 0.0098\). Scaled to sum to 1, that's late 0.55 and income 0.45. A forest does this in every tree, on that tree's bootstrap sample, scales each tree's totals to sum to 1, and averages over the trees.</p>
+
+    <h3>Why impurity importance is biased</h3>
+    <p>On the full forest (300 trees, leaves of 5) MDI gives income 0.341, emi 0.321, late 0.158 and age 0.180. The decoy <code>age</code> outranks <code>late</code>, which adds 25 points to the chance of default and makes the best first split of all. Why:</p>
+    <ul>
+      <li><code>age</code> offers a cut between every pair of neighbouring values, while <code>late</code> (0, 1, 2, …) offers only two or three, so in every node <code>age</code> holds many more lottery tickets;</li>
+      <li>deep in a tree, a node holds a handful of training rows, and among many candidate cuts one usually separates them a little better, by chance;</li>
+      <li>MDI adds up these tiny, training-only gains over tens of thousands of deep splits.</li>
+    </ul>
+    <p>So MDI favours features with <strong>many distinct values</strong> (continuous or high-cardinality), signal or not, and it rewards overfit splits most when the trees are deepest. Add a random applicant ID and a pure-noise column to make it obvious:</p>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>income</th><th>emi</th><th>late</th><th>age</th><th>ID</th><th>noise</th></tr></thead>
+      <tbody>
+        <tr><td>MDI</td><td>0.291</td><td>0.216</td><td>0.148</td><td>0.115</td><td>0.112</td><td>0.118</td></tr>
+        <tr><td>Permutation (test AUC drop)</td><td>0.150</td><td>0.093</td><td>0.127</td><td>−0.001</td><td>−0.002</td><td>0.009</td></tr>
+      </tbody>
+    </table></div>
+    <p>MDI hands a third of the credit to three columns with no information. Permutation importance gives all three about zero (±0.01 is the noise level here).</p>
+    <p>Fixes for MDI exist, such as computing it on OOB rows, or forests with unbiased split selection (conditional inference forests), but the usual answer is permutation importance on held-out data.</p>
+    <p>A <em>real</em> application number is worse than a random ID: it usually rises with time, so it can encode when someone applied and leak information about the outcome, and then it looks important under every measure.</p>
+
+    <h3>Permutation importance</h3>
+    <pre class="code"><code>base = auc(y_te, rf.predict_proba(X_te)[:, 1])
+for j in range(p):
+    Xs = X_te.copy()
+    Xs[:, j] = rng.permutation(Xs[:, j])  <span class="cm"># break column j</span>
+    p_j = rf.predict_proba(Xs)[:, 1]
+    imp[j] = base - auc(y_te, p_j)  <span class="cm"># repeat, average</span></code></pre>
+    <p>On the four features, averaged over 10 shuffles: income 0.159, emi 0.093, late 0.127, age −0.002. Shuffling <code>age</code> costs nothing, because the forest doesn't need it for new applicants. Three choices change the answer:</p>
+    <ul>
+      <li><strong>Which data.</strong> On the <em>training</em> rows, age, the ID and the noise column each get about 0.02. The forest used them to memorize training rows, and shuffling breaks the memorized leaves, so importance on training data measures memorization too.</li>
+      <li><strong>Which metric.</strong> With accuracy, the importances collapse: income 0.034, emi 0.026, late 0.003, age 0.003. Only 52 of the 1,500 applicants are called defaulters, and accuracy changes only when a prediction crosses 0.5. For most applicants two late payments lift the chance only to 0.28, below 0.5; only for the 11 stressed-and-late test applicants do they push it past 0.5 (from 0.48 to 0.73). So by accuracy <code>late</code> looks nearly useless.</li>
+      <li><strong>Which segment.</strong> A feature can matter in one month or segment and not in another.</li>
+    </ul>
+
+    <h3>Correlated features split the credit</h3>
+    <p>Add <code>income2</code>, a near-copy of income (correlation 0.997), as if reported on a second document. (The what-if in <a href="#what-ifs">section 13</a> uses an exact copy.)</p>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>income</th><th>emi</th><th>late</th><th>age</th><th>income2</th></tr></thead>
+      <tbody>
+        <tr><td>MDI</td><td>0.220</td><td>0.292</td><td>0.154</td><td>0.142</td><td>0.191</td></tr>
+        <tr><td>Permutation</td><td>0.053</td><td>0.105</td><td>0.126</td><td>0.005</td><td>0.018</td></tr>
+        <tr><td>Drop-column (refit without it)</td><td>−0.013</td><td>0.056</td><td>0.144</td><td>−0.002</td><td>0.012</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>MDI splits income's credit</strong> between the copies (0.22 and 0.19), so each looks less important than income did alone (0.34).</li>
+      <li><strong>Permutation is fooled worse.</strong> The trees split on both copies, so shuffling one breaks only the splits that used it; the splits on the other still work, the score drops only partly, and neither looks important (0.05 and 0.02, against 0.16 for income alone). It also scores the model on applicants who can't exist, say ₹20k on one document and ₹140k on the other.</li>
+      <li><strong>Drop-column</strong> asks "what does this feature add, given the others?", which is the wrong question for twins: drop either one and the other takes over, so neither seems to matter. It's also noisy (every refit has its own randomness) and costs a refit per feature.</li>
+      <li><strong>The fix is to shuffle the group together.</strong> Permuting both copies with the same row order drops AUC by 0.186: income matters after all. <strong>Conditional permutation</strong> shuffles a feature only among rows with similar values of its partners, which avoids impossible inputs, at more setup cost.</li>
+    </ul>
+
+    <h3>SHAP values</h3>
+    <p>SHAP splits <em>one</em> prediction among the features. For applicant \(x\):</p>
+    <div class="mj">\[ f(x) = \phi_0 + \sum_{j=1}^{p} \phi_j(x) \]</div>
+    <p>In words: \(\phi_0\) is the average prediction, and \(\phi_j(x)\) is feature \(j\)'s share of how far this applicant sits from it. The shares are Shapley values from game theory: each feature's average marginal contribution over all orders in which features could be added.</p>
+    <ul>
+      <li><strong>TreeSHAP</strong> computes them exactly for trees, in polynomial time, and a forest's SHAP values are the average of its trees' (Shapley values are linear in the model).</li>
+      <li><strong>Uses:</strong> per-applicant reasons (reason codes for a declined loan), and a global importance as the average of \(|\phi_j|\).</li>
+      <li><strong>The same trap with correlated features:</strong> the default tree-path version follows the training data's correlations and can credit a feature the model barely uses; the interventional version breaks the correlations and evaluates impossible inputs, as permutation does.</li>
+      <li><strong>Which output is explained:</strong> for a forest, TreeSHAP explains the averaged probability directly (log-odds aren't additive across averaged trees); for a booster, the raw log-odds score is the natural additive scale.</li>
+    </ul>
+
+    <h3>Which way does a feature push?</h3>
+    <p>Importance gives a size, never a direction. <strong>Partial dependence</strong> plots the average prediction as one feature is swept across its range, with the other features kept at their observed values. <strong>ICE</strong> curves draw the same sweep for each applicant separately, so interactions show up as curves that aren't parallel. Both evaluate impossible inputs when features are correlated (sweeping income while its twin stays put). <strong>ALE</strong> (accumulated local effects) avoids that by averaging only small, local changes among similar rows.</p>
+
+    <h3>Importance is not causation</h3>
+    <p>Importance says what the model's predictions lean on, not what changing a feature would do in the world. Replace income with a phone price that tracks income but causes nothing. Its permutation importance is 0.129, close to <code>late</code>'s, because it stands in for income.</p>
+    <p>Ask the model what happens if the 91 stressed test applicants each get a ₹150k phone, and it says their risk falls from 0.39 to 0.05. Their true risk stays 0.51, since the truth never uses the phone. The common ways this goes wrong:</p>
+    <ul>
+      <li><strong>A proxy:</strong> a confounder (income) drives both the feature (phone price) and the outcome.</li>
+      <li><strong>A reversed arrow:</strong> collection calls predict default because calls follow missed payments.</li>
+      <li><strong>Side effects:</strong> cutting an EMI by restructuring also stretches the loan's term and flags the borrower as distressed.</li>
+    </ul>
+    <p>A causal answer needs an experiment, or a quasi-experiment such as difference-in-differences or a regression discontinuity at a score cut-off. And a single feature that dwarfs all the others is a reason to check for leakage first: something recorded after the outcome, or a proxy for the label.</p>
+
+    <!-- behaviour -->
+    <h2 id="behaviour"><span class="pn">11</span>How a forest behaves</h2>
+    <h3 id="knn">A forest is a weighted nearest-neighbour average</h3>
+    <p>Unroll the average. Each tree's leaf value is a (bootstrap-weighted) average of the training targets in that leaf, so the forest's prediction is a weighted average of training targets:</p>
+    <div class="mj">\[ \begin{aligned} \hat f(x) &amp;= \sum_{i=1}^{n} w_i(x)\, y_i \\ w_i(x) &amp;= \frac1B \sum_{b=1}^{B} \frac{c_{bi}\, \mathbf 1[x_i \in L_b(x)]}{\sum_{j} c_{bj}\, \mathbf 1[x_j \in L_b(x)]} \end{aligned} \]</div>
+    <p>In words: \(L_b(x)\) is the leaf of tree \(b\) that \(x\) falls into, and \(c_{bi}\) is how many times row \(i\) was drawn into tree \(b\)'s sample. A training row gets weight when it shares a leaf with \(x\), and more weight the more trees it shares one in. The weights are never negative and sum to 1.</p>
+    <p>So a forest is an <strong>adaptive nearest-neighbour</strong> method (Lin and Jeon, 2006): "near" means "lands in the same leaves", which stretches along features that don't matter and tightens along those that do. Three behaviours follow:</p>
+    <ul>
+      <li>a prediction can never leave the range of the training targets (no extrapolation);</li>
+      <li>a probability reaches 1 only if every row with weight is a positive (the squeeze, below);</li>
+      <li>the share of trees in which two rows land in the same leaf is Breiman's <strong>proximity</strong>, used for clustering, outlier scores and imputing missing values.</li>
+    </ul>
+
+    <h3 id="extrapolation">No extrapolation</h3>
+    <p>Predict the credit limit at EMIs of 20% for incomes beyond the training range, which stops at ₹150k:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Income</th><th>Truth</th><th>Forest</th></tr></thead>
+      <tbody>
+        <tr><td>₹150k</td><td>240</td><td>233.7</td></tr>
+        <tr><td>₹300k</td><td>480</td><td>233.7</td></tr>
+        <tr><td>₹600k</td><td>960</td><td>233.7</td></tr>
+      </tbody>
+    </table></div>
+    <p>Past the data, every tree routes the applicant to its edge leaf, so the forest repeats its edge value. Any trend beyond the training range, including a time trend, is invisible. Remedies: model a ratio or a detrended target, add a linear model for the trend, or use trees with a linear model in each leaf. Boosted trees have the same limit.</p>
+
+    <h3 id="calibration">Probabilities squeezed away from 0 and 1</h3>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 400 290" style="min-width:0;max-width:520px" role="img" aria-label="Average forest prediction against true chance for the four risk groups. Groups at 0.03, 0.28 and 0.48 sit on the diagonal; the 0.73 group is predicted 0.659, below the diagonal.">
+          <path class="in" d="M52 30.0 V240 H382.0"/>
+          <path d="M52 240 L382.0 30.0" style="stroke:var(--ink-3);stroke-width:1.2;stroke-dasharray:5 4;fill:none"/>
+          <text class="lbl" x="52.0" y="258" text-anchor="middle">0</text>
+          <text class="lbl" x="44" y="244.0" text-anchor="end">0</text>
+          <text class="lbl" x="134.5" y="258" text-anchor="middle">0.2</text>
+          <text class="lbl" x="44" y="191.5" text-anchor="end">0.2</text>
+          <text class="lbl" x="217.0" y="258" text-anchor="middle">0.4</text>
+          <text class="lbl" x="44" y="139.0" text-anchor="end">0.4</text>
+          <text class="lbl" x="299.5" y="258" text-anchor="middle">0.6</text>
+          <text class="lbl" x="44" y="86.5" text-anchor="end">0.6</text>
+          <text class="lbl" x="382.0" y="258" text-anchor="end">0.8</text>
+          <text class="lbl" x="44" y="34.0" text-anchor="end">0.8</text>
+          <path d="M353.1 48.4 V67.0" style="stroke:var(--grad);stroke-width:2;fill:none"/>
+          <circle cx="64.4" cy="232.1" r="5" style="fill:var(--hid)"/>
+          <text x="73.4" y="223.1" style="font-size:12px">1,252</text>
+          <circle cx="167.5" cy="168.9" r="5" style="fill:var(--hid)"/>
+          <text x="176.5" y="185.9" style="font-size:12px">157</text>
+          <circle cx="250.0" cy="113.7" r="5" style="fill:var(--hid)"/>
+          <text x="259.0" y="130.7" style="font-size:12px">80</text>
+          <circle cx="353.1" cy="67.0" r="5" style="fill:var(--hid)"/>
+          <text x="362.1" y="84.0" style="font-size:12px">11</text>
+          <text x="343.1" y="52.4" text-anchor="end" style="fill:var(--grad)">true 0.73</text>
+          <text x="343.1" y="77.0" text-anchor="end" style="fill:var(--grad)">forest 0.659</text>
+          <text class="lbl" x="62" y="30">DASHED: PERFECT CALIBRATION</text>
+          <text class="lbl" x="62" y="46">NUMBERS: TEST APPLICANTS</text>
+          <text class="lbl" x="217" y="282" text-anchor="middle">TRUE CHANCE OF THE GROUP</text>
+          <text class="lbl" x="14" y="135" text-anchor="middle" transform="rotate(-90 14 135)">AVERAGE PREDICTION</text>
+          </svg>
+      </div>
+      <figcaption>Each true-risk group's average forest prediction (300 trees, leaves of 5) against its true chance. The middle groups sit on the diagonal; the riskiest, rarest group is pulled down to 0.659, and no applicant scores above 0.753.</figcaption>
+    </figure>
+    <p>Two causes:</p>
+    <ul>
+      <li><strong>Near the edges, variance turns into one-sided error.</strong> A probability can't go above 1 or below 0. For an applicant whose true chance is near 1, any tree that errs can only err downwards, so the average is pulled down; near 0 it's pulled up. The bootstrap and feature sampling add exactly this tree-to-tree variance, which gives random forests their typical S-shaped reliability curve: too low at the top, too high at the bottom (Niculescu-Mizil and Caruana, 2005).</li>
+      <li><strong>Rare extreme groups share leaves with milder neighbours.</strong> Only about 22 training applicants are in the 0.73 group, so many of their leaves mix in lower-risk rows. Bigger leaves make this worse; smaller leaves make the probabilities noisy instead.</li>
+    </ul>
+    <p>In this data, 0.73 isn't that close to 1, so the top group's shortfall likely comes mostly from the second cause. The 0.03 group stays on the line: most of its leaves are pure, so many trees agree on a near-zero answer.</p>
+    <p>Two exceptions run the other way. In a region with no training positives, every tree can say exactly 0 (the 5 defaulters of <a href="#bagging">section 03</a>). And on its own <em>training</em> rows a forest is overconfident, since each row sits in about 63% of the trees.</p>
+    <p><strong>The fix is to calibrate on held-out data:</strong> Platt scaling (a sigmoid fitted to the scores) or isotonic regression (a monotone step fit, which needs more data), for example with <code>CalibratedClassifierCV</code>. OOB predictions can serve as the held-out scores, with the caveat that each comes from only about 37% of the trees. Boosters trained on log loss usually start out closer to calibrated.</p>
+
+    <h3 id="imbalance">Class imbalance</h3>
+    <p>A forest has no built-in handling of imbalance; it just sees few positives. Scale the true chance down so that about 1% default: 37 training defaulters, so each tree sees about 23 distinct ones and most leaves hold none. Four in ten test applicants get exactly 0 from every tree, and with 10 test defaulters, the test AUC wobbles by about ±0.09. The options, roughly in order:</p>
+    <ol>
+      <li><strong>Leave the training alone and move the threshold.</strong> Ranking is what a forest does well; choose the cut-off from the costs or from how many cases can be reviewed.</li>
+      <li><strong>Use bigger leaves</strong>, so rare positives aren't isolated in one-row leaves and most probabilities aren't exact zeros.</li>
+      <li><strong>Judge it properly:</strong> PR-AUC or log loss, with a confidence interval; never OOB accuracy.</li>
+      <li><strong>Reweight or rebalance:</strong> <code>class_weight="balanced_subsample"</code>, or a <strong>balanced random forest</strong>, where each bootstrap draws equal numbers from each class by undersampling the majority (<code>BalancedRandomForestClassifier</code> in <code>imbalanced-learn</code>). Both change the splits and inflate the probabilities (<a href="#class-weight">section 08</a>), so recalibrate afterwards. Dividing a leaf's odds by \(w_1/w_0\) undoes the weighting exactly for one tree, and only roughly for the forest's average.</li>
+      <li><strong>Get more positives</strong>, for example from a longer time window. That beats all of the above.</li>
+    </ol>
+
+    <h3 id="noise">Outliers, noise and noise features</h3>
+    <ul>
+      <li><strong>Outliers in a feature barely matter.</strong> A split depends only on the order of the values, so an extreme income just sits at the end of the sorted list; it can't pull a coefficient. Any monotone transform (log, rank, scaling) leaves the searched splits unchanged. Extra Trees and Isolation Forest are different: they draw cuts uniformly over a feature's range, so a log transform does change them.</li>
+      <li><strong>Outliers in a regression target matter locally.</strong> A leaf predicts the mean of its rows, so one huge target pulls its leaf's value in the roughly 63% of trees that drew it, and averaging with the other trees dilutes it. Clip or transform the target, or use <code>criterion="absolute_error"</code>, which is much slower.</li>
+      <li><strong>Label noise is tolerated well.</strong> Deep trees memorize noisy labels, but different trees memorize different subsets, and averaging washes them out. Boosting, by contrast, keeps fitting the rows it gets wrong, which are disproportionately the mislabelled ones. That's worst for AdaBoost's exponential loss; gradient boosting with log loss, shrinkage, subsampling and early stopping suffers much less.</li>
+      <li><strong>Many noise features hurt through the menu.</strong> At <code>"sqrt"</code>, with 3 useful features out of 24, 56% of splits have no useful feature on offer (<a href="#strength">section 05</a>). Remove junk features, or raise <code>max_features</code>.</li>
+    </ul>
+
+    <h3 id="missing">Missing values, scaling, categories and constraints</h3>
+    <ul>
+      <li><strong>Missing values:</strong> recent scikit-learn (1.4 and later, for random forests) accepts <code>NaN</code> directly. At each candidate split, the tree tries sending all the missing rows left and then right, and keeps whichever gives the bigger impurity drop. At prediction, missing values follow the learned side; if a node saw no missing values for that feature in training, they go to the child that held more rows.</li>
+      <li><strong>Older routes for missing values:</strong> impute (a median plus a "was missing" indicator, which lets the trees learn from missingness itself), CART's surrogate splits (R's <code>rpart</code>), or Breiman's proximity-based imputation.</li>
+      <li><strong>No scaling needed:</strong> searched splits are unchanged by any monotone rescaling.</li>
+      <li><strong>Categories:</strong> sklearn's forests need numbers. One-hot encoding spreads a category over many sparse columns, each rarely on the menu and each a weak split, so ordinal or target encoding often works better for trees (fit a target encoding out of fold, or it leaks). R's <code>randomForest</code> splits categorical factors natively.</li>
+      <li><strong>Monotone constraints:</strong> when risk must rise with late payments, recent scikit-learn forests accept <code>monotonic_cst</code> (1.4 and later), which forces each tree's predictions to move one way along that feature. Boosters have the same option.</li>
+    </ul>
+
+    <h3 id="latency">Memory and latency</h3>
+    <ul>
+      <li><strong>Size:</strong> a full-depth tree has at most about one leaf per distinct in-bag row, so up to about \(2 \times 0.632\, n\) nodes, and the forest multiplies that by \(B\). Here 300 trees with leaves of 5 hold 79,646 nodes, against 15 for one depth-3 tree. The size grows with the data, because deep trees grow more leaves.</li>
+      <li><strong>Prediction cost:</strong> each row walks \(B\) root-to-leaf paths, so about \(B \times \text{depth}\) comparisons, and deep unbalanced trees can run 20–40 levels.</li>
+      <li><strong>Training cost:</strong> per tree, roughly (features tried per split) × (rows) × (depth), plus sorting, with trees spread over cores. <code>max_samples</code> cuts the rows per tree, a smaller <code>max_features</code> cuts the features tried, and Extra Trees skip the sort.</li>
+      <li><strong>To shrink a forest:</strong> use fewer trees (the curve is flat after 100–200), bigger leaves or a depth cap, or switch to a booster with a few hundred shallow trees. Check that the scores don't shift when you shrink it.</li>
+    </ul>
+
+    <!-- vs boosting -->
+    <h2 id="vs-boosting"><span class="pn">12</span>Random forest vs gradient boosting</h2>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Random forest</th><th>Gradient boosting</th></tr></thead>
+      <tbody>
+        <tr><td>Each tree</td><td>Deep: low bias, high variance</td><td>Shallow: high bias, low variance</td></tr>
+        <tr><td>How trees combine</td><td>Independent, averaged</td><td>In sequence; each fits the current errors (gradients), scaled by a learning rate</td></tr>
+        <tr><td>What it reduces</td><td>Variance, by averaging</td><td>Bias, one small correction at a time</td></tr>
+        <tr><td>More trees</td><td>Never overfit; the score plateaus</td><td>Eventually overfit; needs early stopping</td></tr>
+        <tr><td>Tuning</td><td>Defaults near-best; tune <code>max_features</code> and leaf size</td><td>Learning rate, rounds, depth and regularization interact</td></tr>
+        <tr><td>Label noise</td><td>Averaged away</td><td>More exposed: later trees focus on rows still wrong (worst for AdaBoost)</td></tr>
+        <tr><td>Training</td><td>Parallel across trees</td><td>Sequential across rounds (parallel within a tree)</td></tr>
+        <tr><td>Size and latency</td><td>Hundreds of deep trees: big, slower</td><td>Shallow trees: smaller, faster</td></tr>
+        <tr><td>Probabilities</td><td>Squeezed toward the middle</td><td>Usually closer to calibrated, with log loss</td></tr>
+        <tr><td>Extrapolation</td><td>None</td><td>None</td></tr>
+        <tr><td>Free validation</td><td>OOB score</td><td>Only with row subsampling; usually a validation set</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Why the split of labour.</strong> A forest starts from trees that are already flexible enough (low bias) and spends its effort removing their variance. Boosting starts from weak trees (high bias, little variance) and spends its effort removing bias. Its variance creeps up as rounds are added, which is why it needs a learning rate and early stopping.</p>
+    <p><strong>Tuned boosting usually wins</strong> on tabular data, especially with lots of it, and gives smaller, faster models. <strong>A forest can win</strong> when:</p>
+    <ul>
+      <li>the data is small or noisy: boosting is more exposed to label noise, while a forest averages it;</li>
+      <li>there's little time to tune: a forest's defaults are close to its best, a booster's aren't;</li>
+      <li>the validation set is too small for early stopping to pick the number of rounds reliably.</li>
+    </ul>
+    <p>To show which cause is at work, compare the two with repeated cross-validation on the same folds (a paired comparison), and plot learning curves: if the booster pulls ahead as the data grows, small data was the reason. Adding label noise on purpose and watching which model degrades faster is another telling experiment.</p>
+
+    <!-- what-ifs -->
+    <h2 id="what-ifs"><span class="pn">13</span>What if…</h2>
+    <h3>…max_features = p?</h3>
+    <p>It's plain bagging. Every split sees every feature, so the trees share the same strong top splits and are the most alike (\(\rho\) 0.104, against 0.075 at one feature). It's sklearn's regressor default, and the right choice when few features are useful and the target is smooth: it beat <code>"sqrt"</code> on the credit limit.</p>
+    <h3>…max_features = 1?</h3>
+    <p>Each split's feature is drawn at random, and the tree only chooses the threshold. The trees are as different as they can be, and individually weak. With 3 of 4 features useful it had the best gap (0.0047). With 20 noise columns it was the worst (gap 0.0106), since 88% of splits had no useful feature on offer. On the smooth credit limit it was disastrous (RMSE 13.32 against 10.18).</p>
+    <h3>…the trees are depth 1?</h3>
+    <p>A forest of stumps is an average of one-question rules: an additive model with no interactions. It ranks better than one stump (AUC from 0.65 to 0.78 when bagged), but it can never express "EMIs high <em>and</em> income low", and averaging can't remove that bias.</p>
+    <p>With <code>max_features</code> below \(p\), the stumps are also forced onto weaker questions. In boosting, each new stump fixes what the previous ones missed, so their sum does reduce bias, but only within additive shapes: it still can't express an AND. A booster needs trees of depth 2 or more for interactions, since tree depth sets the interaction order.</p>
+    <h3>…one feature dominates?</h3>
+    <p>In bagging it roots most trees (160 of 200 here), so the trees are alike and the other features barely shape them. With \(m\) of \(p\) features on the menu it's missing from a share \(1 - m/p\) of menus, so other features get to root trees (it rooted 90 of 200 at \(m = 2\)), and the trees' mistakes differ more. Check a dominant feature for leakage before celebrating.</p>
+    <h3>…you add many noise features?</h3>
+    <ul>
+      <li>More splits get no useful feature on offer (<a href="#strength">section 05</a>), so the trees weaken and deep splits chase noise.</li>
+      <li>MDI hands the noise columns real importance; permutation importance on held-out data doesn't.</li>
+      <li>The fix: drop junk features (judged by permutation importance), or raise <code>max_features</code>.</li>
+    </ul>
+    <h3>…there are very few trees?</h3>
+    <ul>
+      <li>The \((1-\rho)\sigma^2/B\) term is still large: 10 trees score log loss 0.479, against 0.223 for 500.</li>
+      <li>With pure leaves every prediction is a multiple of \(1/B\), and many positives get an exact 0 from every tree, so the log loss explodes (0.988 for 10 bagged full-depth trees).</li>
+      <li>OOB breaks: about \(0.632^{10}\), or 1%, of the rows are in every bag and get no OOB prediction.</li>
+    </ul>
+    <h3>…two features are near-duplicates?</h3>
+    <ul>
+      <li><strong>Accuracy barely changes:</strong> the information is still there.</li>
+      <li><strong>The forest leans on that information more.</strong> It gets two tickets in the menu lottery. With \(p = 5\) and \(m = 2\), a single feature is on a menu with chance 0.4, but at least one of two copies is:</li>
+    </ul>
+    <div class="mj">\[ \begin{aligned} P(\text{a copy is on the menu}) &amp;= 1 - \binom{3}{2} \Big/ \binom{5}{2} \\ &amp;= 0.7 \end{aligned} \]</div>
+    <ul>
+      <li><strong>The importance splits.</strong> For an exact copy, the two give identical splits that tie, and the tree takes whichever copy it meets first in its random feature order. So MDI splits about evenly (0.196 and 0.199, against 0.341 for income alone), permutation gives each 0.03 against 0.16, and drop-column about 0.01 each. (Section 10's near-copy split a little less evenly.) Permute the pair as a group.</li>
+    </ul>
+    <h3>…every tree gets the same rows, and only the seed changes?</h3>
+    <p>The trees differ only where the seed breaks ties between equally good splits (or, with <code>max_features</code> below \(p\), in their feature draws). With all features, 10 such trees disagree on 4% of applicants and correlate 0.84, so averaging barely helps.</p>
+    <h3>…the data has duplicated rows or repeated customers?</h3>
+    <p>Each duplicate acts as extra weight, and an out-of-bag copy whose twin is in the bag isn't unseen: OOB says 0.993 when the real test AUC is 0.828. Deduplicate, or validate with grouped folds.</p>
+    <h3>…the leaves are huge?</h3>
+    <p>A bootstrap holds only about 150 distinct stressed applicants, and <code>min_samples_leaf</code> counts distinct rows, so leaves of 200 or more can't isolate the group. The gap is already worse at 200 (0.0062), and at 500 AUC falls to 0.747 and the gap rises to 0.0143. Bias wins.</p>
+    <h3>…prediction must take a few milliseconds?</h3>
+    <p>Use fewer trees (the curve is flat after 100–200), bigger leaves, or a booster with a few hundred shallow trees, and check that the scores don't shift.</p>
+    <h3>…you need an uncertainty for one prediction?</h3>
+    <p>The spread of the trees' predictions shows how much they disagree, but it isn't a calibrated interval. The trees share one training set (\(\rho > 0\)), so their spread understates how much a new training set would move the answer, and for a regression target it ignores the outcome's own noise. Use quantile regression forests, or conformal prediction, which sets the interval's width from the model's errors on held-out rows.</p>
+    <p>For the variance of the forest's prediction itself, the infinitesimal jackknife (Wager, Hastie and Efron, 2014) estimates it from the trees' bootstrap counts.</p>
+
+    <!-- isolation -->
+    <h2 id="isolation"><span class="pn">14</span>Isolation Forest, and other tree families</h2>
+    <p>Trees can find odd points with no labels at all. Keep cutting a cloud of points with random cuts (a random feature, a random threshold between its min and max) until one particular point is alone.</p>
+    <p>A point far out on its own is isolated in a few cuts; a point in the crowded middle needs many. Average the number of cuts, the <strong>path length</strong>, over many random trees: a short average path means an outlier. That's <strong>Isolation Forest</strong> (Liu, Ting and Zhou, 2008), a common first screen for odd transactions.</p>
+    <p><strong>In one dimension, by hand.</strong> Take payments of ₹1k, ₹2k, ₹3k, ₹4k and ₹20k. The first cut falls uniformly between 1 and 20, and it isolates ₹20k whenever it lands between 4 and 20: a chance of 16/19, about 0.84. ₹3k can never be alone after one cut, because it needs a cut on each side. Averaged over 10,000 random trees:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Payment</th><th>Average cuts to isolate it</th></tr></thead>
+      <tbody>
+        <tr><td>₹1k</td><td>2.67</td></tr>
+        <tr><td>₹2k</td><td>3.39</td></tr>
+        <tr><td>₹3k</td><td>3.44</td></tr>
+        <tr><td>₹4k</td><td>2.83</td></tr>
+        <tr><td>₹20k</td><td>1.17</td></tr>
+      </tbody>
+    </table></div>
+    <p>₹20k needs one cut with chance 16/19, and about 2.1 cuts when the first cut falls below 4 (chance 3/19):</p>
+    <div class="mj">\[ \begin{aligned} \mathbb E[\text{cuts for ₹20k}] &amp;\approx \tfrac{16}{19} \times 1 + \tfrac{3}{19} \times 2.1 \\ &amp;\approx 1.17 \end{aligned} \]</div>
+    <p>In two dimensions, the most central of 1,000 ordinary points needs about 18.5 cuts, and a planted outlier five standard deviations out needs about 4.6.</p>
+    <p>sklearn grows each tree on a random subsample of 256 points, caps its depth at \(\lceil \log_2 256 \rceil = 8\), and turns the average path into a score:</p>
+    <div class="mj">\[ \begin{aligned} s(x) &amp;= 2^{-\mathbb E[h(x)] / c(\psi)} \\ c(\psi) &amp;= 2H(\psi - 1) - \frac{2(\psi - 1)}{\psi} \end{aligned} \]</div>
+    <p>In words: \(\mathbb E[h(x)]\) is the average path length, \(\psi\) the subsample size, and \(H(i) \approx \ln i + 0.5772\). \(c(\psi)\), about 10.2 for 256 points, is the typical path length in a random tree of \(\psi\) points. So \(s\) is near 1 for points isolated much faster than typical, and 0.5 or below for ordinary ones. (sklearn's <code>score_samples</code> returns \(-s\), so lower means odder.)</p>
+    <p>When a branch stops at the depth cap with \(k\) points still together, sklearn adds \(c(k)\) to the path length, the average number of extra cuts those points would have needed, so a point in a crowded leaf still gets a long path.</p>
+    <ul>
+      <li><strong><code>contamination</code> only sets the flagging threshold</strong> for <code>predict</code>; the scores and the ranking don't change. In practice, rank by score and flag as many as you can review.</li>
+      <li><strong>Masking:</strong> a tight cluster of anomalies, such as a fraud ring of 50 points, shields itself, since its points aren't alone. Smaller subsamples help, because each tree then holds only a few of the ring: the ring's median rank (1 = oddest) goes from 82 with every row in every tree, to 49.5 at 256, to 26.5 at 64. The opposite error, <strong>swamping</strong>, flags normal points that sit near a big group of anomalies; small subsamples help there too.</li>
+      <li><strong>Odd isn't fraud:</strong> a large honest purchase is odd too. Use the score as a review queue, or as one feature of a supervised model once labels exist.</li>
+      <li><strong>Features:</strong> no scaling is needed, since each cut falls within its own feature's range, but log a heavy-tailed feature like amount first: uniform cuts over a long tail mostly land in its empty stretch, so every large value looks isolated. Irrelevant features dilute the signal: with 5 noise columns added, the five planted outliers rank 2, 11, 19, 45 and 65 instead of 1 to 5.</li>
+    </ul>
+    <p><strong>Other tree families to recognize by name:</strong></p>
+    <ul>
+      <li><strong>Quantile regression forests</strong> keep all the training targets in each leaf, not just their mean, which gives a whole predicted distribution: quantiles and intervals.</li>
+      <li><strong>Survival forests</strong> handle time-to-event targets with censoring ("hasn't defaulted <em>yet</em>").</li>
+      <li><strong>Causal forests</strong> estimate how much a treatment changes the outcome for each kind of person, \(\tau(x) = \mathbb E[Y(1) - Y(0) \mid X = x]\). "Honest" versions use separate rows to choose the splits and to estimate the effects. They still need randomized or unconfounded data.</li>
+      <li><strong>BART</strong> (Bayesian additive regression trees) is a sum of small trees fitted by Bayesian sampling, which gives uncertainty intervals.</li>
+      <li><strong>Model trees</strong> put a small linear model in each leaf: smoother fits, and a little extrapolation.</li>
+      <li><strong>RuleFit</strong> turns tree paths into if-then rules and keeps a few of them with a lasso.</li>
+    </ul>
+
+    <!-- pseudocode -->
+    <h2 id="pseudocode"><span class="pn">15</span>Pseudocode</h2>
+    <h3>Training, with a fresh feature draw at every node</h3>
+    <pre class="code"><code>def fit_forest(X, y, B, m, min_leaf):
+    n, p = X.shape
+    forest = []
+    for b in range(B):
+        c = bootstrap_counts(n)   <span class="cm"># row i drawn c[i] times</span>
+        rows = where(c &gt; 0)
+        forest.append((grow(rows, c), c))
+    return forest
+
+def grow(rows, c):
+    if pure(rows) or len(rows) &lt; 2 * min_leaf:
+        return Leaf(weighted_class_shares(rows, c))
+    <span class="cm"># m features, no replacement, fresh at EVERY node</span>
+    <span class="cm"># (sklearn: constant features don't count to m)</span>
+    feats = sample(range(p), m)
+    best = None
+    for f in feats:
+        vals = unique_sorted(X[rows, f])
+        for t in midpoints(vals):
+            L = rows[X[rows, f] &lt;= t]
+            R = rows[X[rows, f] &gt; t]
+            if min(len(L), len(R)) &lt; min_leaf:
+                continue
+            gain = (imp(rows)
+                    - wt(L) / wt(rows) * imp(L)
+                    - wt(R) / wt(rows) * imp(R))
+            if best is None or gain &gt; best.gain:
+                best = Split(f, t, gain, L, R)
+    if best is None:
+        return Leaf(weighted_class_shares(rows, c))
+    return Node(best.f, best.t,          <span class="cm"># no pruning</span>
+                grow(best.L, c), grow(best.R, c))
+
+def predict(forest, x):            <span class="cm"># soft vote</span>
+    return mean(leaf(t, x).value for t, c in forest)</code></pre>
+    <p><code>imp</code> is the impurity (Gini for classes, squared error for numbers) computed with the bootstrap counts as weights, and <code>wt</code> is a set's total weight. For Extra Trees, replace the loop over midpoints with one uniform random cut between the feature's min and max in the node, and skip the bootstrap.</p>
+    <h3>The OOB score</h3>
+    <pre class="code"><code>def oob_predictions(forest, X):
+    total = zeros(n)
+    count = zeros(n)
+    for tree, c in forest:
+        for i in where(c == 0):    <span class="cm"># tree's OOB rows</span>
+            total[i] += predict_tree(tree, X[i])
+            count[i] += 1
+    ok = count &gt; 0                 <span class="cm"># in every bag: none</span>
+    return total[ok] / count[ok], ok
+
+p_oob, ok = oob_predictions(forest, X)
+oob_score = auc(y[ok], p_oob)      <span class="cm"># not accuracy</span></code></pre>
+    <h3>Permutation importance</h3>
+    <pre class="code"><code><span class="cm"># X, y: held-out rows; score: higher is better (AUC)</span>
+def perm_importance(model, X, y, score, k=10):
+    base = score(y, model.predict_proba(X)[:, 1])
+    imp = zeros(X.shape[1])
+    for j in range(X.shape[1]):    <span class="cm"># or a group</span>
+        drops = []
+        for _ in range(k):
+            Xs = X.copy()
+            Xs[:, j] = shuffle(Xs[:, j])
+            p_s = model.predict_proba(Xs)[:, 1]
+            drops.append(base - score(y, p_s))
+        imp[j] = mean(drops)
+    return imp</code></pre>
+
+    <!-- questions -->
+    <h2 id="questions"><span class="pn">16</span>Interview questions</h2>
+    <p>Answer out loud first, then open the answer. The numbers come from the running example: 3,500 training and 1,500 test loan applicants. <strong>Default risk</strong> is the classification target (four true levels: 0.03, 0.28, 0.48 and 0.73), the <strong>credit limit</strong> is a smooth regression target, and the <strong>gap</strong> is the mean squared distance between predicted and true default probability (0 is perfect).</p>
+
+    <details class="qa"><summary><span class="qn">1</span><span>Why does a random forest reduce variance, and why not bias?</span></summary><div class="ans">
+      <p><strong>Averaging \(B\) trees keeps one tree's expected prediction, and so its bias, while cancelling the part of their errors the trees don't share.</strong></p>
+      <div class="mj">\[ \begin{aligned} \mathbb E[\bar f(x)] &amp;= \mathbb E[f_1(x)] \\ \operatorname{Var}(\bar f) &amp;= \rho\sigma^2 + \frac{1-\rho}{B}\,\sigma^2 \end{aligned} \]</div>
+      <p>In words: every tree is grown the same way on an equally random sample, so they share one expected prediction, and the average of equal expectations is that same expectation. The variance falls, but only down to the shared part \(\rho\sigma^2\).</p>
+      <ul>
+        <li><strong>Mechanism:</strong> a full-depth tree has low bias but high variance; its leaves memorize the rows it saw. Trees on different bootstrap samples are wrong in different places, and averaging cancels those parts. Here one tree's gap of 0.066 falls to 0.006 for 100 averaged trees.</li>
+        <li><strong>Why not bias:</strong> a mistake every tree makes survives the average. Bagging logistic regression changed nothing (gap 0.0105 before and after), and bagging stumps improved ranking but kept the gap, since no mix of one-question rules can express an AND.</li>
+        <li><strong>Why not a full \(1/B\):</strong> the trees share one training set, so \(\rho > 0\).</li>
+      </ul>
+      <p><strong>Follow-up:</strong> so use low-bias base learners (deep trees), and once \(B\) is large enough, lower \(\rho\) (feature sampling) or \(\sigma^2\) (bigger leaves) instead of adding trees. (<a href="#bagging">03</a>, <a href="#correlation">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">2</span><span>What is a bootstrap sample, and why does it hold about 63% of the rows?</span></summary><div class="ans">
+      <p><strong>\(n\) rows drawn from the \(n\) training rows with replacement. A row is missed by all \(n\) draws with chance \((1 - 1/n)^n\), which tends to \(1/e \approx 0.368\).</strong></p>
+      <div class="mj">\[ \begin{aligned} P(\text{in the sample}) &amp;= 1 - (1 - 1/n)^n \\ &amp;\to 1 - 1/e \\ &amp;\approx 0.632 \end{aligned} \]</div>
+      <p>In words: each draw misses a given row with chance \(1 - 1/n\), the draws are independent, so the chances multiply.</p>
+      <ul>
+        <li><strong>Counts:</strong> a row's count is Poisson with mean 1, so 37% of rows are left out, 37% drawn once, 18% twice, 6% three times. A bootstrap is a random reweighting, and sklearn implements it as sample weights.</li>
+        <li><strong>Why with replacement:</strong> drawing all \(n\) rows without replacement gives every tree the same data. Replacement varies which rows a tree sees and how much each counts.</li>
+        <li><strong>The left-out 37%</strong> are the tree's out-of-bag rows, which give the OOB score.</li>
+      </ul>
+      <p><strong>Follow-ups:</strong> with <code>max_samples</code> a fraction \(f\), a row is in with chance about \(1 - e^{-f}\) (26% at 0.3). Subsampling without replacement (\(k &lt; n\) rows) works about as well. Duplicate rows in the data break the "unseen" logic. (<a href="#bootstrap">02</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">3</span><span>Derive the variance of an average of \(B\) correlated trees. What does it imply?</span></summary><div class="ans">
+      <p><strong>\(\rho\sigma^2 + (1-\rho)\sigma^2/B\). More trees remove only the second term; the shared part \(\rho\sigma^2\) is a floor.</strong></p>
+      <div class="mj">\[ \begin{aligned} \operatorname{Var}\Big(\frac1B \sum_b f_b\Big) &amp;= \frac{1}{B^2} \Big[ B\sigma^2 + B(B-1)\rho\sigma^2 \Big] \\ &amp;= \rho\sigma^2 + \frac{1-\rho}{B}\,\sigma^2 \end{aligned} \]</div>
+      <p>In words: the variance of a sum is the sum of all pairwise covariances: \(B\) variances \(\sigma^2\), plus \(B(B-1)\) covariances \(\rho\sigma^2\). Dividing by \(B^2\) gives the two terms.</p>
+      <ul>
+        <li><strong>The floor:</strong> as \(B\) grows, the second term vanishes. The removable part as a share of the floor is \((1-\rho)/(\rho B)\): with \(\rho = 0.1\), 9% at 100 trees and under 1% at 1,000.</li>
+        <li><strong>Measured:</strong> 200 bagged trees here had \(\sigma^2 = 0.0598\) and \(\rho = 0.105\), so a floor of 0.0063 and a total of 0.0065, matching the bag's real gap. 1,000 trees would be 3% better for five times the compute.</li>
+        <li><strong>Why \(\rho > 0\):</strong> given the training set, bootstrap draws are independent, so all the correlation comes from sharing that training set.</li>
+      </ul>
+      <p><strong>Implication:</strong> past a point, decorrelation (<code>max_features</code>, <code>max_samples</code>) or steadier trees (leaf size) matter more than more trees. (<a href="#correlation">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">4</span><span>Why random feature subsets, and why at every split rather than per tree?</span></summary><div class="ans">
+      <p><strong>Bagged trees all find the same strong top splits, so they're alike. A fresh random menu at every split forces different trees, which lowers \(\rho\) and so the floor \(\rho\sigma^2\).</strong></p>
+      <ul>
+        <li><strong>Mechanism:</strong> a feature is on a split's menu with chance \(m/p\). Here <code>late</code> rooted 160 of 200 bagged trees, but only 90 with 2 of 4 features on offer; \(\rho\) fell from 0.104 to 0.075 and the gap from 0.0065 to 0.0047.</li>
+        <li><strong>Why per split:</strong> one subset per tree (the random subspace method) locks a tree out of a feature everywhere, so a tree without the key feature is weak all over. A fresh draw at every node keeps every feature available somewhere in every tree, while still forcing variety at each node, especially at the top splits that shape the rest.</li>
+        <li><strong>Detail:</strong> features that are constant in the node don't count towards \(m\), so sklearn keeps drawing until it has tried one that varies.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> each tree is weaker (\(\sigma^2\) rises), so it helps only if \(\rho\) falls faster. On the smooth credit limit it didn't. (<a href="#forest">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">5</span><span>What does <code>max_features</code> do to bias, variance and correlation?</span></summary><div class="ans">
+      <p><strong>Fewer features on the menu lowers the trees' correlation \(\rho\), raises each tree's variance \(\sigma^2\), and adds a little bias, a lot when useful features are rare. The forest improves only if \(\rho\sigma^2\) falls.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{forest variance} &amp;= \rho\sigma^2 + \frac{1-\rho}{B}\,\sigma^2 \\ P(\text{no useful feature on the menu}) &amp;= \binom{p-k}{m} \Big/ \binom{p}{m} \end{aligned} \]</div>
+      <p>In words: \(\rho\) and \(\sigma^2\) move in opposite directions, so what counts is their product. The second line is how often a split is forced onto useless features, with \(k\) useful features out of \(p\).</p>
+      <ul>
+        <li><strong>Bias:</strong> a split forced onto a useless feature wastes rows, leaving fewer for the useful splits below, so the fit gets coarser. The forest inherits one tree's bias.</li>
+        <li><strong>When it helps:</strong> default risk (3 of 4 features useful): \(\rho\) 0.104 to 0.075 at the same \(\sigma^2\).</li>
+        <li><strong>When it hurts:</strong> the credit limit (2 of 4 useful, smooth): <code>"sqrt"</code> halves \(\rho\) but triples \(\sigma^2\), so the floor \(\rho\sigma^2\) rises from 10.4 to 14.7 (₹ thousand)². With 20 noise columns, one feature per split leaves 88% of splits with nothing useful on offer.</li>
+        <li><strong>Extremes:</strong> \(m = p\) is bagging (the most alike trees); \(m = 1\) chooses features at random (the weakest trees).</li>
+      </ul>
+      <p><strong>Practice:</strong> tune it first, over {<code>"sqrt"</code>, 0.2, 0.33, 0.5, 1.0}, on OOB or cross-validation. (<a href="#forest">05</a>, <a href="#strength">strength–correlation</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">6</span><span>Why \(\sqrt p\) for classification and \(p/3\) for regression?</span></summary><div class="ans">
+      <p><strong>They're rules of thumb from Breiman and Cutler's code and R's <code>randomForest</code>, not derivations. Regression gets a bigger menu because each tree's own error counts for more.</strong></p>
+      <ul>
+        <li><strong>Accuracy forgives weak trees:</strong> only which side of 0.5 the averaged probability lands on matters, so weaker, less alike trees still classify correctly, and decorrelation buys a lot. (That's about accuracy, not probability quality.)</li>
+        <li><strong>Squared error doesn't:</strong> in regression each tree's squared error feeds straight into the forest's (the \(\sigma^2\) in \(\rho\sigma^2\)), so a weaker tree costs more.</li>
+        <li><strong>Smooth targets need many good splits:</strong> a tree copies a smooth surface as a fine staircase, so every split forced onto a useless feature coarsens it.</li>
+        <li><strong>Defaults differ by library:</strong> R uses \(\sqrt p\) and \(p/3\); sklearn's classifier uses \(\sqrt p\), but its regressor uses all features, which is plain bagging.</li>
+      </ul>
+      <p><strong>Evidence:</strong> on the credit limit, all features (RMSE 10.18) beat <code>"sqrt"</code> (10.31) and \(p/3\) rounded down to 1 (13.32). <strong>Follow-up:</strong> the best value depends on how many features carry signal, so tune it. (<a href="#mtry">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">7</span><span>Can a random forest overfit by adding more trees?</span></summary><div class="ans">
+      <p><strong>No. Adding trees moves the average towards a fixed limit, so the test error falls to a plateau and stays there. A forest overfits through tree size, not tree count.</strong></p>
+      <div class="mj">\[ \begin{aligned} \bar f_B(x) &amp;= \frac1B \sum_{b=1}^{B} f_b(x) \\ \bar f_B(x) &amp;\to \mathbb E_{\Theta}\big[f(x; \Theta)\big] \quad \text{as } B \to \infty \end{aligned} \]</div>
+      <p>In words: \(\Theta\) is one tree's randomness (its bootstrap and feature draws). Given the data, the trees are independent draws, so their average converges to the expected tree, which more trees can't make any more complex.</p>
+      <ul>
+        <li><strong>Numbers:</strong> gap 0.022 with 1 tree, 0.0028 with 100, 0.0026 with 500. Log loss needs about 200 trees to settle; AUC about 25–100.</li>
+        <li><strong>What does overfit:</strong> leaves too small for noisy data. Fix it with leaf size or depth.</li>
+        <li><strong>A trap:</strong> train AUC 0.97 against test 0.82 isn't evidence of overfitting. Every training row sits in 63% of the trees; the OOB score is the honest training score.</li>
+      </ul>
+      <p><strong>Contrast:</strong> in boosting each tree fits the previous trees' errors, so too many rounds overfit, and early stopping is needed. <strong>Trade-off:</strong> cost and memory grow linearly with \(B\). (<a href="#trees">08</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">8</span><span>Why are a forest's trees grown deep and unpruned?</span></summary><div class="ans">
+      <p><strong>Averaging removes variance but never bias, so each tree should bring as little bias as possible. Deep trees also differ more from one another.</strong></p>
+      <ul>
+        <li><strong>Division of labour:</strong> a full-depth tree can carve out any shape (low bias); its high variance is what averaging removes. Pruning would add bias that no amount of averaging takes back.</li>
+        <li><strong>Decorrelation:</strong> deep splits are chosen from a few rows, so they change most between bootstraps. Shallow trees agree more.</li>
+        <li><strong>Simplicity:</strong> no pruning strength to validate.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> pure leaves give noisy 0/1 probabilities and big models. A minimum leaf size of 5–20 smooths them (gap 0.0052 to 0.0013, log loss 0.271 to 0.218), while leaves of 200 or more turn biased (gap 0.0062 at 200, AUC 0.747 at 500): a bootstrap holds only about 150 distinct applicants of the stressed group, and the leaf-size limit counts distinct rows. Prefer a leaf-size limit to a depth cap: it stops where rows run thin and lets dense regions keep splitting. (<a href="#depth">06</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">9</span><span>Walk through what happens at one node of a forest tree, compared with a single tree.</span></summary><div class="ans">
+      <p><strong>The same greedy search, on different rows and a restricted menu: bootstrap-weighted rows, \(m\) features drawn fresh at that node, every threshold of those \(m\) only, and no pruning afterwards.</strong></p>
+      <ol>
+        <li><strong>Rows:</strong> the bootstrap rows that reached the node, each weighted by how often it was drawn. A single tree uses the plain training rows.</li>
+        <li><strong>Menu:</strong> draw \(m\) of the \(p\) features without replacement, fresh at this node. A single tree considers all \(p\).</li>
+        <li><strong>Search:</strong> for each candidate, sort the node's values and try every midpoint; score each split by the weighted impurity drop.</li>
+        <li><strong>Choose</strong> the best split among the \(m\). Features constant in the node don't count towards \(m\), so sklearn draws on until one varies.</li>
+        <li><strong>Stop</strong> only when the node is pure or a leaf-size limit is hit. No pruning; a single tree is often pruned.</li>
+        <li><strong>Leaf value:</strong> the weighted share of each class. The forest's prediction averages the \(B\) leaves that \(x\) falls into.</li>
+      </ol>
+      <div class="mj">\[ \text{gain} = I(t) - \frac{w_L}{w_t} I(L) - \frac{w_R}{w_t} I(R) \]</div>
+      <p>In words: the node's impurity minus its children's, each weighted by its share of the node's (bootstrap-weighted) rows.</p>
+      <p><strong>Follow-up:</strong> Extra Trees replace the threshold search with one random cut per candidate and skip the bootstrap by default. The same impurity drops, summed per feature, are MDI importance. (<a href="#node">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">10</span><span>Majority vote or averaged probabilities?</span></summary><div class="ans">
+      <p><strong>sklearn averages the trees' probabilities (soft voting); Breiman's original forest used a majority vote. Averaging keeps each tree's confidence, so it ranks better and has lower variance.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{tree probabilities} &amp;= (0.45,\ 0.45,\ 0.9) \\ \text{majority vote} &amp;= 0 \\ \text{average} &amp;= 0.6 \end{aligned} \]</div>
+      <p>In words: two of three trees lean "no", so the vote says 0, but the third is very sure and the average comes out above 0.5.</p>
+      <ul>
+        <li><strong>With pure leaves</strong> they're the same thing: each tree says 0 or 1, so the average is the vote share.</li>
+        <li><strong>Why averaging:</strong> it gives a score to rank and threshold (AUC needs one). A vote gives only a class; only 61 of 1,500 test applicants get a "default" majority from 200 bagged trees.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> averaged probabilities are still squeezed toward the middle, so calibrate if the probability drives a decision. (<a href="#vote">03</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">11</span><span>What is OOB error, how is it computed, and when does it mislead?</span></summary><div class="ans">
+      <p><strong>Each training row is predicted by only the trees whose bootstrap left it out, about 37% of them, and those predictions are scored. It's a nearly free validation score.</strong></p>
+      <div class="mj">\[ \begin{aligned} O_i &amp;= \{\, b : i \notin \text{sample } b \,\} \\ \hat p_{\text{OOB}}(x_i) &amp;= \frac{1}{|O_i|} \sum_{b \in O_i} \hat p_b(x_i) \end{aligned} \]</div>
+      <p>In words: for row \(i\), average only the trees that never saw it, exactly as for a new applicant; then compute any metric over all rows.</p>
+      <ul>
+        <li><strong>Why it works:</strong> the bootstrap already held rows out, so no refit is needed. Here OOB AUC 0.786 matched 5-fold cross-validation's 0.784.</li>
+        <li><strong>Mildly pessimistic:</strong> each row is scored by a smaller forest (37% of the trees), and with tiny leaves an out-of-bag positive's own label is missing from its neighbourhood (0.784 OOB against 0.808 on fresh data at leaf size 1).</li>
+        <li><strong>Misleading when:</strong> the default <code>oob_score_</code> is accuracy (0.917 against a 0.913 baseline); rows repeat (0.993 OOB against 0.828 real); time order or drift matters (OOB looked calibrated while the future defaulted at 11.3% against 7.3% predicted); there are too few trees (\(0.632^B\) of rows get no OOB trees); or settings were tuned on it.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> shuffling a feature within each tree's OOB rows gives Breiman's OOB permutation importance. (<a href="#oob">07</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">12</span><span>Which hyperparameters would you tune, in what order, and what does each do?</span></summary><div class="ans">
+      <p><strong><code>max_features</code> first, then <code>min_samples_leaf</code> (or <code>max_depth</code>); set <code>n_estimators</code> just high enough for the score to plateau; leave the rest near their defaults.</strong></p>
+      <div class="mj">\[ \text{error} = \text{bias}^2 + \rho\sigma^2 + \frac{1-\rho}{B}\,\sigma^2 + \text{noise} \]</div>
+      <p>In words: every knob moves bias, a tree's variance \(\sigma^2\), the correlation \(\rho\), or the number of trees \(B\).</p>
+      <ul>
+        <li><strong><code>max_features</code> down:</strong> \(\rho\) down, \(\sigma^2\) up, bias up slightly. The strength–correlation trade-off.</li>
+        <li><strong><code>min_samples_leaf</code> up / <code>max_depth</code> down:</strong> \(\sigma^2\) down, bias up, \(\rho\) usually up. Matters most for probabilities.</li>
+        <li><strong><code>n_estimators</code> up:</strong> only the \(1/B\) term shrinks. Never overfits; costs time.</li>
+        <li><strong><code>bootstrap</code> off:</strong> slightly stronger but far more alike trees (identical with all features); no OOB.</li>
+        <li><strong><code>max_samples</code> down:</strong> weaker, less alike, faster trees; a cheap regularizer on big data (gap 0.0052 to 0.0024 at 0.3).</li>
+        <li><strong><code>class_weight</code>:</strong> changes splits and inflates probabilities; recalibrate after.</li>
+      </ul>
+      <p><strong>How:</strong> judge on OOB or cross-validation with the metric you care about. Gains over the defaults are usually modest. (<a href="#knobs">08</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">13</span><span>Hand drill: compute a depth-2 tree's impurity importance.</span></summary><div class="ans">
+      <p><strong>For each split, take the node's total impurity minus its children's, over the \(n\) training rows; add up per feature; scale to sum to 1.</strong></p>
+      <div class="mj">\[ \begin{aligned} n_t G_t &amp;= \frac{2 d (n_t - d)}{n_t} \\ \Delta_t &amp;= \frac{n_t G_t - n_L G_L - n_R G_R}{n} \end{aligned} \]</div>
+      <p>In words: a node with \(n_t\) rows and \(d\) defaulters has total Gini impurity \(2d(n_t - d)/n_t\) (its Gini times its rows), computed straight from the counts.</p>
+      <ul>
+        <li><strong>Root, <code>late &lt;= 1.5</code>:</strong> 3,500 rows (304 defaulters) give 555.2; the children give 346.2 and 166.9. The drop is 42.1, or 0.0120 per row.</li>
+        <li><strong>Left, <code>income &lt;= 39.46</code>:</strong> 346.2 − 190.4 − 126.6 = 29.2, so 0.0083.</li>
+        <li><strong>Right, <code>income &lt;= 40.51</code>:</strong> 166.9 − 31.5 − 130.1 = 5.3, so 0.0015.</li>
+        <li><strong>Per feature:</strong> late 0.0120, income 0.0098; scaled, late 0.55 and income 0.45.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> a forest does this per tree on its bootstrap sample, normalizes each tree, and averages. Because the sums use training rows, chance gains at deep splits inflate continuous and noise features. (<a href="#importance">10</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">14</span><span>How does a random forest handle class imbalance?</span></summary><div class="ans">
+      <p><strong>Not by itself; it just sees few positives. Leave the training alone and move the threshold, use bigger leaves, and judge with PR-AUC or log loss. Class weights or balanced bootstraps change the splits but inflate the probabilities.</strong></p>
+      <div class="mj">\[ \begin{aligned} w_c &amp;= \frac{n}{2 n_c} \\ \text{weighted leaf odds} &amp;= \frac{w_1}{w_0} \times \text{plain leaf odds} \end{aligned} \]</div>
+      <p>In words: balanced weights make both classes weigh the same, and a leaf then stores the weighted share of positives, which multiplies its odds by the weight ratio (10.5 here: a plain 0.20 leaf stores 0.724).</p>
+      <ul>
+        <li><strong>The damage without care:</strong> at 1% positives, each tree sees about 23 distinct defaulters, 40% of test applicants get exactly 0 from every tree, and 10 test positives make AUC wobble by ±0.09.</li>
+        <li><strong>What weights do:</strong> they change which splits win (weighted Gini) and what leaves store, at fit time. Ranking barely moves (AUC 0.823 against 0.824), but the mean prediction doubles (0.17 against 0.087).</li>
+        <li><strong>Variants:</strong> <code>"balanced"</code> fixes weights on the whole training set, <code>"balanced_subsample"</code> per bootstrap; a balanced random forest undersamples the majority in each bootstrap instead.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> reweighting can help the splits find the rare class, but recalibrate afterwards, or divide each leaf's odds by \(w_1/w_0\) (exact per tree, approximate for the average). (<a href="#imbalance">11</a>, <a href="#class-weight">08</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">15</span><span>Why are random forest probabilities poorly calibrated?</span></summary><div class="ans">
+      <p><strong>Near 0 and 1, the trees' errors can only point inwards, so averaging them pulls predictions toward the middle. Rare extreme groups also share leaves with milder neighbours.</strong></p>
+      <ul>
+        <li><strong>One-sided errors:</strong> for an applicant whose true chance is near 1, a tree that errs can only say less, never more than 1, so the average sits below the truth; near 0 it sits above. The bootstrap and feature sampling add exactly this tree-to-tree variance, which gives random forests their typical S-shaped reliability curve.</li>
+        <li><strong>Mixed leaves:</strong> the riskiest group (true chance 0.73) has about 22 training applicants, so its leaves mix in lower-risk rows: the forest predicts 0.659 for it, and nothing above 0.753.</li>
+        <li><strong>Exceptions:</strong> regions with no training positives get exact 0s, and on its own training rows a forest is overconfident.</li>
+      </ul>
+      <p><strong>Fix:</strong> calibrate on held-out (or OOB) predictions with Platt scaling or isotonic regression; use moderate leaves; avoid class weights unless you recalibrate. <strong>Follow-up:</strong> boosters trained on log loss usually start closer to calibrated. (<a href="#calibration">11</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">16</span><span>What are the pitfalls of random forest feature importance?</span></summary><div class="ans">
+      <p><strong>Impurity importance (MDI) is computed on training rows and inflates high-cardinality and noise features. Permutation importance on held-out data fixes that, but both split credit between correlated features, and neither is causal.</strong></p>
+      <ul>
+        <li><strong>MDI bias:</strong> a continuous feature offers thousands of thresholds, and deep in a tree one always separates a few training rows by chance. Here the decoy <code>age</code> (0.18) outranked <code>late</code> (0.16), and a random ID and a noise column got about 11% each; permutation gave all three about 0.</li>
+        <li><strong>Permutation choices:</strong> on training rows it measures memorization (noise columns get 0.02); with accuracy it collapses for rare events; it can differ by segment.</li>
+        <li><strong>Correlated features:</strong> MDI splits the credit (0.22 and 0.19 for income and its copy, against 0.34 alone); permutation makes both look unimportant (0.05 and 0.02 against 0.16), since the splits on the unshuffled twin still work; drop-column says neither matters. Permute the group together (0.186).</li>
+        <li><strong>SHAP</strong> (TreeSHAP) gives per-prediction, additive shares, but has the same correlated-feature trouble.</li>
+        <li><strong>Not causal:</strong> a phone price standing in for income got importance 0.129, and the model "predicted" that giving people expensive phones cuts their risk. Importance is what the model uses, not what to change.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> one feature far above the rest is a leakage alarm before it's a finding. (<a href="#importance">10</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">17</span><span>Random forest or Extra Trees?</span></summary><div class="ans">
+      <p><strong>Extra Trees draw one random threshold per candidate feature instead of searching for the best, and by default skip the bootstrap: cruder trees, a smoother average, faster training.</strong></p>
+      <ul>
+        <li><strong>Bias and variance:</strong> each tree is cruder (more bias), but random cut positions blur the average's steps into a slope, so it varies less between training sets.</li>
+        <li><strong>Here:</strong> a tie on step-shaped default risk (gap 0.0026 both), a win on the smooth credit limit (RMSE 10.00 against 10.18, the noise floor being 10), and about twice as fast.</li>
+        <li><strong>No bootstrap by default:</strong> the random thresholds supply the variety, and each tree sees every row (hence bigger trees).</li>
+      </ul>
+      <p><strong>Trade-off:</strong> it loses where the truth has sharp cut-offs that a search lands on exactly. It's cheap to try both. (<a href="#extra-trees">09</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">18</span><span>Can a random forest extrapolate?</span></summary><div class="ans">
+      <p><strong>No. Its prediction is a weighted average of training targets, so it can never leave their range; beyond the data it repeats its edge value.</strong></p>
+      <div class="mj">\[ \begin{aligned} \hat f(x) &amp;= \sum_{i=1}^{n} w_i(x)\, y_i \\ w_i(x) &amp;\ge 0 \\ \textstyle\sum_i w_i(x) &amp;= 1 \end{aligned} \]</div>
+      <p>In words: \(w_i(x)\) is the share of leaf weight row \(i\) has alongside \(x\), averaged over trees. A weighted average with non-negative weights summing to 1 stays between the smallest and largest target.</p>
+      <ul>
+        <li><strong>Here:</strong> the credit limit for incomes of ₹150k, ₹300k and ₹600k (truth 240, 480, 960) is 233.7 every time.</li>
+        <li><strong>Why it matters:</strong> time trends, growing prices or anything that drifts beyond the training range are invisible.</li>
+      </ul>
+      <p><strong>Fixes:</strong> model a ratio or detrended target, add a linear model for the trend, or use model trees with linear leaves. Boosted trees share the limit. (<a href="#extrapolation">11</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">19</span><span>How does a forest cope with outliers, label noise and missing values?</span></summary><div class="ans">
+      <p><strong>Feature outliers barely matter, label noise is averaged away, target outliers distort only their own leaves, and recent sklearn sends missing values to a learned side at each split.</strong></p>
+      <ul>
+        <li><strong>Feature outliers:</strong> a split depends only on the order of values, so an extreme value just sits at the end; any monotone transform leaves the searched splits unchanged (not Extra Trees' random cuts, which are drawn over the range).</li>
+        <li><strong>Target outliers (regression):</strong> a leaf predicts its rows' mean, so an extreme target pulls its leaf in the 63% of trees that drew it. Clip or transform the target, or use absolute-error splitting.</li>
+        <li><strong>Label noise:</strong> deep trees memorize noisy labels, but different trees memorize different ones, and averaging dilutes them. Boosting keeps refitting the rows it gets wrong, which are disproportionately mislabelled (worst for AdaBoost; shrinkage and early stopping limit it).</li>
+        <li><strong>Missing values:</strong> each split tries sending missing rows left and right and keeps the better side; at prediction they follow that side (or the bigger child if none were seen in training). Alternatives: impute with a missing indicator, surrogate splits, proximity imputation.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> many noise <em>features</em> do hurt, by crowding useful ones off the split menus. (<a href="#noise">11</a>, <a href="#missing">11</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">20</span><span>Random forest or gradient boosting: when does each win, and why?</span></summary><div class="ans">
+      <p><strong>A forest averages deep, independent trees to cut variance; boosting adds shallow trees in sequence to cut bias. Tuned boosting usually wins on accuracy and model size; a forest wins on small or noisy data and when there's no time to tune.</strong></p>
+      <ul>
+        <li><strong>Mechanism:</strong> forest trees are low-bias and high-variance, averaged; boosting trees are high-bias and low-variance, each fitting the current errors with a small learning rate.</li>
+        <li><strong>More trees:</strong> a forest plateaus; boosting eventually overfits, so it needs early stopping and a validation set.</li>
+        <li><strong>Noise:</strong> boosting is more exposed to mislabelled rows (AdaBoost most of all; shrinkage and early stopping help); a forest averages them away.</li>
+        <li><strong>Tuning:</strong> a forest's defaults are near-best; a booster's learning rate, rounds and depth interact.</li>
+        <li><strong>Practicalities:</strong> forests train in parallel and give an OOB score; boosters give smaller, faster models and better-calibrated probabilities. Neither extrapolates.</li>
+      </ul>
+      <p><strong>To tell which cause is at work:</strong> paired cross-validation on the same folds, learning curves over data size, or injected label noise. (<a href="#vs-boosting">12</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">21</span><span>What happens with one dominant feature, or with many noise features?</span></summary><div class="ans">
+      <p><strong>A dominant feature makes bagged trees alike, which random menus fix. Many noise features crowd useful ones off the menus, which weakens trees and inflates impurity importance.</strong></p>
+      <div class="mj">\[ \begin{aligned} P(\text{feature on a menu}) &amp;= m/p \\ P(\text{no useful feature}) &amp;= \binom{p-k}{m} \Big/ \binom{p}{m} \end{aligned} \]</div>
+      <p>In words: with \(m\) of \(p\) features drawn, a given feature is offered at a share \(m/p\) of splits, and a split has nothing useful with the chance on the second line, for \(k\) useful features.</p>
+      <ul>
+        <li><strong>Dominant feature:</strong> it rooted 160 of 200 bagged trees, but 90 with 2 of 4 features per menu, so the others get to shape trees. Check it for leakage.</li>
+        <li><strong>Noise features:</strong> with 3 useful out of 24, a menu of 4 has nothing useful 56% of the time, and a menu of 1 88% of the time (gap 0.0106, the worst). MDI credits the noise; permutation doesn't.</li>
+      </ul>
+      <p><strong>Fix:</strong> drop junk features using permutation importance, or raise <code>max_features</code>. (<a href="#what-ifs">13</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">22</span><span>Write the pseudocode for training a forest and computing its OOB score.</span></summary><div class="ans">
+      <p><strong>For each tree: bootstrap, then grow with a fresh feature draw at every node and no pruning. Predict by averaging. For OOB, average each row over only the trees that left it out.</strong></p>
+      <pre class="code"><code>for b in range(B):
+    c = bootstrap_counts(n)           <span class="cm"># weights</span>
+    trees[b] = grow(rows with c &gt; 0, c)
+
+grow(node):
+    if pure or too small: leaf(weighted shares)
+    F = sample(features, m)           <span class="cm"># per node</span>
+    best split over F, all thresholds
+    grow(left); grow(right)           <span class="cm"># no pruning</span>
+
+for each tree b, for each i with c_b[i] == 0:
+    total[i] += tree_b(x_i); count[i] += 1
+oob = total / count                   <span class="cm"># where count &gt; 0</span>
+score = auc(y, oob)</code></pre>
+      <ul>
+        <li><strong>Per node, not per tree:</strong> the feature draw sits inside <code>grow</code>.</li>
+        <li><strong>Weights:</strong> bootstrap counts weight the impurity and the leaf shares.</li>
+        <li><strong>OOB:</strong> skip rows in every bag (likely only with few trees), and score with AUC or log loss, not accuracy.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> for Extra Trees, replace the threshold search with one random cut per feature and drop the bootstrap. (<a href="#pseudocode">15</a>)</p>
+    </div></details>
+
+    <!-- sheet -->
+    <h2 id="sheet"><span class="pn">17</span>Cheat sheet</h2>
+    <div class="sheet">
+      <h3>Bootstrap and OOB</h3>
+      <div class="mj">\[ \begin{aligned} P(\text{row in a bootstrap}) &amp;= 1 - (1 - 1/n)^n \\ &amp;\to 1 - 1/e \\ &amp;\approx 0.632 \\ P(\text{drawn } k \text{ times}) &amp;= e^{-1}/k! \\ P(\text{in, drawing a fraction } f) &amp;\approx 1 - e^{-f} \\ P(\text{in all } B \text{ bags}) &amp;= 0.632^B \\ \hat p_{\text{OOB}}(x_i) &amp;= \text{mean of trees with } i \text{ out of bag} \end{aligned} \]</div>
+      <h3>Averaging</h3>
+      <div class="mj">\[ \begin{aligned} \hat p(x) &amp;= \tfrac1B \textstyle\sum_b \hat p_b(x) \\ \mathbb E[\bar f] &amp;= \mathbb E[f_1] \\ \operatorname{Var}(\bar f) &amp;= \rho\sigma^2 + (1-\rho)\sigma^2/B \\ \text{removable share of floor} &amp;= (1-\rho)/(\rho B) \end{aligned} \]</div>
+      <h3>Random forest</h3>
+      <div class="mj">\[ \begin{aligned} P(\text{feature on a menu}) &amp;= m/p \\ P(\text{no useful feature}) &amp;= \tbinom{p-k}{m} \big/ \tbinom{p}{m} \\ m &amp;= \sqrt p \ \text{(classes)}, \quad p/3 \ \text{(numbers)} \\ \text{test error} &amp;\le \bar\rho\,(1 - s^2)/s^2 \end{aligned} \]</div>
+      <h3>Importance, weights, neighbours</h3>
+      <div class="mj">\[ \begin{aligned} \Delta_t &amp;= (n_t G_t - n_L G_L - n_R G_R)/n \\ \text{permutation}_j &amp;= \text{score} - \text{score}_{x_j \text{ shuffled}} \\ f(x) &amp;= \phi_0 + \textstyle\sum_j \phi_j(x) \\ w_c &amp;= n/(2 n_c) \\ \hat f(x) &amp;= \textstyle\sum_i w_i(x)\, y_i \\ s(x) &amp;= 2^{-\mathbb E[h(x)]/c(\psi)} \end{aligned} \]</div>
+      <h3>Knobs</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Move</th><th>Bias</th><th>\(\sigma^2\)</th><th>\(\rho\)</th></tr></thead>
+        <tbody>
+          <tr><td>More trees</td><td>Same</td><td>Same</td><td>Same (only the \(1/B\) term shrinks)</td></tr>
+          <tr><td>Smaller <code>max_features</code></td><td>Up</td><td>Up</td><td>Down</td></tr>
+          <tr><td>Bigger leaves / shallower</td><td>Up</td><td>Down</td><td>Up</td></tr>
+          <tr><td>Bootstrap off</td><td>Down</td><td>Down</td><td>Up sharply</td></tr>
+          <tr><td>Smaller <code>max_samples</code></td><td>Up</td><td>Up</td><td>Down</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <footer><a href="./">More study notes</a> · <a href="../">Deepam Minda</a></footer>
+  </article>
+</div>
+<a class="jump" href="#tldr">Contents ↑</a>
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+  svg: { fontCache: "global" },
+  options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script>
+(function () {
+  var d = document.getElementById("tocd");
+  var wide = window.matchMedia("(min-width: 1081px)");
+  function sync() { d.open = wide.matches; }
+  sync();
+  if (wide.addEventListener) wide.addEventListener("change", sync);
+  var jump = document.querySelector(".jump");
+  jump.addEventListener("click", function () { if (!wide.matches) d.open = true; });
+  d.addEventListener("click", function (e) {
+    if (!wide.matches && e.target.closest("a")) d.open = false;
+  });
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+  function spy() {
+    var y = window.scrollY + 120, cur = 0;
+    targets.forEach(function (t, i) { if (t && t.getBoundingClientRect().top + window.scrollY <= y) cur = i; });
+    links.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
+  }
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+})();
+</script>
+
+<script>
+(function () {
+  var root = document.documentElement, b = document.getElementById("theme-toggle");
+  function cur() { return root.getAttribute("data-theme") === "light" ? "light" : "dark"; }
+  function label() { b.setAttribute("aria-label", "Switch to " + (cur() === "dark" ? "light" : "dark") + " mode"); }
+  b.addEventListener("click", function () {
+    var n = cur() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", n);
+    try { localStorage.setItem("deepam-theme", n); } catch (e) {}
+    label();
+  });
+  label();
+})();
+</script>
+</body>
+</html>
