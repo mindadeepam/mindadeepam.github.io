@@ -1,0 +1,1717 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070707">
+<title>Gradient boosting and XGBoost · Deepam Minda</title>
+<meta name="description" content="Trees fitted to gradients, tree by tree: g and h, XGBoost&#x27;s leaf weight and gain, regularizers, missing values, split finding, LightGBM, CatBoost, tuning and monotone constraints.">
+<meta property="og:title" content="Gradient boosting and XGBoost">
+<meta property="og:description" content="Trees fitted to gradients, tree by tree: g and h, XGBoost&#x27;s leaf weight and gain, regularizers, missing values, split finding, LightGBM, CatBoost, tuning and monotone constraints.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem("deepam-theme"); } catch (e) {}
+  if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<link rel="stylesheet" href="../assets/design/tokens.css?v=1">
+<link rel="stylesheet" href="../assets/design/components.css?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<style>
+/* Green graph-paper theme for the recurrent-notebook content.
+   Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
+   One sans for text, one mono for labels; MathJax draws the maths. Green = the cell / notebook,
+   slate = the hidden state, orange only for gradients. */
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
+body {
+  margin: 0; color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: 50% 0;
+  font: 16.5px/1.7 var(--sans); letter-spacing: -.003em;
+  padding-inline: 20px; padding-block: 44px 88px;
+  -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 640px) { body { font-size: 16px; padding-inline: 16px; padding-block: 24px 80px; } }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+table, button { font: inherit; }
+code { font: .86em var(--mono); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; }
+
+.page { max-width: 1200px; margin: 0 auto; display: grid; gap: 52px; grid-template-columns: 220px minmax(0, 860px); justify-content: center; }
+@media (max-width: 1080px) { .page { grid-template-columns: minmax(0, 860px); gap: 0; } }
+
+/* contents */
+.toc { position: sticky; top: 28px; align-self: start; font: 13.5px/1.4 var(--sans); max-height: calc(100vh - 56px); overflow-y: auto; }
+.toc summary { display: none; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--ink-2); text-decoration: none; }
+.toc a:hover { background: var(--surface); color: var(--ink); }
+.toc a.on { color: var(--ink); background: var(--surface); box-shadow: inset 2px 0 0 var(--cell); }
+.toc .n { font: 500 11px var(--mono); color: var(--ink-3); margin-right: 8px; }
+.toc .label { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 10px 10px; }
+.toc li.part { font: 500 10.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 14px 10px 4px; }
+@media (max-width: 1080px) {
+  .toc { position: static; margin-bottom: 26px; max-height: none; }
+  .toc .label { display: none; }
+  .toc details { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  .toc summary { display: block; cursor: pointer; padding: 12px 14px; font: 500 14px var(--sans); list-style: none; }
+  .toc summary::-webkit-details-marker { display: none; }
+  .toc summary::after { content: "+"; float: right; color: var(--ink-3); }
+  .toc details[open] summary::after { content: "–"; }
+  .toc details ol { padding: 0 6px 10px; }
+}
+.jump {
+  display: none; position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+  font: 500 13px var(--sans); color: var(--ink); background: var(--surface); text-decoration: none;
+  border: 1px solid var(--rule); border-radius: 999px; padding: 9px 14px;
+}
+@media (max-width: 1080px) { .jump { display: block; } }
+
+/* article */
+article { min-width: 0; }
+header.hero { display: grid; gap: 10px; margin-bottom: 26px; }
+.kicker { font: 500 12px/1 var(--mono); color: var(--ink-3); letter-spacing: .02em; }
+h1 { margin: 0; font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.6rem); line-height: 1.1; font-weight: 600; letter-spacing: -.028em; text-wrap: balance; }
+.dek { margin: 0; font-size: 1.1rem; line-height: 1.55; color: var(--ink-2); max-width: 40em; }
+.meta { font: 12px/1.5 var(--mono); color: var(--ink-3); }
+.key { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.key span::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--c); margin-right: 6px; vertical-align: middle; }
+
+h2 { font-size: 1.36rem; line-height: 1.25; font-weight: 600; letter-spacing: -.018em; margin: 56px 0 12px; text-wrap: balance; scroll-margin-top: 16px; }
+h2 .pn { font: 500 .74em/1 var(--mono); color: var(--ink-3); margin-right: .7em; letter-spacing: 0; }
+h3 { font-size: 1.04rem; font-weight: 600; letter-spacing: -.01em; margin: 30px 0 6px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 1.25em; }
+li { margin-bottom: 5px; }
+li::marker { color: var(--ink-3); }
+strong { font-weight: 600; }
+.mj { overflow-x: auto; overflow-y: hidden; margin: 4px 0 16px; padding: 2px 0; }
+mjx-container[display="true"] { margin: 0 !important; }
+
+/* plan and summary panels */
+.tldr { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 22px 6px; margin-bottom: 14px; }
+.tldr h2 { margin: 0 0 10px; font: 500 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.tldr ol { padding-left: 1.3em; }
+.tldr li { margin-bottom: 8px; }
+.tldr p { margin: 0 0 12px; font-size: 15.5px; }
+.tldr .tbl { margin: 4px 0 12px; }
+
+/* notes: quote-style, coloured by kind */
+.note { margin: 16px 0 20px; padding: 2px 0 2px 16px; border-left: 2px solid var(--c); color: var(--ink-2); font-size: .97em; }
+.note > .nl { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); margin: 4px 0 8px; }
+.note strong { color: var(--ink); }
+.note.ask { --c: var(--cell); }
+.note.say { --c: var(--hid); }
+.note.trap { --c: var(--grad); }
+.note.lab { --c: var(--cell); }
+.note .q { font-style: italic; color: var(--ink); }
+.note ul { margin: 0 0 10px; }
+.note li { margin-bottom: 5px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 6px 0 20px; }
+table { border-collapse: collapse; width: 100%; font-size: .93em; line-height: 1.5; }
+th { text-align: left; vertical-align: bottom; font: 500 11px/1.4 var(--mono); color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; padding: 0 14px 8px 0; border-bottom: 1px solid var(--ink-3); }
+td { padding: 8px 14px 8px 0; vertical-align: top; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+td .src { display: block; font: 11.5px/1.4 var(--mono); color: var(--ink-3); margin-top: 2px; }
+
+/* gate cards */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0 20px; }
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.gc { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 4px; font-size: 15.5px; line-height: 1.6; }
+.gc h4 { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.gc h4 .tag { font: 500 11px var(--mono); color: var(--c); }
+.gc.g1 { --c: var(--cell); }
+.gc.g2 { --c: var(--ink-3); }
+.gc p { margin-bottom: 10px; }
+
+/* figures */
+figure { margin: 18px 0 24px; }
+.plate { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 10px; overflow-x: auto; }
+.plate svg { display: block; width: 100%; height: auto; min-width: 460px; max-width: 700px; margin: 0 auto; }
+@media (max-width: 500px) { .plate svg { max-width: none; } }
+figcaption { font-size: .86rem; line-height: 1.5; color: var(--ink-3); margin-top: 10px; }
+.dg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink-2); }
+.dg .v { font-family: var(--serif); font-style: italic; font-size: 19px; fill: var(--ink); }
+.dg .v .s { font-size: 12.5px; }
+.dg .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; fill: var(--ink-3); }
+.dg .gl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--gate); }
+.dg .gs { font-family: var(--serif); font-style: normal; font-size: 12px; fill: var(--ink-3); }
+.dg .cl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--ink); }
+.dg .cs { font-family: var(--sans); font-size: 12px; fill: var(--ink-2); }
+.dg .optx { font: 500 17px var(--sans); fill: var(--ink); }
+.dg .cell { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.dg .hid { stroke: var(--hid); stroke-width: 2.4; fill: none; }
+.dg .hid.thick { stroke-width: 3.6; }
+.dg .in { stroke: var(--ink-3); stroke-width: 1.5; fill: none; }
+.dg .gw { stroke: var(--gate); stroke-width: 1.6; fill: none; }
+.dg .cw { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+.dg .grad { stroke: var(--grad); fill: none; stroke-linecap: round; }
+.dg .gbox { fill: var(--gate-wash); stroke: var(--gate); stroke-width: 1.3; }
+.dg .box { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .op { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.3; }
+.dg .dot { fill: var(--ink-2); }
+.dg .cellon { fill: var(--cell-wash); stroke: var(--cell); stroke-width: 1; }
+.dg .celloff { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.dg .stream { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.mk-cell { fill: var(--cell); } .mk-hid { fill: var(--hid); } .mk-in { fill: var(--ink-3); }
+.mk-gate { fill: var(--gate); } .mk-cw { fill: var(--ink-2); } .mk-grad { fill: var(--grad); }
+
+/* questions */
+details.qa { border-bottom: 1px solid var(--rule); }
+details.qa:first-of-type { border-top: 1px solid var(--rule); }
+details.qa summary { cursor: pointer; padding: 11px 2px; font-weight: 500; font-size: 15.5px; line-height: 1.45; list-style: none; display: flex; gap: 12px; }
+details.qa summary::-webkit-details-marker { display: none; }
+details.qa summary .qn { font: 500 11.5px/1.9 var(--mono); color: var(--ink-3); flex: none; min-width: 1.9em; }
+details.qa summary::after { content: "+"; margin-left: auto; color: var(--ink-3); flex: none; }
+details.qa[open] summary::after { content: "–"; }
+details.qa .ans { padding: 0 4px 12px 32px; font-size: 15.5px; color: var(--ink-2); }
+summary:focus-visible, a:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+
+.sheet { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 6px; }
+.sheet h3 { margin: 4px 0 6px; font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: .9rem; color: var(--ink-3); }
+
+/* code blocks */
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; margin: 8px 0 20px; overflow-x: auto; font: 12.8px/1.6 var(--mono); color: var(--ink); white-space: pre; }
+pre.code code { font: inherit; background: none; border: 0; padding: 0; }
+pre.code .cm { color: var(--ink-3); }
+@media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
+
+/* public copy: colours, fonts and sizes come from the site's tokens.css; this maps the notebook's
+   token names onto them (green_theme.css's own token block is left out of public pages). */
+:root {
+  --paper: var(--void); --ink: var(--text); --ink-2: var(--soft); --ink-3: var(--muted);
+  --accent: var(--amber);
+  --cell: var(--green); --cell-wash: var(--green-wash); --hid: var(--blue); --hid-wash: var(--blue-wash);
+  --gate: var(--neutral); --gate-wash: var(--neutral-wash); --grad: var(--orange); --grad-wash: var(--orange-wash);
+  --sans: var(--font-sans); --mono: var(--font-mono);
+  --serif: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
+}
+body { padding-block-start: 0; letter-spacing: 0; }
+/* the shared header sits inside the notebook's side padding */
+.site-header { width: min(100%, 1260px); margin-bottom: 40px; }
+.site-header a:hover { text-decoration: none; }
+@media (max-width: 720px) { .site-header { width: 100%; margin-bottom: 26px; } }
+/* the site's type scale */
+h1 { font-weight: 600; font-size: var(--fs-title); line-height: 1.12; letter-spacing: -.02em; }
+h2 { font-size: var(--fs-h2); letter-spacing: -.01em; }
+h3 { font-size: var(--fs-h3); }
+.dek { font-size: 18px; }
+.toc a.on { box-shadow: inset 2px 0 0 var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline-color: var(--accent); }
+footer .site-nav { display: block; margin-top: 10px; }
+.next { margin-top: 36px; font-weight: 500; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="a-cell" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path class="mk-cell" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-hid" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto"><path class="mk-hid" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-in" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-in" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-gate" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-cw" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-cw" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-grad" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path class="mk-grad" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">study notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
+<div class="page">
+  <nav class="toc" aria-label="Contents">
+    <details id="tocd" open>
+      <summary>Contents</summary>
+      <div class="label">Contents</div>
+      <ol>
+        <li><a href="#tldr"><span class="n">00</span>In short</a></li>
+        <li><a href="#pieces"><span class="n">01</span>The pieces: a sum of trees, one loss</a></li>
+        <li><a href="#regression"><span class="n">02</span>Regression, tree by tree</a></li>
+        <li><a href="#functional"><span class="n">03</span>Why it's called gradient boosting</a></li>
+        <li><a href="#gh"><span class="n">04</span>g and h: the same thing, renamed</a></li>
+        <li><a href="#classification"><span class="n">05</span>Classification, tree by tree</a></li>
+        <li><a href="#xgboost"><span class="n">06</span>XGBoost at a node</a></li>
+        <li><a href="#regularizers"><span class="n">07</span>What each regularizer does, and why it exists</a></li>
+        <li><a href="#missing"><span class="n">08</span>Missing values: the learned default direction</a></li>
+        <li><a href="#splits"><span class="n">09</span>Finding splits: exact, approximate, histogram</a></li>
+        <li><a href="#lightgbm"><span class="n">10</span>LightGBM: leaf-wise growth, GOSS, EFB</a></li>
+        <li><a href="#catboost"><span class="n">11</span>CatBoost: ordered statistics, ordered boosting, symmetric trees</a></li>
+        <li><a href="#tuning"><span class="n">12</span>Hyperparameters and tuning order</a></li>
+        <li><a href="#practice"><span class="n">13</span>Practical behaviour</a></li>
+        <li><a href="#compare"><span class="n">14</span>Boosting vs random forest vs neural nets on tables</a></li>
+        <li><a href="#whatif"><span class="n">15</span>What-ifs</a></li>
+        <li><a href="#pseudocode"><span class="n">16</span>Pseudocode and a from-scratch build</a></li>
+        <li><a href="#questions"><span class="n">17</span>Interview questions</a></li>
+        <li><a href="#sheet"><span class="n">18</span>Cheat sheet</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <article>
+    <header class="hero">
+      <div class="tag">Study notes · Trees</div>
+      <h1>Gradient boosting and XGBoost</h1>
+      <p class="dek">What happens at every step and every node: trees fitted to gradients one by one, what XGBoost computes at a node (g, h, the leaf weight, the gain), how missing values and categories are handled, why each regularizer exists, and what breaks when you change one.</p>
+      <div class="meta">About 50 minutes, plus the questions · six loan applicants worked tree by tree, then XGBoost at the node, then the libraries and the practice ·
+        <span class="key"><span style="--c: var(--hid)">predictions</span><span style="--c: var(--grad)">gradients</span><span style="--c: var(--cell)">chosen split or leaf</span></span>
+      </div>
+    </header>
+
+    <section class="tldr" id="tldr" aria-labelledby="tldr-h">
+      <h2 id="tldr-h">In short</h2>
+      <ol>
+        <li>Boosting builds \(F(x) = F_0 + \eta \sum_m f_m(x)\), one small regression tree at a time. Each tree is fitted to the <strong>negative gradient</strong> of the loss at the current predictions: the residual \(y - F\) for squared error, \(y - p\) for log loss. It's gradient descent, with each step a tree.</li>
+        <li>A leaf stores a <strong>correction</strong>, not a target. For squared error the best correction is the mean residual and the best split is the biggest drop in squared error. For classification \(F\) is the log-odds, and the sigmoid is applied once, to the total.</li>
+        <li>XGBoost expands each row's loss to second order around its current prediction: slope \(g\) and bend \(h\). Summing over a leaf gives the best leaf value \(w^* = -G/(H + \lambda)\). A split's gain is half of (left score + right score − parent score), minus \(\gamma\), where a node's score is \(G^2/(H + \lambda)\). For log loss, \(g = p - y\) and \(h = p(1 - p)\).</li>
+        <li>\(\lambda\) shrinks leaves with a small hessian sum (few rows, or rows the model is already sure about), \(\gamma\) is a price per leaf, and <code>min_child_weight</code> is a minimum hessian per child. All three stop a leaf chasing a handful of rows.</li>
+        <li>Missing values: at every split, the missing rows' \(G\) and \(H\) are tried on the left and on the right, and the better side is stored as the <strong>default direction</strong>. If training had no missing values, that direction was never learned.</li>
+        <li>Speed comes from histograms (bin once, sum \(g\) and \(h\) per bin, get one child by subtraction) and parallel work inside each tree. LightGBM adds leaf-wise growth, GOSS and EFB; CatBoost adds ordered target statistics, ordered boosting and symmetric trees.</li>
+        <li>Boosting cuts bias and overfits as trees are added; a forest cuts variance and doesn't. Fix \(\eta\), early-stop on a validation set that looks like production, then tune depth and <code>min_child_weight</code>, subsampling, and the penalties.</li>
+        <li>In practice: <code>scale_pos_weight</code> multiplies the predicted odds (recalibrate), monotone constraints are enforced at split time with bounds on the leaf values, split-count and gain importances mislead (prefer SHAP), and a sum of trees can't extrapolate.</li>
+      </ol>
+    </section>
+
+    <!-- pieces -->
+    <h2 id="pieces"><span class="pn">01</span>The pieces: a sum of trees, one loss</h2>
+    <h3 id="example">The running example</h3>
+    <p>Six loan applicants and one feature: how many late payments they've had. The same rows carry two targets: a credit limit for regression (section 02) and whether they defaulted for classification (section 05).</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Row</th><th>Late payments</th><th>Credit limit, ₹k</th><th>Defaulted</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>0</td><td>100</td><td>0</td></tr>
+        <tr><td>2</td><td>0</td><td>110</td><td>0</td></tr>
+        <tr><td>3</td><td>0</td><td>90</td><td>1</td></tr>
+        <tr><td>4</td><td>1</td><td>80</td><td>0</td></tr>
+        <tr><td>5</td><td>2</td><td>50</td><td>1</td></tr>
+        <tr><td>6</td><td>3</td><td>50</td><td>1</td></tr>
+      </tbody>
+    </table></div>
+    <p>Watch <strong>row 3</strong>. It defaulted with 0 late payments, just like rows 1 and 2, who didn't. No question about late payments can separate it from them, so it shows what boosting does with a row it can't fix.</p>
+    <p><strong>Settings used throughout:</strong> learning rate \(\eta = 0.3\) (XGBoost's default), and each tree makes <strong>one split</strong>, so every tree can be worked by hand. The same steps work at any depth.</p>
+
+    <h3>A tree is questions plus numbers</h3>
+    <p>A tree asks a few yes/no questions, like “late &lt; 1.5?”, to send each row to a <strong>leaf</strong>, and each leaf holds one number. Building a tree means choosing two things: the <strong>questions</strong>, which decide which rows end up together, and the <strong>number</strong> in each leaf. A row the tree has never seen still falls into some leaf, so the tree works on new data too.</p>
+
+    <h3>The model is a sum of trees</h3>
+    <div class="mj">\[ F(x) = F_0 + \eta\, f_1(x) + \dots + \eta\, f_M(x) \]</div>
+    <ul>
+      <li>\(F_0\) is the <strong>starting number</strong>, the same for everyone.</li>
+      <li>\(f_m(x)\) is the \(m\)-th tree's output: a <strong>correction</strong> to the prediction so far, not a prediction on its own.</li>
+      <li>\(\eta\) is the <strong>learning rate</strong>: each correction is only partly trusted (section 02 says why).</li>
+      <li>For regression, \(F\) is the prediction itself. For classification, \(F\) is a score, the log-odds, which becomes a probability only at the very end (section 05).</li>
+    </ul>
+
+    <h3>One loss for the whole model</h3>
+    <p>Each row gets a penalty for how wrong it is, and the penalties add up: \(L = \sum_i \ell(y_i, F_i)\). For regression \(\ell = \tfrac12 (y - F)^2\), so being off by 10 costs 50; for classification it's the log loss. <strong>Everything below is chosen to make this one number smaller:</strong> the starting number, every split and every leaf.</p>
+
+    <h3>One tree at a time</h3>
+    <p>Choosing 100 trees at once to minimize \(L\) is hopeless: there are far too many combinations. So boosting is <strong>greedy</strong> (the textbook name is forward stagewise additive modelling): keep everything built so far fixed, find the one new tree that lowers \(L\) the most, add it, freeze it, repeat. Every round solves the same problem: with the current predictions \(F_i\) fixed, find the tree \(f\) that minimizes</p>
+    <div class="mj">\[ \sum_i \ell\big(y_i,\ F_i + f(x_i)\big) \]</div>
+    <p>This is “the loss inside the tree”. It isn't Gini or entropy, which belong to a standalone classification tree; it's the model's own loss, measured after adding the new tree. And since a leaf holds a number to be added, <strong>every tree in boosting is a regression tree, even for classification</strong>.</p>
+
+    <h3>Boosting vs a random forest</h3>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Random forest</th><th>Boosting</th></tr></thead>
+      <tbody>
+        <tr><td>Trees built</td><td>Independently, each on a bootstrap sample</td><td>One after another, each fixing the last</td></tr>
+        <tr><td>Tree size</td><td>Deep</td><td>Shallow, typically depth 3–8</td></tr>
+        <tr><td>Combined by</td><td>Averaging</td><td>Adding up</td></tr>
+        <tr><td>Mainly cuts</td><td>Variance: jumpy deep trees, averaged</td><td>Bias: weak trees, added up</td></tr>
+        <tr><td>More trees</td><td>Never hurts; validation loss goes flat</td><td>Eventually overfits; needs early stopping</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>In an interview:</strong> “Boosting builds an additive model, a starting value plus a sum of small trees. Each tree is a correction to the prediction so far, fitted greedily to lower one loss given everything before it. Each is a regression tree, even for classification, because its leaves hold numbers that get added to a score. A forest averages independent deep trees to cut variance; boosting adds shallow trees in sequence to cut bias, which is why it can overfit as trees are added.”</p>
+
+    <!-- regression -->
+    <h2 id="regression"><span class="pn">02</span>Regression, tree by tree</h2>
+    <p>The loss is \(\tfrac12 (y - F)^2\). Every step asks one question: what makes this loss smallest?</p>
+
+    <h3>Round 0: the starting number</h3>
+    <p>Before any tree exists, which single number \(c\) should everyone get? Try a few:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>\(c\)</th><th>70</th><th>80</th><th>90</th></tr></thead>
+      <tbody><tr><td>Total loss \(\tfrac12\sum (y - c)^2\)</td><td>1900</td><td><strong>1600</strong></td><td>1900</td></tr></tbody>
+    </table></div>
+    <p>The bottom is at <strong>80, the mean</strong>. In general the slope of \(\tfrac12\sum (y - c)^2\) in \(c\) is \(\sum (c - y)\), which is zero at \(c = \bar y\). So \(F_0 = 80\) for every row.</p>
+
+    <h3>Tree 1: the number in a leaf</h3>
+    <p>What's left to fix for each row is its <strong>residual</strong>, \(r = y - F\):</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Row</th><th>\(y\)</th><th>\(F\)</th><th>\(r = y - F\)</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>100</td><td>80</td><td>20</td></tr>
+        <tr><td>2</td><td>110</td><td>80</td><td>30</td></tr>
+        <tr><td>3</td><td>90</td><td>80</td><td>10</td></tr>
+        <tr><td>4</td><td>80</td><td>80</td><td>0</td></tr>
+        <tr><td>5</td><td>50</td><td>80</td><td>−30</td></tr>
+        <tr><td>6</td><td>50</td><td>80</td><td>−30</td></tr>
+      </tbody>
+    </table></div>
+    <p>Suppose a leaf holds rows 1–4. Every row in it gets the same nudge \(w\). Which \(w\) makes these rows' loss smallest? After the nudge, the leaf's loss is</p>
+    <div class="mj">\[ \sum_{\text{leaf}} \tfrac12\big(y_i - (F_i + w)\big)^2 = \sum_{\text{leaf}} \tfrac12 (r_i - w)^2 \]</div>
+    <div class="tbl"><table>
+      <thead><tr><th>\(w\)</th><th>0</th><th>10</th><th>15</th><th>20</th></tr></thead>
+      <tbody><tr><td>Leaf loss (rows 1–4)</td><td>700</td><td>300</td><td><strong>250</strong></td><td>300</td></tr></tbody>
+    </table></div>
+    <p>The bottom is at <strong>15, the mean residual</strong>. Setting the slope \(-\sum (r_i - w)\) to zero gives it in general:</p>
+    <div class="mj">\[ w^* = \frac{1}{n_{\text{leaf}}} \sum_{\text{leaf}} r_i \]</div>
+    <ul>
+      <li><strong>Residuals aren't a trick someone made up.</strong> They fall straight out of asking which nudge makes squared error smallest.</li>
+      <li><strong>A leaf stores a correction, not a target.</strong> Rows 1–4 have a mean limit of 95, but the leaf stores +15, because 80 + 15 = 95.</li>
+    </ul>
+
+    <h3>Tree 1: choosing the split</h3>
+    <p>Which question should the tree ask? The one that leaves the least loss, once each side gets its best nudge. Before any split the node's best nudge is the mean residual, 0, so the loss is \(\tfrac12\sum r^2 = 1600\).</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Split</th><th>Left gets</th><th>Right gets</th><th>Loss after</th><th>Drop</th></tr></thead>
+      <tbody>
+        <tr><td>late &lt; 0.5</td><td>+20</td><td>−20</td><td>400</td><td>1200</td></tr>
+        <tr><td><strong>late &lt; 1.5</strong></td><td><strong>+15</strong></td><td><strong>−30</strong></td><td><strong>250</strong></td><td><strong>1350</strong></td></tr>
+        <tr><td>late &lt; 2.5</td><td>+6</td><td>−30</td><td>1060</td><td>540</td></tr>
+      </tbody>
+    </table></div>
+    <p>The winning 250: left residuals 20, 30, 10, 0 minus 15 are 5, 15, −5, −15, whose squares add to 500; the right residuals −30, −30 minus −30 are 0. Half of 500 is 250, and the drop is 1600 − 250 = 1350. <strong>Tree 1 is “late &lt; 1.5? → +15, otherwise −30”</strong>: an ordinary regression tree, grown on residuals instead of on \(y\).</p>
+    <p><strong>A shortcut you'll see again.</strong> The drop needs only sums and counts:</p>
+    <div class="mj">\[ \begin{aligned} \text{drop} &amp;= \frac12 \Big[ \frac{(\sum r_L)^2}{n_L} + \frac{(\sum r_R)^2}{n_R} \\ &amp;\qquad - \frac{(\sum r)^2}{n} \Big] \end{aligned} \]</div>
+    <p>For late &lt; 1.5: ½ × [60²/4 + (−60)²/2 − 0²/6] = ½ × [900 + 1800] = 1350. It works because giving a group its mean residual removes exactly \(\tfrac12 (\sum r)^2/n\) of its loss: <strong>(sum)²/count is big when many rows push the same way</strong>. XGBoost's gain (section 06) is exactly this with new names.</p>
+    <p><strong>Deeper trees</strong> repeat the search inside each child, on that child's rows only, with that child's own loss as the “before”. They stop at the maximum depth, or when no split lowers the loss.</p>
+
+    <h3>The learning rate</h3>
+    <p>Don't add the whole tree. Add \(\eta\) times it, with \(\eta = 0.3\): +4.5 for rows 1–4 and −9 for rows 5–6, so \(F\) becomes 84.5 (rows 1–4) and 71 (rows 5–6).</p>
+    <ul>
+      <li><strong>Why not the full +15 and −30?</strong> Tree 1 was fitted to these exact rows, noise included, so trusting it fully overfits. Taking 30% leaves room for later trees to correct it. The cost is more trees (section 03).</li>
+      <li><strong>Does \(\eta\) change which split wins? No.</strong> The split search pretends the full leaf value will be added; \(\eta\) is applied afterwards. Adding only \(\eta\) of a leaf's value removes a share \(2\eta - \eta^2\) of its full drop (expand \(\tfrac12\sum (r - \eta w)^2\)). With \(\eta = 0.3\) that's 0.51 for every split: 1200 → 612, 1350 → 688.5, 540 → 275.4. Every drop shrinks by the same factor, so the order is unchanged. What \(\eta\) does change is the residuals the <em>next</em> tree sees.</li>
+    </ul>
+
+    <h3>Tree 2</h3>
+    <p>Every residual is now measured against the <strong>current</strong> prediction, \(r = y - F_0 - \eta f_1(x)\):</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Row</th><th>\(y\)</th><th>\(F\)</th><th>\(r\)</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>100</td><td>84.5</td><td>15.5</td></tr>
+        <tr><td>2</td><td>110</td><td>84.5</td><td>25.5</td></tr>
+        <tr><td>3</td><td>90</td><td>84.5</td><td>5.5</td></tr>
+        <tr><td>4</td><td>80</td><td>84.5</td><td>−4.5</td></tr>
+        <tr><td>5</td><td>50</td><td>71</td><td>−21</td></tr>
+        <tr><td>6</td><td>50</td><td>71</td><td>−21</td></tr>
+      </tbody>
+    </table></div>
+    <p>Tree 2 does exactly what Tree 1 did, on these residuals. The loss before any split is ½Σr² = 911.5.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Split</th><th>Left gets</th><th>Right gets</th><th>Drop</th></tr></thead>
+      <tbody>
+        <tr><td><strong>late &lt; 0.5</strong></td><td><strong>+15.5</strong></td><td><strong>−15.5</strong></td><td><strong>720.75</strong></td></tr>
+        <tr><td>late &lt; 1.5</td><td>+10.5</td><td>−21</td><td>661.5</td></tr>
+        <tr><td>late &lt; 2.5</td><td>+4.2</td><td>−21</td><td>264.6</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>The best split moved.</strong> Tree 1 pushed row 4 (limit 80) up to 84.5, so it's now over-predicted (\(r = -4.5\)) and belongs with the “push down” group. Each tree sees only what's left over, so different trees cut in different places, and their sum builds a staircase.</p>
+    <p><strong>Trap: average the residuals, not the targets.</strong> In Tree 1 you couldn't tell them apart, because every row had the same \(F\). Now you can. On the right side of late &lt; 0.5 (rows 4–6, with \(F\) = 84.5, 71, 71), the mean target is 60: as a nudge, that would send row 4 from 84.5 to 144.5. The mean residual is −15.5, which moves each row toward its target, leaving a loss of ½ × (11² + 5.5² + 5.5²) = 90.75.</p>
+    <p>Tree 2 is “late &lt; 0.5? → +15.5, otherwise −15.5”. Times \(\eta\), that's ±4.65, so \(F\) becomes 89.15 (late 0), 79.85 (late 1) and 66.35 (late 2–3).</p>
+
+    <h3>Where it ends, and predicting a new row</h3>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 400 300" style="min-width:0;max-width:460px" role="img" aria-label="The six rows plotted as late payments against credit limit. The start is a flat line at 80. After one tree the prediction is a two-step staircase, 84.5 then 71. After two trees it has three steps, 89.15, 79.85 and 66.35. After 50 trees it reaches the group means: 100, 80 and 50.">
+          <path d="M60 22 H80" style="stroke:var(--ink-3);stroke-width:1.4;stroke-dasharray:5 4;fill:none"/><text x="86" y="26">start</text>
+          <path class="hid" d="M134 22 H154" style="opacity:.45"/><text x="160" y="26">1 tree</text>
+          <path class="hid" d="M216 22 H236"/><text x="242" y="26">2 trees</text>
+          <path class="cell" d="M300 22 H320" style="stroke-width:2.6"/><text x="326" y="26">50 trees</text>
+          <path d="M50 50 V264 H390" style="stroke:var(--ink-3);stroke-width:1;fill:none"/>
+          <text class="lbl" x="44" y="82" text-anchor="end">110</text>
+          <text class="lbl" x="44" y="160" text-anchor="end">80</text>
+          <text class="lbl" x="44" y="238" text-anchor="end">50</text>
+          <text class="lbl" x="90" y="284" text-anchor="middle">late 0</text>
+          <text class="lbl" x="180" y="284" text-anchor="middle">1</text>
+          <text class="lbl" x="270" y="284" text-anchor="middle">2</text>
+          <text class="lbl" x="360" y="284" text-anchor="middle">3</text>
+          <path d="M50 156 H390" style="stroke:var(--ink-3);stroke-width:1.4;stroke-dasharray:5 4;fill:none"/>
+          <path class="hid" d="M56 144 H225 V179 H384" style="opacity:.45"/>
+          <path class="hid" d="M56 132 H135 V156 H225 V192 H384"/>
+          <path class="cell" d="M56 104 H135 V156 H225 V234 H384" style="stroke-width:2.6"/>
+          <circle class="dot" cx="84" cy="104" r="4.5"/><circle class="dot" cx="90" cy="78" r="4.5"/><circle class="dot" cx="96" cy="130" r="4.5"/>
+          <circle class="dot" cx="180" cy="156" r="4.5"/><circle class="dot" cx="270" cy="234" r="4.5"/><circle class="dot" cx="360" cy="234" r="4.5"/>
+        </svg>
+      </div>
+      <figcaption>The six rows (dots) and the prediction after 0, 1, 2 and 50 trees. Tree 1 cuts at 1.5, tree 2 at 0.5; after 50 trees the staircase sits at the mean limit for each number of late payments.</figcaption>
+    </figure>
+    <div class="tbl"><table>
+      <thead><tr><th>After</th><th>Late 0</th><th>Late 1</th><th>Late 2–3</th></tr></thead>
+      <tbody>
+        <tr><td>2 trees</td><td>89.15</td><td>79.85</td><td>66.35</td></tr>
+        <tr><td>10 trees</td><td>98.97</td><td>80.45</td><td>51.32</td></tr>
+        <tr><td>50 trees</td><td>100</td><td>80</td><td>50</td></tr>
+      </tbody>
+    </table></div>
+    <p>It settles at the <strong>mean limit for each number of late payments</strong>: (100 + 110 + 90)/3 = 100, then 80, then 50. That's the best squared error can do with this one feature.</p>
+    <p><strong>A new applicant with 2 late payments</strong>, after 2 trees: add up the start and each tree's shrunk leaf value.</p>
+    <div class="mj">\[ \begin{aligned} F &amp;= 80 + 0.3 \times (-30) + 0.3 \times (-15.5) \\ &amp;= 80 - 9 - 4.65 \\ &amp;= 66.35 \end{aligned} \]</div>
+    <p>With 1 late payment: 80 + 4.5 − 4.65 = 79.85. Tree 1 sends late = 1 left, but Tree 2 sends it right. For regression, the sum <em>is</em> the prediction. And an applicant with 10 late payments also gets 66.35: past the last split, a sum of trees is flat (section 13).</p>
+
+    <h3>The regression loop in one box</h3>
+    <pre class="code"><code>F0 = mean(y)
+F = F0 for every row
+repeat for each tree:
+    r = y - F         <span class="cm"># what's left per row</span>
+    split: biggest drop in ½Σr²
+           <span class="cm"># each side gets its mean r</span>
+    leaf value = mean r of its rows
+    F = F + eta * (row's leaf value)
+predict(x) = F0 + eta * Σ (x's leaf values)</code></pre>
+    <p><strong>In an interview:</strong> “Start from the mean. Each round computes residuals against the current prediction and fits a small regression tree to them: the leaf value is the mean residual, the split is the biggest drop in squared error, and the tree goes in after shrinking by the learning rate. Leaves store corrections, not targets; from the second tree on, rows in a leaf have different predictions, so you average residuals, not targets.”</p>
+
+    <!-- functional -->
+    <h2 id="functional"><span class="pn">03</span>Why it's called gradient boosting</h2>
+    <p>The slope of \(\tfrac12 (y - F)^2\) in the prediction \(F\) is \(F - y\). So the residual is minus the slope:</p>
+    <div class="mj">\[ \begin{aligned} \frac{\partial}{\partial F}\, \tfrac12 (y - F)^2 &amp;= F - y \\ r &amp;= y - F \\ &amp;= -\frac{\partial}{\partial F}\, \tfrac12 (y - F)^2 \end{aligned} \]</div>
+    <p>Each tree in section 02 was fitted to minus the slope of every row's loss: the downhill direction for that row. Adding the tree moves every row a little way downhill. That's gradient descent, and it generalizes to any loss you can differentiate.</p>
+
+    <h3>Gradient descent on the predictions</h3>
+    <p>Treat the \(n\) training predictions as the parameters. Their loss is a function of \(n\) numbers, and plain gradient descent would update each one:</p>
+    <div class="mj">\[ \begin{aligned} L(F_1, \dots, F_n) &amp;= \sum_i \ell(y_i, F_i) \\ g_i &amp;= \frac{\partial \ell(y_i, F_i)}{\partial F_i} \\ F_i &amp;\leftarrow F_i - \eta\, g_i \end{aligned} \]</div>
+    <p>That would just memorize the training rows, and say nothing about a new \(x\). So boosting replaces the step \(-g\) by the tree that's closest to it, which is a function of the features and therefore works for any row:</p>
+    <div class="mj">\[ \begin{aligned} f_m &amp;= \arg\min_{f \in \text{trees}} \sum_i \big(-g_i - f(x_i)\big)^2 \\ F_m(x) &amp;= F_{m-1}(x) + \eta\, f_m(x) \end{aligned} \]</div>
+    <p>In words: the tree is the best tree-shaped approximation of the negative gradient, and adding it is one gradient step taken in the space of functions. That's why it's called <strong>functional gradient descent</strong>, and why \(-g_i\) is called the <strong>pseudo-residual</strong>.</p>
+
+    <h3>Friedman's algorithm (classic gradient boosting)</h3>
+    <ol>
+      <li><strong>Start</strong> at the best constant: \(F_0 = \arg\min_c \sum_i \ell(y_i, c)\).</li>
+      <li><strong>Each round:</strong> compute the pseudo-residuals \(r_i = -g_i\) at \(F_{m-1}\).</li>
+      <li><strong>Fit a regression tree</strong> to the \(r_i\) by squared error. This only chooses the regions (the leaves).</li>
+      <li><strong>Re-set each leaf</strong> to the value that minimizes the real loss on that leaf's rows: \(c_j = \arg\min_c \sum_{i \in j} \ell\big(y_i, F_{m-1}(x_i) + c\big)\).</li>
+      <li><strong>Add</strong> \(\eta\) times the tree, and repeat.</li>
+    </ol>
+    <div class="tbl"><table>
+      <thead><tr><th>Loss</th><th>Each tree is fitted to</th><th>Best leaf value</th><th>Start \(F_0\)</th></tr></thead>
+      <tbody>
+        <tr><td>Squared error</td><td>\(y - F\)</td><td>Mean residual</td><td>Mean</td></tr>
+        <tr><td>Absolute error</td><td>\(\text{sign}(y - F)\)</td><td>Median residual</td><td>Median</td></tr>
+        <tr><td>Huber</td><td>\(y - F\), capped at \(\pm\delta\)</td><td>Close to a mean that ignores the extremes</td><td>Median</td></tr>
+        <tr><td>Log loss</td><td>\(y - p\)</td><td>One Newton step (section 05)</td><td>Log-odds of the base rate</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Why step 4 matters.</strong> For absolute error the tree is fitted to signs, ±1, so its raw leaf values are at most 1 in size: useless as step sizes when the residuals are in the tens. Re-setting each leaf to its median residual makes every step the right size. For squared error the mean residual is already the best value, so step 4 changes nothing. For log loss the best value has no formula, so it takes one Newton step instead. XGBoost goes further and uses that Newton information to choose the splits too (section 06).</p>
+    <p><strong>Why the loss matters: outliers.</strong> In a larger simulated loan book, corrupting 2% of the training limits with a +₹500k typo gave a test RMSE of 29.0 under squared error, against 10.5 under absolute error and 10.9 under Huber. Under squared error those rows have residuals near 500 and every tree chases them; under absolute error each row only says “up” or “down”.</p>
+
+    <h3>Initialization</h3>
+    <p>\(F_0\) is the best constant for the loss: the mean for squared error, the median for absolute error, and the <strong>log-odds of the base rate</strong> for log loss, where the slope \(\sum (p - y)\) is zero exactly when \(p = \bar y\). A bad start isn't fatal but wastes trees: in the same simulated book (8.7% defaults), starting XGBoost at \(p = 0.5\) needed 64 trees instead of 35 to reach the same test log loss, because the first trees spent themselves walking everyone down to 8.7%. Recent XGBoost versions estimate the start from the data for this reason.</p>
+
+    <h3>Shrinkage: why a small learning rate generalizes better</h3>
+    <p>Each tree is a greedy, noisy estimate of the downhill direction, fitted to the same rows it will be judged on. A full step bakes all of that noise in, and later trees have to spend themselves undoing it. A small step keeps only a little of each tree, so the final model is an average over many trees, each fitted to slightly different residuals: the noise in any one of them is diluted. It's the same reason a small step size makes gradient descent stable. Validation log loss on the simulated book, depth-3 trees, 400 trees each:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>\(\eta\)</th><th>Best number of trees</th><th>Best validation loss</th><th>Loss after 400 trees</th></tr></thead>
+      <tbody>
+        <tr><td>0.5</td><td>2</td><td>0.239</td><td>0.589</td></tr>
+        <tr><td>0.1</td><td>15</td><td>0.232</td><td>0.280</td></tr>
+        <tr><td>0.03</td><td>91</td><td>0.232</td><td>0.242</td></tr>
+        <tr><td>0.01</td><td>266</td><td>0.232</td><td>0.233</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>A large rate overshoots:</strong> best after 2 trees, and a worse best.</li>
+      <li><strong>Small rates trade off with the number of trees:</strong> for the two small rates, \(\eta \times\) trees is about the same (0.03 × 91 ≈ 0.01 × 266 ≈ 2.7), because small steps walk roughly the same path in shorter strides.</li>
+      <li><strong>A small rate forgives a bad tree count:</strong> past the best round it climbs slowly (0.233 after 400 trees at 0.01) where a large one climbs fast (0.280 at 0.1).</li>
+      <li><strong>The cost</strong> is training and prediction time, both proportional to the number of trees.</li>
+    </ul>
+
+    <h3>Stochastic gradient boosting</h3>
+    <p>Friedman's later variant fits each tree on a random subsample of the rows, drawn without replacement, typically 50–80% (<code>subsample</code>). The tree is then <em>applied</em> to every row, so every prediction still moves. It helps in three ways: consecutive trees can't all latch onto the same noisy rows, so they're less alike and the sum has lower variance; each tree is cheaper; and the left-out rows give a free out-of-bag estimate of each round's improvement. The cost is a little bias and noisier steps, so it usually wants a few more trees. Column subsampling (section 09) does the same with features.</p>
+    <p><strong>In an interview:</strong> “Gradient boosting is gradient descent in function space. Each round computes the negative gradient of the loss for every row at the current predictions, fits a regression tree to it by least squares, sets each leaf to the value that minimizes the real loss there, and adds a shrunk copy. For squared error the negative gradient is the residual, so ‘fit the residuals’ is a special case; for absolute error it's the sign; for log loss it's \(y - p\). Start at the best constant, keep the learning rate small, and subsample rows to decorrelate the trees.”</p>
+
+    <!-- gh -->
+    <h2 id="gh"><span class="pn">04</span>g and h: the same thing, renamed</h2>
+    <p>Section 02 used residuals and row counts, which only make sense for squared error. This section renames them so the same steps work for any loss. Nothing new happens yet.</p>
+    <h3>Two new names</h3>
+    <p>For every row define \(g = F - y\) (minus the residual) and \(h = 1\). Over the rows of a leaf, \(G = \sum g\), which is \(-\sum r\), and \(H = \sum h\), which is the row count \(n\). Section 02's two results become:</p>
+    <div class="mj">\[ \begin{aligned} \text{leaf value} &amp;= \frac{\sum r}{n} \\ &amp;= -\frac{G}{H} \\ \text{drop} &amp;= \frac12 \Big[ \frac{G_L^2}{H_L} + \frac{G_R^2}{H_R} \\ &amp;\qquad - \frac{(G_L + G_R)^2}{H_L + H_R} \Big] \end{aligned} \]</div>
+    <p><strong>Check on Tree 1</strong> (late &lt; 1.5): the left rows have \(g\) = −20, −30, −10, 0, so \(G = -60\), \(H = 4\) and \(-G/H = 15\). The right rows have \(G = 60\), \(H = 2\), giving −30. The drop is ½ × [3600/4 + 3600/2 − 0/6] = 1350. All as before.</p>
+
+    <h3>Slope and bend</h3>
+    <p>Why these names? Nudge a leaf by \(w\). From section 02 the slope of the leaf's loss is \(-\sum (r - w)\), which is</p>
+    <div class="mj">\[ \frac{\partial\, \text{leaf loss}}{\partial w} = G + H w \]</div>
+    <p>Read it like walking down a hill. <strong>\(G\) is the slope right now</strong>, at \(w = 0\): its sign says which way is downhill and its size how steep. <strong>\(H\) is how fast that slope flattens</strong> per unit walked. If the slope is \(G\) and it flattens by \(H\) per unit, you reach flat ground after \(G/H\) units downhill: \(w = -G/H\). On Tree 1's left leaf (\(G = -60\), \(H = 4\)):</p>
+    <div class="tbl"><table>
+      <thead><tr><th>\(w\)</th><th>0</th><th>5</th><th>10</th><th>15</th></tr></thead>
+      <tbody><tr><td>Slope \(G + H w\)</td><td>−60</td><td>−40</td><td>−20</td><td><strong>0</strong></td></tr></tbody>
+    </table></div>
+    <p>So per row, \(g\) is <strong>the slope</strong> of that row's loss in its prediction (the gradient), and \(h\) is <strong>the bend</strong>, how fast the slope changes (the hessian, the second derivative). For squared error the slope is \(F - y\) and the bend is always 1, which is why section 02 looked like “mean residual”. “Residual” and “row count” only mean something for squared error; “slope” and “bend” mean something for any loss with two derivatives and a bend above 0. Section 05 swaps in log loss and keeps every step.</p>
+    <p><strong>In an interview:</strong> “Write \(g\) for each row's gradient of the loss with respect to its prediction and \(h\) for the second derivative. For squared error \(g = F - y\) and \(h = 1\), so \(-G/H\) is the mean residual and the gain is the squared-error drop.”</p>
+
+    <!-- classification -->
+    <h2 id="classification"><span class="pn">05</span>Classification, tree by tree</h2>
+    <h3>F is a score, and the sigmoid comes last</h3>
+    <p>A sum of trees can be any number, while a probability must stay in (0, 1), and probabilities can't be added (0.6 + 0.7 = 1.3). So for classification \(F\) is the <strong>log-odds</strong>, and it becomes a probability only at the very end:</p>
+    <div class="mj">\[ \begin{aligned} p &amp;= \sigma(F) \\ &amp;= \frac{1}{1 + e^{-F}} \\ F &amp;= \log\frac{p}{1 - p} \end{aligned} \]</div>
+    <div class="tbl"><table>
+      <thead><tr><th>\(F\)</th><th>−2</th><th>−1</th><th>0</th><th>1</th><th>2</th></tr></thead>
+      <tbody><tr><td>\(p = \sigma(F)\)</td><td>0.12</td><td>0.27</td><td>0.5</td><td>0.73</td><td>0.88</td></tr></tbody>
+    </table></div>
+    <ul>
+      <li><strong>A tree has no sigmoid inside it.</strong> Each leaf holds a change in log-odds, like −0.3 or +0.6.</li>
+      <li><strong>The sigmoid is applied once, to the total:</strong> \(p = \sigma(F_0 + \eta f_1 + \eta f_2 + \dots)\).</li>
+      <li>During training the sigmoid appears only when computing \(g\) and \(h\), always on the running total \(F\).</li>
+    </ul>
+
+    <h3>The loss, and round 0</h3>
+    <div class="mj">\[ \ell = -\big[\, y \log p + (1 - y) \log (1 - p) \,\big] \]</div>
+    <p>A defaulter costs \(-\log p\) and a non-defaulter \(-\log(1 - p)\): a defaulter given \(p\) = 0.9, 0.5 or 0.1 costs 0.11, 0.69 or 2.30. The best single probability for everyone is the base rate, here 3/6 = 0.5, so \(F_0 = \log(0.5/0.5)\), which is 0, and every row starts at \(p = 0.5\). In general \(F_0 = \log\frac{\bar y}{1 - \bar y}\); for a 10% default rate that's \(\log(0.1/0.9) = -2.20\).</p>
+
+    <h3>The slope g and the bend h</h3>
+    <p>One fact does all the work: the sigmoid's slope is \(p(1 - p)\).</p>
+    <div class="mj">\[ \begin{aligned} \frac{d\sigma}{dF} &amp;= \frac{e^{-F}}{(1 + e^{-F})^2} \\ &amp;= \frac{1}{1 + e^{-F}} \cdot \frac{e^{-F}}{1 + e^{-F}} \\ &amp;= p\,(1 - p) \end{aligned} \]</div>
+    <p><strong>The slope \(g\)</strong>, by the chain rule through \(p\):</p>
+    <div class="mj">\[ \begin{aligned} y = 1:\quad \frac{d\ell}{dF} &amp;= -\frac{1}{p} \cdot p(1 - p) \\ &amp;= p - 1 \\ y = 0:\quad \frac{d\ell}{dF} &amp;= \frac{1}{1 - p} \cdot p(1 - p) \\ &amp;= p \\ \text{both:}\quad g &amp;= p - y \end{aligned} \]</div>
+    <p><strong>The bend \(h\):</strong> in \(g = p - y\) only \(p\) moves as \(F\) moves, at the sigmoid's rate, so</p>
+    <div class="mj">\[ \begin{aligned} h &amp;= \frac{dg}{dF} \\ &amp;= p\,(1 - p) \end{aligned} \]</div>
+    <p>What they mean:</p>
+    <ul>
+      <li><strong>\(g = p - y\) is the probability error, with a sign.</strong> Positive means \(p\) is too high, so push down. It plays the role the residual played (\(y - p = -g\)).</li>
+      <li><strong>\(h = p(1 - p)\) is how much \(p\) moves when \(F\) moves by 1.</strong> It depends on how sure the model already is: 0.25 at \(p = 0.5\), 0.09 at 0.9, 0.0099 at 0.99.</li>
+    </ul>
+    <p><strong>This is the one real difference from regression: \(h\) is no longer 1.</strong> A row the model is unsure about has a large \(h\); a row it's sure about has \(h\) near 0. And the claim about round 0 follows: for a single constant the slope is \(\sum (p - y)\), zero at \(p = \bar y\).</p>
+
+    <h3>Why the exact leaf value doesn't work</h3>
+    <p>In section 02 each leaf's best nudge was exact. Try that here, on the split late &lt; 1.5:</p>
+    <ul>
+      <li><strong>Left leaf</strong> (rows 1–4, labels 0, 0, 1, 0, all at \(F = 0\)): the best probability is the leaf's rate, 1/4, so the best nudge solves \(\sigma(0 + w) = 1/4\): \(w = \log(1/3)\), about −1.10. That one works.</li>
+      <li><strong>Right leaf</strong> (rows 5–6, both defaulted): the best probability is 1, so \(w = +\infty\). <strong>A pure leaf wants infinity.</strong></li>
+      <li><strong>From Tree 2 on</strong>, rows in a leaf have different \(F\)s, and the best \(w\) solves \(\sum_i \sigma(F_i + w) = \sum_i y_i\), which has no formula. A numerical search for every leaf of every candidate split, every round, is too slow, and each new loss would need its own solver.</li>
+    </ul>
+
+    <h3>The shortcut: a Newton step</h3>
+    <p>Do exactly what section 04 did: the slope is \(G\) now and it flattens by \(H\) per unit, so walk \(G/H\) downhill.</p>
+    <div class="mj">\[ \begin{aligned} w &amp;= -\frac{G}{H} \\ &amp;= -\frac{\sum_i (p_i - y_i)}{\sum_i p_i (1 - p_i)} \end{aligned} \]</div>
+    <ul>
+      <li><strong>For squared error this is exact</strong>, because the bend really is constant.</li>
+      <li><strong>For log loss it's an approximation.</strong> As you walk, \(p\) shifts and the bend changes; we pretend it stays at today's value. That replaces each row's loss curve with a parabola with the same slope and bend at the current point: the <strong>second-order approximation</strong>, or a <strong>Newton step</strong> (step = −slope / bend). It's close enough, and the next tree corrects what's left.</li>
+      <li><strong>On Tree 1's leaves:</strong> left, \(G = 1\), \(H = 1\), so \(w = -1\) (exact: −1.10); right, \(G = -1\), \(H = 0.5\), so \(w = +2\) (exact: ∞, but the shortcut gives a finite step).</li>
+    </ul>
+    <p><strong>Why divide by \(H\), not by the number of rows?</strong> \(g\) is an error in probability, while \(F\) is measured in log-odds. Near \(p = 0.5\), one unit of log-odds moves \(p\) by about 0.25. The left leaf is 0.25 too high on average, so it needs about 0.25 / 0.25 = 1 unit down. <strong>Dividing by \(h\) converts “wrong in probability” into “how far to move in log-odds”.</strong> In regression \(F\) and \(y\) share units, so \(h = 1\).</p>
+    <p><strong>The split score carries over unchanged</strong>: the same \(\tfrac12[G_L^2/H_L + G_R^2/H_R - G^2/H]\), now the loss a split removes under the parabola. It's Newton's method for logistic regression, one leaf at a time.</p>
+
+    <h3>Tree 1 by hand</h3>
+    <p>Every row is at \(p = 0.5\), so \(g = 0.5 - y\) and \(h = 0.25\):</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Row</th><th>Late</th><th>\(y\)</th><th>\(g = p - y\)</th><th>\(h = p(1 - p)\)</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>0</td><td>0</td><td>0.5</td><td>0.25</td></tr>
+        <tr><td>2</td><td>0</td><td>0</td><td>0.5</td><td>0.25</td></tr>
+        <tr><td>3</td><td>0</td><td>1</td><td>−0.5</td><td>0.25</td></tr>
+        <tr><td>4</td><td>1</td><td>0</td><td>0.5</td><td>0.25</td></tr>
+        <tr><td>5</td><td>2</td><td>1</td><td>−0.5</td><td>0.25</td></tr>
+        <tr><td>6</td><td>3</td><td>1</td><td>−0.5</td><td>0.25</td></tr>
+      </tbody>
+    </table></div>
+    <p>The whole node has \(G = 0\), \(H = 1.5\). Each cut:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Split</th><th>\(G_L,\ H_L\)</th><th>\(G_R,\ H_R\)</th><th>Gain</th></tr></thead>
+      <tbody>
+        <tr><td>late &lt; 0.5</td><td>0.5, 0.75</td><td>−0.5, 0.75</td><td>0.33</td></tr>
+        <tr><td><strong>late &lt; 1.5</strong></td><td><strong>1, 1</strong></td><td><strong>−1, 0.5</strong></td><td><strong>1.50</strong></td></tr>
+        <tr><td>late &lt; 2.5</td><td>0.5, 1.25</td><td>−0.5, 0.25</td><td>0.60</td></tr>
+      </tbody>
+    </table></div>
+    <p>For late &lt; 1.5: ½ × [1²/1 + (−1)²/0.5 − 0²/1.5] = ½ × [1 + 2] = 1.5. <strong>Why the parent scores 0:</strong> \(G = 0\). Half the rows want to go up and half down, so one shared nudge helps no one. A split earns its gain by letting the two sides move in opposite directions.</p>
+    <p><strong>Leaves:</strong> −1/1 = −1 and 1/0.5 = +2. Times \(\eta = 0.3\): \(F\) becomes −0.3 for rows 1–4 and +0.6 for rows 5–6, so \(p\) = 0.426 and 0.646. (Added in full, the step would give 0.27 and 0.88 after one tree: very confident, on two rows.)</p>
+
+    <h3>Tree 2 by hand</h3>
+    <p>Recompute \(g\) and \(h\) at the new \(F\). The parabola fits only near where you're standing, so you measure again every round.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Row</th><th>\(y\)</th><th>\(p\)</th><th>\(g\)</th><th>\(h\)</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>0</td><td>0.426</td><td>0.426</td><td>0.244</td></tr>
+        <tr><td>2</td><td>0</td><td>0.426</td><td>0.426</td><td>0.244</td></tr>
+        <tr><td>3</td><td>1</td><td>0.426</td><td>−0.574</td><td>0.244</td></tr>
+        <tr><td>4</td><td>0</td><td>0.426</td><td>0.426</td><td>0.244</td></tr>
+        <tr><td>5</td><td>1</td><td>0.646</td><td>−0.354</td><td>0.229</td></tr>
+        <tr><td>6</td><td>1</td><td>0.646</td><td>−0.354</td><td>0.229</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Rows 5–6 push less</strong> (\(g\): −0.5 → −0.354). They've been partly fixed.</li>
+      <li><strong>Row 3's \(g\) grew</strong> (−0.5 → −0.574). Tree 1 pushed it the wrong way, because it shares a leaf with two non-defaulters, and no split on “late” can ever pull it out.</li>
+      <li><strong>Splits:</strong> late &lt; 0.5 scores 0.11, <strong>late &lt; 1.5 scores 0.80</strong>, late &lt; 2.5 scores 0.32.</li>
+      <li><strong>Leaves</strong> (from unrounded sums): left \(G = 0.7022\), \(H = 0.9778\), value −0.7181; right \(G = -0.7087\), \(H = 0.4576\), value +1.5488.</li>
+    </ul>
+    <p>Times \(\eta\): −0.215 and +0.465, so \(F\) becomes −0.515 (\(p\) = 0.374) for rows 1–4 and +1.065 (\(p\) = 0.744) for rows 5–6. The steps shrink (+0.6 → +0.465 on the right) because the errors shrink.</p>
+
+    <h3>Where it ends, and predicting a new row</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>After</th><th>Late 0</th><th>Late 1</th><th>Late 2–3</th></tr></thead>
+      <tbody>
+        <tr><td>2 trees</td><td>0.374</td><td>0.374</td><td>0.744</td></tr>
+        <tr><td>10 trees</td><td>0.298</td><td>0.207</td><td>0.945</td></tr>
+        <tr><td>50 trees</td><td>0.332</td><td>0.009</td><td>0.998</td></tr>
+        <tr><td>200 trees</td><td>0.333</td><td>0.000</td><td>1.000</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Late 0 settles at 1/3</strong>, the real default rate in that group (row 3 of rows 1–3), and the best possible, since row 3 can't be separated.</li>
+      <li><strong>Late 1 and late 2–3 head to 0 and 1.</strong> By 200 trees their scores are \(F = -16.1\) and \(+17.6\): “certain”, on one and two rows. That's overfitting in miniature: pure groups keep pulling their \(F\) toward ±∞. XGBoost's \(\lambda\) slows it (with \(\lambda = 1\) the late 2–3 score after 200 trees is 3.9, not 17.6), and early stopping stops it.</li>
+    </ul>
+    <p><strong>A new applicant with 2 late payments</strong>, after 2 trees: add the log-odds, then apply the sigmoid once.</p>
+    <div class="mj">\[ \begin{aligned} F &amp;= 0 + 0.6 + 0.465 \\ &amp;= 1.065 \\ p &amp;= \sigma(1.065) \\ &amp;= 0.744 \end{aligned} \]</div>
+
+    <h3>Regression and classification side by side</h3>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Regression</th><th>Classification</th></tr></thead>
+      <tbody>
+        <tr><td>\(F\) is</td><td>The prediction</td><td>The log-odds</td></tr>
+        <tr><td>\(F_0\)</td><td>Mean of \(y\)</td><td>\(\log\frac{\bar y}{1 - \bar y}\)</td></tr>
+        <tr><td>\(g\) (slope)</td><td>\(F - y\)</td><td>\(p - y\), with \(p = \sigma(F)\)</td></tr>
+        <tr><td>\(h\) (bend)</td><td>1</td><td>\(p(1 - p)\)</td></tr>
+        <tr><td>\(H\) in a leaf</td><td>Number of rows</td><td>Rows weighted by how unsure the model is</td></tr>
+        <tr><td>Leaf \(-G/H\)</td><td>Mean residual (exact)</td><td>Newton step in log-odds (approximate)</td></tr>
+        <tr><td>Output</td><td>\(F\)</td><td>\(\sigma(F)\), applied once</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>The algorithm is identical in both columns; only the formulas for \(g\) and \(h\) change.</strong> Multiclass works the same way with \(K\) scores per row: each round grows \(K\) trees, one per class, on \(g_k = p_k - y_k\) with \(p_k\) from the softmax (each class uses only its own \(h_k\); the cross-class terms of the hessian are ignored), so 100 rounds with 3 classes is 300 trees.</p>
+    <p><strong>In an interview:</strong> “For classification \(F\) is the log-odds and \(p = \sigma(F)\). Trees add log-odds corrections and the sigmoid is applied once, to the sum. Log loss has \(g = p - y\) and \(h = p(1 - p)\), both from the sigmoid's slope. There's no closed-form best leaf value, and a pure leaf would want infinity, so each leaf takes a Newton step, \(-G/H\): total gradient over total curvature. Dividing by \(h\) converts a probability error into a step in log-odds.”</p>
+
+    <!-- xgboost -->
+    <h2 id="xgboost"><span class="pn">06</span>XGBoost at a node</h2>
+    <p>Section 05 already did XGBoost's core: it chose splits <em>and</em> leaf values from \(g\) and \(h\). On top of that, XGBoost adds penalties inside the objective (this section and 07), a learned direction for missing values (08), and engineering for speed (09).</p>
+    <p><strong>Why it needs penalties.</strong> Look at the right leaf in section 05: +2 in Tree 1 and +1.55 in Tree 2, each time from just two rows, and a score of 17.6 after 200 trees. Small leaves take big swings on very little evidence. So XGBoost minimizes the loss plus a price for complexity:</p>
+    <div class="mj">\[ \begin{aligned} \text{Obj} &amp;= \sum_i \ell\big(y_i,\ F_i + f(x_i)\big) \\ &amp;\quad + \gamma T + \tfrac12 \lambda \sum_{j=1}^{T} w_j^2 \end{aligned} \]</div>
+    <p>In words: the loss after adding this round's tree \(f\), plus \(\gamma\) for each of its \(T\) leaves, plus an L2 price \(\lambda\) on its leaf values \(w_j\) (the same idea as ridge regression).</p>
+
+    <h3>The derivation in five steps</h3>
+    <p><strong>Step 1: the objective</strong> is the line above. <strong>Step 2: replace each row's loss with a parabola.</strong> A Taylor expansion approximates a curve near a point from its value, slope and bend there; “second order” means stopping at the bend. The tree nudges row \(i\) by \(f_i = f(x_i)\):</p>
+    <div class="mj">\[ \begin{aligned} \ell(y_i,\ F_i + f_i) &amp;\approx \ell(y_i, F_i) + g_i f_i + \tfrac12 h_i f_i^2 \\ g_i &amp;= \frac{\partial \ell(y_i, F_i)}{\partial F_i} \\ h_i &amp;= \frac{\partial^2 \ell(y_i, F_i)}{\partial F_i^2} \end{aligned} \]</div>
+    <p>In words: loss after the nudge ≈ loss now + slope × nudge + ½ × bend × nudge². <strong>Why second order:</strong> a first-order version (\(g f\) alone) is a straight line, which has no bottom: it says which way is downhill, not how far. The bend makes it a parabola, and a parabola's bottom has a formula.</p>
+    <p><strong>Step 3: group the rows by leaf.</strong> Every row in leaf \(j\) gets the same \(w_j\). Drop \(\ell(y_i, F_i)\), which the tree can't change, and add up each leaf's rows:</p>
+    <div class="mj">\[ \begin{aligned} \text{Obj} &amp;\approx \sum_{j=1}^{T} \Big[\, G_j w_j + \tfrac12 (H_j + \lambda)\, w_j^2 \,\Big] + \gamma T \\ G_j &amp;= \sum_{i \in j} g_i \\ H_j &amp;= \sum_{i \in j} h_i \end{aligned} \]</div>
+    <p>Each leaf is now its own parabola, and <strong>\(\lambda\) simply adds to the bend</strong>.</p>
+    <p><strong>Step 4: the best leaf value.</strong> Set each leaf's slope to zero:</p>
+    <div class="mj">\[ \begin{aligned} G_j + (H_j + \lambda)\, w_j &amp;= 0 \\ w_j^* &amp;= -\frac{G_j}{H_j + \lambda} \end{aligned} \]</div>
+    <p><strong>Step 5: score a tree, then a split.</strong> Put \(w_j^*\) back into the leaf's parabola to see how low it gets:</p>
+    <div class="mj">\[ \begin{aligned} &amp;G_j w_j^* + \tfrac12 (H_j + \lambda)\, {w_j^*}^2 \\ &amp;\quad = -\frac{G_j^2}{H_j + \lambda} + \frac{G_j^2}{2(H_j + \lambda)} \\ &amp;\quad = -\frac{G_j^2}{2(H_j + \lambda)} \\ &amp;\text{Obj}^* = -\frac12 \sum_{j=1}^{T} \frac{G_j^2}{H_j + \lambda} + \gamma T \end{aligned} \]</div>
+    <p>\(\text{Obj}^*\) is the <strong>structure score</strong> of a tree shape: the best it can do, computed from sums alone, with nothing refitted (lower is better; tutorials call \(G^2/(H + \lambda)\) a leaf's <em>similarity score</em>). A split turns one leaf into two, which adds one leaf and costs \(\gamma\). Its <strong>gain</strong> is the drop in the structure score:</p>
+    <div class="mj">\[ \begin{aligned} \text{Gain} &amp;= \frac12 \Big[ \frac{G_L^2}{H_L + \lambda} + \frac{G_R^2}{H_R + \lambda} \\ &amp;\qquad - \frac{(G_L + G_R)^2}{H_L + H_R + \lambda} \Big] - \gamma \end{aligned} \]</div>
+    <p>In words: (left score + right score − the score without splitting), halved, minus the price of a leaf. The tree takes the split with the largest gain; if none is above 0, the node stays a leaf (exact XGBoost applies \(\gamma\) afterwards, by pruning; section 07). You've done every step by hand already. The only new pieces are \(\lambda\) in the denominators and \(\gamma\) at the end; with \(\lambda = 0\) and \(\gamma = 0\) it's exactly section 05. One implementation detail: XGBoost stores \(\eta\, w^*\) in each leaf, so its dumped leaf values already include the learning rate.</p>
+
+    <h3>One node, x-rayed</h3>
+    <p>The first tree on the six rows again, now with \(\lambda = 1\) and \(\gamma = 0\). Everything XGBoost computes at the root:</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 400 312" style="min-width:0;max-width:460px" role="img" aria-label="One XGBoost node. The root holds all six rows with G equal to 0 and H equal to 1.5 and asks late less than 1.5. The left child holds rows 1 to 4: g values plus 0.5, plus 0.5, minus 0.5, plus 0.5 sum to G equal to 1; H equals 1; leaf weight minus 1 over 2 equals minus 0.5. The right child holds rows 5 and 6: G equals minus 1, H equals 0.5, leaf weight 1 over 1.5 equals plus 0.667. The gain is one half of 0.5 plus 0.667 minus 0, equal to 0.583.">
+          <rect class="box" x="90" y="10" width="220" height="70" rx="10"/>
+          <text x="200" y="32" text-anchor="middle" style="fill:var(--ink);font-weight:600">late &lt; 1.5 ?</text>
+          <text x="200" y="52" text-anchor="middle">6 rows · G = 0 · H = 1.5</text>
+          <text x="200" y="70" text-anchor="middle" style="font-size:12px">score 0²/(1.5+1) = 0</text>
+          <path class="cw" d="M150 80 L104 116" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M250 80 L296 116" marker-end="url(#a-cw)"/>
+          <text class="lbl" x="112" y="96" text-anchor="middle">YES</text>
+          <text class="lbl" x="288" y="96" text-anchor="middle">NO</text>
+          <rect class="box" x="6" y="120" width="190" height="112" rx="10"/>
+          <text x="101" y="140" text-anchor="middle" style="fill:var(--ink);font-weight:600">rows 1–4</text>
+          <text x="101" y="160" text-anchor="middle" style="fill:var(--grad)">g: +.5 +.5 −.5 +.5</text>
+          <text x="101" y="180" text-anchor="middle">G = 1 · H = 1</text>
+          <text x="101" y="202" text-anchor="middle" style="fill:var(--cell);font-weight:600">w = −1/(1+1) = −0.5</text>
+          <text x="101" y="222" text-anchor="middle" style="font-size:12px">score 1²/2 = 0.5</text>
+          <rect class="box" x="204" y="120" width="190" height="112" rx="10"/>
+          <text x="299" y="140" text-anchor="middle" style="fill:var(--ink);font-weight:600">rows 5–6</text>
+          <text x="299" y="160" text-anchor="middle" style="fill:var(--grad)">g: −.5 −.5</text>
+          <text x="299" y="180" text-anchor="middle">G = −1 · H = 0.5</text>
+          <text x="299" y="202" text-anchor="middle" style="fill:var(--cell);font-weight:600">w = 1/(0.5+1) = +0.667</text>
+          <text x="299" y="222" text-anchor="middle" style="font-size:12px">score 1²/1.5 = 0.667</text>
+          <text x="200" y="258" text-anchor="middle" style="fill:var(--ink)">Gain = ½ (0.5 + 0.667 − 0) − γ = 0.583</text>
+          <text x="200" y="280" text-anchor="middle" style="font-size:12px">λ = 1 · γ = 0 · every row has h = 0.25</text>
+          <text x="200" y="300" text-anchor="middle" style="font-size:12px">XGBoost dump: gain 1.167 (no ½), cover = H</text>
+        </svg>
+      </div>
+      <figcaption>The whole node from sums: per-row \(g\) and \(h\) (all rows at \(p = 0.5\)), each side's \(G\) and \(H\), the leaf weights \(-G/(H + \lambda)\) and the gain. \(\lambda\) pulls both leaves toward 0, and the smaller one (\(H = 0.5\)) harder.</figcaption>
+    </figure>
+    <div class="tbl"><table>
+      <thead><tr><th>Split</th><th>Gain, \(\lambda = 0\)</th><th>Gain, \(\lambda = 1\)</th></tr></thead>
+      <tbody>
+        <tr><td>late &lt; 0.5</td><td>0.33</td><td>0.143</td></tr>
+        <tr><td><strong>late &lt; 1.5</strong></td><td><strong>1.50</strong></td><td><strong>0.583</strong></td></tr>
+        <tr><td>late &lt; 2.5</td><td>0.60</td><td>0.156</td></tr>
+      </tbody>
+    </table></div>
+    <p>The leaves are −0.5 and +0.667, down from −1 and +2. After 3 trees (\(\eta = 0.3\)) this gives \(p\) = 0.404 for late ≤ 1 and 0.633 for late ≥ 2, and XGBoost itself (exact method, \(\lambda = 1\), <code>min_child_weight</code> = 0) returns the same probabilities. Its tree dump shows a Gain of 1.167 for the split, because XGBoost drops the ½, and a <strong>Cover</strong> of 1.5, 1.0 and 0.5: cover is \(H\).</p>
+
+    <h3>The weighted least-squares view</h3>
+    <p>Complete the square in each row's term from step 2:</p>
+    <div class="mj">\[ g\, w + \tfrac12 h\, w^2 = \tfrac12 h \Big(w + \frac{g}{h}\Big)^2 - \frac{g^2}{2h} \]</div>
+    <p>The last part doesn't depend on \(w\). So <strong>each XGBoost tree is a weighted least-squares fit to the targets \(-g/h\), with weights \(h\)</strong>: each row asks for its own Newton step, weighted by how sure that step is. For squared error that's the residuals with weight 1, section 02 again. This view explains why the approximate split finder weights its quantiles by \(h\) (section 09).</p>
+
+    <h3>Classic gradient boosting vs XGBoost</h3>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Classic GBM (Friedman)</th><th>XGBoost</th></tr></thead>
+      <tbody>
+        <tr><td>Chooses splits by</td><td>Squared error on \(-g\) (e.g. \(y - p\)), as if \(h = 1\)</td><td>The gain, from \(g\) and \(h\)</td></tr>
+        <tr><td>Leaf value</td><td>Newton step \(-G/H\), filled in after the tree is grown</td><td>\(-G/(H + \lambda)\), the formula that chose the splits</td></tr>
+        <tr><td>Regularization</td><td>Learning rate, tree size, row subsampling</td><td>Those, plus \(\lambda\), \(\gamma\), \(\alpha\), minimum child weight, column subsampling</td></tr>
+        <tr><td>Missing values</td><td>Not part of the method</td><td>Learned default direction per split</td></tr>
+        <tr><td>Speed</td><td>Exact search, one thread</td><td>Histograms, parallel inside a tree, GPU, distributed</td></tr>
+      </tbody>
+    </table></div>
+    <p>For squared error with \(\lambda = 0\) the two are the same algorithm, because \(h = 1\) everywhere. LightGBM and sklearn's <code>HistGradientBoosting</code> use the same second-order gain.</p>
+    <p><strong>In an interview:</strong> “XGBoost minimizes the loss plus \(\gamma\) per leaf plus \(\tfrac12\lambda\sum w^2\). It expands the loss to second order around the current prediction, so each row contributes \(g w + \tfrac12 h w^2\). Grouping by leaf gives \(G w + \tfrac12 (H + \lambda) w^2\), minimized at \(w^* = -G/(H + \lambda)\); plugging back gives \(-\tfrac12 G^2/(H + \lambda)\) per leaf, and the gain is the children's scores minus the parent's, halved, minus \(\gamma\). Equivalently, each tree is a weighted least-squares fit to \(-g/h\) with weights \(h\).”</p>
+
+    <!-- regularizers -->
+    <h2 id="regularizers"><span class="pn">07</span>What each regularizer does, and why it exists</h2>
+    <p>Every penalty answers the same failure: <strong>a leaf that takes a big step on little evidence</strong>. For log loss, “little evidence” has two forms: few rows, or rows the model is already sure about, whose \(h = p(1 - p)\) is tiny. Both make \(H\) small, and \(-G/H\) huge.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Setting</th><th>Where it acts</th><th>Raising it</th></tr></thead>
+      <tbody>
+        <tr><td>\(\lambda\) (<code>reg_lambda</code>)</td><td>\(H + \lambda\) in the leaf value and the gain</td><td>Shrinks leaves, most where \(H\) is small; more bias, less variance</td></tr>
+        <tr><td>\(\gamma\) (<code>gamma</code>, <code>min_split_loss</code>)</td><td>The “− γ” in the gain</td><td>Fewer, larger leaves; more bias, less variance</td></tr>
+        <tr><td><code>min_child_weight</code></td><td>Each child's \(H\)</td><td>Refuses leaves with little hessian; more bias, less variance</td></tr>
+        <tr><td>\(\alpha\) (<code>reg_alpha</code>)</td><td>\(G\), before dividing</td><td>Sets weak leaves to exactly 0</td></tr>
+        <tr><td><code>max_delta_step</code></td><td>The leaf value itself</td><td>Caps how far one leaf can move a score</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>λ: fake evidence for “don't move”</h3>
+    <p>Take a leaf of one row (\(y = 1\), \(p = 0.5\)), so \(G = -0.5\) and \(H = 0.25\), and a leaf of 100 such rows:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Leaf</th><th>\(\lambda = 0\)</th><th>\(\lambda = 1\)</th></tr></thead>
+      <tbody>
+        <tr><td>1 row: \(G = -0.5\), \(H = 0.25\)</td><td>2.0</td><td><strong>0.4</strong> (cut hard)</td></tr>
+        <tr><td>100 rows: \(G = -50\), \(H = 25\)</td><td>2.0</td><td><strong>1.92</strong> (barely touched)</td></tr>
+      </tbody>
+    </table></div>
+    <p>Think of \(\lambda\) as \(\lambda\) units of hessian saying “don't move”, added to every leaf. It matters only where the real \(H\) is comparable to it: small leaves and confident regions. It also enters the gain, where it shrinks each child's score \(G^2/(H + \lambda)\), so splits that isolate a small group earn less. On the six rows, \(\lambda = 1\) holds the pure late 2–3 group's score to 3.9 after 200 trees, against 17.6 with \(\lambda = 0\).</p>
+
+    <h3>γ: a price per leaf, and pruning</h3>
+    <p>A split must earn more than \(\gamma\), or it isn't worth the extra leaf. Two details matter at node level:</p>
+    <ul>
+      <li><strong>Units.</strong> XGBoost's code and dumps use the gain without the ½, and compare that number with <code>gamma</code>. The toy split's dumped gain is 1.167, so it survives <code>gamma = 1.1</code> and is pruned at <code>gamma = 1.2</code>.</li>
+      <li><strong>When it's applied.</strong> XGBoost's exact method grows the tree to <code>max_depth</code> first, then prunes bottom-up: a split is removed if its gain is below \(\gamma\) and both its children are leaves. So a weak split with a strong split below it survives, which matters for patterns like XOR, where the first cut gains almost nothing but enables a big second one. With the default histogram method, \(\gamma\) is checked as the tree grows instead, so a weak first cut is never made and an XOR-like pair can be missed.</li>
+    </ul>
+    <p>\(\gamma\) also caps the tree's size indirectly: on noisy data most deep splits have small gains, and a \(\gamma\) on that scale removes them.</p>
+
+    <h3>min_child_weight: a minimum hessian, not a row count</h3>
+    <p>Each child needs \(H \ge\) <code>min_child_weight</code>, or the split is refused. For squared error (\(h = 1\)) that's a minimum row count. For log loss it counts rows weighted by how unsure the model is. Take 10 rows the model is 99% sure won't default (\(p = 0.01\), \(h = 0.0099\) each), one of which defaults anyway:</p>
+    <div class="mj">\[ \begin{aligned} G &amp;= 10 \times 0.01 - 1 \\ &amp;= -0.9 \\ H &amp;= 10 \times 0.0099 \\ &amp;= 0.099 \\ w_{\lambda = 0} &amp;= 0.9 / 0.099 \\ &amp;\approx 9.1 \\ w_{\lambda = 1} &amp;= 0.9 / 1.099 \\ &amp;\approx 0.82 \end{aligned} \]</div>
+    <p>With \(\lambda = 0\), one surprise would take the whole leaf from 1% risk to about 99% (before the learning rate). With the default <code>min_child_weight = 1</code>, the leaf isn't allowed at all, since \(H = 0.099 &lt; 1\). At \(p = 0.03\) (\(h \approx 0.029\)), it takes about 35 rows to reach \(H = 1\). So <code>min_child_weight</code> blocks leaves made of rows the model already has right, where a big step would only chase noise. Two consequences:</p>
+    <ul>
+      <li><strong>It tightens on its own as training goes on.</strong> As predictions grow confident, each row's \(h\) shrinks, so the same rows carry less weight and fewer splits pass.</li>
+      <li><strong>The toy can't split at all under the default:</strong> every cut leaves one side with \(H\) below 1 (0.75, 0.5 or 0.25). Section 15 shows what that does.</li>
+    </ul>
+
+    <h3>α, max_delta_step, and the rest</h3>
+    <p><strong>\(\alpha\) (L1)</strong> adds \(\alpha \sum_j \lvert w_j \rvert\). The parabola gets a kink at 0, and the solution moves \(G\) toward 0 by \(\alpha\) before dividing:</p>
+    <div class="mj">\[ \begin{aligned} w^* &amp;= -\frac{\text{sign}(G)\, \max(\lvert G \rvert - \alpha,\ 0)}{H + \lambda} \\ \text{leaf score} &amp;= \frac{\max(\lvert G \rvert - \alpha,\ 0)^2}{H + \lambda} \end{aligned} \]</div>
+    <p>A leaf whose \(\lvert G \rvert \le \alpha\) gets exactly 0, and the gain uses the thresholded \(G\) too. <strong><code>max_delta_step</code></strong> caps \(\lvert w \rvert\) directly; XGBoost suggests it for logistic loss on extremely imbalanced data, where \(H\) can be tiny. The learning rate, row subsampling and column subsampling regularize the ensemble rather than a leaf (sections 03 and 09).</p>
+    <p><strong>In an interview:</strong> “\(\lambda\) adds to the hessian in every leaf, so it shrinks leaves with little hessian (few rows, or confident ones) and barely touches big leaves. \(\gamma\) is the minimum gain for a split, a price per leaf: the exact method prunes bottom-up after growing, the histogram method refuses weak splits as it grows. <code>min_child_weight</code> is the minimum hessian sum per child; for log loss it blocks leaves made of rows the model is already sure about. \(\alpha\) soft-thresholds \(G\), so weak leaves go to exactly 0.”</p>
+
+    <!-- missing -->
+    <h2 id="missing"><span class="pn">08</span>Missing values: the learned default direction</h2>
+    <p>Real data has holes: a blank field, no credit history yet. XGBoost doesn't need them filled in. Its <strong>sparsity-aware split finding</strong> learns, at every split, which side the missing rows should go.</p>
+    <ol>
+      <li>Scan only the rows where the feature is present, with running sums as usual.</li>
+      <li>Add up the missing rows' \(G_{\text{miss}}\) and \(H_{\text{miss}}\) once.</li>
+      <li>At each cut, compute the gain twice: once with the missing rows added to the left side, once to the right.</li>
+      <li>Keep the better of all of these. The winning side is stored with the split as its <strong>default direction</strong>.</li>
+      <li>At prediction time, a missing value follows its split's default direction.</li>
+    </ol>
+    <p><strong>Example.</strong> Add two applicants with no record of late payments, both of whom defaulted. Everyone is at \(p = 0.5\), and \(\lambda = 1\):</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Row</th><th>Late</th><th>\(y\)</th><th>\(g\)</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>0</td><td>0</td><td>0.5</td></tr>
+        <tr><td>2</td><td>0</td><td>0</td><td>0.5</td></tr>
+        <tr><td>3</td><td>0</td><td>1</td><td>−0.5</td></tr>
+        <tr><td>4</td><td>1</td><td>0</td><td>0.5</td></tr>
+        <tr><td>5</td><td>2</td><td>1</td><td>−0.5</td></tr>
+        <tr><td>6</td><td>3</td><td>1</td><td>−0.5</td></tr>
+        <tr><td>7</td><td>–</td><td>1</td><td>−0.5</td></tr>
+        <tr><td>8</td><td>–</td><td>1</td><td>−0.5</td></tr>
+      </tbody>
+    </table></div>
+    <p>So \(G_{\text{miss}} = -1\) and \(H_{\text{miss}} = 0.5\).</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Cut</th><th>Missing go left</th><th>Missing go right</th></tr></thead>
+      <tbody>
+        <tr><td>late &lt; 0.5</td><td>−0.04</td><td>0.405</td></tr>
+        <tr><td><strong>late &lt; 1.5</strong></td><td>0.167</td><td><strong>1.083</strong></td></tr>
+        <tr><td>late &lt; 2.5</td><td>−0.021</td><td>0.532</td></tr>
+      </tbody>
+    </table></div>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 400 236" style="min-width:0;max-width:460px" role="img" aria-label="The same cut, late less than 1.5, tried twice. Left panel: the missing rows' G of minus 1 and H of 0.5 join the left child, making it G 0, H 1.5, while the right child is G minus 1, H 0.5; gain 0.167. Right panel: they join the right child, making it G minus 2, H 1, while the left child is G 1, H 1; gain 1.083, the winner, so missing values default to the right.">
+          <text x="100" y="20" text-anchor="middle" style="fill:var(--ink);font-weight:600">missing → left</text>
+          <rect class="box" x="48" y="32" width="104" height="30" rx="8"/>
+          <text x="100" y="52" text-anchor="middle">late &lt; 1.5</text>
+          <path class="cw" d="M76 62 L54 92" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M124 62 L146 92" marker-end="url(#a-cw)"/>
+          <rect class="gbox" x="6" y="96" width="90" height="74" rx="8"/>
+          <text x="51" y="118" text-anchor="middle" style="fill:var(--ink);font-weight:600">G = 0</text>
+          <text x="51" y="138" text-anchor="middle" style="fill:var(--ink);font-weight:600">H = 1.5</text>
+          <text x="51" y="160" text-anchor="middle" style="fill:var(--grad);font-size:12px">+ missing</text>
+          <rect class="box" x="104" y="96" width="90" height="74" rx="8"/>
+          <text x="149" y="118" text-anchor="middle" style="fill:var(--ink);font-weight:600">G = −1</text>
+          <text x="149" y="138" text-anchor="middle" style="fill:var(--ink);font-weight:600">H = 0.5</text>
+          <text x="149" y="160" text-anchor="middle" style="font-size:12px">present</text>
+          <text x="100" y="198" text-anchor="middle">½ (0/2.5 + 1/1.5 − 1/3)</text>
+          <text x="100" y="222" text-anchor="middle" style="fill:var(--ink)">gain 0.167</text>
+          <path d="M200 30 V226" style="stroke:var(--rule);stroke-width:1"/>
+          <text x="300" y="20" text-anchor="middle" style="fill:var(--ink);font-weight:600">missing → right ✓</text>
+          <rect class="box" x="248" y="32" width="104" height="30" rx="8"/>
+          <text x="300" y="52" text-anchor="middle">late &lt; 1.5</text>
+          <path class="cw" d="M276 62 L254 92" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M324 62 L346 92" marker-end="url(#a-cw)"/>
+          <rect class="box" x="206" y="96" width="90" height="74" rx="8"/>
+          <text x="251" y="118" text-anchor="middle" style="fill:var(--ink);font-weight:600">G = 1</text>
+          <text x="251" y="138" text-anchor="middle" style="fill:var(--ink);font-weight:600">H = 1</text>
+          <text x="251" y="160" text-anchor="middle" style="font-size:12px">present</text>
+          <rect class="gbox" x="304" y="96" width="90" height="74" rx="8"/>
+          <text x="349" y="118" text-anchor="middle" style="fill:var(--ink);font-weight:600">G = −2</text>
+          <text x="349" y="138" text-anchor="middle" style="fill:var(--ink);font-weight:600">H = 1</text>
+          <text x="349" y="160" text-anchor="middle" style="fill:var(--grad);font-size:12px">+ missing</text>
+          <text x="300" y="198" text-anchor="middle">½ (1/2 + 4/2 − 1/3)</text>
+          <text x="300" y="222" text-anchor="middle" style="fill:var(--cell);font-weight:600">gain 1.083</text>
+        </svg>
+      </div>
+      <figcaption>One cut, scored twice. The present rows give left \(G = 1\), \(H = 1\) and right \(G = -1\), \(H = 0.5\); the missing rows add \(G = -1\), \(H = 0.5\) to one side (shaded). The parent is \(G = -1\), \(H = 2\) (score \(1/3\) with \(\lambda = 1\)) either way. The higher gain wins and fixes the default direction.</figcaption>
+    </figure>
+    <p>So missing values go right, with the risky “2+ late payments” group, which makes sense: both missing rows defaulted. XGBoost picks the same split, and its dump's Missing column points to the right child.</p>
+    <p><strong>Things to know:</strong></p>
+    <ul>
+      <li><strong>Missingness can carry signal.</strong> Here “no record” behaved like “risky”. Imputing the mean would have thrown that away; if you do impute (for a linear model, say), add a missing-indicator column.</li>
+      <li><strong>No missing values in training means no learned direction.</strong> Every split then has a fixed default side, which depends on the library, version and tree method. On the six rows, an applicant whose late count is missing gets, after section 05's two trees, 0.374 from this note's NumPy build (which breaks the tie to the left, the low-risk side) but 0.744 from XGBoost's default histogram method (which sends unseen missing values right). Either way it's a default nobody learned. In a simulated loan book, blanking one key feature for every test applicant sent them all to its high-risk side and dropped AUC from 0.832 to 0.66. Monitor missing rates between training and serving, and let training see the same kind of missingness.</li>
+      <li><strong>Sparse matrices:</strong> in XGBoost, entries that aren't stored count as missing, so if your zeros are real zeros, a sparse matrix silently turns them into “missing”. (LightGBM keeps unstored entries as zeros unless <code>zero_as_missing=True</code>.)</li>
+      <li><strong>Cost:</strong> the scan touches only present values, so very sparse features (one-hot columns, rare flags) are cheap.</li>
+      <li><strong>Other libraries:</strong> LightGBM and sklearn's HistGB also learn a side per split (HistGB sends unseen-in-training missing values to the child with more rows). CatBoost doesn't learn one: by default a missing value is treated as smaller than every real value, so it always goes to the low side.</li>
+    </ul>
+    <p><strong>In an interview:</strong> “At each split XGBoost scans only the present values, then tries adding the missing rows' \(G\) and \(H\) to the left and to the right, and keeps whichever gives the higher gain as that split's default direction. No imputation, missingness can carry signal, and it's cheap on sparse data. The risk: if a feature had no missing values in training, the direction is a fixed default, so values that go missing only in production all go one arbitrary way.”</p>
+
+    <!-- splits -->
+    <h2 id="splits"><span class="pn">09</span>Finding splits: exact, approximate, histogram</h2>
+    <h3>Exact greedy: running sums</h3>
+    <p>Sort the rows by a feature, then sweep left to right, adding each row's \(g\) and \(h\) to \(G_L\) and \(H_L\), with \(G_R = G - G_L\) and \(H_R = H - H_L\). Every cut between distinct values is scored in one pass, with nothing refitted: that's why the gain needs only sums. XGBoost sorts each feature once before training (it stores the data in sorted column blocks), so each node costs one linear sweep per feature over its rows. Exact, but every distinct value is a candidate, which is slow on millions of rows.</p>
+
+    <h3>Approximate: quantiles weighted by h</h3>
+    <p>Instead of every value, propose candidate cuts at quantiles of the feature, with each row weighted by its hessian \(h_i\), so every bucket holds about the same total \(h\). Why \(h\): by the weighted least-squares view (section 06), each row is a squared-error target with weight \(h\), so rows the model is unsure about (\(p\) near 0.5) count more and get finer cut points, while confident rows get coarse ones. The candidates can be proposed once per tree (global) or again at every node (local). A <strong>weighted quantile sketch</strong> is a small summary that answers these weighted quantile questions within a set error and can be merged across machines, which lets the approximate method propose cuts when the data is split across machines.</p>
+
+    <h3>Histograms: the modern default</h3>
+    <ol>
+      <li>Once, before training, cut each feature into at most about 256 bins at its quantiles, and store each row's bin number (one byte).</li>
+      <li>At each node, add up \(g\) and \(h\) per bin: one pass over the node's rows.</li>
+      <li>Sweep the bin edges with running sums, scoring at most 255 candidates.</li>
+    </ol>
+    <ul>
+      <li><strong>Sibling subtraction:</strong> a parent's histogram is the sum of its children's, so build the smaller child's histogram and get the bigger one's by subtraction. That at least halves the work at every level.</li>
+      <li><strong>Where the speed comes from:</strong> far fewer candidates; one-byte codes, so passes over the rows are small and cache-friendly; histograms add up across threads, machines and GPUs.</li>
+      <li><strong>The price:</strong> a cut can only land on a bin edge. In a simulated book, the best income threshold moved from 39.46 to 39.66 and lost 0.6% of its gain with 255 bins; with only 8 bins it moved to 48.6 and lost about a quarter. Quantile bins also shrug off outliers, which just share the last bin.</li>
+    </ul>
+    <p>XGBoost (<code>tree_method="hist"</code>, the default), LightGBM, CatBoost and sklearn's <code>HistGradientBoosting</code> all work this way.</p>
+
+    <h3>Column subsampling, and parallelism</h3>
+    <ul>
+      <li><strong>Column subsampling</strong> lets each tree (<code>colsample_bytree</code>), each level (<code>bylevel</code>) or each split (<code>bynode</code>) see a random share of the features; the three multiply, so 0.5 each on 64 features leaves 8 per split. It decorrelates the trees as in a random forest, speeds things up, and stops one dominant feature from taking every split, at the risk of missing the best feature at some nodes.</li>
+      <li><strong>Parallel, but not across trees.</strong> Each tree needs the previous one's \(F\), so trees are built in sequence. The parallelism is inside a tree: \(g\) and \(h\) for all rows, histogram building, and the scans over different features all run at once.</li>
+    </ul>
+    <p><strong>In an interview:</strong> “Exact search sorts each feature once and sweeps every distinct value with running sums of \(g\) and \(h\). The approximate method proposes candidates at quantiles weighted by \(h\), because each row is a squared-error target with weight \(h\). Histogram search bins each feature once into about 256 quantile bins, sums \(g\) and \(h\) per bin in one pass, scans only bin edges, and gets one child's histogram free by subtraction. The price is a little threshold precision.”</p>
+
+    <!-- lightgbm -->
+    <h2 id="lightgbm"><span class="pn">10</span>LightGBM: leaf-wise growth, GOSS, EFB</h2>
+    <p>LightGBM uses the same core: \(g\), \(h\), the leaf score \(G^2/(H + \lambda)\), the same gain (reported without the ½) and leaves \(-G/(H + \lambda)\), with histograms by design. What differs is how a tree grows, plus two speed tricks and native categories. Its defaults also differ: \(\lambda = 0\), 31 leaves, at least 20 rows per leaf, learning rate 0.1.</p>
+
+    <h3>Depth-wise vs leaf-wise growth</h3>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 400 226" style="min-width:0;max-width:460px" role="img" aria-label="Three trees with four leaves each. Depth-wise: two levels, every leaf at depth 2. Leaf-wise: the root splits, then only the left child splits, then only its left child, so one branch is three deep and the leaves sit at depths 1, 2 and 3. Symmetric: every node at a level asks the same question, A at the root and B at both nodes of level two.">
+          <text x="67" y="20" text-anchor="middle" style="fill:var(--ink);font-weight:600">depth-wise</text>
+          <text x="200" y="20" text-anchor="middle" style="fill:var(--ink);font-weight:600">leaf-wise</text>
+          <text x="333" y="20" text-anchor="middle" style="fill:var(--ink);font-weight:600">symmetric</text>
+          <path class="in" d="M67 48 L40 90 M67 48 L94 90 M40 90 L27 132 M40 90 L53 132 M94 90 L81 132 M94 90 L107 132"/>
+          <circle class="node" cx="67" cy="48" r="8"/><circle class="node" cx="40" cy="90" r="8"/><circle class="node" cx="94" cy="90" r="8"/>
+          <rect class="gbox" x="20" y="125" width="14" height="14" rx="3"/><rect class="gbox" x="46" y="125" width="14" height="14" rx="3"/><rect class="gbox" x="74" y="125" width="14" height="14" rx="3"/><rect class="gbox" x="100" y="125" width="14" height="14" rx="3"/>
+          <path class="in" d="M200 48 L172 90 M200 48 L228 90 M172 90 L150 132 M172 90 L194 132 M150 132 L132 174 M150 132 L168 174"/>
+          <circle class="node" cx="200" cy="48" r="8"/><circle class="node" cx="172" cy="90" r="8"/><circle class="node" cx="150" cy="132" r="8"/>
+          <rect class="gbox" x="221" y="83" width="14" height="14" rx="3"/><rect class="gbox" x="187" y="125" width="14" height="14" rx="3"/><rect class="gbox" x="125" y="167" width="14" height="14" rx="3"/><rect class="gbox" x="161" y="167" width="14" height="14" rx="3"/>
+          <path class="in" d="M333 48 L306 90 M333 48 L360 90 M306 90 L293 132 M306 90 L319 132 M360 90 L347 132 M360 90 L373 132"/>
+          <circle class="node" cx="333" cy="48" r="10"/><text x="333" y="53" text-anchor="middle" style="fill:var(--ink)">A</text><circle class="node" cx="306" cy="90" r="10"/><text x="306" y="95" text-anchor="middle" style="fill:var(--ink)">B</text><circle class="node" cx="360" cy="90" r="10"/><text x="360" y="95" text-anchor="middle" style="fill:var(--ink)">B</text>
+          <rect class="gbox" x="286" y="125" width="14" height="14" rx="3"/><rect class="gbox" x="312" y="125" width="14" height="14" rx="3"/><rect class="gbox" x="340" y="125" width="14" height="14" rx="3"/><rect class="gbox" x="366" y="125" width="14" height="14" rx="3"/>
+          <text x="67" y="212" text-anchor="middle">XGBoost default</text>
+          <text x="200" y="212" text-anchor="middle">LightGBM</text>
+          <text x="333" y="212" text-anchor="middle">CatBoost</text>
+          </svg>
+      </div>
+      <figcaption>Four leaves, three ways. Circles are splits, squares are leaves. Leaf-wise spends every split where the gain is largest, so one branch can run deep; symmetric asks one question per level (A, then B).</figcaption>
+    </figure>
+    <ul>
+      <li><strong>Depth-wise (level-wise)</strong> splits every leaf at the current depth, then goes one level deeper. XGBoost's default (<code>grow_policy="depthwise"</code>); a depth-\(d\) tree has up to \(2^d\) leaves.</li>
+      <li><strong>Leaf-wise (best-first)</strong> splits, of all current leaves, the one whose best split gains most, until there are <code>num_leaves</code> leaves. LightGBM's way; XGBoost does it with <code>grow_policy="lossguide"</code>.</li>
+      <li><strong>Why leaf-wise:</strong> for the same number of leaves it usually lowers the training loss more, because it never spends a split on a leaf with little to gain.</li>
+      <li><strong>The risk:</strong> deep, thin branches that fit a handful of rows. On a simulated loan book, LightGBM's first 8-leaf tree went one level deeper than a depth-3 tree could, isolating a 20-row group, and spent a split on a decoy feature.</li>
+    </ul>
+    <p><strong><code>num_leaves</code> is the main capacity knob.</strong> Validation log loss on the simulated book, learning rate 0.05, 500 rounds:</p>
+    <div class="tbl"><table>
+      <thead><tr><th><code>num_leaves</code></th><th>Best round</th><th>Best loss</th><th>Loss after 500</th></tr></thead>
+      <tbody>
+        <tr><td>4</td><td>52</td><td>0.227</td><td>0.243</td></tr>
+        <tr><td>8</td><td>44</td><td>0.230</td><td>0.263</td></tr>
+        <tr><td>31 (default)</td><td>29</td><td>0.234</td><td>0.401</td></tr>
+        <tr><td>127</td><td>26</td><td>0.238</td><td>0.746</td></tr>
+      </tbody>
+    </table></div>
+    <p>More leaves reach their best sooner, then overfit much faster. On small data <strong><code>min_child_samples</code></strong> (a row count, unlike XGBoost's hessian sum) is what stops it: with 400 training rows, allowing one-row leaves gave a best loss of 0.272, against 0.237 with 50-row leaves. <code>max_depth</code> is an extra cap; if it's set, \(2^{\text{depth}}\) bounds the leaves, so use one main knob and keep the other loose.</p>
+
+    <h3>GOSS: sample the rows that still teach something</h3>
+    <p><strong>Gradient-based one-side sampling.</strong> Rows with small \(\lvert g \rvert\) are already well fitted and add little to any split's gain. So keep the top \(a\) share of rows by \(\lvert g \rvert\) (say 20%; the paper ranks by \(\lvert g \rvert\), LightGBM's code by \(\lvert g h \rvert\), and it skips sampling for the first \(1/\eta\) rounds), sample \(b\) of all rows (say 10%) from the rest, and give each sampled row the weight \((1 - a)/b = 8\), since it stands in for 8 rows. The reweighting keeps \(G\) and \(H\) unbiased: without it the sums would come from the hardest rows only, and the leaves would overshoot toward them. Each tree sees 30% of the rows for little loss of accuracy.</p>
+
+    <h3>EFB: bundle features that are never on together</h3>
+    <p><strong>Exclusive feature bundling.</strong> Sparse features that are rarely non-zero at the same time (one-hot columns, say) are merged into one feature, with each original's values shifted into its own range of bins, so a split can still separate them. Fewer histograms to build. Finding the best bundling is a graph-colouring problem, so it's done greedily, allowing a small rate of conflicts. Neither GOSS nor EFB defines LightGBM; its core is histograms plus leaf-wise growth.</p>
+
+    <h3>Native categorical splits</h3>
+    <p>Give LightGBM a column of category codes and it finds a good way to split the categories into two groups without trying all \(2^{k-1}\) groupings: it sorts the categories by \(G/(H + s)\), a Newton-style value per category with \(s\) = <code>cat_smooth</code>, and scans that order like a numeric feature. With plain \(G/H\), for squared error and the \(\lambda = 0\) gain, the best two-group split is always a cut of that sorted order (Fisher, 1958); with the smoothing it's a good heuristic rather than a guarantee. Very few categories (up to 4 by default) get one-vs-rest splits instead.</p>
+    <ul>
+      <li><strong><code>cat_smooth</code></strong> (default 10) does two jobs: categories with fewer rows than it are left out of the sorted scan (they go to the “other” side), and it adds pseudo-hessian to the rest, so a small category can't reach an extreme of the order by luck.</li>
+      <li><strong>Other guards:</strong> <code>cat_l2</code> adds to \(\lambda\) for these splits, <code>max_cat_threshold</code> limits how many categories the scan can put on one side, and <code>min_data_per_group</code> sets a minimum per side.</li>
+      <li><strong>The risk:</strong> with hundreds of rare levels it can still overfit. On a useless 300-level pincode it dropped test AUC from 0.811 to 0.753, until <code>cat_smooth</code> was raised to 100.</li>
+    </ul>
+    <p><strong>XGBoost does the same</strong> with the histogram method and <code>enable_categorical=True</code>: a feature with at most <code>max_cat_to_onehot</code> levels gets one-vs-rest splits; otherwise its categories are sorted by their leaf weight \(-G/(H + \lambda)\) and the order is scanned like a number, with at most <code>max_cat_threshold</code> categories on one side. Same idea, same small-category risk.</p>
+    <p><strong>In an interview:</strong> “LightGBM is histogram-based and grows leaf-wise: it always splits the leaf with the largest gain, so for the same number of leaves it lowers training loss faster, but it can grow deep, thin branches that overfit small data. <code>num_leaves</code> is the main capacity knob, with <code>min_child_samples</code> and <code>max_depth</code> as guards. GOSS keeps the large-gradient rows and an up-weighted sample of the rest; EFB bundles mutually exclusive sparse features. Categories are split by sorting them on \(G/H\).”</p>
+
+    <!-- catboost -->
+    <h2 id="catboost"><span class="pn">11</span>CatBoost: ordered statistics, ordered boosting, symmetric trees</h2>
+    <h3>The problem with categories</h3>
+    <p>A categorical feature with many levels (pincode, merchant ID, branch) is awkward for trees. One-hot encoding makes hundreds of sparse, individually weak columns; integer codes impose an order that means nothing. <strong>Target encoding</strong> replaces each category by its average target (“pincode 110034 → 12% default rate”): compact and powerful. But computed on the same rows the model trains on, it <strong>leaks</strong>: each row's own label is inside its category's average.</p>
+    <p><strong>How big the leak is.</strong> In a simulated loan book, give every applicant a random pincode, 300 of them, with no effect on default. A pincode has about 12 training rows, so when one of them defaults, its own label lifts its pincode's rate by about 1/12, or 8 points. On training rows the encoding “knows” the answer; on test rows it's noise.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Pincode encoded as</th><th>Train AUC of the column alone</th><th>Test AUC of the column alone</th><th>Model's test AUC</th></tr></thead>
+      <tbody>
+        <tr><td>Not used</td><td>–</td><td>–</td><td>0.809</td></tr>
+        <tr><td>Naive target mean</td><td>0.779</td><td>0.471</td><td><strong>0.609</strong></td></tr>
+        <tr><td>Ordered target statistic</td><td>0.492</td><td>–</td><td>0.812</td></tr>
+      </tbody>
+    </table></div>
+    <p>The model trusted a strong signal that wasn't there. Smoothing toward the prior doesn't fix it: it pulls every encoding toward the mean but keeps their order almost exactly when categories have similar counts (here about 12 rows each), and splits and AUC only use the order (train AUC stayed at 0.78). The extreme case is an ID-like column with a new value for every row: naive encoding hands each row its own label, a train AUC of 1.0.</p>
+
+    <h3>Ordered target statistics</h3>
+    <p>Put the training rows in a random order and encode each row using only the rows <strong>before it</strong> with the same category, as if the data arrived one row at a time. A row's own label never enters its own encoding:</p>
+    <div class="mj">\[ \hat x_i = \frac{\sum_{j \prec i,\ c_j = c_i} y_j + a \cdot \text{prior}}{\#\{\, j \prec i : c_j = c_i \,\} + a} \]</div>
+    <p>In words: \(j \prec i\) means “before row \(i\) in the random order”. The prior (the overall rate) counts as \(a\) extra rows, so the first rows of a category, which have seen almost nothing, get an encoding near the prior instead of a wild value. Test rows use all the training rows. The early rows of each permutation get noisy encodings, so CatBoost uses several random permutations. An unseen category at inference gets the prior. With a real time order, <code>has_time=True</code> uses it instead of a random one, which matches how data arrives in production.</p>
+
+    <h3>Ordered boosting: the prediction-shift problem</h3>
+    <p>The same leak happens inside boosting itself. Row \(i\)'s gradient \(g_i\) is computed from a model that was trained on row \(i\), so on training rows the residuals are systematically smaller than they would be on new rows: the model's training predictions are shifted toward their own labels. The trees are then fitted to gradients that look better than reality, which is a bias, worst on small data. <strong>Ordered boosting</strong> computes each row's gradient from a model built only on the rows before it in the permutation, so no row's gradient comes from a model that saw it. Keeping one model per prefix would be far too costly, so CatBoost keeps a few, on prefixes of doubling length. It's <code>boosting_type="Ordered"</code>; the usual “Plain” mode is cheaper and common on large data.</p>
+
+    <h3>Symmetric (oblivious) trees</h3>
+    <p>Every node at the same depth asks the <strong>same</strong> question (the figure in section 10). A depth-6 tree is just 6 (feature, threshold) pairs and 64 leaves, and a row's leaf index is its 6 yes/no answers read as a 6-bit number. Prediction is a few comparisons and one array lookup, with no branching, so it vectorizes well and is very fast. Each level's question is chosen by its total improvement across every node of the level. The rigid shape is also a strong regularizer: 6 splits instead of up to 63, and no branch can carve out a handful of rows on its own. The cost is flexibility per tree, so it may need more trees.</p>
+    <p>CatBoost also builds combinations of categorical features (pincode × product) greedily as trees grow, with their own ordered statistics, and its defaults are strong: untuned, it scored 0.827 / 0.221 (AUC / log loss) on the simulated book where sklearn's untuned HistGB scored 0.808 / 0.250. Missing values aren't learned: by default they're treated as the smallest value.</p>
+    <p><strong>In an interview:</strong> “Naive target encoding leaks, because each row's own label is inside its category's average, so a useless high-cardinality feature looks predictive on training rows and hurts on test. CatBoost's ordered target statistics encode each row using only the rows before it in a random permutation, plus a prior. Ordered boosting applies the same idea to the gradients, fixing prediction shift. Its symmetric trees ask one question per level, so the leaf index is a bit string: very fast inference and strong regularization.”</p>
+
+    <!-- tuning -->
+    <h2 id="tuning"><span class="pn">12</span>Hyperparameters and tuning order</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Knob</th><th>Typical range</th><th>Raising it</th></tr></thead>
+      <tbody>
+        <tr><td><code>learning_rate</code> \(\eta\)</td><td>0.01–0.1</td><td>Fewer trees needed; noisier fit, worse best score</td></tr>
+        <tr><td><code>n_estimators</code></td><td>Set by early stopping</td><td>Bias down; variance up past the best round</td></tr>
+        <tr><td><code>max_depth</code> / <code>num_leaves</code></td><td>3–8 / 8–64</td><td>Higher-order interactions; bias down, variance up</td></tr>
+        <tr><td><code>min_child_weight</code></td><td>1–20+</td><td>Bias up, variance down</td></tr>
+        <tr><td><code>subsample</code>, <code>colsample_*</code></td><td>0.5–0.9</td><td>(Lowering them) variance down, a little bias up</td></tr>
+        <tr><td><code>reg_lambda</code>, <code>reg_alpha</code>, <code>gamma</code></td><td>0–10</td><td>Bias up, variance down</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Depth sets the interaction order.</strong> A stump uses one feature, so a sum of stumps is a sum of one-feature effects, \(f_1(x_1) + f_2(x_2) + \dots\), and can't make a jump that happens only when A <em>and</em> B are true. For a 0/1 target that's 1 only when both are 1 (the four combinations equally common), the best a sum of stumps can do in squared error is −0.25, 0.25, 0.25, 0.75; a depth-2 tree gets 0, 0, 0, 1 exactly. On a smooth simulated target, stumps scored an RMSE of 20.5 (no better than linear regression) and depth 2 scored 10.5.</p>
+
+    <h3>A tuning order that works</h3>
+    <ol>
+      <li><strong>Fix \(\eta\)</strong> at 0.05–0.1, set the number of trees high, and early-stop. Never grid-search the number of trees: one fit with early stopping reads the best round off the validation curve.</li>
+      <li><strong>Tree size with leaf size:</strong> <code>max_depth</code> or <code>num_leaves</code>, together with <code>min_child_weight</code> or <code>min_child_samples</code>. These usually matter most.</li>
+      <li><strong>Randomness:</strong> <code>subsample</code> and <code>colsample_bytree</code>.</li>
+      <li><strong>Penalties:</strong> \(\lambda\), \(\alpha\), \(\gamma\).</li>
+      <li><strong>Lower \(\eta\)</strong> (to 0.01–0.02), early-stop again, and refit.</li>
+      <li><strong>Score once on the test set.</strong></li>
+    </ol>
+    <p><strong>Why this order:</strong> \(\eta\) and the tree count trade off almost one for one, so fixing \(\eta\) removes a redundant dimension; capacity has the biggest effect; randomness and penalties fine-tune what's left; and a smaller \(\eta\) at the end buys a slightly better minimum for more trees. Put \(\eta\) into a random search and the search drifts to tiny rates and slow models, because a smaller rate with more trees almost always looks a little better. Random search or Bayesian optimization beats a grid for steps 2–4. On the simulated book, this took validation log loss from 0.234 (defaults) to 0.226, and the winner was the smallest tree size tried (4 leaves): a winner at the edge of the grid means extend the grid.</p>
+
+    <h3>Early stopping, done right</h3>
+    <ul>
+      <li><strong>Keep the best round</strong> after a patience of, say, 50 rounds. LightGBM and XGBoost's sklearn API predict with the best round (with native <code>xgb.train</code>, pass <code>iteration_range=(0, bst.best_iteration + 1)</code>); sklearn's HistGB keeps the trees it built while waiting, so keep its patience small or refit.</li>
+      <li><strong>The validation set must look like production.</strong> For credit or anything time-dependent, validate on a later period (out-of-time), with each customer on one side only. A random split of a drifting book stops at the wrong round.</li>
+      <li><strong>Never early-stop on the test set:</strong> the round is then chosen for those rows, and no honest estimate is left. On the simulated book, stopping on test picked 24 trees and reported 0.218; stopping on validation picked 15 trees, which scored 0.220 on test.</li>
+      <li><strong>Stop on the metric you'll use.</strong> AUC only cares about order and can stop where probabilities are still off; stop on log loss when the probability itself is used (pricing, expected loss).</li>
+    </ul>
+    <div class="tbl"><table>
+      <thead><tr><th>Default</th><th>XGBoost</th><th>LightGBM</th><th>CatBoost</th></tr></thead>
+      <tbody>
+        <tr><td>Learning rate</td><td>0.3</td><td>0.1</td><td>Automatic</td></tr>
+        <tr><td>Tree size</td><td>Depth 6</td><td>31 leaves</td><td>Depth 6</td></tr>
+        <tr><td>L2 on leaves</td><td>\(\lambda = 1\)</td><td>\(\lambda = 0\)</td><td>3</td></tr>
+        <tr><td>Min leaf size</td><td>\(H \ge 1\)</td><td>20 rows</td><td>Not used</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>In an interview:</strong> “Fix the learning rate at 0.05–0.1 and let early stopping pick the number of trees. Then tune tree size with minimum leaf size, then subsampling, then the penalties, and finally lower the learning rate and early-stop again. Depth and leaves lower bias and raise variance; minimum child weight, subsampling and the penalties do the reverse. All of it on a validation set that mirrors deployment, out-of-time for credit, with the test set used once.”</p>
+
+    <!-- practice -->
+    <h2 id="practice"><span class="pn">13</span>Practical behaviour</h2>
+    <h3>Class imbalance and scale_pos_weight</h3>
+    <p><code>scale_pos_weight = k</code> multiplies every positive row's \(g\) and \(h\) by \(k\), exactly as if each positive appeared \(k\) times. The model then fits the reweighted data, whose odds are \(k\) times the real ones. For one group, the weighted best constant solves</p>
+    <div class="mj">\[ \begin{aligned} k\, n_+ (p - 1) + n_-\, p &amp;= 0 \\ \frac{p}{1 - p} &amp;= k\, \frac{n_+}{n_-} \end{aligned} \]</div>
+    <p>In words: the zero-slope condition of the weighted log loss, with \(n_+\) positives and \(n_-\) negatives; the predicted odds come out at \(k\) times the true odds \(n_+/n_-\).</p>
+    <ul>
+      <li><strong>On the six rows, \(k = 2\)</strong> (still starting at \(p = 0.5\)): the root gain rises from 0.583 to 0.709, and the leaves become −0.222 and +1.0 (from −0.5 and +0.667): positives pull harder everywhere.</li>
+      <li><strong>At \(k = 50\):</strong> an applicant with a true 3% risk has odds 0.031; times 50 that's 1.55, so a well-fitted model says about 0.61. In a simulated book with 8.7% defaults, a 100-tree depth-3 XGBoost model's mean prediction became 0.55, and its AUC fell from 0.825 to 0.794.</li>
+      <li><strong>Fix the probabilities</strong> by subtracting \(\log k\) from the raw score, or by recalibrating on held-out data.</li>
+      <li><strong>Do you need it at all?</strong> Often not. Starting at the log-odds of the base rate already balances the gradients (\(\sum g = 0\) at the start), and log loss is fine with rare positives. If you only need a ranking or a decision, keep the plain loss and move the threshold. Weighting can help when positives are so rare that splits on them can't clear <code>min_child_weight</code>; <code>max_delta_step</code> is the other knob for that case.</li>
+    </ul>
+
+    <h3>Monotonic constraints</h3>
+    <p>Credit models are expected to move one way in some features: predicted risk mustn't fall as late payments rise, or rise as income rises. An unconstrained booster fits some noise, so in places a richer applicant gets a higher risk, which is hard to defend to a customer or a regulator and is usually overfitting anyway. A <strong>monotonic constraint</strong> forces the prediction to move only one way in a feature, with every other feature held fixed. It's enforced <strong>while the tree grows</strong>:</p>
+    <ol>
+      <li><strong>Reject violating splits.</strong> For a split on a feature constrained to increase, a candidate whose left (lower-value) child gets a larger weight than its right child is refused (its gain is treated as \(-\infty\)).</li>
+      <li><strong>Pass bounds down.</strong> After an accepted split with child weights \(w_L \le w_R\), the midpoint \(m = (w_L + w_R)/2\) becomes an upper bound for every leaf in the left subtree and a lower bound for every leaf in the right subtree. Later splits, on any feature, inherit these bounds.</li>
+      <li><strong>Clip leaf values</strong> into their bounds, so nothing deeper down can undo the order.</li>
+      <li><strong>Each tree is then monotone</strong> in that feature, and a sum of monotone functions is monotone, so the whole model is.</li>
+    </ol>
+    <p>On a simulated loan book, unconstrained XGBoost's average risk curve rose with income at 12 of 27 steps, and every applicant's own curve rose somewhere. Constrained (income −1, EMI share and late payments +1), no curve rose anywhere, test log loss was unchanged (0.222 → 0.221), and AUC fell from 0.832 to 0.811; on a test set this size a gap like that is partly luck (the true probabilities themselves score 0.817). A wrong constraint shows up as a flat curve and a worse score: forcing risk to rise with income took log loss to 0.262.</p>
+    <p><strong>Caveats:</strong> the constraint holds with other features fixed, which can differ from the raw trend (if higher earners take bigger loans, raw default rates can rise with income even though, at a fixed loan size, they fall); and it says nothing about where missing values go, which is the learned default direction. LightGBM offers three enforcement methods (<code>monotone_constraints_method</code>): “basic” is the midpoint bounding above, the most restrictive; “intermediate” and “advanced” compute tighter, less restrictive bounds. <strong>Interaction constraints</strong> are the sibling tool: they say which features may share a tree path, e.g. {income, EMI} together and late payments alone, making the model \(f(\text{income}, \text{emi}) + g(\text{late})\) in log-odds.</p>
+
+    <h3>Feature importance: gain, split count, cover, SHAP</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Type</th><th>Measures</th><th>Biased toward / note</th></tr></thead>
+      <tbody>
+        <tr><td>Weight (split count)</td><td>How many splits use the feature</td><td>Continuous, many-valued features, including noise ones</td></tr>
+        <tr><td>Gain</td><td>Average gain of those splits</td><td>Features used in one big early split per tree</td></tr>
+        <tr><td>Total gain</td><td>Sum of their gains</td><td>Closer to SHAP, still training-data based</td></tr>
+        <tr><td>Cover</td><td>Average \(H\) reaching those splits (rows, for squared error)</td><td>Splits near the root</td></tr>
+        <tr><td>Mean \(\lvert\)SHAP\(\rvert\)</td><td>Average size of each feature's contribution to predictions</td><td>Consistent; still describes the model, not the world</td></tr>
+      </tbody>
+    </table></div>
+    <p>On a simulated book with a useless <code>age</code> feature, the shares were: weight 0.29 for age (split often, because it has many thresholds) and 0.05 for late payments (6 values, one big split per tree); gain 0.65 for late payments; mean |SHAP| put income and late payments on top and still gave age 0.11. All three built-in types are computed on training data, so they reward noise splits, and gain-based importance isn't <strong>consistent</strong>: a model can come to rely more on a feature while its gain importance falls. Prefer mean |SHAP|, or permutation importance on held-out data. With near-duplicate features, boosting tends to give the credit to whichever copy the early trees picked (the other's residual signal is gone), and which one wins can flip with the seed: add their importances or drop one before reading them.</p>
+
+    <h3>TreeSHAP in one paragraph</h3>
+    <p>A SHAP value splits one prediction into per-feature contributions that add up exactly to the raw score: \(F(x) = \phi_0 + \sum_j \phi_j\), with \(\phi_0\) the average score, in log-odds for a classifier. Each \(\phi_j\) is a Shapley value: feature \(j\)'s extra contribution when it “joins”, averaged over every order in which features could join, where a feature that hasn't joined is averaged out. For a rule “risk = 1 if income &lt; 40k AND EMI share &gt; 0.5”, with those conditions true for 19% and 38% of applicants independently (base 0.072), a flagged applicant gets 0.56 for income and 0.37 for EMI: the rarer condition moves the prediction further when it's revealed. With \(k\) features there are \(k!\) orders, too many to list. <strong>TreeSHAP</strong> computes the exact values from the tree's structure in polynomial time: for any set of known features it follows their branches and averages over the unknown ones' branches by the training cover that went each way, and one recursion handles all subsets at once. An applicant's largest positive values are the reasons for a decline. SHAP describes the model, not causes, and correlated features share credit arbitrarily.</p>
+
+    <h3>Custom objectives, ranking, offsets and DART</h3>
+    <ul>
+      <li><strong>Custom objectives:</strong> XGBoost and LightGBM accept a function that returns \(g\) and \(h\) for every row; that's all the tree builder needs. \(h\) must stay positive (libraries clip it to a small floor), so a loss with zero or negative curvature breaks \(-G/(H + \lambda)\) and the gain. The evaluation metric is separate from the objective.</li>
+      <li><strong>Ranking (LambdaMART):</strong> within each query, every pair of items gets a “lambda” gradient weighted by how much swapping them would change NDCG; each item's lambdas sum to its \(g\) (with a matching \(h\)), and trees are grown as usual. Keep each query's rows together when splitting the data.</li>
+      <li><strong>Offsets and continued training:</strong> <code>base_margin</code> (XGBoost) or <code>init_score</code> (LightGBM) gives each row its own starting score instead of one \(F_0\), such as log exposure in a Poisson model or an earlier model's score; boosting continues from it. Passing an existing model (<code>xgb_model</code>) adds trees to it.</li>
+      <li><strong>DART</strong> drops a random few of the existing trees when computing each round's gradients, so no early tree dominates. It regularizes, but it's slower and doesn't combine well with early stopping.</li>
+    </ul>
+
+    <h3>Why boosting overfits noisy labels more than a random forest</h3>
+    <p>Boosting puts each new tree where the remaining error is, and a mislabelled or unpredictable row <em>stays</em> in the remaining error. On the six rows, row 3 (a defaulter that looks like the non-defaulters) has \(g\) = −0.5 at the start, −0.574 after one tree, −0.70 after ten, and settles at −0.667, while row 5's \(g\) falls to −0.002. The unfixable row ends up with one of the largest gradients in the data, round after round, and deeper trees will spend splits isolating it. A random forest fits each tree to the labels with every row weighted equally; a noisy row distorts a few leaves in some trees, and averaging over bootstrap trees dilutes it. Log loss at least caps each row's pull at \(\lvert g \rvert \le 1\); AdaBoost's exponential loss doesn't, which is why it's even more fragile. For regression with squared error, one huge residual dominates \(G\) in every leaf it touches. Guards: early stopping, <code>min_child_weight</code> and \(\lambda\), subsampling, a robust loss (Huber, absolute error), and cleaning the labels.</p>
+
+    <h3>No extrapolation</h3>
+    <p>Every tree is flat beyond its last split, so the sum is too. An applicant with 10 late payments gets the same 66.35 as one with 3. In a simulated book, a booster predicted a credit limit of 242.6 at incomes of 150, 300 and 600 (₹k), where the truth was 240, 480 and 960. Fixes: predict a quantity that stays in range (limit ÷ income), detrend first and boost the residual of a linear model, or use linear leaves (LightGBM's <code>linear_tree</code>).</p>
+
+    <h3>Calibration</h3>
+    <p>A booster trained on log loss and early-stopped on log loss is often reasonably calibrated, because log loss rewards honest probabilities. It drifts when: you go past the best round (on the six rows, 200 trees took one- and two-row groups to 0.000 and 1.000); you use <code>scale_pos_weight</code>, class weights or undersampling (odds × \(k\)); you use a large \(\eta\) or tiny leaves. Check a reliability curve on held-out, out-of-time data, and fix it with Platt scaling (a logistic regression on the raw score, good with little data) or isotonic regression (more flexible, needs more data), fitted on data not used for training or early stopping.</p>
+    <p><strong>In an interview:</strong> “<code>scale_pos_weight</code> multiplies the positives' \(g\) and \(h\), so the model learns \(k\) times the odds: subtract \(\log k\) or recalibrate, or just move the threshold. Monotone constraints are enforced at split time: violating splits are rejected and midpoint bounds pass down to the leaves, so every tree, and the sum, is monotone. Split-count and gain importances are biased and computed on training data; use SHAP or permutation importance. Boosting chases unfixable rows, can't extrapolate, and needs a calibration check after any reweighting.”</p>
+
+    <!-- compare -->
+    <h2 id="compare"><span class="pn">14</span>Boosting vs random forest vs neural nets on tables</h2>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Boosted trees</th><th>Neural net</th></tr></thead>
+      <tbody>
+        <tr><td>Accuracy on typical tables</td><td>Usually best</td><td>Usually behind on small and medium data</td></tr>
+        <tr><td>Preprocessing</td><td>None: no scaling, native missing values</td><td>Scaling, encoding, imputation</td></tr>
+        <tr><td>Useless features</td><td>Robust: never split on</td><td>Hurt</td></tr>
+        <tr><td>Steps and thresholds</td><td>Natural</td><td>Biased toward smooth functions</td></tr>
+        <tr><td>Beyond the training range</td><td>Flat</td><td>Unreliable, but not flat</td></tr>
+        <tr><td>Constraints, explanations</td><td>Monotone constraints, TreeSHAP</td><td>Harder</td></tr>
+        <tr><td>Tuning</td><td>Moderate, with early stopping</td><td>A lot, with early stopping</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Where the forest sits:</strong> a random forest shares the trees' column (no preprocessing, robust to useless features, flat outside the range, TreeSHAP). It differs from boosting as in section 01: it cuts variance rather than bias, doesn't overfit with more trees, needs little tuning and trains in parallel, and usually scores a little lower once both are tuned. It's the safer choice when you can't validate carefully.</p>
+    <p><strong>Why trees win on most tables.</strong> Benchmarks on medium-sized tabular data (Grinsztajn et al., 2022) point to three reasons. Real tabular targets are irregular, full of thresholds and steps, and neural nets are biased toward smooth functions. Useless columns hurt an MLP much more than a tree, which simply never splits on them. And each column has its own meaning: trees work feature by feature, while an MLP treats the inputs as a rotatable vector and has to learn which directions matter.</p>
+    <p><strong>When neural nets win:</strong> very large data; raw images, text or audio inside the row; sequences such as transaction histories; many tasks sharing learned embeddings; end-to-end training with other modalities. Tabular foundation models trained to do in-context learning are now competitive on small tables. Ensembles of a booster and a neural net often beat either alone.</p>
+
+    <!-- whatif -->
+    <h2 id="whatif"><span class="pn">15</span>What-ifs</h2>
+    <h3>…the learning rate is 1?</h3>
+    <p>Every tree goes in at full size, noise and all. On the six rows, one tree takes the late 2–3 group from 0.5 to 0.88, on two rows, and two trees to 0.96. For log loss a full Newton step from far away also overshoots, because the parabola is only accurate near the current point: in a simulated book, one full step took a group with a real 30.5% default rate from the 8.7% base rate to 58%. Validation loss bottoms early and high (\(\eta = 0.5\) was best after 2 trees at 0.239, against 0.232 for small rates) and then climbs fast. Given the same residuals, \(\eta\) doesn't change which split wins; but a full step changes the residuals every later tree sees, and keeps all of each tree's noise.</p>
+    <h3>…the trees are very deep?</h3>
+    <p>Each tree fits the current residuals almost exactly, noise included. With full-depth trees and \(\eta = 0.1\), every round leaves 90% of each residual and the next tree refits the same pattern, so after 200 rounds the sum is about \(1 - 0.9^{200} \approx 1\) times one memorizing tree: a test RMSE of 13.5 in a simulated book, no better than a single deep tree (13.9), against 10.3 for depth-3 trees. Boosting reduces bias; a deep tree has no bias left to reduce, only variance, and adding deep trees in sequence doesn't average it away. Depth also raises the interaction order and shrinks leaves, so <code>min_child_weight</code> and \(\lambda\) start to bite.</p>
+    <h3>…λ is 0?</h3>
+    <p>Leaves become \(-G/H\), so a leaf with a tiny hessian sum takes a huge step: 10 confident rows with one surprise default give 9.1 in log-odds instead of 0.82. Pure groups climb without limit: on the six rows the late 2–3 score reaches 17.6 after 200 trees, against 3.9 with \(\lambda = 1\). With squared error and big leaves, \(\lambda = 0\) barely matters, since \(H\) is a row count. LightGBM's default is \(\lambda = 0\), relying on <code>min_child_samples</code> instead.</p>
+    <h3>…there's no early stopping?</h3>
+    <p>Training loss keeps falling; validation loss is a U and climbs past the best round. In a simulated book at \(\eta = 0.1\), the best was 15 trees (0.232), and 600 trees reached 0.301 while training loss fell to 0.044. Probabilities grow overconfident: on the six rows, 200 trees push the late 1 and late 2–3 groups to 0.000 and 1.000. A small \(\eta\) makes the climb slower, not absent.</p>
+    <h3>…min_child_weight is huge?</h3>
+    <p>No split can give both children enough hessian, so every tree is a single leaf, \(w = -G/(H + \lambda)\): a constant shift. At the base-rate start \(G = 0\), so the model never moves from \(F_0\). On the six rows even the default of 1 does this (every cut leaves a side with \(H &lt; 1\)): five trees, all single leaves of value 0, and every applicant stays at 0.5. Less extreme values bite harder as training goes on, because confident rows carry less hessian. High bias, by design.</p>
+    <h3>…a feature is duplicated?</h3>
+    <p>With exact search, the copy offers exactly the same gains, so ties are broken by a fixed rule and predictions don't change. Two things do change: with column subsampling, the duplicated feature is twice as likely to be offered at each tree or node, so it's effectively up-weighted; and importances. Without column subsampling every tie goes to the same copy (XGBoost prefers the lower column index), so one copy takes all the splits and the other shows zero; with column subsampling each copy wins when the other isn't offered, so the credit is split between them. Near-duplicates with a little noise behave like correlated features: the first trees take one, and the credit concentrates there.</p>
+    <h3>…one label is a big outlier?</h3>
+    <p>For regression with squared error, that row's residual is huge and dominates \(G\) in every leaf it lands in, so every tree bends toward it; in a simulated book, a 2% share of +₹500k typos took test RMSE from about 10 to 29.0, while absolute error (10.5) and Huber (10.9) shrugged it off. For classification a flipped label caps at \(\lvert g \rvert \le 1\) but never goes away (section 13), so deeper trees isolate it. Use a robust loss, early stopping and bigger leaves, and look at the rows with the largest final gradients: they're often label errors.</p>
+    <h3>…every feature is missing for a row?</h3>
+    <p>The row follows the default direction at every split, so in each tree it lands in one fixed leaf: the end of the “all-missing” path. Its prediction is \(F_0\) plus \(\eta\) times those leaves, which isn't the base rate and isn't a considered estimate either. Each default direction was learned from rows where <em>that one</em> feature was missing (or not learned at all), not from rows where everything was. On the six rows, after two trees, a missing late count gets 0.374 (the low-risk value) from this note's NumPy build and 0.744 (the high-risk value) from XGBoost's default histogram method: two arbitrary defaults, two very different answers. Catch such rows before scoring: count missing fields, route them to a fallback (the base rate, a rule, a manual review), and monitor how often it happens.</p>
+    <h3>Quick ones</h3>
+    <ul>
+      <li><strong>…you start from 0 instead of the base rate?</strong> The first trees spend themselves walking everyone to the base rate; the end point is the same, the early rounds are wasted.</li>
+      <li><strong>…you fit the gradient instead of the negative gradient?</strong> Every step goes uphill and training loss rises each round. It's the classic from-scratch bug; the check is that training loss falls.</li>
+      <li><strong>…the trees are fitted in parallel on the same target?</strong> They come out nearly the same, so the sum is one tree with a bigger step. The correction only happens because tree \(m\) sees what trees 1 to \(m - 1\) got wrong.</li>
+      <li><strong>…the base learner is linear?</strong> A sum of linear models is one linear model, so boosting adds nothing a regularized linear fit doesn't have. Trees work because sums of steps build curves and interactions.</li>
+      <li><strong>…a category at inference was never seen?</strong> CatBoost gives it the prior; LightGBM sends it down the “other” side of each categorical split; one-hot gives all zeros.</li>
+    </ul>
+
+    <!-- pseudocode -->
+    <h2 id="pseudocode"><span class="pn">16</span>Pseudocode and a from-scratch build</h2>
+    <h3>Generic gradient boosting (any loss)</h3>
+    <pre class="code"><code>INPUT X, y, loss, M trees, eta
+F0 = argmin_c Σ_i loss(y_i, c)
+     <span class="cm"># mean | median | log-odds of rate</span>
+F[i] = F0 for every row i
+repeat M times:
+    r[i] = -∂loss(y_i, F[i]) / ∂F[i]
+                    <span class="cm"># pseudo-residuals</span>
+    tree = regression tree on (X, r),
+           by squared error
+                    <span class="cm"># picks the regions</span>
+    for each leaf j:
+        c[j] = argmin_c Σ_(i in j)
+                 loss(y_i, F[i] + c)
+                    <span class="cm"># mean / median / Newton</span>
+    F[i] += eta * c[leaf of row i]
+    save (tree, c)
+
+PREDICT(x):
+    s = F0 + eta * Σ_m c_m[leaf_m(x)]
+    regression:     return s
+    classification: return sigmoid(s)</code></pre>
+
+    <h3>XGBoost: one round and one tree</h3>
+    <pre class="code"><code>each round:
+    for every row i:
+        g[i], h[i] = slope, bend at F[i]
+        <span class="cm"># squared: g = F - y, h = 1</span>
+        <span class="cm"># log loss: p = sigmoid(F)</span>
+        <span class="cm">#   g = p - y, h = p * (1 - p)</span>
+    tree = GROW(all rows, depth = 0)
+    F[i] += eta * tree(x_i)
+
+GROW(rows, depth):
+    G = Σ g;  H = Σ h      <span class="cm"># over these rows</span>
+    if depth == max_depth:
+        return LEAF(-G / (H + lam))
+    best = SPLIT_SEARCH(rows, G, H)
+    if best.gain &lt;= 0:
+        return LEAF(-G / (H + lam))
+    split rows by best.f &lt; best.cut
+        <span class="cm"># missing f → best.default side</span>
+    return NODE(best,
+                GROW(left,  depth + 1),
+                GROW(right, depth + 1))</code></pre>
+
+    <h3>One split search, with the default direction</h3>
+    <pre class="code"><code>SPLIT_SEARCH(rows, G, H):
+  best.gain = -infinity
+  for each feature f:
+    M = rows where f is missing
+    Gm = Σ g over M;  Hm = Σ h over M
+    P = rows with f present, sorted by f
+    GL = 0;  HL = 0
+    for k = 0 .. len(P) - 2:
+      GL += g[P[k]];  HL += h[P[k]]
+      if f(P[k]) == f(P[k+1]):
+        continue      <span class="cm"># no cut inside ties</span>
+      for side in (left, right):
+        gl, hl = GL, HL
+        if side == left:
+          gl += Gm;  hl += Hm
+        gr = G - gl;  hr = H - hl
+        if min(hl, hr) &lt; min_child_weight:
+          continue
+        gain = 1/2 * ( gl²/(hl + lam)
+                     + gr²/(hr + lam)
+                     - G²/(H + lam) ) - gamma
+        if gain &gt; best.gain:
+          cut = (f(P[k]) + f(P[k+1])) / 2
+          best = (gain, f, cut, side)
+  return best</code></pre>
+    <p><strong>Cost:</strong> sorting once per feature before training makes each node one linear sweep per feature; histograms replace the sorted rows by at most 256 bins. With \(\gamma\), XGBoost's exact method then prunes bottom-up any split whose gain is below \(\gamma\) and whose children are both leaves.</p>
+
+    <h3>XGBoost from scratch, in NumPy</h3>
+    <p>Every piece by hand: \(g\) and \(h\), the running-sum split search with the default direction, the gain and the leaf value. It follows the pseudocode line by line.</p>
+    <pre class="code"><code>import numpy as np
+
+def sigmoid(z):
+  return 1 / (1 + np.exp(-z))
+
+def grad_hess(y, F, loss):
+  if loss == "squared":
+    return F - y, np.ones_like(F)
+  p = sigmoid(F)                  <span class="cm"># log loss</span>
+  return p - y, p * (1 - p)
+
+def score(G, H, lam):
+  return G * G / (H + lam)
+
+def best_split(X, g, h, cfg):
+  lam, best = cfg["lam"], None
+  G, H = g.sum(), h.sum()
+  for j in range(X.shape[1]):
+    x = X[:, j]
+    miss = np.isnan(x)
+    Gm, Hm = g[miss].sum(), h[miss].sum()
+    o = np.argsort(x[~miss])
+    xs = x[~miss][o]
+    gs, hs = g[~miss][o], h[~miss][o]
+    GL = HL = 0.0
+    for i in range(len(xs) - 1):
+      GL, HL = GL + gs[i], HL + hs[i]
+      if xs[i] == xs[i + 1]:
+        continue          <span class="cm"># no cut inside ties</span>
+      for m_left in (True, False):
+        gl = GL + Gm * m_left
+        hl = HL + Hm * m_left
+        gr, hr = G - gl, H - hl
+        if min(hl, hr) &lt; cfg["mcw"]:
+          continue
+        gain = 0.5 * (score(gl, hl, lam)
+          + score(gr, hr, lam)
+          - score(G, H, lam)) - cfg["gamma"]
+        if best is None or gain &gt; best[0]:
+          cut = (xs[i] + xs[i + 1]) / 2
+          best = (gain, j, cut, m_left)
+  return best
+
+def build(X, g, h, depth, cfg):
+  if depth &lt; cfg["max_depth"]:
+    s = best_split(X, g, h, cfg)
+    if s is not None and s[0] &gt; 0:
+      _, j, cut, m_left = s
+      miss = np.isnan(X[:, j])
+      L = np.where(miss, m_left, X[:, j] &lt; cut)
+      d = depth + 1
+      lt = build(X[L], g[L], h[L], d, cfg)
+      rt = build(X[~L], g[~L], h[~L], d, cfg)
+      return {"j": j, "cut": cut,
+              "m_left": m_left,
+              "left": lt, "right": rt}
+  w = -g.sum() / (h.sum() + cfg["lam"])
+  return {"leaf": float(w)}
+
+def tree_predict(node, x):
+  while "leaf" not in node:
+    v = x[node["j"]]
+    if np.isnan(v):
+      go_left = node["m_left"]
+    else:
+      go_left = v &lt; node["cut"]
+    side = "left" if go_left else "right"
+    node = node[side]
+  return node["leaf"]
+
+def fit(X, y, loss, n_trees, cfg):
+  if loss == "squared":
+    F0 = y.mean()
+  else:                 <span class="cm"># log-odds of base rate</span>
+    F0 = np.log(y.mean() / (1 - y.mean()))
+  F = np.full(len(y), F0)
+  trees = []
+  for _ in range(n_trees):
+    g, h = grad_hess(y, F, loss)
+    tree = build(X, g, h, 0, cfg)
+    step = [tree_predict(tree, x) for x in X]
+    F = F + cfg["eta"] * np.array(step)
+    trees.append(tree)
+  return F0, trees
+
+def predict(X, F0, trees, cfg, loss):
+  F = np.full(len(X), F0)
+  for t in trees:
+    F += cfg["eta"] * np.array(
+      [tree_predict(t, x) for x in X])
+  if loss == "squared":
+    return F
+  return sigmoid(F)</code></pre>
+    <p><strong>Check it on the six rows.</strong> The <code># →</code> lines are the real outputs (NumPy 1.x printing), and they match sections 02, 05 and 08. Two-space indents keep the lines phone-width; it's ordinary Python.</p>
+    <pre class="code"><code>late = np.array([0, 0, 0, 1, 2, 3.0])
+X = late.reshape(-1, 1)
+limit = np.array([100, 110, 90, 80, 50, 50.0])
+default = np.array([0, 0, 1, 0, 1, 1.0])
+cfg = dict(eta=0.3, max_depth=1, lam=0.0,
+           gamma=0.0, mcw=0.0)
+
+F0, trees = fit(X, limit, "squared", 2, cfg)
+predict(X, F0, trees, cfg, "squared")
+<span class="cm"># → [89.15 89.15 89.15 79.85 66.35 66.35]</span>
+F0, trees = fit(X, default, "logloss", 2, cfg)
+predict(X, F0, trees, cfg, "logloss").round(3)
+<span class="cm"># → [0.374 0.374 0.374 0.374 0.744 0.744]</span>
+
+cfg1 = dict(cfg, lam=1.0)
+F0, trees = fit(X, default, "logloss", 3, cfg1)
+predict(X, F0, trees, cfg1, "logloss").round(4)
+<span class="cm"># → [0.4043 0.4043 0.4043 0.4043 0.633  0.633 ]</span>
+
+nan = np.nan          <span class="cm"># two missing rows</span>
+Xm = np.array([[0], [0], [0], [1], [2], [3],
+               [nan], [nan]])
+ym = np.array([0, 0, 1, 0, 1, 1, 1, 1.0])
+g, h = grad_hess(ym, np.zeros(8), "logloss")
+s = best_split(Xm, g, h, cfg1)
+round(s[0], 3), s[2], s[3]
+<span class="cm"># → (1.083, 1.5, False): missing go right</span></code></pre>
+
+    <!-- questions -->
+    <h2 id="questions"><span class="pn">17</span>Interview questions</h2>
+    <p>Answer out loud first, then open the answer.</p>
+
+    <details class="qa"><summary><span class="qn">1</span>How does gradient boosting work, step by step?</summary><div class="ans">
+      <p><strong>It builds an additive model one small regression tree at a time: each tree is fitted to the negative gradient of the loss at the current predictions, and added after shrinking by the learning rate.</strong></p>
+      <ol>
+        <li>Start every row at the best constant \(F_0\): the mean for squared error, the log-odds of the base rate for log loss.</li>
+        <li>Each round, compute every row's gradient \(g\) (and, for XGBoost, the hessian \(h\)) at its current prediction.</li>
+        <li>Grow a regression tree on them: classic GBM fits \(-g\) by least squares; XGBoost scores splits with the second-order gain.</li>
+        <li>Set each leaf to the value that lowers the loss most: the mean residual for squared error, a Newton step \(-G/(H + \lambda)\) for log loss.</li>
+        <li>Update \(F \leftarrow F + \eta \cdot \text{tree}(x)\) and repeat until validation loss stops improving.</li>
+        <li>Predict with \(F_0 + \eta \sum_m f_m(x)\), passed through the sigmoid for classification.</li>
+      </ol>
+      <p><strong>Why it works:</strong> each tree moves every row's prediction downhill on its own loss, and because the step is a function of the features, it moves unseen rows sensibly too. On a toy where credit limits fall with late payments, tree 1 cuts at 1.5 late payments; tree 2 cuts at 0.5, because tree 1 over-pushed the one applicant with a single late payment. <strong>Follow-up:</strong> trees are built in sequence, since each needs the previous predictions; the parallelism is inside a tree. (<a href="#regression">02</a>, <a href="#functional">03</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">2</span>Why fit the negative gradient? Why not fit the target directly?</summary><div class="ans">
+      <p><strong>Adding a tree fitted to the negative gradient is one gradient-descent step on the predictions, so every round lowers the loss; for squared error the negative gradient is exactly the residual.</strong></p>
+      <div class="mj">\[ \begin{aligned} L &amp;= \sum_i \ell(y_i, F_i) \\ -g_i &amp;= -\frac{\partial \ell(y_i, F_i)}{\partial F_i} \\ f_m &amp;= \arg\min_{f} \sum_i \big(-g_i - f(x_i)\big)^2 \end{aligned} \]</div>
+      <p>In words: the steepest way down for each row is \(-g_i\); the tree is the closest function of \(x\) to that direction. \(-g\) is \(y - F\) for squared error, \(\text{sign}(y - F)\) for absolute error and \(y - p\) for log loss.</p>
+      <p><strong>Why not the target:</strong> every round would see the same labels and grow the same tree, ignoring what the model already knows. With gradients, rows that are already right have \(g \approx 0\) and barely pull on the split, so each tree works on what's still wrong. <strong>Trade-off:</strong> the gradient gives a direction, not a step size, so the leaves are re-set by a line search or Newton step. Fitting \(+g\) by mistake makes the training loss rise every round: the classic from-scratch bug. (<a href="#functional">03</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">3</span>What loss does each tree minimize? Gini, entropy? Are they classification trees?</summary><div class="ans">
+      <p><strong>Neither Gini nor entropy: each tree minimizes the model's own loss after the tree is added, and its leaves hold real numbers, so every tree is a regression tree, even for classification.</strong></p>
+      <div class="mj">\[ \begin{aligned} &amp;\sum_i \ell\big(y_i, F_i + f(x_i)\big) \\ &amp;\quad \approx \text{const} + \sum_i \big[ g_i f(x_i) + \tfrac12 h_i f(x_i)^2 \big] \\ &amp;\text{Gain} = \tfrac12 \Big[\tfrac{G_L^2}{H_L + \lambda} + \tfrac{G_R^2}{H_R + \lambda} \\ &amp;\qquad - \tfrac{G^2}{H + \lambda}\Big] - \gamma \end{aligned} \]</div>
+      <p>In words: XGBoost approximates the loss after the tree to second order, and the gain is how much a split lowers that approximation. Classic GBM instead grows each tree by squared error on \(-g\) and fixes the leaf values afterwards.</p>
+      <p><strong>Why not Gini:</strong> Gini and entropy score class purity for a standalone tree whose leaves predict classes. Here a leaf is a correction added to a running log-odds score, and what matters is the ensemble's loss. <strong>Follow-up:</strong> for squared error with \(\lambda = 0\) the gain is exactly half the drop in squared error, the usual regression-tree criterion. (<a href="#pieces">01</a>, <a href="#xgboost">06</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">4</span>Does each tree output a probability? Where's the sigmoid?</summary><div class="ans">
+      <p><strong>No: each tree outputs a change in log-odds, and the sigmoid is applied once, to the total.</strong></p>
+      <div class="mj">\[ p = \sigma\Big(F_0 + \eta \sum_m f_m(x)\Big) \]</div>
+      <p>In words: add up the start and every tree's shrunk leaf value in log-odds, then convert to a probability. During training the sigmoid appears only when computing \(g = p - y\) and \(h = p(1 - p)\) from the running total.</p>
+      <p><strong>Why:</strong> probabilities are bounded and can't be added (0.6 + 0.7 = 1.3), while log-odds can take any value, so any sum maps back into (0, 1). Example: start at \(F_0 = 0\) (a 50% base rate); if two trees add +0.6 and +0.465 for some applicant, \(F\) is 1.065 and \(p = \sigma(1.065)\), about 0.744. <strong>Follow-up:</strong> AdaBoost's score is half the log-odds, so its probability is \(\sigma(2F)\). (<a href="#classification">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">5</span>What is the initial prediction F₀, and why does it matter?</summary><div class="ans">
+      <p><strong>The best constant for the loss: the mean for squared error, the log-odds of the base rate for log loss.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{squared:}\quad \textstyle\sum_i (c - y_i) &amp;= 0 \\ c &amp;= \bar y \\ \text{log loss:}\quad \textstyle\sum_i (\sigma(c) - y_i) &amp;= 0 \\ c &amp;= \log\frac{\bar y}{1 - \bar y} \end{aligned} \]</div>
+      <p>In words: set the slope of the total loss in one shared constant to zero. At that start the gradients already sum to zero, \(\sum g = 0\), so imbalance doesn't tilt the first trees.</p>
+      <p><strong>Why it matters:</strong> start elsewhere and the first trees spend themselves walking everyone to the base rate. In a simulated book with 8.7% defaults, starting at 0.5 needed 64 trees instead of 35 for the same test log loss. <strong>Follow-up:</strong> for absolute error it's the median; XGBoost's <code>base_score</code> sets it, and recent versions estimate it from the data. (<a href="#functional">03</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">6</span>Derive g and h for squared error and for log loss. What changes for multiclass?</summary><div class="ans">
+      <p><strong>Squared error: \(g = F - y\), \(h = 1\). Log loss on the raw score: \(g = p - y\), \(h = p(1 - p)\).</strong></p>
+      <div class="mj">\[ \begin{aligned} \frac{dp}{dF} &amp;= p(1 - p) \\ \frac{\partial \ell}{\partial p} &amp;= -\frac{y}{p} + \frac{1 - y}{1 - p} \\ &amp;= \frac{p - y}{p(1 - p)} \\ g &amp;= \frac{\partial \ell}{\partial p} \cdot \frac{dp}{dF} \\ &amp;= p - y \\ h &amp;= \frac{dg}{dF} \\ &amp;= p(1 - p) \end{aligned} \]</div>
+      <p>In words: the sigmoid's slope \(p(1 - p)\) cancels the denominator, leaving the probability error; differentiating \(p - y\) again leaves only the sigmoid's slope.</p>
+      <p><strong>Why it matters:</strong> \(h\) is how much \(p\) moves per unit of log-odds, so confident rows (\(p\) near 0 or 1) have \(h \approx 0\) and count little. <strong>Multiclass:</strong> \(K\) scores, softmax probabilities, \(g_k = p_k - y_k\) and \(h_k = p_k(1 - p_k)\) (XGBoost uses twice that), and \(K\) trees per round. <strong>Follow-up:</strong> absolute error has \(h = 0\) almost everywhere, so the Newton leaf breaks; classic GBM uses the median residual instead, and XGBoost's absolute-error and quantile objectives grow the tree with \(h = 1\), then re-set each leaf by a line search, like Friedman's step 4. (<a href="#classification">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">7</span>Derive XGBoost's optimal leaf weight and split gain.</summary><div class="ans">
+      <p><strong>Expand the regularized objective to second order, group rows by leaf, and minimize each leaf's parabola: \(w^* = -G/(H + \lambda)\); the gain is the drop in the resulting structure score.</strong></p>
+      <div class="mj">\[ \begin{aligned} \Omega &amp;= \gamma T + \tfrac12 \lambda \textstyle\sum_j w_j^2 \\ \text{Obj} &amp;= \textstyle\sum_i \ell(y_i, F_i + f_i) + \Omega \\ &amp;\approx \textstyle\sum_i \big[g_i f_i + \tfrac12 h_i f_i^2\big] + \Omega \\ &amp;= \textstyle\sum_j \big[G_j w_j + \tfrac12 (H_j + \lambda) w_j^2\big] \\ &amp;\quad + \gamma T \\ w_j^* &amp;= -\frac{G_j}{H_j + \lambda} \\ \text{Obj}^* &amp;= -\tfrac12 \textstyle\sum_j \frac{G_j^2}{H_j + \lambda} + \gamma T \end{aligned} \]</div>
+      <p>In words: line 3 is the Taylor expansion, dropping the current loss, which the tree can't change; lines 4–5 use that every row in leaf \(j\) gets \(w_j\); line 6 sets each leaf's slope \(G_j + (H_j + \lambda) w_j\) to zero; line 7 plugs it back. A split replaces one leaf by two and adds one \(\gamma\):</p>
+      <div class="mj">\[ \begin{aligned} \text{Gain} &amp;= \frac12 \Big[\frac{G_L^2}{H_L + \lambda} + \frac{G_R^2}{H_R + \lambda} \\ &amp;\qquad - \frac{(G_L + G_R)^2}{H_L + H_R + \lambda}\Big] - \gamma \end{aligned} \]</div>
+      <p><strong>Why it's useful:</strong> the gain needs only sums of \(g\) and \(h\), so every cut is scored in one sweep with running sums. <strong>Check:</strong> six rows at \(p = 0.5\), \(\lambda = 1\), split late &lt; 1.5: \(G_L = 1\), \(H_L = 1\), \(G_R = -1\), \(H_R = 0.5\), so the gain is ½ × (0.5 + 0.667 − 0) = 0.583 and the leaves are −0.5 and +0.667. XGBoost's dump shows 1.167, because it drops the ½. (<a href="#xgboost">06</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">8</span>Why second-order? Why divide by the hessian?</summary><div class="ans">
+      <p><strong>A first-order approximation gives a direction but no step size; the second-order term makes each leaf a parabola whose minimum is a Newton step, and dividing by \(h\) converts an error in probability into a step in log-odds.</strong></p>
+      <div class="mj">\[ \begin{aligned} \ell(F + w) &amp;\approx \ell(F) + g\, w + \tfrac12 h\, w^2 \\ w^* &amp;= -g / h \end{aligned} \]</div>
+      <p>In words: a straight line has no bottom; a parabola does. Near \(p = 0.5\), one unit of log-odds moves \(p\) by about 0.25, so a leaf whose probabilities are 0.25 too high needs about one unit down: \(G/H\) = 0.25/0.25 = 1 (the exact answer on the toy was 1.10).</p>
+      <ul>
+        <li><strong>Rows weighted by certainty:</strong> confident rows have \(h \approx 0\), so they barely count in \(H\) or in the choice of split.</li>
+        <li><strong>Any loss plugs in:</strong> any twice-differentiable loss with \(h &gt; 0\) only needs to supply \(g\) and \(h\); that's how custom objectives work.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> the parabola is accurate only near the current prediction. From far away a full Newton step overshoots (a group with a real 30.5% rate jumped from 8.7% to 58% in one full step), which is one reason for \(\eta &lt; 1\) and for recomputing \(g\) and \(h\) every round. (<a href="#classification">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">9</span>What do λ, γ and min_child_weight do? Give numbers.</summary><div class="ans">
+      <p><strong>\(\lambda\) shrinks leaf values, most where the hessian sum is small; \(\gamma\) is the minimum gain a split must earn; <code>min_child_weight</code> is the minimum hessian sum each child must have.</strong></p>
+      <ul>
+        <li><strong>\(\lambda\)</strong> sits in \(-G/(H + \lambda)\) and in the gain. A one-row leaf (\(G = -0.5\), \(H = 0.25\)) goes from 2.0 to 0.4 at \(\lambda = 1\); a 100-row leaf goes from 2.0 to 1.92. It's \(\lambda\) units of hessian saying “don't move”.</li>
+        <li><strong>\(\gamma\)</strong> is a price per leaf. XGBoost compares it with the gain without the ½: the toy split (1.167) survives \(\gamma = 1.1\) and is pruned at 1.2. The exact method grows to <code>max_depth</code> and prunes bottom-up, so a weak split with a strong one below it survives; the default histogram method checks \(\gamma\) as it grows, so it never makes the weak split.</li>
+        <li><strong><code>min_child_weight</code></strong> counts rows weighted by \(p(1 - p)\). Ten rows at \(p = 0.01\) have \(H = 0.099\): with one surprise default and \(\lambda = 0\) their leaf would be 9.1 in log-odds; the default of 1 refuses it.</li>
+      </ul>
+      <p><strong>Why they exist:</strong> a leaf with little hessian (few rows, or rows the model is already sure about) takes a big step on little evidence. <strong>Trade-off:</strong> all three raise bias and lower variance. For squared error <code>min_child_weight</code> is just a minimum row count; for log loss it tightens as predictions grow confident. (<a href="#regularizers">07</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">10</span>How does XGBoost handle missing values? What can go wrong?</summary><div class="ans">
+      <p><strong>Sparsity-aware split finding: at each candidate split it tries sending the missing rows left and right, and keeps the side with the higher gain as that split's default direction.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{left} &amp;= (G_L + G_M,\ H_L + H_M) \\ \text{right} &amp;= (G_R,\ H_R) \\ \text{or: left} &amp;= (G_L,\ H_L) \\ \text{right} &amp;= (G_R + G_M,\ H_R + H_M) \end{aligned} \]</div>
+      <p>In words: scan only present values, compute the missing rows' sums \(G_M\) and \(H_M\) once, and score each cut twice with the usual gain: once with the missing rows' sums on the left (first two lines), once on the right. On the toy, two missing defaulters at late &lt; 1.5 score 1.083 on the right against 0.167 on the left, so missing goes with the risky group.</p>
+      <p><strong>Why it's good:</strong> no imputation, missingness itself can carry signal, and the scan costs only the present values, so sparse data is cheap. <strong>What goes wrong:</strong> if a feature had no missing values in training, the direction is a fixed default, not learned, so values that go missing only in production all go one arbitrary way (in a simulation, AUC fell from 0.832 to 0.66); sparse matrices treat unstored zeros as missing; and CatBoost doesn't learn a direction (missing is the smallest value). Monitor missing rates between training and serving. (<a href="#missing">08</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">11</span>Exact vs approximate vs histogram split finding. Why weight quantiles by h?</summary><div class="ans">
+      <p><strong>Exact scores every distinct value; approximate scores candidates at \(h\)-weighted quantiles; histogram bins each feature once and scores only bin edges.</strong></p>
+      <ul>
+        <li><strong>Exact:</strong> sort each feature once, then sweep with running sums \(G_L\), \(H_L\) and \(G_R = G - G_L\). Precise, slow on big data.</li>
+        <li><strong>Approximate:</strong> candidate cuts at quantiles where each row weighs \(h_i\), proposed per tree or per node; a weighted quantile sketch makes this mergeable across machines.</li>
+        <li><strong>Histogram:</strong> about 256 quantile bins per feature, one-byte codes, one pass per node to sum \(g\) and \(h\) per bin, the larger child's histogram by subtraction. The default in XGBoost, LightGBM, CatBoost and sklearn's HistGB.</li>
+      </ul>
+      <div class="mj">\[ g\, w + \tfrac12 h\, w^2 = \tfrac12 h \big(w + g/h\big)^2 - \frac{g^2}{2h} \]</div>
+      <p><strong>Why \(h\):</strong> in words, each row is a squared-error target \(-g/h\) with weight \(h\), so unsure rows deserve finer cut points. <strong>Trade-off:</strong> binning costs a little precision: in a simulation the best income cut moved from 39.46 to 39.66 and lost 0.6% of its gain. (<a href="#splits">09</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">12</span>Learning rate vs number of trees: how do they trade off?</summary><div class="ans">
+      <p><strong>A smaller learning rate needs proportionally more trees and usually reaches the same or a slightly better validation loss, with a flatter minimum.</strong></p>
+      <p>On a simulated loan book: \(\eta\) = 0.1 was best at 15 trees, 0.03 at 91 and 0.01 at 266, all at a validation log loss of 0.232; for small rates \(\eta \times\) trees stayed about 2.7. \(\eta = 0.5\) was best after 2 trees, at a worse 0.239.</p>
+      <p><strong>Why small helps:</strong> each tree is a greedy, noisy fit to the same rows; a small step keeps only a little of each tree's noise, so the model averages over many trees. Past the best round, a small rate also climbs slowly, so a mis-set tree count costs less. \(\eta\) doesn't change which split a tree picks (every drop shrinks by the same factor \(2\eta - \eta^2\)); it changes the residuals later trees see. <strong>Trade-off:</strong> training and prediction time grow with the number of trees. In practice: fix 0.05–0.1, early-stop, lower it at the end if you can afford it. (<a href="#functional">03</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">13</span>How do you prevent overfitting in gradient boosting?</summary><div class="ans">
+      <p><strong>Stop it chasing noise at two levels, the ensemble and the leaf, and check it on validation data that looks like production.</strong></p>
+      <ul>
+        <li><strong>Ensemble:</strong> early stopping on the number of trees; a small learning rate; row and column subsampling, which decorrelate the trees.</li>
+        <li><strong>Each tree:</strong> shallow depth or few leaves (lower interaction order); <code>min_child_weight</code> or <code>min_child_samples</code>; \(\lambda\), \(\alpha\) and \(\gamma\).</li>
+        <li><strong>Structure:</strong> monotone and interaction constraints remove wiggles that are usually noise.</li>
+        <li><strong>Data:</strong> a robust loss for outlying targets, label cleaning, out-of-time validation for drifting data, and the test set used once.</li>
+      </ul>
+      <p><strong>Why boosting needs it:</strong> each tree fits what's left, and eventually that's noise, so training loss falls forever while validation loss is U-shaped. <strong>Follow-up:</strong> tune in order: \(\eta\) with early stopping, then size, then sampling, then penalties. (<a href="#tuning">12</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">14</span>Boosting vs bagging: bias and variance?</summary><div class="ans">
+      <p><strong>Bagging averages deep, independent trees to cut variance; boosting adds shallow, dependent trees in sequence to cut bias.</strong></p>
+      <div class="mj">\[ \text{Var}\Big(\frac1B \sum_b T_b\Big) = \rho\, \sigma^2 + \frac{1 - \rho}{B}\, \sigma^2 \]</div>
+      <p>In words: for a forest of \(B\) trees each with variance \(\sigma^2\) and correlation \(\rho\), more trees only shrink the second term, so adding trees never hurts. Boosting instead reduces the remaining error tree by tree; once only noise is left, more trees raise variance.</p>
+      <p>On a simulated book, boosting's validation loss was best at 15 trees (0.232) and reached 0.301 by 600, while the forest's fell steadily and flattened at 0.249. <strong>Trade-off:</strong> tuned boosting usually wins on accuracy; a forest is harder to break, parallel to train, and needs almost no tuning. (<a href="#pieces">01</a>, <a href="#compare">14</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">15</span>Why does boosting overfit noisy labels more than a random forest?</summary><div class="ans">
+      <p><strong>Boosting aims each new tree at the remaining error, and a mislabelled or unpredictable row stays in the remaining error forever, so it keeps attracting splits.</strong></p>
+      <p>On a six-row toy with one feature, a defaulter whose feature value matches two non-defaulters (so no split can separate them) has \(g\) = −0.5 at the start, −0.70 after ten trees and settles at −0.667, while a fixable row's \(g\) falls to −0.002. The unfixable row ends up with one of the largest gradients, round after round, and deeper trees will isolate it.</p>
+      <ul>
+        <li><strong>The forest:</strong> every tree fits the labels with each row weighted equally; a noisy row distorts a few leaves in some trees, and averaging over bootstrap trees dilutes it.</li>
+        <li><strong>The loss matters:</strong> log loss caps each row's pull at \(\lvert g \rvert \le 1\); AdaBoost's exponential loss grows without limit, so it's more fragile; squared error lets one outlier dominate a leaf.</li>
+      </ul>
+      <p><strong>Guards:</strong> early stopping, <code>min_child_weight</code> and \(\lambda\), subsampling, a robust loss, and looking at the rows with the largest final gradients, which are often label errors. (<a href="#practice">13</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">16</span>Depth-wise vs leaf-wise tree growth?</summary><div class="ans">
+      <p><strong>Depth-wise splits every node level by level; leaf-wise always splits the single leaf with the largest gain, wherever it is.</strong></p>
+      <ul>
+        <li><strong>Leaf-wise</strong> (LightGBM; XGBoost's <code>lossguide</code>) lowers training loss more for the same number of leaves, because no split is spent on a leaf with little to gain.</li>
+        <li><strong>The risk:</strong> deep, thin branches that fit a few rows. On a simulated book, validation loss after 500 rounds was 0.243 with 4 leaves and 0.746 with 127.</li>
+        <li><strong>Controls:</strong> <code>num_leaves</code> as the main knob, <code>min_child_samples</code> as the floor (it's what saved small data: 0.272 with one-row leaves vs 0.237 with 50-row leaves), <code>max_depth</code> as a cap.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> CatBoost's symmetric trees are the opposite extreme: one question per level, fast and hard to overfit, less flexible per tree. (<a href="#lightgbm">10</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">17</span>XGBoost vs LightGBM vs CatBoost?</summary><div class="ans">
+      <p><strong>All three are second-order gradient boosters; they differ in how trees grow, how splits are searched and sampled, and how categories are handled.</strong></p>
+      <ul>
+        <li><strong>XGBoost:</strong> depth-wise by default, exact / approximate / histogram search, \(\lambda = 1\) by default, learned missing directions, monotone and interaction constraints, native categories (sorted by leaf weight, like LightGBM), custom objectives, a mature distributed and GPU ecosystem.</li>
+        <li><strong>LightGBM:</strong> histograms with leaf-wise growth, GOSS and EFB; usually fastest on large data; overfits small data at default settings; categories split by sorting on \(G/H\).</li>
+        <li><strong>CatBoost:</strong> ordered target statistics and ordered boosting, symmetric trees, strong defaults; the best native handling of high-cardinality categoricals; slower to train, very fast to predict.</li>
+      </ul>
+      <p><strong>How to choose:</strong> tuned, they usually land within noise of each other, so choose by the data. Many high-cardinality categories: CatBoost (with <code>has_time</code> if there's a time order), or XGBoost/LightGBM with out-of-fold or time-ordered target encoding. Very large data: LightGBM or XGBoost's histogram method. The validation design matters more than the library. (<a href="#lightgbm">10</a>, <a href="#catboost">11</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">18</span>Why is CatBoost's target encoding special? What's prediction shift?</summary><div class="ans">
+      <p><strong>CatBoost encodes each row using only the rows before it in a random permutation (plus a prior), so a row's own label never enters its own encoding; naive target encoding leaks exactly that.</strong></p>
+      <div class="mj">\[ \hat x_i = \frac{\sum_{j \prec i,\ c_j = c_i} y_j + a \cdot \text{prior}}{\#\{\, j \prec i : c_j = c_i \,\} + a} \]</div>
+      <p>In words: the average label of earlier rows in the same category, pulled toward the overall rate by \(a\) pseudo-rows. Naively, each row's label sits inside its category's mean: a useless 300-level pincode scored train AUC 0.779 and test 0.471, and dropped a model's test AUC from 0.809 to 0.609. Ordered statistics removed the fake signal (train AUC 0.492, model 0.812). Smoothing alone doesn't, because it keeps the order.</p>
+      <p><strong>Prediction shift</strong> is the same leak inside boosting: each row's gradient comes from a model trained on that row, so training residuals look smaller than they would on new data. Ordered boosting computes each row's gradient from a model built only on earlier rows. <strong>Trade-off:</strong> early rows get noisy encodings (CatBoost keeps several random permutations and uses different ones for different trees, so no row is always early), a random order isn't time order, and ordered boosting costs more. Elsewhere, out-of-fold target encoding does the same job. (<a href="#catboost">11</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">19</span>Feature importance: weight vs gain vs cover vs SHAP. What is TreeSHAP?</summary><div class="ans">
+      <p><strong>Weight counts splits, gain averages their gains, cover averages the hessian reaching them; SHAP splits each prediction into additive per-feature contributions, and mean |SHAP| is the most trustworthy of the four.</strong></p>
+      <ul>
+        <li><strong>Weight</strong> favours many-valued features, noise included: a useless age feature got 29% of splits in a simulation, while a 6-valued strong feature got 5%.</li>
+        <li><strong>Gain</strong> favours a feature used in one big early split per tree (that same strong feature: 65%), and isn't consistent: a model can rely more on a feature while its gain falls.</li>
+        <li><strong>Cover</strong> favours splits near the root. All three are measured on training data, so they reward noise splits.</li>
+      </ul>
+      <div class="mj">\[ F(x) = \phi_0 + \sum_j \phi_j(x) \]</div>
+      <p><strong>TreeSHAP</strong>, in words: \(\phi_0\) is the average raw score, and each \(\phi_j\) is a Shapley value, feature \(j\)'s marginal contribution averaged over all orders in which features could be revealed. TreeSHAP computes them exactly in polynomial time, by following known features' branches and averaging over unknown features' branches by the training cover. <strong>Caveats:</strong> SHAP explains the model, not causes; correlated features share credit arbitrarily; for global importance, permutation importance on held-out data is a good cross-check. (<a href="#practice">13</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">20</span>What are monotonic constraints, and how are they enforced?</summary><div class="ans">
+      <p><strong>They force the prediction to move only one way in a feature, with every other feature fixed, and they're enforced while each tree grows: violating splits are rejected and leaf values are bounded.</strong></p>
+      <ol>
+        <li>For a split on a feature constrained to increase, a candidate whose lower-value child gets the larger weight is refused.</li>
+        <li>After an accepted split with \(w_L \le w_R\), the midpoint \((w_L + w_R)/2\) becomes an upper bound for every leaf under the left child and a lower bound for every leaf under the right child; later splits inherit the bounds.</li>
+        <li>Leaf values are clipped into their bounds, so each tree is monotone, and a sum of monotone trees is monotone.</li>
+      </ol>
+      <p><strong>Why credit wants it:</strong> decline reasons must make sense (more income can't raise risk), regulators check directions, and removing wiggles usually removes overfitting. In a simulation, constraining income, EMI share and late payments removed every rise in every applicant's curve at no cost in log loss (0.222 → 0.221), though AUC fell from 0.832 to 0.811. <strong>Trade-off:</strong> a wrong constraint adds bias (forcing risk to rise with income took log loss to 0.262); it holds “others fixed”, which can differ from the raw trend; and it doesn't govern where missing values go. (<a href="#practice">13</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">21</span>Class imbalance: what does scale_pos_weight do to the model?</summary><div class="ans">
+      <p><strong>It multiplies every positive row's \(g\) and \(h\) by \(k\), as if each positive appeared \(k\) times, so the model learns odds \(k\) times too high.</strong></p>
+      <div class="mj">\[ \begin{aligned} k\, n_+ (p - 1) + n_-\, p &amp;= 0 \\ \frac{p}{1 - p} &amp;= k \cdot \frac{n_+}{n_-} \end{aligned} \]</div>
+      <p>In words: the weighted loss's best constant for a group with \(n_+\) positives and \(n_-\) negatives has \(k\) times the true odds. With \(k = 50\), a true 3% risk (odds 0.031) becomes odds 1.55, about 0.61; in a simulation with 8.7% defaults the mean prediction became 0.55 and AUC fell from 0.825 to 0.794.</p>
+      <p><strong>What to do:</strong> subtract \(\log k\) from the raw score or recalibrate before using probabilities. Often you don't need it: starting at the base-rate log-odds already balances the gradients, and for a decision you can keep the plain loss and move the threshold. It can help when positives are so rare that splits on them can't clear <code>min_child_weight</code>; <code>max_delta_step</code> is the other knob there. (<a href="#practice">13</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">22</span>Are a booster's probabilities calibrated?</summary><div class="ans">
+      <p><strong>Often roughly, if it's trained and early-stopped on log loss; reweighting, too many rounds or a large learning rate break it, so always check.</strong></p>
+      <ul>
+        <li><strong>Why it can be calibrated:</strong> log loss is a proper scoring rule: it's minimized by the true probabilities, so an honest fit is rewarded.</li>
+        <li><strong>What breaks it:</strong> past the best round, groups get pushed toward 0 and 1 (on the toy, 200 trees put one- and two-row groups at 0.000 and 1.000); <code>scale_pos_weight</code>, class weights and undersampling multiply the odds; tiny leaves and large \(\eta\) make extreme steps.</li>
+        <li><strong>How to check and fix:</strong> a reliability curve on held-out, out-of-time data; Platt scaling (a logistic regression on the raw score) with little data, isotonic regression with more, fitted on data not used for training or early stopping.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> Platt scaling is strictly increasing, so the ranking and AUC are unchanged; isotonic regression creates ties, so AUC can shift slightly. Calibration matters when the probability itself is used, for pricing or expected loss. (<a href="#practice">13</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">23</span>Can gradient boosting extrapolate? Does it need feature scaling? What about outliers?</summary><div class="ans">
+      <p><strong>It can't extrapolate, it doesn't need scaling, and outliers in features are harmless while outliers in the target matter under squared error.</strong></p>
+      <ul>
+        <li><strong>Extrapolation:</strong> each tree is flat beyond its last split, so the sum is too. A simulated booster predicted a limit of 242.6 at incomes of 150, 300 and 600 where the truth was 240, 480 and 960. Fixes: predict a ratio that stays in range, boost the residual of a linear model, or use linear leaves.</li>
+        <li><strong>Scaling:</strong> a split only uses the order of a feature's values, so any monotone transform gives the same splits.</li>
+        <li><strong>Outliers:</strong> a feature outlier just sits at one end (and shares the last histogram bin). A target outlier has a huge residual that every tree chases: 2% of +₹500k typos took a simulated test RMSE from about 10 to 29.0; absolute error or Huber brought it back to 10.5 and 10.9.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> monitor inputs that drift beyond the training range; the model will silently predict the edge value. (<a href="#practice">13</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">24</span>Gradient boosting vs random forest vs a neural net on tabular data?</summary><div class="ans">
+      <p><strong>Boosting is usually the most accurate on typical tables, a forest is the robust low-effort alternative, and neural nets win with very large data, unstructured inputs, sequences or multimodal setups.</strong></p>
+      <ul>
+        <li><strong>Why trees win on tables:</strong> tabular targets are irregular (thresholds, steps) and nets are biased toward smooth functions; useless columns hurt an MLP but a tree just never splits on them; and columns have individual meanings that trees use one at a time, while an MLP must learn which directions matter.</li>
+        <li><strong>Practical edges of trees:</strong> no scaling, native missing values and categories, monotone constraints, TreeSHAP, cheap training.</li>
+        <li><strong>When nets win:</strong> raw text or images in the row, transaction sequences, huge data, shared embeddings across tasks, end-to-end training with other modalities. Tabular foundation models are now competitive on small tables.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> boosting needs early stopping and some tuning; a forest needs almost none; ensembles of a booster and a net often beat both. (<a href="#compare">14</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">25</span>What does XGBoost add over classic gradient boosting? How can it be parallel if boosting is sequential?</summary><div class="ans">
+      <p><strong>Second-order split finding, regularization inside the objective, learned missing-value directions, faster split search and column subsampling; it's parallel inside each tree, not across trees.</strong></p>
+      <ul>
+        <li><strong>Splits from \(g\) and \(h\):</strong> classic GBM grows each tree by squared error on \(-g\) and adds a Newton step only in the leaves; XGBoost uses the second-order gain for both.</li>
+        <li><strong>Regularization:</strong> \(\lambda\), \(\alpha\), \(\gamma\) and <code>min_child_weight</code> in the objective, plus column subsampling by tree, level or node.</li>
+        <li><strong>Missing values:</strong> a default direction learned per split.</li>
+        <li><strong>Speed:</strong> sorted column blocks, weighted quantile sketches, histograms, GPU and distributed training.</li>
+      </ul>
+      <p><strong>Parallelism:</strong> each tree needs the previous predictions, so trees are sequential; but computing \(g\) and \(h\) for all rows, building histograms and scanning features all run in parallel within a tree. <strong>Follow-up:</strong> for squared error with \(\lambda = 0\), classic GBM and XGBoost grow the same trees, since \(h = 1\). (<a href="#xgboost">06</a>, <a href="#splits">09</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">26</span>AdaBoost vs gradient boosting?</summary><div class="ans">
+      <p><strong>AdaBoost reweights rows each round and gives each weak learner a vote; it turns out to be forward stagewise modelling with the exponential loss, and gradient boosting generalizes it to any differentiable loss.</strong></p>
+      <div class="mj">\[ \begin{aligned} \alpha_m &amp;= \tfrac12 \log\frac{1 - \epsilon_m}{\epsilon_m} \\ w_i &amp;\propto e^{-y_i F(x_i)} \end{aligned} \]</div>
+      <p>In words: a learner with weighted error \(\epsilon\) gets a vote \(\alpha\), and a row's weight is its current exponential loss, which is also the size of that loss's gradient (labels are ±1). So AdaBoost carries the gradient as a weight instead of fitting it as a target.</p>
+      <p><strong>Why gradient boosting replaced it:</strong> the exponential loss grows exponentially with a confident mistake, so a mislabelled row gets an enormous weight; log loss grows only linearly there. <strong>Follow-up:</strong> AdaBoost's score is half the log-odds, so its probability is \(\sigma(2F)\).</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">27</span>Hand drills: work these with a pen.</summary><div class="ans">
+      <p><strong>Small numbers that exercise every formula in this note.</strong></p>
+      <ol>
+        <li>A leaf has \(G = -3\), \(H = 2\). Its value with \(\lambda = 1\)? With \(\lambda = 0\)? → 3/3 = <strong>1.0</strong>; 3/2 = <strong>1.5</strong>.</li>
+        <li>Three non-defaulters at \(p = 0.5\), \(\lambda = 1\): \(G\), \(H\), leaf? → \(g = 0.5\) each, \(G = 1.5\); \(h = 0.25\) each, \(H = 0.75\); \(w\) = −1.5/1.75 = <strong>−0.857</strong>, pushing their risk down.</li>
+        <li>Regression residuals 10, 20 on the left and −30 on the right, \(\lambda = 0\): gain? → ½ × [30²/2 + 30²/1 − 0²/3] = ½ × [450 + 900] = <strong>675</strong>.</li>
+        <li>Log loss, \(F_0 = 0\), \(\eta = 0.3\). Tree 1: late &lt; 1.5 → −1 / +2. Tree 2: late &lt; 1.5 → −0.718 / +1.549. A new applicant with 1 late payment: \(p\)? → \(F\) = 0.3 × (−1) + 0.3 × (−0.718) = −0.515, so \(p\) = <strong>0.374</strong>.</li>
+        <li>Squared error, \(F_0 = 80\), \(\eta = 0.3\). Tree 1: late &lt; 1.5 → +15 / −30. Tree 2: late &lt; 0.5 → +15.5 / −15.5. The same applicant? → 80 + 4.5 − 4.65 = <strong>79.85</strong> (tree 2 sends late = 1 right).</li>
+        <li>Missing rows with \(G_{\text{miss}} = -1\), \(H_{\text{miss}} = 0.5\); present left \(1, 1\) and right \(-1, 0.5\); \(\lambda = 1\). Which side? → right: ½ × [1/2 + 4/2 − 1/3] = <strong>1.083</strong>; left: ½ × [0 + 1/1.5 − 1/3] = 0.167.</li>
+        <li>True risk 10%, <code>scale_pos_weight</code> = 9: predicted probability? → odds 0.111 × 9 = 1, so <strong>0.5</strong>.</li>
+      </ol>
+      <p><strong>Follow-up:</strong> if you can do these without notes, you can rebuild any node of any tree in this note.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">28</span>Write the pseudocode for gradient boosting and for one XGBoost split search.</summary><div class="ans">
+      <p><strong>Start at the best constant; each round compute \(g\) and \(h\), grow a tree by sweeping sorted features with running sums and scoring each cut with the gain (trying missing rows on both sides), set leaves to \(-G/(H + \lambda)\), and add \(\eta\) times the tree.</strong></p>
+      <pre class="code"><code>F = F0 for all rows
+repeat M times:
+  g, h = slope, bend of loss at F
+  tree = GROW(rows, g, h)
+  F += eta * tree(X)
+
+<span class="cm"># in GROW, at each node (mcw =</span>
+<span class="cm"># min_child_weight):</span>
+for each feature f:
+  Gm, Hm = sums over rows missing f
+  GL = HL = 0
+  for each cut, in sorted order of f:
+    GL += g;  HL += h
+    for side in (left, right):
+      add (Gm, Hm) to that side's sums
+      GR = G - GL;  HR = H - HL
+      skip if HL or HR &lt; mcw
+      gain = ½(GL²/(HL+λ) + GR²/(HR+λ)
+               - G²/(H+λ)) - γ
+      keep the best (f, cut, side)
+leaf value = -G / (H + λ)</code></pre>
+      <p><strong>Why it's shaped like this:</strong> the gain needs only sums, so one sorted sweep scores every cut; the missing rows' sums are computed once and tried on both sides. <strong>Follow-up:</strong> the cost is one linear sweep per feature per node after a single upfront sort, or a sweep over at most 256 bins with histograms. Full versions and a runnable NumPy build: <a href="#pseudocode">section 16</a>.</p>
+    </div></details>
+
+    <!-- sheet -->
+    <h2 id="sheet"><span class="pn">18</span>Cheat sheet</h2>
+    <div class="sheet">
+      <h3>The model and the start</h3>
+      <div class="mj">\[ \begin{aligned} F(x) &amp;= F_0 + \eta \sum_m f_m(x) \\ F_0 &amp;= \bar y \quad \text{or} \quad \log\frac{\bar y}{1 - \bar y} \\ p &amp;= \sigma(F) \quad \text{(once, at the end)} \end{aligned} \]</div>
+      <h3>Gradients and hessians</h3>
+      <div class="mj">\[ \begin{aligned} \text{squared error:}\quad g &amp;= F - y \\ h &amp;= 1 \\ \text{log loss:}\quad g &amp;= p - y \\ h &amp;= p(1 - p) \\ \text{pseudo-residual:}\quad r &amp;= -g \end{aligned} \]</div>
+      <h3>XGBoost at a node</h3>
+      <div class="mj">\[ \begin{aligned} \ell(F + w) &amp;\approx \ell(F) + g w + \tfrac12 h w^2 \\ w^* &amp;= -\frac{G}{H + \lambda} \\ \text{Obj}^* &amp;= -\frac12 \sum_j \frac{G_j^2}{H_j + \lambda} + \gamma T \\ \text{Gain} &amp;= \tfrac12 \Big[\tfrac{G_L^2}{H_L + \lambda} + \tfrac{G_R^2}{H_R + \lambda} \\ &amp;\qquad - \tfrac{G^2}{H + \lambda}\Big] - \gamma \\ w^*_{L1} &amp;= -\frac{\text{sign}(G)\, (\lvert G \rvert - \alpha)_+}{H + \lambda} \end{aligned} \]</div>
+      <p>\(x_+\) means \(\max(x, 0)\).</p>
+      <h3>Settings in one line each</h3>
+      <ul>
+        <li>\(\eta\): shrinks every tree; smaller needs more trees, generalizes a little better.</li>
+        <li>\(\lambda\): adds to \(H\); shrinks small-hessian leaves. \(\gamma\): minimum gain per split (XGBoost: no ½).</li>
+        <li><code>min_child_weight</code>: minimum \(H\) per child; for log loss, rows weighted by \(p(1 - p)\).</li>
+        <li>Missing: try \((G_{\text{miss}}, H_{\text{miss}})\) on each side; keep the better as the default direction.</li>
+        <li><code>scale_pos_weight</code> \(k\): odds × \(k\); subtract \(\log k\) or recalibrate.</li>
+        <li>Monotone: reject violating splits; midpoint \((w_L + w_R)/2\) bounds each subtree.</li>
+      </ul>
+      <h3>Libraries</h3>
+      <ul>
+        <li>LightGBM: leaf-wise (<code>num_leaves</code>), GOSS weight \((1 - a)/b\), EFB, categories sorted by \(G/(H + s)\) with \(s\) = <code>cat_smooth</code>.</li>
+        <li>CatBoost: ordered target statistic \(\big(\sum_{\text{earlier}} y + a \cdot \text{prior}\big)/(n_{\text{earlier}} + a)\), ordered boosting, symmetric trees.</li>
+        <li>SHAP: \(F(x) = \phi_0 + \sum_j \phi_j\), in log-odds.</li>
+      </ul>
+    </div>
+
+    <footer><a href="./">More study notes</a> · <a href="../">Deepam Minda</a></footer>
+  </article>
+</div>
+<a class="jump" href="#tldr">Contents ↑</a>
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+  svg: { fontCache: "global" },
+  options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script>
+(function () {
+  var d = document.getElementById("tocd");
+  var wide = window.matchMedia("(min-width: 1081px)");
+  function sync() { d.open = wide.matches; }
+  sync();
+  if (wide.addEventListener) wide.addEventListener("change", sync);
+  var jump = document.querySelector(".jump");
+  jump.addEventListener("click", function () { if (!wide.matches) d.open = true; });
+  d.addEventListener("click", function (e) {
+    if (!wide.matches && e.target.closest("a")) d.open = false;
+  });
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+  function spy() {
+    var y = window.scrollY + 120, cur = 0;
+    targets.forEach(function (t, i) { if (t && t.getBoundingClientRect().top + window.scrollY <= y) cur = i; });
+    links.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
+  }
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+})();
+</script>
+
+<script>
+(function () {
+  var root = document.documentElement, b = document.getElementById("theme-toggle");
+  function cur() { return root.getAttribute("data-theme") === "light" ? "light" : "dark"; }
+  function label() { b.setAttribute("aria-label", "Switch to " + (cur() === "dark" ? "light" : "dark") + " mode"); }
+  b.addEventListener("click", function () {
+    var n = cur() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", n);
+    try { localStorage.setItem("deepam-theme", n); } catch (e) {}
+    label();
+  });
+  label();
+})();
+</script>
+</body>
+</html>
