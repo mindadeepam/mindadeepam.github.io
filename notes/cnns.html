@@ -1,0 +1,1294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070707">
+<title>Convolutional neural networks · Deepam Minda</title>
+<meta name="description" content="Why convolution, shapes and costs, receptive fields, pooling, 1×1 and depthwise convs, architectures, how convolution is computed (im2col, FFT, Winograd), upsampling and U-Net, CNN vs ViT.">
+<meta property="og:title" content="Convolutional neural networks">
+<meta property="og:description" content="Why convolution, shapes and costs, receptive fields, pooling, 1×1 and depthwise convs, architectures, how convolution is computed (im2col, FFT, Winograd), upsampling and U-Net, CNN vs ViT.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem("deepam-theme"); } catch (e) {}
+  if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<link rel="stylesheet" href="../assets/design/tokens.css?v=1">
+<link rel="stylesheet" href="../assets/design/components.css?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<style>
+/* Green graph-paper theme for the recurrent-notebook content.
+   Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
+   One sans for text, one mono for labels; MathJax draws the maths. Green = the cell / notebook,
+   slate = the hidden state, orange only for gradients. */
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
+body {
+  margin: 0; color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: 50% 0;
+  font: 16.5px/1.7 var(--sans); letter-spacing: -.003em;
+  padding-inline: 20px; padding-block: 44px 88px;
+  -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 640px) { body { font-size: 16px; padding-inline: 16px; padding-block: 24px 80px; } }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+table, button { font: inherit; }
+code { font: .86em var(--mono); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; }
+
+.page { max-width: 1200px; margin: 0 auto; display: grid; gap: 52px; grid-template-columns: 220px minmax(0, 860px); justify-content: center; }
+@media (max-width: 1080px) { .page { grid-template-columns: minmax(0, 860px); gap: 0; } }
+
+/* contents */
+.toc { position: sticky; top: 28px; align-self: start; font: 13.5px/1.4 var(--sans); max-height: calc(100vh - 56px); overflow-y: auto; }
+.toc summary { display: none; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--ink-2); text-decoration: none; }
+.toc a:hover { background: var(--surface); color: var(--ink); }
+.toc a.on { color: var(--ink); background: var(--surface); box-shadow: inset 2px 0 0 var(--cell); }
+.toc .n { font: 500 11px var(--mono); color: var(--ink-3); margin-right: 8px; }
+.toc .label { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 10px 10px; }
+.toc li.part { font: 500 10.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 14px 10px 4px; }
+@media (max-width: 1080px) {
+  .toc { position: static; margin-bottom: 26px; max-height: none; }
+  .toc .label { display: none; }
+  .toc details { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  .toc summary { display: block; cursor: pointer; padding: 12px 14px; font: 500 14px var(--sans); list-style: none; }
+  .toc summary::-webkit-details-marker { display: none; }
+  .toc summary::after { content: "+"; float: right; color: var(--ink-3); }
+  .toc details[open] summary::after { content: "–"; }
+  .toc details ol { padding: 0 6px 10px; }
+}
+.jump {
+  display: none; position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+  font: 500 13px var(--sans); color: var(--ink); background: var(--surface); text-decoration: none;
+  border: 1px solid var(--rule); border-radius: 999px; padding: 9px 14px;
+}
+@media (max-width: 1080px) { .jump { display: block; } }
+
+/* article */
+article { min-width: 0; }
+header.hero { display: grid; gap: 10px; margin-bottom: 26px; }
+.kicker { font: 500 12px/1 var(--mono); color: var(--ink-3); letter-spacing: .02em; }
+h1 { margin: 0; font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.6rem); line-height: 1.1; font-weight: 600; letter-spacing: -.028em; text-wrap: balance; }
+.dek { margin: 0; font-size: 1.1rem; line-height: 1.55; color: var(--ink-2); max-width: 40em; }
+.meta { font: 12px/1.5 var(--mono); color: var(--ink-3); }
+.key { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.key span::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--c); margin-right: 6px; vertical-align: middle; }
+
+h2 { font-size: 1.36rem; line-height: 1.25; font-weight: 600; letter-spacing: -.018em; margin: 56px 0 12px; text-wrap: balance; scroll-margin-top: 16px; }
+h2 .pn { font: 500 .74em/1 var(--mono); color: var(--ink-3); margin-right: .7em; letter-spacing: 0; }
+h3 { font-size: 1.04rem; font-weight: 600; letter-spacing: -.01em; margin: 30px 0 6px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 1.25em; }
+li { margin-bottom: 5px; }
+li::marker { color: var(--ink-3); }
+strong { font-weight: 600; }
+.mj { overflow-x: auto; overflow-y: hidden; margin: 4px 0 16px; padding: 2px 0; }
+mjx-container[display="true"] { margin: 0 !important; }
+
+/* plan and summary panels */
+.tldr { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 22px 6px; margin-bottom: 14px; }
+.tldr h2 { margin: 0 0 10px; font: 500 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.tldr ol { padding-left: 1.3em; }
+.tldr li { margin-bottom: 8px; }
+.tldr p { margin: 0 0 12px; font-size: 15.5px; }
+.tldr .tbl { margin: 4px 0 12px; }
+
+/* notes: quote-style, coloured by kind */
+.note { margin: 16px 0 20px; padding: 2px 0 2px 16px; border-left: 2px solid var(--c); color: var(--ink-2); font-size: .97em; }
+.note > .nl { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); margin: 4px 0 8px; }
+.note strong { color: var(--ink); }
+.note.ask { --c: var(--cell); }
+.note.say { --c: var(--hid); }
+.note.trap { --c: var(--grad); }
+.note.lab { --c: var(--cell); }
+.note .q { font-style: italic; color: var(--ink); }
+.note ul { margin: 0 0 10px; }
+.note li { margin-bottom: 5px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 6px 0 20px; }
+table { border-collapse: collapse; width: 100%; font-size: .93em; line-height: 1.5; }
+th { text-align: left; vertical-align: bottom; font: 500 11px/1.4 var(--mono); color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; padding: 0 14px 8px 0; border-bottom: 1px solid var(--ink-3); }
+td { padding: 8px 14px 8px 0; vertical-align: top; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+td .src { display: block; font: 11.5px/1.4 var(--mono); color: var(--ink-3); margin-top: 2px; }
+
+/* gate cards */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0 20px; }
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.gc { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 4px; font-size: 15.5px; line-height: 1.6; }
+.gc h4 { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.gc h4 .tag { font: 500 11px var(--mono); color: var(--c); }
+.gc.g1 { --c: var(--cell); }
+.gc.g2 { --c: var(--ink-3); }
+.gc p { margin-bottom: 10px; }
+
+/* figures */
+figure { margin: 18px 0 24px; }
+.plate { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 10px; overflow-x: auto; }
+.plate svg { display: block; width: 100%; height: auto; min-width: 460px; max-width: 700px; margin: 0 auto; }
+@media (max-width: 500px) { .plate svg { max-width: none; } }
+figcaption { font-size: .86rem; line-height: 1.5; color: var(--ink-3); margin-top: 10px; }
+.dg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink-2); }
+.dg .v { font-family: var(--serif); font-style: italic; font-size: 19px; fill: var(--ink); }
+.dg .v .s { font-size: 12.5px; }
+.dg .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; fill: var(--ink-3); }
+.dg .gl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--gate); }
+.dg .gs { font-family: var(--serif); font-style: normal; font-size: 12px; fill: var(--ink-3); }
+.dg .cl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--ink); }
+.dg .cs { font-family: var(--sans); font-size: 12px; fill: var(--ink-2); }
+.dg .optx { font: 500 17px var(--sans); fill: var(--ink); }
+.dg .cell { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.dg .hid { stroke: var(--hid); stroke-width: 2.4; fill: none; }
+.dg .hid.thick { stroke-width: 3.6; }
+.dg .in { stroke: var(--ink-3); stroke-width: 1.5; fill: none; }
+.dg .gw { stroke: var(--gate); stroke-width: 1.6; fill: none; }
+.dg .cw { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+.dg .grad { stroke: var(--grad); fill: none; stroke-linecap: round; }
+.dg .gbox { fill: var(--gate-wash); stroke: var(--gate); stroke-width: 1.3; }
+.dg .box { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .op { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.3; }
+.dg .dot { fill: var(--ink-2); }
+.dg .cellon { fill: var(--cell-wash); stroke: var(--cell); stroke-width: 1; }
+.dg .celloff { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.dg .stream { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.mk-cell { fill: var(--cell); } .mk-hid { fill: var(--hid); } .mk-in { fill: var(--ink-3); }
+.mk-gate { fill: var(--gate); } .mk-cw { fill: var(--ink-2); } .mk-grad { fill: var(--grad); }
+
+/* questions */
+details.qa { border-bottom: 1px solid var(--rule); }
+details.qa:first-of-type { border-top: 1px solid var(--rule); }
+details.qa summary { cursor: pointer; padding: 11px 2px; font-weight: 500; font-size: 15.5px; line-height: 1.45; list-style: none; display: flex; gap: 12px; }
+details.qa summary::-webkit-details-marker { display: none; }
+details.qa summary .qn { font: 500 11.5px/1.9 var(--mono); color: var(--ink-3); flex: none; min-width: 1.9em; }
+details.qa summary::after { content: "+"; margin-left: auto; color: var(--ink-3); flex: none; }
+details.qa[open] summary::after { content: "–"; }
+details.qa .ans { padding: 0 4px 12px 32px; font-size: 15.5px; color: var(--ink-2); }
+summary:focus-visible, a:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+
+.sheet { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 6px; }
+.sheet h3 { margin: 4px 0 6px; font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: .9rem; color: var(--ink-3); }
+
+/* code blocks */
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; margin: 8px 0 20px; overflow-x: auto; font: 12.8px/1.6 var(--mono); color: var(--ink); white-space: pre; }
+pre.code code { font: inherit; background: none; border: 0; padding: 0; }
+pre.code .cm { color: var(--ink-3); }
+@media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
+
+/* public copy: colours, fonts and sizes come from the site's tokens.css; this maps the notebook's
+   token names onto them (green_theme.css's own token block is left out of public pages). */
+:root {
+  --paper: var(--void); --ink: var(--text); --ink-2: var(--soft); --ink-3: var(--muted);
+  --accent: var(--amber);
+  --cell: var(--green); --cell-wash: var(--green-wash); --hid: var(--blue); --hid-wash: var(--blue-wash);
+  --gate: var(--neutral); --gate-wash: var(--neutral-wash); --grad: var(--orange); --grad-wash: var(--orange-wash);
+  --sans: var(--font-sans); --mono: var(--font-mono);
+  --serif: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
+}
+body { padding-block-start: 0; letter-spacing: 0; }
+/* the shared header sits inside the notebook's side padding */
+.site-header { width: min(100%, 1260px); margin-bottom: 40px; }
+.site-header a:hover { text-decoration: none; }
+@media (max-width: 720px) { .site-header { width: 100%; margin-bottom: 26px; } }
+/* the site's type scale */
+h1 { font-weight: 600; font-size: var(--fs-title); line-height: 1.12; letter-spacing: -.02em; }
+h2 { font-size: var(--fs-h2); letter-spacing: -.01em; }
+h3 { font-size: var(--fs-h3); }
+.dek { font-size: 18px; }
+.toc a.on { box-shadow: inset 2px 0 0 var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline-color: var(--accent); }
+footer .site-nav { display: block; margin-top: 10px; }
+.next { margin-top: 36px; font-weight: 500; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="a-cell" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path class="mk-cell" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-hid" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto"><path class="mk-hid" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-in" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-in" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-gate" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-cw" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-cw" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-grad" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path class="mk-grad" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">study notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
+<div class="page">
+  <nav class="toc" aria-label="Contents">
+    <details id="tocd" open>
+      <summary>Contents</summary>
+      <div class="label">Contents</div>
+      <ol>
+        <li><a href="#tldr"><span class="n">00</span>In short</a></li>
+        <li><a href="#why"><span class="n">01</span>Why convolution</a></li>
+        <li><a href="#op"><span class="n">02</span>The operation: shapes, sizes and costs</a></li>
+        <li><a href="#rf"><span class="n">03</span>Receptive field</a></li>
+        <li><a href="#pool"><span class="n">04</span>Pooling and global average pooling</a></li>
+        <li><a href="#channels"><span class="n">05</span>Channels, 1×1 convolutions and cheaper convolutions</a></li>
+        <li><a href="#norm"><span class="n">06</span>Normalization and activation in CNNs</a></li>
+        <li><a href="#arch"><span class="n">07</span>Architectures, one idea each</a></li>
+        <li><a href="#compute"><span class="n">08</span>How convolution is computed efficiently</a></li>
+        <li><a href="#upsample"><span class="n">09</span>Recovering spatial resolution</a></li>
+        <li><a href="#transfer"><span class="n">10</span>Transfer learning, fine-tuning and augmentation</a></li>
+        <li><a href="#vit"><span class="n">11</span>CNN vs vision transformer</a></li>
+        <li><a href="#whatif"><span class="n">12</span>What if…</a></li>
+        <li><a href="#code"><span class="n">13</span>Pseudocode</a></li>
+        <li><a href="#questions"><span class="n">14</span>Interview questions</a></li>
+        <li><a href="#sheet"><span class="n">15</span>Cheat sheet</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <article>
+    <header class="hero">
+      <div class="tag">Study notes · Neural networks</div>
+      <h1>Convolutional neural networks</h1>
+      <p class="dek">Why convolution suits images, what a conv layer costs, how libraries actually compute it (im2col, FFT, Winograd), how to get full resolution back after downsampling, the architectures from LeNet to ConvNeXt, and how CNNs compare with vision transformers.</p>
+      <div class="meta">About 45 minutes · formulas, figures, pseudocode and 22 questions · pairs with Deep learning basics</div>
+    </header>
+
+    <section class="tldr" id="tldr" aria-labelledby="tldr-h">
+      <h2 id="tldr-h">In short</h2>
+      <ol>
+        <li>A conv layer is a dense layer with two constraints: each output reads only a small patch (<strong>locality</strong>), and the same filter is used at every position (<strong>weight sharing</strong>). Parameters drop from \((HWC_{in})(HWC_{out})\) to \(k^2 C_{in} C_{out}\), and the layer becomes <strong>translation equivariant</strong>. That built-in bias is why CNNs learn from far less data than dense nets on images.</li>
+        <li>The output size counts where the window can start; the parameters, about \(k^2 C_{in} C_{out}\), don't depend on resolution, while compute and memory grow with the output's area. The receptive field grows by \(k - 1\) times the product of earlier strides at every layer.</li>
+        <li>Libraries rarely run the naive loops. <strong>im2col + GEMM</strong> unfolds patches into a matrix and does one big matrix multiply (fast, but up to \(k^2\) times the memory). <strong>FFT convolution</strong> uses the convolution theorem, \(\mathcal F(x \circledast w) = \mathcal F(x) \cdot \mathcal F(w)\) (circular convolution; zero-pad for the ordinary kind): \(O(n^2 \log n)\) instead of \(O(n^2 k^2)\), worth it only for large kernels. <strong>Winograd</strong> cuts a 3×3 conv's multiplications by 2.25–4×. cuDNN times them and picks one.</li>
+        <li>To get \(H \times W\) back: transposed convolution (the gradient of a conv; checkerboard artifacts when \(k\) isn't divisible by \(s\)), resize then conv, max-unpooling with saved indices, pixel shuffle, or dilated convs that avoid downsampling. Skip connections (U-Net) supply the fine detail from before the downsampling, which no upsampler can recreate.</li>
+        <li>Architectures each add one idea: stacked 3×3s (VGG), cheap 1×1 reductions (Inception), residuals that fix the degradation problem (ResNet), depthwise separable convs at about \(1/k^2\) the cost (MobileNet), compound scaling (EfficientNet), transformer-era design in a pure CNN (ConvNeXt).</li>
+        <li>CNN vs ViT: a CNN's locality and equivariance are free knowledge with little data and cost linear in pixels; a ViT is global from layer 1 and scales better with data, but costs quadratic in tokens and needs large pretraining. Hybrids and ConvNeXt sit in between.</li>
+      </ol>
+    </section>
+
+    <!-- why -->
+    <h2 id="why"><span class="pn">01</span>Why convolution</h2>
+    <p>Take a layer that maps an image with \(C_{in}\) channels to a same-sized map with \(C_{out}\) channels. Count its weights (biases ignored) under three designs, each adding one constraint to the one before:</p>
+    <div class="mj">\[ \begin{aligned} P_{\text{dense}} &amp;= (H W C_{in}) \cdot (H W C_{out}) \\ P_{\text{local}} &amp;= H W \cdot k^2 C_{in} C_{out} \\ P_{\text{conv}} &amp;= k^2 C_{in} C_{out} \end{aligned} \]</div>
+    <p>In words: a dense layer connects every output to every input. A locally connected layer lets each output read only a \(k \times k\) patch, which divides the count by \(HW/k^2\). A convolution also uses the <em>same</em> patch weights at all \(HW\) positions, which divides it by another \(HW\). Altogether the count falls by \((HW)^2/k^2\), and it no longer depends on the image size at all.</p>
+    <p>Each constraint is an assumption about images, an <strong>inductive bias</strong> built in before any data is seen:</p>
+    <ul>
+      <li><strong>Locality.</strong> Nearby pixels are strongly related and distant ones weakly, so the useful low-level features (edges, corners, textures) are local. <em>Without it</em>, a dense layer must learn from data that most of its weights should be zero, which costs parameters, samples and compute.</li>
+      <li><strong>Weight sharing.</strong> A pattern means the same thing wherever it appears, so the detector learned in one place should be reused everywhere. <em>Without it</em>, the network must see each pattern at each position to learn it there.</li>
+      <li><strong>Hierarchy.</strong> Stacking layers composes local patterns into larger ones: edges, then parts, then objects. Each layer's view of the image grows (section <a href="#rf">03</a>).</li>
+    </ul>
+    <p>Sharing gives <strong>translation equivariance</strong>: shift the input and the feature map shifts the same way.</p>
+    <div class="mj">\[ (T_\Delta x) \star w = T_\Delta (x \star w) \]</div>
+    <p>In words: \(T_\Delta\) shifts an image by \(\Delta\) pixels and \(\star\) is the conv layer's operation. Convolving the shifted image gives the shifted feature map. It holds exactly for stride 1 away from the borders; strides and pooling break it (section <a href="#pool">04</a>).</p>
+    <p><strong>A useful way to see it:</strong> written as a matrix acting on the flattened image, a conv layer is a dense layer whose matrix is mostly zeros (locality) with repeated entries along its diagonals (sharing): a doubly block-Toeplitz matrix. That view explains the backward pass and the transposed convolution later (section <a href="#transposed">09</a>).</p>
+    <p><strong>The trade-off.</strong> When the assumptions hold, they're free knowledge: less data, less overfitting, any input size. When they don't, they hurt. Shuffle every image's pixels with one fixed permutation and a dense net trains exactly as well as before (it just permutes its weights), while a CNN collapses, because its windows now hold unrelated pixels. The same goes for table columns, or a form where the absolute position of a field is the signal. Equivariance also covers only shifts: not rotation, scale or lighting, which have to come from data augmentation (section <a href="#transfer">10</a>).</p>
+    <p><strong>Where convolutions fit:</strong> any grid with local, position-independent structure. That means images (2D), audio and time series (1D convolutions along time), video and volumetric scans (3D).</p>
+
+    <!-- op -->
+    <h2 id="op"><span class="pn">02</span>The operation: shapes, sizes and costs</h2>
+    <h3>It's cross-correlation</h3>
+    <div class="mj">\[ \begin{aligned} y[i, j] &amp;= \sum_{u, v} w[u, v]\; x[i + u,\, j + v] \\ (x * w)[i, j] &amp;= \sum_{u, v} w[u, v]\; x[i - u,\, j - v] \end{aligned} \]</div>
+    <p>In words: the first line is what a CNN layer computes, the second the mathematical convolution. The true convolution flips the kernel (upside down and left to right) before sliding it; a CNN layer slides it unflipped, which is <strong>cross-correlation</strong>. Since the kernel is learned, a network that needs the flipped pattern just learns flipped weights, so for training it makes no difference.</p>
+    <p>It does matter in three places: porting weights to or from a signal-processing routine, FFT convolution (section <a href="#fft">08</a>), and the backward pass, where the input's gradient turns out to be a true convolution.</p>
+
+    <h3>Shapes</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Tensor</th><th>Shape</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>Input</td><td>\((N, C_{in}, H, W)\)</td><td>PyTorch's NCHW; TensorFlow defaults to NHWC</td></tr>
+        <tr><td>Weights</td><td>\((C_{out}, C_{in}/g, k, k)\)</td><td>One filter per output channel, spanning the \(C_{in}/g\) input channels of its group, all of them when \(g = 1\) (\(g\) groups: section <a href="#channels">05</a>)</td></tr>
+        <tr><td>Bias</td><td>\((C_{out})\)</td><td>Dropped when BatchNorm follows</td></tr>
+        <tr><td>Output</td><td>\((N, C_{out}, H_{out}, W_{out})\)</td><td>Channel \(o\) is the map of where filter \(o\) fires</td></tr>
+      </tbody>
+    </table></div>
+    <p>With stride \(s\), zero padding \(p\) and dilation \(d\) (gaps between the kernel's taps), one output value is:</p>
+    <div class="mj">\[ \begin{aligned} y[n, o, i, j] &amp;= b_o + \sum_{c=0}^{C_{in}-1} \sum_{u, v = 0}^{k-1} w[o, c, u, v] \\ &amp;\qquad \cdot\; \tilde x[n, c,\, s i + d u,\, s j + d v] \end{aligned} \]</div>
+    <p>In words: output channel \(o\) at position \((i, j)\) is one dot product between filter \(o\) (all \(C_{in}\) channels by \(k \times k\)) and the patch of the zero-padded input \(\tilde x\) whose corner sits at \((si, sj)\), with taps \(d\) apart, plus a bias.</p>
+
+    <h3>Output size</h3>
+    <div class="mj">\[ H_{out} = \left\lfloor \frac{H + 2p - d(k - 1) - 1}{s} \right\rfloor + 1 \]</div>
+    <p>In words: \(d(k - 1) + 1\) is the kernel's effective span. Padding makes the input \(H + 2p\) long, so the window's first cell can start at \(0, s, 2s, \dots\) up to \(H + 2p - \text{span}\). The fraction counts the steps after the first start and the \(+1\) counts the first. The floor drops a last window that would hang off the edge, so those last rows of the input are silently never used. With \(d = 1\) it's the familiar \(\lfloor (H + 2p - k)/s \rfloor + 1\).</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Padding</th><th>\(p\)</th><th>Output (stride 1, dilation 1)</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td>Valid</td><td>0</td><td>\(H - k + 1\)</td><td>No made-up pixels; the map shrinks by \(k - 1\) per layer</td></tr>
+        <tr><td>Same</td><td>\((k - 1)/2\), odd \(k\)</td><td>\(H\)</td><td>The default: depth without shrinking. With stride \(s\), TensorFlow's “same” gives \(\lceil H/s \rceil\), padding unevenly if needed</td></tr>
+        <tr><td>Full</td><td>\(k - 1\)</td><td>\(H + k - 1\)</td><td>Every partial overlap; it's what the input gradient uses</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Why pad:</strong> without it, every layer shrinks the map and border pixels fall inside fewer windows than central ones, so they barely influence the output. Padding keeps the size, so networks can be deep.</li>
+      <li><strong>What it costs:</strong> zeros are fake data. They create an artificial edge at the border, and a deep network can use that edge to work out absolute position, which breaks pure translation equivariance. Reflect or replicate padding avoids the fake edge.</li>
+      <li><strong>Why kernels are odd:</strong> an odd kernel has a centre pixel, so “same” padding is symmetric. An even kernel needs uneven padding and shifts the map by half a pixel.</li>
+    </ul>
+
+    <h3>Parameters, compute and memory</h3>
+    <div class="mj">\[ \begin{aligned} \text{params} &amp;= C_{out} \cdot \frac{C_{in}}{g} \cdot k^2 + C_{out} \\ \text{MACs} &amp;= N \cdot H_{out} W_{out} \cdot C_{out} \cdot \frac{C_{in}}{g} \cdot k^2 \\ \text{activations} &amp;= N \cdot C_{out} \cdot H_{out} W_{out} \end{aligned} \]</div>
+    <p>In words: each filter has \(C_{in}/g \times k \times k\) weights and a bias. Each output value costs one multiply-add (MAC) per filter weight, and there are \(N C_{out} H_{out} W_{out}\) outputs. FLOPs are about twice the MACs. The activations are what the backward pass must store.</p>
+    <p><strong>The consequence:</strong> parameters don't depend on resolution, but compute and memory do. Early layers (high resolution, few channels) dominate activation memory; late layers (low resolution, many channels) dominate the parameters; compute is spread roughly evenly, because the usual stage design halves \(H\) and \(W\) and doubles the channels, which keeps the cost per layer level:</p>
+    <div class="mj">\[ \tfrac{H}{2} \cdot \tfrac{W}{2} \cdot (2C)^2 k^2 = H W C^2 k^2 \]</div>
+    <p>In words: a quarter of the positions times four times the channel pairs is the same number of multiply-adds.</p>
+
+    <h3 id="backward">The backward pass is also a convolution</h3>
+    <p>Write \(\delta = \partial L / \partial y\) for the gradient arriving at the output, with subscripts for indices (stride 1, no padding, and \(\delta\) is zero outside its range):</p>
+    <div class="mj">\[ \begin{aligned} \frac{\partial L}{\partial w_{ocuv}} &amp;= \sum_{n, i, j} \delta_{noij}\; x_{n,\, c,\, i+u,\, j+v} \\ \frac{\partial L}{\partial x_{ncab}} &amp;= \sum_{o, u, v} \delta_{n,\, o,\, a-u,\, b-v}\; w_{ocuv} \\ \frac{\partial L}{\partial b_o} &amp;= \sum_{n, i, j} \delta_{noij} \end{aligned} \]</div>
+    <ul>
+      <li><strong>Weights:</strong> a shared weight is used at every position, so its gradient <em>sums</em> one term per position (summed, not averaged). That sum is the input cross-correlated with the output gradient.</li>
+      <li><strong>Input:</strong> each input pixel fed every window that covered it, so its gradient collects from all of them. The minus signs make it a true convolution: the output gradient, zero-padded “full”, convolved with the kernel. This is exactly the transposed convolution of section <a href="#transposed">09</a> (the formula above is the stride-1 case; with stride \(s\) it's a stride-\(s\) transposed conv).</li>
+      <li><strong>Pooling:</strong> max pooling sends the gradient only to the maximum in each window; average pooling splits it equally.</li>
+    </ul>
+    <p><strong>Why it matters:</strong> a training step runs three convolution-shaped computations per layer (forward, weight gradient, input gradient), so the fast algorithms of section <a href="#compute">08</a> pay off three times.</p>
+
+    <!-- rf -->
+    <h2 id="rf"><span class="pn">03</span>Receptive field</h2>
+    <p>A unit's <strong>receptive field</strong> is the patch of the input that can affect it. Track two numbers layer by layer: the field \(r\), and the jump \(j\), the distance in input pixels between neighbouring units at that layer.</p>
+    <div class="mj">\[ \begin{aligned} r_l &amp;= r_{l-1} + (k_l - 1)\, d_l\, j_{l-1} \\ j_l &amp;= j_{l-1}\, s_l \\ r_0 &amp;= j_0 = 1 \end{aligned} \]</div>
+    <p>In words: each layer widens the view by its kernel's extra span, \((k - 1)d\), measured in units of the current jump; then its stride multiplies the jump. Pooling layers count as layers. Unrolled:</p>
+    <div class="mj">\[ r_L = 1 + \sum_{l=1}^{L} (k_l - 1)\, d_l \prod_{m=1}^{l-1} s_m \]</div>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 420 232" style="min-width:0;max-width:520px" role="img" aria-label="Receptive field of two stacked 3 by 3 layers along one row: one layer-2 unit reads three layer-1 units, which together read five input pixels."><path d="M195.0 60 L159.0 100" style="stroke:var(--hid);stroke-width:1.4;fill:none"/><path d="M159.0 130 L123.0 170" style="stroke:var(--hid);stroke-width:1.4;fill:none"/><path d="M159.0 130 L159.0 170" style="stroke:var(--hid);stroke-width:1.4;fill:none"/><path d="M159.0 130 L195.0 170" style="stroke:var(--hid);stroke-width:1.4;fill:none"/><path d="M195.0 60 L195.0 100" style="stroke:var(--hid);stroke-width:1.4;fill:none"/><path d="M195.0 130 L159.0 170" style="stroke:var(--hid);stroke-width:1.4;fill:none"/><path d="M195.0 130 L195.0 170" style="stroke:var(--hid);stroke-width:1.4;fill:none"/><path d="M195.0 130 L231.0 170" style="stroke:var(--hid);stroke-width:1.4;fill:none"/><path d="M195.0 60 L231.0 100" style="stroke:var(--hid);stroke-width:1.4;fill:none"/><path d="M231.0 130 L195.0 170" style="stroke:var(--hid);stroke-width:1.4;fill:none"/><path d="M231.0 130 L231.0 170" style="stroke:var(--hid);stroke-width:1.4;fill:none"/><path d="M231.0 130 L267.0 170" style="stroke:var(--hid);stroke-width:1.4;fill:none"/><rect class="celloff" x="72" y="30" width="30" height="30"/><rect class="celloff" x="108" y="30" width="30" height="30"/><rect class="celloff" x="144" y="30" width="30" height="30"/><rect class="cellon" x="180" y="30" width="30" height="30"/><rect class="celloff" x="216" y="30" width="30" height="30"/><rect class="celloff" x="252" y="30" width="30" height="30"/><rect class="celloff" x="288" y="30" width="30" height="30"/><text x="62" y="50" text-anchor="end">layer 2</text><rect class="celloff" x="72" y="100" width="30" height="30"/><rect class="celloff" x="108" y="100" width="30" height="30"/><rect class="cellon" x="144" y="100" width="30" height="30"/><rect class="cellon" x="180" y="100" width="30" height="30"/><rect class="cellon" x="216" y="100" width="30" height="30"/><rect class="celloff" x="252" y="100" width="30" height="30"/><rect class="celloff" x="288" y="100" width="30" height="30"/><text x="62" y="120" text-anchor="end">layer 1</text><rect class="celloff" x="72" y="170" width="30" height="30"/><rect class="cellon" x="108" y="170" width="30" height="30"/><rect class="cellon" x="144" y="170" width="30" height="30"/><rect class="cellon" x="180" y="170" width="30" height="30"/><rect class="cellon" x="216" y="170" width="30" height="30"/><rect class="cellon" x="252" y="170" width="30" height="30"/><rect class="celloff" x="288" y="170" width="30" height="30"/><text x="62" y="190" text-anchor="end">input</text><text x="328" y="50" text-anchor="start" style="fill:var(--hid)">sees 5</text><text x="328" y="120" text-anchor="start" style="fill:var(--hid)">each sees 3</text><text class="lbl" x="210" y="224" text-anchor="middle">each stride-1 3×3 layer adds k − 1 = 2</text></svg>
+      </div>
+      <figcaption>Two stacked 3×3 layers along one row. Each layer-1 unit sees 3 input pixels; the layer-2 unit reads 3 overlapping layer-1 units, so it sees 5. Each stride-1 layer adds \(k - 1 = 2\).</figcaption>
+    </figure>
+    <ul>
+      <li><strong>\(L\) stacked stride-1 3×3 layers:</strong> \(2L + 1\). The field grows only linearly with depth.</li>
+      <li><strong>A stride-2 layer</strong> doubles the jump, so every later layer adds twice as much. Downsampling early is the cheap way to see far.</li>
+      <li><strong>Dilations \(1, 2, 4, \dots, 2^{L-1}\)</strong> with 3×3 kernels give \(2^{L+1} - 1\): exponential growth at full resolution.</li>
+    </ul>
+    <h3>Effective vs theoretical</h3>
+    <p>The formula gives the <em>theoretical</em> field: what can possibly matter. The <em>effective</em> field is what does. A central input pixel reaches a top unit through many more paths than a pixel at the edge of the field. With the paths weighted equally, the number of paths to each pixel is the kernel's footprint convolved with itself \(L\) times, which by the central limit theorem is a bell curve:</p>
+    <div class="mj">\[ \begin{aligned} \text{theoretical radius} &amp;\propto L \\ \text{effective radius} &amp;\propto \sqrt{L} \end{aligned} \]</div>
+    <p>In words: the influence (the gradient of the unit with respect to each input pixel) is concentrated in a Gaussian-shaped blob whose width grows like \(\sqrt L\), so the effective share of the theoretical field shrinks like \(1/\sqrt L\) (Luo et al., 2016). Training widens it somewhat. So “the receptive field covers the whole image” doesn't mean the unit actually uses the whole image.</p>
+    <p><strong>Why it matters:</strong> a unit can't use information outside its field. A classifier's top units must see the whole object; a segmentation network needs context at every pixel (is this grey patch road or river?). Too small a field and the network can't tell apart things that differ only in their surroundings.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Way to grow it</th><th>How</th><th>The catch</th></tr></thead>
+      <tbody>
+        <tr><td>More layers</td><td>Adds \((k - 1)j\) per layer</td><td>More compute and depth; the effective field grows only like \(\sqrt L\)</td></tr>
+        <tr><td>Downsampling (stride, pooling)</td><td>Multiplies every later layer's growth</td><td>Loses resolution, which dense prediction needs back (section <a href="#upsample">09</a>)</td></tr>
+        <tr><td>Dilation</td><td>Spreads the taps \(d\) apart</td><td>Full-resolution maps are expensive; gridding artifacts</td></tr>
+        <tr><td>Larger kernels</td><td>7×7 depthwise (ConvNeXt), even 31×31 (RepLKNet)</td><td>Cost grows with \(k^2\), cheap only if depthwise</td></tr>
+        <tr><td>Global operations</td><td>Global pooling, squeeze-and-excitation, attention blocks</td><td>Attention costs quadratic in positions</td></tr>
+      </tbody>
+    </table></div>
+
+    <!-- pool -->
+    <h2 id="pool"><span class="pn">04</span>Pooling and global average pooling</h2>
+    <div class="mj">\[ \begin{aligned} y_{\max}[i, j] &amp;= \max_{0 \le u, v &lt; k}\; x[s i + u,\, s j + v] \\ y_{\text{avg}}[i, j] &amp;= \frac{1}{k^2} \sum_{0 \le u, v &lt; k} x[s i + u,\, s j + v] \end{aligned} \]</div>
+    <p>In words: for each channel separately, summarize each \(k \times k\) window by its largest value or its mean. There are no parameters and no mixing across channels; the output size follows the same formula as a conv. The usual 2×2 window with stride 2 halves \(H\) and \(W\).</p>
+    <p><strong>Why pool:</strong> downsampling makes every later layer cheaper and grows the receptive field faster, and a small shift inside a window doesn't change its maximum, which gives some local invariance.</p>
+    <h3>Equivariance vs invariance</h3>
+    <div class="mj">\[ \begin{aligned} \text{equivariant:}\quad f(T x) &amp;= T f(x) \\ \text{invariant:}\quad g(T x) &amp;= g(x) \end{aligned} \]</div>
+    <p>In words: an equivariant map moves with its input; an invariant one ignores the move. Feature maps should be equivariant (the edge moved, so its response should move); a class label should be invariant (a cat that moves is still a cat). Conv layers are equivariant, pooling makes small local shifts invariant, and a global pool at the end makes the whole classifier roughly invariant. Detection and segmentation need to know where things are, so they keep equivariant spatial maps to the end.</p>
+    <ul>
+      <li><strong>Max vs average:</strong> max asks “is the feature anywhere in this window?” and passes the gradient only to the winner; average keeps the total response, blurs, and spreads the gradient evenly. Max dominated inside classic CNNs.</li>
+      <li><strong>Strided conv instead:</strong> a stride-2 convolution downsamples with learned weights (the “all-convolutional” net; most ResNet downsampling; ConvNeXt's separate downsampling layers). It costs parameters but chooses what to keep.</li>
+    </ul>
+    <h3>Aliasing: CNNs aren't really shift-invariant</h3>
+    <p>Keeping every \(s\)-th sample can only represent frequencies below a limit (the sampling theorem):</p>
+    <div class="mj">\[ f_{\max} = \frac{1}{2s} \ \text{cycles per pixel} \]</div>
+    <p>In words: anything that oscillates faster than one full cycle per two kept samples (\(2s\) input pixels) can't be represented, and instead of vanishing it folds back as a false slow pattern (aliasing, the moiré effect).</p>
+    <p>Max pooling and strided convs subsample without smoothing first, so fine detail aliases. The result: shift an image by one pixel and the subsampled grid lands on different samples, and a classifier's output can change noticeably (Azulay and Weiss, 2019). The fix is the one signal processing has always used: low-pass filter before subsampling. BlurPool (Zhang, 2019) computes the max at stride 1, blurs, then subsamples, and makes CNNs measurably more shift-stable. Shift augmentation helps too.</p>
+    <h3>Global average pooling</h3>
+    <div class="mj">\[ z_c = \frac{1}{H W} \sum_{h, w} x[c, h, w] \]</div>
+    <p>In words: one number per channel, saying how strongly that channel's feature is present anywhere in the image. The classifier head then reads \(C\) numbers instead of \(H W C\):</p>
+    <div class="mj">\[ \begin{aligned} P_{\text{flatten}} &amp;= H W C \cdot K + K \\ P_{\text{GAP}} &amp;= C \cdot K + K \end{aligned} \]</div>
+    <ul>
+      <li><strong>Why it replaced flatten:</strong> \(HW\) times fewer head parameters (VGG's flattened dense head holds most of its 138M parameters), any input size works, the output is invariant to where the object is, and fewer parameters means less overfitting (Network in Network, 2013).</li>
+      <li><strong>What it loses:</strong> where things are. That's fine for classification and wrong when position is the signal. Class activation maps (CAM, Grad-CAM) recover a rough “where” by weighting the last conv maps by each channel's contribution to the class.</li>
+    </ul>
+
+    <!-- channels -->
+    <h2 id="channels"><span class="pn">05</span>Channels, 1×1 convolutions and cheaper convolutions</h2>
+    <p>Each filter detects one pattern, so output channel \(o\) is a map of where pattern \(o\) appears. The next layer's filters span <em>all</em> input channels, so they detect combinations of patterns (an edge of this colour next to that texture). Channel counts usually grow with depth while resolution shrinks: there are only a few kinds of edge, but many kinds of object part.</p>
+
+    <h3 id="one-by-one">The 1×1 convolution</h3>
+    <div class="mj">\[ \begin{aligned} y[:, i, j] &amp;= W\, x[:, i, j] + b \\ W &amp;\in \mathbb R^{C_{out} \times C_{in}} \end{aligned} \]</div>
+    <p>In words: the same small dense layer applied to every pixel's channel vector, with no mixing across space. It has \(C_{in} C_{out} + C_{out}\) parameters and costs \(H W C_{in} C_{out}\) multiply-adds. It's a per-token linear layer: two 1×1 convs with an activation between them are a transformer's feed-forward block.</p>
+    <ul>
+      <li><strong>Change the channel count cheaply:</strong> squeeze channels before an expensive 3×3 (a bottleneck), or project a residual skip so the shapes match.</li>
+      <li><strong>Mix channels:</strong> recombine features that came from elsewhere, such as the branches Inception concatenates, DenseNet's growing stack, U-Net's concatenated skips, or the channels a depthwise conv kept separate.</li>
+      <li><strong>Add depth cheaply:</strong> the 1×1 itself is linear, but the activation after it adds a non-linearity at almost no cost (Network in Network).</li>
+      <li><strong>Score every pixel:</strong> a final 1×1 conv to \(K\) channels turns a feature map into per-pixel class scores (FCN, U-Net).</li>
+    </ul>
+    <p><strong>The bottleneck block</strong> (ResNet-50 and deeper) squeezes to \(C/4\) channels, runs the 3×3 there, and expands back:</p>
+    <div class="mj">\[ \begin{aligned} P_{\text{basic}} &amp;= 2 \cdot 9 C^2 = 18\, C^2 \\ P_{\text{bottleneck}} &amp;= C \cdot \tfrac{C}{4} + 9 \big(\tfrac{C}{4}\big)^2 + \tfrac{C}{4} \cdot C \\ &amp;= \tfrac{17}{16}\, C^2 \end{aligned} \]</div>
+    <p>In words: two full 3×3 convs on \(C\) channels cost \(18C^2\); the bottleneck on the same \(C\) channels costs about what a basic block on \(C/4\) channels does (\(18 C^2/16\)). So deep ResNets carry four times wider features at the same cost. <strong>The catch:</strong> the 3×3 only sees a \(C/4\)-channel summary, an information bottleneck that works because channels are highly redundant (correlated).</p>
+
+    <h3 id="separable">Depthwise separable convolution</h3>
+    <p>A standard conv filters space and mixes channels in one step. MobileNet splits it in two:</p>
+    <ol>
+      <li><strong>Depthwise:</strong> one \(k \times k\) filter per input channel, applied to that channel only.</li>
+      <li><strong>Pointwise:</strong> a 1×1 conv that mixes the channels.</li>
+    </ol>
+    <div class="mj">\[ \begin{aligned} \text{cost}_{\text{std}} &amp;= H'W' \cdot k^2 C_{in} C_{out} \\ \text{cost}_{\text{sep}} &amp;= H'W' \cdot \big(k^2 C_{in} + C_{in} C_{out}\big) \\ \frac{\text{cost}_{\text{sep}}}{\text{cost}_{\text{std}}} &amp;= \frac{1}{C_{out}} + \frac{1}{k^2} \end{aligned} \]</div>
+    <p>In words: the depthwise step pays \(k^2\) per channel and the pointwise step pays \(C_{in} C_{out}\); dividing by the standard cost leaves two small fractions. With many output channels the first vanishes, so a 3×3 separable conv costs about \(1/9\) of a standard one, in both multiply-adds and parameters.</p>
+    <ul>
+      <li><strong>The assumption:</strong> <em>where</em> to look (spatial filtering) and <em>which channels to combine</em> can be learned separately (Xception's hypothesis). Each layer loses a little accuracy; spending the savings on more channels or layers wins it back.</li>
+      <li><strong>FLOPs aren't speed:</strong> a depthwise conv does only about \(k^2\) multiply-adds per value it reads, with no reuse across channels, so it's limited by memory bandwidth, not arithmetic. MobileNets are fast on phone CPUs but gain far less on a GPU than their FLOP count suggests, because tensor cores need large matrix multiplies to be busy.</li>
+      <li><strong>MobileNetV2's inverted residual:</strong> 1×1 expand (about 6×), 3×3 depthwise, 1×1 project back, with a residual between the narrow ends. The narrow output has no ReLU (a “linear bottleneck”), because a ReLU in a low-dimensional space zeroes whole directions and destroys information.</li>
+    </ul>
+
+    <h3 id="grouped">Grouped convolution</h3>
+    <div class="mj">\[ \text{params} = g \cdot k^2 \cdot \frac{C_{in}}{g} \cdot \frac{C_{out}}{g} = \frac{k^2 C_{in} C_{out}}{g} \]</div>
+    <p>In words: split the channels into \(g\) groups, each with its own conv, and the cost falls \(g\)-fold. \(g = 1\) is a standard conv; \(g = C_{in}\) is depthwise. AlexNet used two groups to fit on two GPUs; ResNeXt found that many thin groups (32) beat a wider single path for the same cost. <strong>The catch:</strong> groups never see each other's channels, so a 1×1 conv or a channel shuffle (ShuffleNet) must follow.</p>
+
+    <!-- norm -->
+    <h2 id="norm"><span class="pn">06</span>Normalization and activation in CNNs</h2>
+    <h3>BatchNorm per channel</h3>
+    <div class="mj">\[ \begin{aligned} \mu_c &amp;= \frac{1}{N H W} \sum_{n, h, w} x_{nchw} \\ \sigma_c^2 &amp;= \frac{1}{N H W} \sum_{n, h, w} \big(x_{nchw} - \mu_c\big)^2 \\ y_{nchw} &amp;= \gamma_c\, \frac{x_{nchw} - \mu_c}{\sqrt{\sigma_c^2 + \epsilon}} + \beta_c \end{aligned} \]</div>
+    <p>In words: one mean and one variance per channel, pooled over the batch <em>and every position</em>, with a learned scale \(\gamma_c\) and shift \(\beta_c\). Why per channel and not per position: every position is then normalized the same way, so the layer stays shift-equivariant; per-position statistics would treat the same pattern differently in different places. Pooling over \(N H W\) values also makes the estimate much less noisy than in an MLP with the same batch. The general mechanics (why it helps, train vs eval) are in <a href="./deep-learning-basics.html#norm">Deep learning basics</a>.</p>
+
+    <h3 id="block">Why conv → BN → ReLU</h3>
+    <ul>
+      <li><strong>The ReLU sees a standardized input.</strong> With BN on the pre-activation, the ReLU's threshold always sits inside the data, so roughly half the units fire. Without it, weight updates can drift a channel all negative (dead: no gradient ever again) or all positive (just linear). \(\gamma\) and \(\beta\) let the network choose what fraction fires.</li>
+      <li><strong>The conv's bias is redundant:</strong> BN subtracts the mean, which removes any constant, and \(\beta\) adds one back. So convs before BN use <code>bias=False</code>.</li>
+      <li><strong>It's free at inference.</strong> With fixed running statistics, BN is a per-channel scale and shift, which folds into the conv just before it:</li>
+    </ul>
+    <div class="mj">\[ \begin{aligned} w'_o &amp;= \frac{\gamma_o}{\sqrt{\sigma_o^2 + \epsilon}}\; w_o \\ b'_o &amp;= \beta_o + \frac{\gamma_o\, (b_o - \mu_o)}{\sqrt{\sigma_o^2 + \epsilon}} \end{aligned} \]</div>
+    <p>In words: scale filter \(o\) by its channel's BN gain and fold the shift into the bias; the deployed network has no BN layers at all. A BN placed <em>after</em> the ReLU can only fold into the next conv, and not exactly at the borders, because that conv's zero padding would need to be padding in the normalized space.</p>
+    <p><strong>BN after the ReLU</strong> also trains well (it normalizes the next conv's input instead), and some benchmarks find it equal or marginally better; the difference is small. Pre-activation ResNets use BN → ReLU → conv so that the skip path stays a pure identity.</p>
+    <p><strong>Without BN:</strong> deep plain CNNs train slowly and need a small learning rate and careful He initialization. Deep ResNets can train without it using initialization tricks (Fixup, SkipInit) or NF-Nets with adaptive gradient clipping, but they lose BN's tolerance of high learning rates and its mild regularizing noise.</p>
+
+    <h3>Small batches: GroupNorm</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Norm</th><th>Statistics over</th><th>Computed per</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>BatchNorm</td><td>\(N, H, W\)</td><td>Channel</td><td>Depends on the batch; running averages at inference</td></tr>
+        <tr><td>LayerNorm</td><td>\(C, H, W\)</td><td>Example</td><td>Batch-independent; ConvNeXt normalizes \(C\) at each position</td></tr>
+        <tr><td>InstanceNorm</td><td>\(H, W\)</td><td>Example and channel</td><td>Removes each image's contrast; style transfer</td></tr>
+        <tr><td>GroupNorm</td><td>\(C/G, H, W\)</td><td>Example and group of channels</td><td>Batch-independent; \(G = 32\) is typical</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Why GroupNorm:</strong> detection and segmentation run at high resolution, so a GPU often holds only one or two images. BN's batch statistics are then very noisy, and the running averages used at test time no longer match what training saw. GroupNorm never looks across the batch, so it behaves the same at any batch size and in training and inference (Wu and He, 2018). It sits between LayerNorm (\(G = 1\)) and InstanceNorm (\(G = C\)), assuming channels within a group share statistics. Alternatives: synchronized BN across GPUs, or frozen BN when fine-tuning (section <a href="#transfer">10</a>).</p>
+
+    <h3>Activations</h3>
+    <p>ReLU is the CNN default: slope exactly 1 where active, so it doesn't shrink gradients through depth, and it's cheap. Its failure mode in a CNN is the dead filter: a filter whose pre-activation is negative at every position of every image gets zero gradient for good. Leaky ReLU is common in GAN discriminators, SiLU in EfficientNet, GELU in ConvNeXt, and ReLU6 or hard-swish for 8-bit mobile inference. The details are in <a href="./activation-functions.html#relu">Activation functions</a>.</p>
+
+    <!-- arch -->
+    <h2 id="arch"><span class="pn">07</span>Architectures, one idea each</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Network</th><th>Key idea</th><th>Why it mattered</th></tr></thead>
+      <tbody>
+        <tr><td><strong>LeNet-5</strong><br><span class="src">1998</span></td><td>Conv, pool, conv, pool, then dense layers; tanh-like units; digits</td><td>Showed that weight sharing plus backprop learns features end to end</td></tr>
+        <tr><td><strong>AlexNet</strong><br><span class="src">2012</span></td><td>The same recipe, scaled up on GPUs, with ReLU, dropout and data augmentation</td><td>Won ImageNet with a top-5 error of 15.3% against 26.2% for the runner-up, and started the deep-learning era in vision</td></tr>
+        <tr><td><strong>VGG</strong><br><span class="src">2014</span></td><td>Only 3×3 convs, stacked 16–19 deep</td><td>Same receptive field as large kernels with fewer weights and more non-linearities; a simple, uniform design</td></tr>
+        <tr><td><strong>Inception</strong><br><span class="src">2014</span></td><td>Parallel 1×1, 3×3, 5×5 and pooling branches, made affordable by 1×1 reductions; global average pooling</td><td>Multi-scale features at a fraction of VGG's parameters</td></tr>
+        <tr><td><strong>ResNet</strong><br><span class="src">2015</span></td><td>Residual blocks, \(x + F(x)\); bottlenecks</td><td>Fixed the degradation problem, so 100+ layers train</td></tr>
+        <tr><td><strong>DenseNet</strong><br><span class="src">2017</span></td><td>Each layer receives the concatenation of all earlier maps in its block</td><td>Feature reuse and short gradient paths with few parameters</td></tr>
+        <tr><td><strong>MobileNet</strong><br><span class="src">2017</span></td><td>Depthwise separable convs; width and resolution multipliers</td><td>About \(k^2\) times cheaper layers, for phones</td></tr>
+        <tr><td><strong>EfficientNet</strong><br><span class="src">2019</span></td><td>Scale depth, width and resolution together (compound scaling)</td><td>Much better accuracy per FLOP than scaling one dimension</td></tr>
+        <tr><td><strong>ConvNeXt</strong><br><span class="src">2022</span></td><td>A ResNet redesigned with transformer-era choices</td><td>A pure CNN matching Swin transformers: much of ViT's edge was recipe and design</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>VGG: two 3×3s instead of one 5×5</h3>
+    <div class="mj">\[ \begin{aligned} P_{5 \times 5} &amp;= 25\, C^2 \\ P_{2 \times (3 \times 3)} &amp;= 18\, C^2 \\ P_{7 \times 7} &amp;= 49\, C^2 \\ P_{3 \times (3 \times 3)} &amp;= 27\, C^2 \end{aligned} \]</div>
+    <p>In words: two stacked 3×3 layers see the same 5×5 patch as one 5×5 layer, and three see 7×7, for \(18/25\) and \(27/49\) of the weights and multiply-adds, with one or two extra ReLUs in between.</p>
+    <p>The cost: more layers of activations to store, more sequential steps, and a narrower family of functions. The stack has \(18C^2\) numbers and a general 5×5 layer \(25C^2\), so most 5×5 layers are out of its reach; with a single channel, two 3×3s compose into only a special, factorable 5×5. In practice the extra ReLU makes the stack the better trade. VGG's other lesson was a warning: its flattened dense head holds most of its 138M parameters.</p>
+
+    <h3>Inception: many kernel sizes at once</h3>
+    <p>Objects appear at different scales, so each block runs 1×1, 3×3 and 5×5 convs and a max pool in parallel and concatenates them. A 1×1 reduction before each large conv shrinks the channels first, or the 5×5 branch would be ruinous. GoogLeNet ended in global average pooling and had about 7M parameters against VGG's 138M; later versions factorized convs further (3×3 into 1×3 then 3×1) and added BatchNorm.</p>
+
+    <h3 id="resnet">ResNet: the degradation problem and residuals</h3>
+    <p><strong>The problem:</strong> stacking more plain layers past about 20 made <em>training</em> error worse (a 56-layer plain net did worse than a 20-layer one on CIFAR-10). That isn't overfitting. A deeper net could copy the shallower one and set its extra layers to the identity, so its training error should be no worse; the optimizer just couldn't find that solution. Learning an exact identity through a stack of convs and ReLUs is hard.</p>
+    <div class="mj">\[ \begin{aligned} x_{l+1} &amp;= x_l + F(x_l; W_l) \\ \frac{\partial L}{\partial x_l} &amp;= \frac{\partial L}{\partial x_L} \prod_{m=l}^{L-1} \Big(I + \frac{\partial F_m}{\partial x_m}\Big) \end{aligned} \]</div>
+    <p>In words: each block adds a learned correction to its input. Doing nothing is now the easy default (\(F = 0\), which weight decay already pushes towards). Multiplying out the product gives a sum over paths, one of which is the plain identity, so the gradient reaches early layers without being forced through every block's Jacobian (\(\partial F/\partial x\), the block's matrix of slopes). When a block changes the width or halves the resolution, the skip becomes a 1×1 conv (stride 2 when the resolution halves), a projection.</p>
+    <p><strong>Two more views:</strong> deleting one block from a trained ResNet barely hurts, unlike deleting a layer from VGG, because it behaves like an ensemble of many relatively short paths (Veit et al., 2016); and skips make the loss surface far smoother (Li et al., 2018). More in <a href="./deep-learning-basics.html#residual">Deep learning basics</a>.</p>
+
+    <h3>DenseNet: concatenate instead of add</h3>
+    <div class="mj">\[ \begin{aligned} x_l &amp;= H_l\big([x_0, x_1, \dots, x_{l-1}]\big) \\ C_{\text{in}, l} &amp;= C_0 + c_g\,(l - 1) \end{aligned} \]</div>
+    <p>In words: layer \(l\) reads the concatenation of every earlier map in its block and adds \(c_g\) new channels (the growth rate, such as 32). Features are reused instead of relearned, and every layer has a short path to the loss; transition layers (1×1 conv, 2×2 average pool) sit between blocks. <strong>The cost:</strong> every map stays alive for the concatenations, so memory is high, and the growing input width makes later layers slow despite few parameters.</p>
+
+    <h3>MobileNet and EfficientNet: cost-aware design</h3>
+    <p>MobileNet builds everything from depthwise separable convs (section <a href="#separable">05</a>) and exposes two knobs: a width multiplier \(\alpha\) on every layer's channels and a resolution multiplier \(\rho\) on the input, with cost roughly proportional to \(\alpha^2 \rho^2\). EfficientNet asks how to spend more compute, and scales all three dimensions together with one coefficient \(\phi\):</p>
+    <div class="mj">\[ \begin{aligned} \text{depth} &amp;= \alpha^{\phi} \\ \text{width} &amp;= \beta^{\phi} \\ \text{resolution} &amp;= \gamma^{\phi} \\ \alpha\, \beta^2 \gamma^2 &amp;\approx 2 \end{aligned} \]</div>
+    <p>In words: FLOPs grow linearly with depth, with the square of width (\(C_{in}\) and \(C_{out}\) both grow) and with the square of resolution (\(H\) and \(W\) both grow), so each step of \(\phi\) about doubles the FLOPs. \(\alpha, \beta, \gamma\) (unrelated to BatchNorm's \(\gamma, \beta\) or MobileNet's \(\alpha\)) come from a small grid search on the base network B0, itself found by architecture search. <strong>Why together:</strong> a higher resolution only helps if the network is deep enough for its receptive field to cover the larger image and wide enough to capture the finer detail; scaling one dimension alone saturates quickly.</p>
+
+    <h3>ConvNeXt: a CNN for the 2020s</h3>
+    <p>Liu et al. (2022) took ResNet-50 and applied vision-transformer design choices one at a time: the modern training recipe (AdamW, long schedules, Mixup, CutMix, RandAugment, stochastic depth), Swin's stage ratios, a 4×4 stride-4 “patchify” stem, ResNeXt-style depthwise convs with wider channels, enlarged to 7×7, an inverted bottleneck, fewer activations and norms, GELU, LayerNorm instead of BatchNorm, and separate 2×2 stride-2 downsampling layers. It matched Swin at the same compute. <strong>The lesson:</strong> much of ViTs' early lead over ResNets came from training recipes and macro design, not from attention itself.</p>
+
+    <!-- compute -->
+    <h2 id="compute"><span class="pn">08</span>How convolution is computed efficiently</h2>
+    <p>A conv layer is one fixed linear map, so there are many ways to compute it: same result, very different speed. Two things set the speed on real hardware: how many multiplications are done, and how much data moves between memory and the arithmetic units. Each method below attacks one or both.</p>
+
+    <h3>Direct loops</h3>
+    <p>The definition, taken literally, is seven nested loops: over images, output channels, output rows and columns, input channels, and the kernel's rows and columns (code in section <a href="#code">13</a>). Its cost is the MAC count from section <a href="#op">02</a>:</p>
+    <div class="mj">\[ \text{MACs} = N \cdot C_{out} \cdot H' W' \cdot C_{in} \cdot k^2 \]</div>
+    <p>In words: one multiply-add per output value per filter weight. The count is fine; the access pattern isn't. The innermost loops are tiny (\(k = 3\)), each input value is fetched again for every window and output channel that uses it, and the vector units sit idle. The general fix is to turn the convolution into a matrix multiplication.</p>
+
+    <h3 id="im2col">im2col + GEMM</h3>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 640 246" role="img" aria-label="im2col: a C by k by k input patch is unfolded into one column of the patch matrix X_col; the weight matrix W_row, one filter per row, times X_col gives Y, one column per output position, which is reshaped into the output map."><rect x="28" y="62" width="98" height="98" style="fill:var(--surface);stroke:var(--rule);stroke-width:1"/><rect class="cellon" x="20" y="70" width="18" height="18"/><rect class="cellon" x="40" y="70" width="18" height="18"/><rect class="cellon" x="60" y="70" width="18" height="18"/><rect class="celloff" x="80" y="70" width="18" height="18"/><rect class="celloff" x="100" y="70" width="18" height="18"/><rect class="cellon" x="20" y="90" width="18" height="18"/><rect class="cellon" x="40" y="90" width="18" height="18"/><rect class="cellon" x="60" y="90" width="18" height="18"/><rect class="celloff" x="80" y="90" width="18" height="18"/><rect class="celloff" x="100" y="90" width="18" height="18"/><rect class="cellon" x="20" y="110" width="18" height="18"/><rect class="cellon" x="40" y="110" width="18" height="18"/><rect class="cellon" x="60" y="110" width="18" height="18"/><rect class="celloff" x="80" y="110" width="18" height="18"/><rect class="celloff" x="100" y="110" width="18" height="18"/><rect class="celloff" x="20" y="130" width="18" height="18"/><rect class="celloff" x="40" y="130" width="18" height="18"/><rect class="celloff" x="60" y="130" width="18" height="18"/><rect class="celloff" x="80" y="130" width="18" height="18"/><rect class="celloff" x="100" y="130" width="18" height="18"/><rect class="celloff" x="20" y="150" width="18" height="18"/><rect class="celloff" x="40" y="150" width="18" height="18"/><rect class="celloff" x="60" y="150" width="18" height="18"/><rect class="celloff" x="80" y="150" width="18" height="18"/><rect class="celloff" x="100" y="150" width="18" height="18"/><text x="69" y="194" text-anchor="middle">input C × H × W</text><text class="lbl" x="69" y="210" text-anchor="middle">patch: C × k × k</text><path class="hid" d="M50 66 V34 H319 V54" marker-end="url(#a-hid)"/><text class="lbl" x="190" y="26" text-anchor="middle">unfold each patch into one column</text><rect class="gbox" x="160" y="96" width="112" height="52" rx="4"/><path d="M160 109 H272" style="stroke:var(--gate);stroke-width:0.8;fill:none;opacity:.5"/><path d="M160 122 H272" style="stroke:var(--gate);stroke-width:0.8;fill:none;opacity:.5"/><path d="M160 135 H272" style="stroke:var(--gate);stroke-width:0.8;fill:none;opacity:.5"/><text x="216" y="127" text-anchor="middle" style="fill:var(--ink)">W_row</text><text class="lbl" x="216" y="166" text-anchor="middle">C_out × C·k²</text><text x="292" y="128" text-anchor="middle" style="font-size:20px;fill:var(--ink)">×</text><rect class="box" x="312" y="60" width="120" height="124" rx="4"/><rect x="312" y="60" width="14" height="124" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/><path d="M340 60 V184" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M354 60 V184" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M368 60 V184" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M382 60 V184" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M396 60 V184" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M410 60 V184" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M424 60 V184" style="stroke:var(--rule);stroke-width:1;fill:none"/><text x="372" y="127" text-anchor="middle" style="fill:var(--ink)">X_col</text><text class="lbl" x="372" y="202" text-anchor="middle">C·k² × H′W′</text><text x="450" y="128" text-anchor="middle" style="font-size:20px;fill:var(--ink)">=</text><rect class="box" x="468" y="96" width="120" height="52" rx="4"/><rect x="468" y="96" width="14" height="52" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/><path d="M496 96 V148" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M510 96 V148" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M524 96 V148" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M538 96 V148" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M552 96 V148" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M566 96 V148" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M580 96 V148" style="stroke:var(--rule);stroke-width:1;fill:none"/><text x="532" y="127" text-anchor="middle" style="fill:var(--ink)">Y</text><text class="lbl" x="528" y="166" text-anchor="middle">C_out × H′W′</text><text class="lbl" x="528" y="182" text-anchor="middle">reshape → C_out × H′ × W′</text><text class="lbl" x="320" y="238" text-anchor="middle">one GEMM: M = C_out, K = C·k², N = H′W′ (times the batch)</text></svg>
+      </div>
+      <figcaption>im2col: every \(C_{in} \times k \times k\) patch of the input becomes one column of a patch matrix, the filters become the rows of a weight matrix, and one matrix multiply (GEMM) computes every output value at once.</figcaption>
+    </figure>
+    <ol>
+      <li><strong>Unfold:</strong> for each output position, copy its \(C_{in} \times k \times k\) input patch into one column of \(X_{\text{col}}\).</li>
+      <li><strong>Reshape the weights:</strong> each filter becomes one row of \(W_{\text{row}}\).</li>
+      <li><strong>One GEMM:</strong> multiply, add the bias, and reshape the result to \((C_{out}, H', W')\).</li>
+    </ol>
+    <div class="mj">\[ \underbrace{Y}_{C_{out} \times N H' W'} = \underbrace{W_{\text{row}}}_{C_{out} \times C_{in} k^2}\; \underbrace{X_{\text{col}}}_{C_{in} k^2 \times N H' W'} \]</div>
+    <p>In words: a general matrix multiply (GEMM) whose inner dimension is the patch length \(C_{in} k^2\) and whose columns are all the output positions of all the images. It does exactly as many multiply-adds as the loops; only the order changes.</p>
+    <p><strong>Why it's fast:</strong> matrix multiplication is the most heavily optimized routine in computing (BLAS on CPUs, cuBLAS and tensor cores on GPUs). It's tiled so that blocks of both matrices sit in cache, shared memory or registers while every number in them is used many times, and it keeps the vector units full. The deeper reason is arithmetic intensity, the work done per number moved:</p>
+    <div class="mj">\[ \text{intensity} = \frac{M K N}{M K + K N + M N} \]</div>
+    <p>In words (\(M, K, N\) here are matrix sizes, not batch or classes): multiplying an \(M \times K\) matrix by a \(K \times N\) one does \(MKN\) multiply-adds on \(MK + KN + MN\) numbers, so the work per number grows with the matrix sizes. Large GEMMs are limited by arithmetic, not memory, and arithmetic is what hardware has most of.</p>
+    <p><strong>The cost is memory.</strong> Neighbouring windows overlap, so \(X_{\text{col}}\) stores each input value once for every window that covers it:</p>
+    <div class="mj">\[ \frac{\text{size}(X_{\text{col}})}{\text{size}(x)} = \frac{C_{in} k^2 H' W'}{C_{in} H W} \approx \frac{k^2}{s^2} \]</div>
+    <p>In words: about 9 times the input for a stride-1 3×3 conv, plus the time to write and read that copy. <strong>Implicit GEMM</strong>, the workhorse of cuDNN, avoids it by building tiles of \(X_{\text{col}}\) on the fly in fast on-chip memory and never storing the whole matrix. A stride-1 1×1 conv needs no unfolding at all: the input, viewed as \(C_{in} \times HW\), already is the matrix.</p>
+    <p>The backward pass reuses the same matrices. With \(\Delta\) the output gradient reshaped to \(C_{out} \times N H'W'\):</p>
+    <div class="mj">\[ \begin{aligned} \frac{\partial L}{\partial W_{\text{row}}} &amp;= \Delta\, X_{\text{col}}^\top \\ \frac{\partial L}{\partial X_{\text{col}}} &amp;= W_{\text{row}}^\top\, \Delta \end{aligned} \]</div>
+    <p>In words: the weight gradient is one more GEMM; the patch-matrix gradient is too, followed by “col2im”, which adds each column back into the patch it came from. That scatter-add is the transposed convolution of section <a href="#transposed">09</a>.</p>
+
+    <h3 id="fourier">The Fourier transform, intuitively</h3>
+    <p>Any signal (a row of pixels, a sound, an image) can be written as a sum of waves of different frequencies, each with its own amplitude and phase. Low frequencies are slow changes: smooth regions, overall shading. High frequencies are fast changes: edges, fine texture, noise. For an image the waves are 2D stripes at every frequency and orientation. The <strong>discrete Fourier transform</strong> (DFT) measures how much of each wave the signal contains:</p>
+    <div class="mj">\[ \begin{aligned} X[f] &amp;= \sum_{t=0}^{n-1} x[t]\; e^{-2\pi i f t / n} \\ x[t] &amp;= \frac{1}{n} \sum_{f=0}^{n-1} X[f]\; e^{2\pi i f t / n} \end{aligned} \]</div>
+    <p>In words: \(X[f]\) is the dot product of the signal with a wave that completes \(f\) cycles across it, written compactly as a complex exponential, \(e^{i\theta} = \cos\theta + i \sin\theta\), so one complex number holds both the cosine and the sine part. Its size \(\lvert X[f] \rvert\) is how strong that wave is; its angle is the wave's phase (where its peaks sit). The second line rebuilds the signal by adding the waves back up, so nothing is lost. In 2D the transform runs along every row, then along every column.</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 452 270" style="min-width:0;max-width:560px" role="img" aria-label="Left: a slow wave, a fast wave and their sum. Right: after a blur kernel the slow wave is kept, the fast wave is shrunk, and the sum is smoother."><text x="127.0" y="22" text-anchor="middle" style="fill:var(--ink);font-weight:600">input</text><text x="365.0" y="22" text-anchor="middle" style="fill:var(--ink);font-weight:600">after a blur kernel</text><text x="8" y="66" text-anchor="start">slow</text><path d="M52 62 H202" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M290 62 H440" style="stroke:var(--rule);stroke-width:1;fill:none"/><text x="8" y="136" text-anchor="start">fast</text><path d="M52 132 H202" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M290 132 H440" style="stroke:var(--rule);stroke-width:1;fill:none"/><text x="8" y="218" text-anchor="start">sum</text><path d="M52 214 H202" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M290 214 H440" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M52.0 62.0 L52.9 60.8 L53.9 59.6 L54.8 58.5 L55.8 57.3 L56.7 56.2 L57.6 55.1 L58.6 54.0 L59.5 52.9 L60.4 51.9 L61.4 50.9 L62.3 49.9 L63.2 49.0 L64.2 48.1 L65.1 47.3 L66.1 46.5 L67.0 45.8 L67.9 45.2 L68.9 44.6 L69.8 44.0 L70.8 43.5 L71.7 43.1 L72.6 42.8 L73.6 42.5 L74.5 42.2 L75.4 42.1 L76.4 42.0 L77.3 42.0 L78.2 42.1 L79.2 42.2 L80.1 42.4 L81.1 42.6 L82.0 43.0 L82.9 43.4 L83.9 43.8 L84.8 44.4 L85.8 44.9 L86.7 45.6 L87.6 46.3 L88.6 47.0 L89.5 47.9 L90.4 48.7 L91.4 49.6 L92.3 50.6 L93.2 51.6 L94.2 52.6 L95.1 53.6 L96.1 54.7 L97.0 55.8 L97.9 57.0 L98.9 58.1 L99.8 59.3 L100.8 60.4 L101.7 61.6 L102.6 62.8 L103.6 64.0 L104.5 65.1 L105.4 66.3 L106.4 67.4 L107.3 68.6 L108.2 69.7 L109.2 70.7 L110.1 71.8 L111.1 72.8 L112.0 73.8 L112.9 74.7 L113.9 75.6 L114.8 76.4 L115.8 77.2 L116.7 77.9 L117.6 78.6 L118.6 79.3 L119.5 79.8 L120.4 80.3 L121.4 80.8 L122.3 81.1 L123.2 81.4 L124.2 81.7 L125.1 81.9 L126.1 82.0 L127.0 82.0 L127.9 82.0 L128.9 81.9 L129.8 81.7 L130.8 81.4 L131.7 81.1 L132.6 80.8 L133.6 80.3 L134.5 79.8 L135.4 79.3 L136.4 78.6 L137.3 77.9 L138.2 77.2 L139.2 76.4 L140.1 75.6 L141.1 74.7 L142.0 73.8 L142.9 72.8 L143.9 71.8 L144.8 70.7 L145.8 69.7 L146.7 68.6 L147.6 67.4 L148.6 66.3 L149.5 65.1 L150.4 64.0 L151.4 62.8 L152.3 61.6 L153.2 60.4 L154.2 59.3 L155.1 58.1 L156.1 57.0 L157.0 55.8 L157.9 54.7 L158.9 53.6 L159.8 52.6 L160.8 51.6 L161.7 50.6 L162.6 49.6 L163.6 48.7 L164.5 47.9 L165.4 47.0 L166.4 46.3 L167.3 45.6 L168.2 44.9 L169.2 44.4 L170.1 43.8 L171.1 43.4 L172.0 43.0 L172.9 42.6 L173.9 42.4 L174.8 42.2 L175.8 42.1 L176.7 42.0 L177.6 42.0 L178.6 42.1 L179.5 42.2 L180.4 42.5 L181.4 42.8 L182.3 43.1 L183.2 43.5 L184.2 44.0 L185.1 44.6 L186.1 45.2 L187.0 45.8 L187.9 46.5 L188.9 47.3 L189.8 48.1 L190.8 49.0 L191.7 49.9 L192.6 50.9 L193.6 51.9 L194.5 52.9 L195.4 54.0 L196.4 55.1 L197.3 56.2 L198.2 57.3 L199.2 58.5 L200.1 59.6 L201.1 60.8 L202.0 62.0" style="stroke:var(--hid);stroke-width:2;fill:none"/><path d="M290.0 62.0 L290.9 60.9 L291.9 59.7 L292.8 58.6 L293.8 57.5 L294.7 56.4 L295.6 55.3 L296.6 54.2 L297.5 53.2 L298.4 52.2 L299.4 51.2 L300.3 50.3 L301.2 49.4 L302.2 48.6 L303.1 47.8 L304.1 47.0 L305.0 46.3 L305.9 45.7 L306.9 45.1 L307.8 44.5 L308.8 44.1 L309.7 43.7 L310.6 43.3 L311.6 43.1 L312.5 42.8 L313.4 42.7 L314.4 42.6 L315.3 42.6 L316.2 42.7 L317.2 42.8 L318.1 43.0 L319.1 43.2 L320.0 43.5 L320.9 43.9 L321.9 44.4 L322.8 44.9 L323.8 45.5 L324.7 46.1 L325.6 46.8 L326.6 47.5 L327.5 48.3 L328.4 49.1 L329.4 50.0 L330.3 50.9 L331.2 51.9 L332.2 52.9 L333.1 53.9 L334.1 54.9 L335.0 56.0 L335.9 57.1 L336.9 58.2 L337.8 59.3 L338.8 60.5 L339.7 61.6 L340.6 62.8 L341.6 63.9 L342.5 65.0 L343.4 66.2 L344.4 67.3 L345.3 68.4 L346.2 69.4 L347.2 70.5 L348.1 71.5 L349.1 72.5 L350.0 73.4 L350.9 74.3 L351.9 75.2 L352.8 76.0 L353.8 76.8 L354.7 77.5 L355.6 78.1 L356.6 78.7 L357.5 79.3 L358.4 79.8 L359.4 80.2 L360.3 80.6 L361.2 80.9 L362.2 81.1 L363.1 81.3 L364.1 81.4 L365.0 81.4 L365.9 81.4 L366.9 81.3 L367.8 81.1 L368.8 80.9 L369.7 80.6 L370.6 80.2 L371.6 79.8 L372.5 79.3 L373.4 78.7 L374.4 78.1 L375.3 77.5 L376.2 76.8 L377.2 76.0 L378.1 75.2 L379.1 74.3 L380.0 73.4 L380.9 72.5 L381.9 71.5 L382.8 70.5 L383.8 69.4 L384.7 68.4 L385.6 67.3 L386.6 66.2 L387.5 65.0 L388.4 63.9 L389.4 62.8 L390.3 61.6 L391.2 60.5 L392.2 59.3 L393.1 58.2 L394.1 57.1 L395.0 56.0 L395.9 54.9 L396.9 53.9 L397.8 52.9 L398.8 51.9 L399.7 50.9 L400.6 50.0 L401.6 49.1 L402.5 48.3 L403.4 47.5 L404.4 46.8 L405.3 46.1 L406.2 45.5 L407.2 44.9 L408.1 44.4 L409.1 43.9 L410.0 43.5 L410.9 43.2 L411.9 43.0 L412.8 42.8 L413.8 42.7 L414.7 42.6 L415.6 42.6 L416.6 42.7 L417.5 42.8 L418.4 43.1 L419.4 43.3 L420.3 43.7 L421.2 44.1 L422.2 44.5 L423.1 45.1 L424.1 45.7 L425.0 46.3 L425.9 47.0 L426.9 47.8 L427.8 48.6 L428.8 49.4 L429.7 50.3 L430.6 51.2 L431.6 52.2 L432.5 53.2 L433.4 54.2 L434.4 55.3 L435.3 56.4 L436.2 57.5 L437.2 58.6 L438.1 59.7 L439.1 60.9 L440.0 62.0" style="stroke:var(--hid);stroke-width:2;fill:none"/><path d="M52.0 132.0 L52.9 129.2 L53.9 126.6 L54.8 124.2 L55.8 122.3 L56.7 120.9 L57.6 120.1 L58.6 120.0 L59.5 120.6 L60.4 121.8 L61.4 123.5 L62.3 125.7 L63.2 128.3 L64.2 131.1 L65.1 133.9 L66.1 136.6 L67.0 139.1 L67.9 141.1 L68.9 142.7 L69.8 143.7 L70.8 144.0 L71.7 143.7 L72.6 142.7 L73.6 141.1 L74.5 139.1 L75.4 136.6 L76.4 133.9 L77.3 131.1 L78.2 128.3 L79.2 125.7 L80.1 123.5 L81.1 121.8 L82.0 120.6 L82.9 120.0 L83.9 120.1 L84.8 120.9 L85.8 122.3 L86.7 124.2 L87.6 126.6 L88.6 129.2 L89.5 132.0 L90.4 134.8 L91.4 137.4 L92.3 139.8 L93.2 141.7 L94.2 143.1 L95.1 143.9 L96.1 144.0 L97.0 143.4 L97.9 142.2 L98.9 140.5 L99.8 138.3 L100.8 135.7 L101.7 132.9 L102.6 130.1 L103.6 127.4 L104.5 124.9 L105.4 122.9 L106.4 121.3 L107.3 120.3 L108.2 120.0 L109.2 120.3 L110.1 121.3 L111.1 122.9 L112.0 124.9 L112.9 127.4 L113.9 130.1 L114.8 132.9 L115.8 135.7 L116.7 138.3 L117.6 140.5 L118.6 142.2 L119.5 143.4 L120.4 144.0 L121.4 143.9 L122.3 143.1 L123.2 141.7 L124.2 139.8 L125.1 137.4 L126.1 134.8 L127.0 132.0 L127.9 129.2 L128.9 126.6 L129.8 124.2 L130.8 122.3 L131.7 120.9 L132.6 120.1 L133.6 120.0 L134.5 120.6 L135.4 121.8 L136.4 123.5 L137.3 125.7 L138.2 128.3 L139.2 131.1 L140.1 133.9 L141.1 136.6 L142.0 139.1 L142.9 141.1 L143.9 142.7 L144.8 143.7 L145.8 144.0 L146.7 143.7 L147.6 142.7 L148.6 141.1 L149.5 139.1 L150.4 136.6 L151.4 133.9 L152.3 131.1 L153.2 128.3 L154.2 125.7 L155.1 123.5 L156.1 121.8 L157.0 120.6 L157.9 120.0 L158.9 120.1 L159.8 120.9 L160.8 122.3 L161.7 124.2 L162.6 126.6 L163.6 129.2 L164.5 132.0 L165.4 134.8 L166.4 137.4 L167.3 139.8 L168.2 141.7 L169.2 143.1 L170.1 143.9 L171.1 144.0 L172.0 143.4 L172.9 142.2 L173.9 140.5 L174.8 138.3 L175.8 135.7 L176.7 132.9 L177.6 130.1 L178.6 127.4 L179.5 124.9 L180.4 122.9 L181.4 121.3 L182.3 120.3 L183.2 120.0 L184.2 120.3 L185.1 121.3 L186.1 122.9 L187.0 124.9 L187.9 127.4 L188.9 130.1 L189.8 132.9 L190.8 135.7 L191.7 138.3 L192.6 140.5 L193.6 142.2 L194.5 143.4 L195.4 144.0 L196.4 143.9 L197.3 143.1 L198.2 141.7 L199.2 139.8 L200.1 137.4 L201.1 134.8 L202.0 132.0" style="stroke:var(--grad);stroke-width:2;fill:none"/><path d="M290.0 132.0 L290.9 131.2 L291.9 130.4 L292.8 129.7 L293.8 129.1 L294.7 128.7 L295.6 128.4 L296.6 128.4 L297.5 128.6 L298.4 128.9 L299.4 129.5 L300.3 130.1 L301.2 130.9 L302.2 131.7 L303.1 132.6 L304.1 133.4 L305.0 134.1 L305.9 134.7 L306.9 135.2 L307.8 135.5 L308.8 135.6 L309.7 135.5 L310.6 135.2 L311.6 134.7 L312.5 134.1 L313.4 133.4 L314.4 132.6 L315.3 131.7 L316.2 130.9 L317.2 130.1 L318.1 129.5 L319.1 128.9 L320.0 128.6 L320.9 128.4 L321.9 128.4 L322.8 128.7 L323.8 129.1 L324.7 129.7 L325.6 130.4 L326.6 131.2 L327.5 132.0 L328.4 132.8 L329.4 133.6 L330.3 134.3 L331.2 134.9 L332.2 135.3 L333.1 135.6 L334.1 135.6 L335.0 135.4 L335.9 135.1 L336.9 134.5 L337.8 133.9 L338.8 133.1 L339.7 132.3 L340.6 131.4 L341.6 130.6 L342.5 129.9 L343.4 129.3 L344.4 128.8 L345.3 128.5 L346.2 128.4 L347.2 128.5 L348.1 128.8 L349.1 129.3 L350.0 129.9 L350.9 130.6 L351.9 131.4 L352.8 132.3 L353.8 133.1 L354.7 133.9 L355.6 134.5 L356.6 135.1 L357.5 135.4 L358.4 135.6 L359.4 135.6 L360.3 135.3 L361.2 134.9 L362.2 134.3 L363.1 133.6 L364.1 132.8 L365.0 132.0 L365.9 131.2 L366.9 130.4 L367.8 129.7 L368.8 129.1 L369.7 128.7 L370.6 128.4 L371.6 128.4 L372.5 128.6 L373.4 128.9 L374.4 129.5 L375.3 130.1 L376.2 130.9 L377.2 131.7 L378.1 132.6 L379.1 133.4 L380.0 134.1 L380.9 134.7 L381.9 135.2 L382.8 135.5 L383.8 135.6 L384.7 135.5 L385.6 135.2 L386.6 134.7 L387.5 134.1 L388.4 133.4 L389.4 132.6 L390.3 131.7 L391.2 130.9 L392.2 130.1 L393.1 129.5 L394.1 128.9 L395.0 128.6 L395.9 128.4 L396.9 128.4 L397.8 128.7 L398.8 129.1 L399.7 129.7 L400.6 130.4 L401.6 131.2 L402.5 132.0 L403.4 132.8 L404.4 133.6 L405.3 134.3 L406.2 134.9 L407.2 135.3 L408.1 135.6 L409.1 135.6 L410.0 135.4 L410.9 135.1 L411.9 134.5 L412.8 133.9 L413.8 133.1 L414.7 132.3 L415.6 131.4 L416.6 130.6 L417.5 129.9 L418.4 129.3 L419.4 128.8 L420.3 128.5 L421.2 128.4 L422.2 128.5 L423.1 128.8 L424.1 129.3 L425.0 129.9 L425.9 130.6 L426.9 131.4 L427.8 132.3 L428.8 133.1 L429.7 133.9 L430.6 134.5 L431.6 135.1 L432.5 135.4 L433.4 135.6 L434.4 135.6 L435.3 135.3 L436.2 134.9 L437.2 134.3 L438.1 133.6 L439.1 132.8 L440.0 132.0" style="stroke:var(--grad);stroke-width:2;fill:none"/><path d="M52.0 214.0 L52.6 211.3 L53.2 208.7 L53.9 206.2 L54.5 203.8 L55.1 201.6 L55.8 199.6 L56.4 197.9 L57.0 196.4 L57.6 195.2 L58.2 194.3 L58.9 193.8 L59.5 193.5 L60.1 193.5 L60.8 193.8 L61.4 194.4 L62.0 195.2 L62.6 196.2 L63.2 197.3 L63.9 198.5 L64.5 199.9 L65.1 201.2 L65.8 202.5 L66.4 203.7 L67.0 204.9 L67.6 205.9 L68.2 206.7 L68.9 207.2 L69.5 207.6 L70.1 207.7 L70.8 207.5 L71.4 207.1 L72.0 206.4 L72.6 205.4 L73.2 204.3 L73.9 202.9 L74.5 201.3 L75.1 199.6 L75.8 197.8 L76.4 195.9 L77.0 194.0 L77.6 192.1 L78.2 190.4 L78.9 188.7 L79.5 187.2 L80.1 185.9 L80.8 184.8 L81.4 184.1 L82.0 183.6 L82.6 183.4 L83.2 183.5 L83.9 184.0 L84.5 184.8 L85.1 185.9 L85.8 187.2 L86.4 188.9 L87.0 190.8 L87.6 192.8 L88.2 195.1 L88.9 197.4 L89.5 199.9 L90.1 202.3 L90.8 204.7 L91.4 207.1 L92.0 209.3 L92.6 211.4 L93.2 213.3 L93.9 214.9 L94.5 216.3 L95.1 217.5 L95.8 218.3 L96.4 218.9 L97.0 219.2 L97.6 219.3 L98.2 219.0 L98.9 218.6 L99.5 217.9 L100.1 217.1 L100.8 216.1 L101.4 215.1 L102.0 214.0 L102.6 212.9 L103.2 211.9 L103.9 210.9 L104.5 210.1 L105.1 209.4 L105.8 209.0 L106.4 208.7 L107.0 208.8 L107.6 209.1 L108.2 209.7 L108.9 210.5 L109.5 211.7 L110.1 213.1 L110.8 214.7 L111.4 216.6 L112.0 218.7 L112.6 220.9 L113.2 223.3 L113.9 225.7 L114.5 228.1 L115.1 230.6 L115.8 232.9 L116.4 235.2 L117.0 237.2 L117.6 239.1 L118.2 240.8 L118.9 242.1 L119.5 243.2 L120.1 244.0 L120.8 244.5 L121.4 244.6 L122.0 244.4 L122.6 243.9 L123.2 243.2 L123.9 242.1 L124.5 240.8 L125.1 239.3 L125.8 237.6 L126.4 235.9 L127.0 234.0 L127.6 232.1 L128.2 230.2 L128.9 228.4 L129.5 226.7 L130.1 225.1 L130.8 223.7 L131.4 222.6 L132.0 221.6 L132.6 220.9 L133.2 220.5 L133.9 220.3 L134.5 220.4 L135.1 220.8 L135.8 221.3 L136.4 222.1 L137.0 223.1 L137.6 224.3 L138.2 225.5 L138.9 226.8 L139.5 228.1 L140.1 229.5 L140.8 230.7 L141.4 231.8 L142.0 232.8 L142.6 233.6 L143.2 234.2 L143.9 234.5 L144.5 234.5 L145.1 234.2 L145.8 233.7 L146.4 232.8 L147.0 231.6 L147.6 230.1 L148.2 228.4 L148.9 226.4 L149.5 224.2 L150.1 221.8 L150.8 219.3 L151.4 216.7 L152.0 214.0 L152.6 211.3 L153.2 208.7 L153.9 206.2 L154.5 203.8 L155.1 201.6 L155.8 199.6 L156.4 197.9 L157.0 196.4 L157.6 195.2 L158.2 194.3 L158.9 193.8 L159.5 193.5 L160.1 193.5 L160.8 193.8 L161.4 194.4 L162.0 195.2 L162.6 196.2 L163.2 197.3 L163.9 198.5 L164.5 199.9 L165.1 201.2 L165.8 202.5 L166.4 203.7 L167.0 204.9 L167.6 205.9 L168.2 206.7 L168.9 207.2 L169.5 207.6 L170.1 207.7 L170.8 207.5 L171.4 207.1 L172.0 206.4 L172.6 205.4 L173.2 204.3 L173.9 202.9 L174.5 201.3 L175.1 199.6 L175.8 197.8 L176.4 195.9 L177.0 194.0 L177.6 192.1 L178.2 190.4 L178.9 188.7 L179.5 187.2 L180.1 185.9 L180.8 184.8 L181.4 184.1 L182.0 183.6 L182.6 183.4 L183.2 183.5 L183.9 184.0 L184.5 184.8 L185.1 185.9 L185.8 187.2 L186.4 188.9 L187.0 190.8 L187.6 192.8 L188.2 195.1 L188.9 197.4 L189.5 199.9 L190.1 202.3 L190.8 204.7 L191.4 207.1 L192.0 209.3 L192.6 211.4 L193.2 213.3 L193.9 214.9 L194.5 216.3 L195.1 217.5 L195.8 218.3 L196.4 218.9 L197.0 219.2 L197.6 219.3 L198.2 219.0 L198.9 218.6 L199.5 217.9 L200.1 217.1 L200.8 216.1 L201.4 215.1 L202.0 214.0" style="stroke:var(--ink);stroke-width:2;fill:none"/><path d="M290.0 214.0 L290.6 212.7 L291.2 211.4 L291.9 210.1 L292.5 208.8 L293.1 207.7 L293.8 206.6 L294.4 205.5 L295.0 204.6 L295.6 203.7 L296.2 203.0 L296.9 202.3 L297.5 201.8 L298.1 201.3 L298.8 201.0 L299.4 200.7 L300.0 200.5 L300.6 200.4 L301.2 200.3 L301.9 200.3 L302.5 200.3 L303.1 200.3 L303.8 200.4 L304.4 200.4 L305.0 200.4 L305.6 200.4 L306.2 200.4 L306.9 200.3 L307.5 200.1 L308.1 199.9 L308.8 199.7 L309.4 199.4 L310.0 199.0 L310.6 198.5 L311.2 198.0 L311.9 197.5 L312.5 197.0 L313.1 196.4 L313.8 195.8 L314.4 195.2 L315.0 194.6 L315.6 194.1 L316.2 193.5 L316.9 193.1 L317.5 192.7 L318.1 192.4 L318.8 192.2 L319.4 192.1 L320.0 192.1 L320.6 192.2 L321.2 192.5 L321.9 192.8 L322.5 193.3 L323.1 193.9 L323.8 194.5 L324.4 195.3 L325.0 196.2 L325.6 197.1 L326.2 198.1 L326.9 199.2 L327.5 200.3 L328.1 201.4 L328.8 202.5 L329.4 203.6 L330.0 204.7 L330.6 205.8 L331.2 206.8 L331.9 207.7 L332.5 208.6 L333.1 209.4 L333.8 210.2 L334.4 210.8 L335.0 211.4 L335.6 211.9 L336.2 212.4 L336.9 212.8 L337.5 213.1 L338.1 213.4 L338.8 213.6 L339.4 213.8 L340.0 214.0 L340.6 214.2 L341.2 214.4 L341.9 214.6 L342.5 214.9 L343.1 215.2 L343.8 215.6 L344.4 216.1 L345.0 216.6 L345.6 217.2 L346.2 217.8 L346.9 218.6 L347.5 219.4 L348.1 220.3 L348.8 221.2 L349.4 222.2 L350.0 223.3 L350.6 224.4 L351.2 225.5 L351.9 226.6 L352.5 227.7 L353.1 228.8 L353.8 229.9 L354.4 230.9 L355.0 231.8 L355.6 232.7 L356.2 233.5 L356.9 234.1 L357.5 234.7 L358.1 235.2 L358.8 235.5 L359.4 235.8 L360.0 235.9 L360.6 235.9 L361.2 235.8 L361.9 235.6 L362.5 235.3 L363.1 234.9 L363.8 234.5 L364.4 233.9 L365.0 233.4 L365.6 232.8 L366.2 232.2 L366.9 231.6 L367.5 231.0 L368.1 230.5 L368.8 230.0 L369.4 229.5 L370.0 229.0 L370.6 228.6 L371.2 228.3 L371.9 228.1 L372.5 227.9 L373.1 227.7 L373.8 227.6 L374.4 227.6 L375.0 227.6 L375.6 227.6 L376.2 227.6 L376.9 227.7 L377.5 227.7 L378.1 227.7 L378.8 227.7 L379.4 227.6 L380.0 227.5 L380.6 227.3 L381.2 227.0 L381.9 226.7 L382.5 226.2 L383.1 225.7 L383.8 225.0 L384.4 224.3 L385.0 223.4 L385.6 222.5 L386.2 221.4 L386.9 220.3 L387.5 219.2 L388.1 217.9 L388.8 216.6 L389.4 215.3 L390.0 214.0 L390.6 212.7 L391.2 211.4 L391.9 210.1 L392.5 208.8 L393.1 207.7 L393.8 206.6 L394.4 205.5 L395.0 204.6 L395.6 203.7 L396.2 203.0 L396.9 202.3 L397.5 201.8 L398.1 201.3 L398.8 201.0 L399.4 200.7 L400.0 200.5 L400.6 200.4 L401.2 200.3 L401.9 200.3 L402.5 200.3 L403.1 200.3 L403.8 200.4 L404.4 200.4 L405.0 200.4 L405.6 200.4 L406.2 200.4 L406.9 200.3 L407.5 200.1 L408.1 199.9 L408.8 199.7 L409.4 199.4 L410.0 199.0 L410.6 198.5 L411.2 198.0 L411.9 197.5 L412.5 197.0 L413.1 196.4 L413.8 195.8 L414.4 195.2 L415.0 194.6 L415.6 194.1 L416.2 193.5 L416.9 193.1 L417.5 192.7 L418.1 192.4 L418.8 192.2 L419.4 192.1 L420.0 192.1 L420.6 192.2 L421.2 192.5 L421.9 192.8 L422.5 193.3 L423.1 193.9 L423.8 194.5 L424.4 195.3 L425.0 196.2 L425.6 197.1 L426.2 198.1 L426.9 199.2 L427.5 200.3 L428.1 201.4 L428.8 202.5 L429.4 203.6 L430.0 204.7 L430.6 205.8 L431.2 206.8 L431.9 207.7 L432.5 208.6 L433.1 209.4 L433.8 210.2 L434.4 210.8 L435.0 211.4 L435.6 211.9 L436.2 212.4 L436.9 212.8 L437.5 213.1 L438.1 213.4 L438.8 213.6 L439.4 213.8 L440.0 214.0" style="stroke:var(--ink);stroke-width:2;fill:none"/><path class="cw" d="M212 62 H280" marker-end="url(#a-cw)"/><text class="lbl" x="246.0" y="54" text-anchor="middle">kept</text><path class="cw" d="M212 132 H280" marker-end="url(#a-cw)"/><text class="lbl" x="246.0" y="124" text-anchor="middle">shrunk</text><path class="cw" d="M212 214 H280" marker-end="url(#a-cw)"/><text class="lbl" x="246.0" y="206" text-anchor="middle">smoother</text><text class="lbl" x="230" y="262" text-anchor="middle">each frequency is multiplied by W[f]</text></svg>
+      </div>
+      <figcaption>A signal is a sum of waves. A blurring kernel passes the slow wave almost untouched and shrinks the fast one, so the output is smoother. A convolution can only rescale (and phase-shift) each frequency; it never turns one frequency into another.</figcaption>
+    </figure>
+    <p><strong>The FFT.</strong> Computing every \(X[f]\) directly costs \(O(n^2)\). The fast Fourier transform splits the sum into even and odd samples, each a DFT of half the length, and combines them:</p>
+    <div class="mj">\[ \begin{aligned} T(n) &amp;= 2\, T(n/2) + O(n) \\ &amp;= O(n \log n) \end{aligned} \]</div>
+    <p>In words: one length-\(n\) transform is two length-\(n/2\) transforms plus \(n\) multiply-adds to combine them, and halving can happen \(\log_2 n\) times. An \(n \times n\) image costs \(O(n^2 \log n)\).</p>
+
+    <h3 id="conv-theorem">The convolution theorem</h3>
+    <p><strong>Why waves are the right basis:</strong> slide a kernel over a pure wave and you get the same wave back, only rescaled and shifted in phase, because a weighted sum of shifted copies of a wave of frequency \(f\) is still a wave of frequency \(f\). So a convolution can't move energy between frequencies. All it can do is multiply each frequency by the kernel's response at that frequency, and that response is \(W[f]\), the kernel's own Fourier transform. Decompose, scale each wave, recombine:</p>
+    <div class="mj">\[ \mathcal F(x \circledast w) = \mathcal F(x) \cdot \mathcal F(w) \]</div>
+    <p>In words: convolution in space is pointwise multiplication in frequency. The derivation is one substitution, with indices taken mod \(n\) and a short name for the basic phase:</p>
+    <div class="mj">\[ \begin{aligned} t' &amp;= t - u \\ \omega &amp;= e^{-2\pi i/n} \end{aligned} \]</div>
+    <div class="mj">\[ \begin{aligned} \mathcal F(x \circledast w)[f] &amp;= \sum_{t} \sum_{u} w[u]\; x[t - u]\; \omega^{f t} \\ &amp;= \sum_{u} w[u]\, \omega^{f u} \sum_{t'} x[t']\, \omega^{f t'} \\ &amp;= W[f]\; X[f] \end{aligned} \]</div>
+    <p>In words: shifting a signal by \(u\) multiplies its frequency-\(f\) component by the phase \(\omega^{f u}\). A convolution is a weighted sum of shifted copies, so in frequency it's \(X[f]\) times a weighted sum of phases, which is exactly \(W[f]\). Work that took \(k\) multiply-adds per output becomes one multiplication per frequency.</p>
+    <p>Two catches:</p>
+    <ul>
+      <li><strong>It's circular convolution</strong> (\(\circledast\)). The DFT treats the signal as periodic, so the kernel wraps around the edge. For the ordinary linear convolution, zero-pad both signals to length \(n + k - 1\) so the wrap lands on zeros. If you only need the valid outputs, length \(n\) is enough: the wrapped outputs are exactly the ones you'd discard (the idea behind overlap-save, below).</li>
+      <li><strong>CNNs compute cross-correlation.</strong> For a real kernel, reversing it in space conjugates its spectrum:</li>
+    </ul>
+    <div class="mj">\[ \mathcal F(x \star w) = \mathcal F(x) \cdot \overline{\mathcal F(w)} \]</div>
+    <p>In words: either flip the kernel before transforming it, or conjugate its transform. Forget, and the layer runs with every kernel flipped: silently wrong with pretrained weights.</p>
+
+    <h3 id="fft">FFT convolution, step by step</h3>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 640 200" role="img" aria-label="FFT convolution: the input and the kernel are zero-padded to P by Q and transformed; the kernel's transform is conjugated; the two are multiplied per frequency and summed over input channels; an inverse FFT and a crop give the output."><rect class="box" x="10" y="24" width="84" height="36" rx="8"/><text x="52.0" y="47" text-anchor="middle">x: H × W</text><rect class="box" x="116" y="24" width="120" height="36" rx="8"/><text x="176.0" y="47" text-anchor="middle">zero-pad to P × Q</text><rect class="gbox" x="258" y="24" width="92" height="36" rx="8"/><text x="304.0" y="47" text-anchor="middle">FFT</text><rect class="box" x="10" y="134" width="84" height="36" rx="8"/><text x="52.0" y="157" text-anchor="middle">w: k × k</text><rect class="box" x="116" y="134" width="120" height="36" rx="8"/><text x="176.0" y="157" text-anchor="middle">zero-pad to P × Q</text><rect class="gbox" x="258" y="134" width="92" height="36" rx="8"/><text x="304.0" y="157" text-anchor="middle">FFT, conj</text><path class="cw" d="M94 42 H112" marker-end="url(#a-cw)"/><path class="cw" d="M236 42 H254" marker-end="url(#a-cw)"/><path class="cw" d="M94 152 H112" marker-end="url(#a-cw)"/><path class="cw" d="M236 152 H254" marker-end="url(#a-cw)"/><path class="cw" d="M350 42 H392 V78" marker-end="url(#a-cw)"/><path class="cw" d="M350 152 H392 V112" marker-end="url(#a-cw)"/><circle class="op" cx="392" cy="95" r="14"/><text class="optx" x="392" y="101" text-anchor="middle">×</text><path class="cw" d="M406 95 H424" marker-end="url(#a-cw)"/><rect class="gbox" x="428" y="77" width="96" height="36" rx="8"/><text x="476.0" y="100" text-anchor="middle">inverse FFT</text><path class="cw" d="M524 95 H542" marker-end="url(#a-cw)"/><rect class="box" x="546" y="77" width="84" height="36" rx="8"/><text x="588.0" y="100" text-anchor="middle">crop</text><text class="lbl" x="304" y="16" text-anchor="middle">O(n² log n) per map</text><text class="lbl" x="304" y="190" text-anchor="middle">kernels: once, cached at inference</text><text class="lbl" x="512" y="52" text-anchor="middle">× : multiply per frequency and</text><text class="lbl" x="512" y="66" text-anchor="middle">sum over input channels, O(n²)</text><text class="lbl" x="476" y="134" text-anchor="middle">O(n² log n)</text><text class="lbl" x="588" y="134" text-anchor="middle">valid part;</text><text class="lbl" x="588" y="149" text-anchor="middle">stride: keep</text><text class="lbl" x="588" y="164" text-anchor="middle">every s-th</text></svg>
+      </div>
+      <figcaption>FFT convolution of one layer. Transforms cost \(O(n^2 \log n)\) per map; the multiply step costs one complex multiply-add per frequency per channel pair, whatever the kernel size.</figcaption>
+    </figure>
+    <ol>
+      <li><strong>Pad:</strong> zero-pad each input map (\(H \times W\)) and each kernel (\(k \times k\)) to \(P \times Q\), with \(P \ge H + k - 1\) and \(Q \ge W + k - 1\) for full or “same” outputs (\(P = H\) and \(Q = W\) suffice if you keep only the valid part), usually rounded up to a size the FFT handles fast.</li>
+      <li><strong>Transform:</strong> FFT every input channel and every kernel. At inference the kernels' transforms are computed once and stored.</li>
+      <li><strong>Multiply and sum over input channels:</strong></li>
+    </ol>
+    <div class="mj">\[ \hat Y_o[u, v] = \sum_{c=1}^{C_{in}} \hat X_c[u, v]\; \overline{\hat W_{o,c}[u, v]} \]</div>
+    <p>In words: at each frequency \((u, v)\), output channel \(o\) is a weighted sum of the input channels' coefficients, a small \((C_{out} \times C_{in})\) matrix times a \(C_{in}\) vector. The channel sum can happen in frequency space because the transform is linear, so only \(C_{out}\) inverse transforms are needed, not \(C_{in} C_{out}\).</p>
+    <ol start="4">
+      <li><strong>Transform back and crop:</strong> inverse FFT each output channel, keep the valid (or “same”) region, and apply any stride by keeping every \(s\)-th value.</li>
+    </ol>
+
+    <h3>Complexity: direct vs FFT</h3>
+    <p>For one (input channel, output channel) pair on an \(n \times n\) map with a \(k \times k\) kernel:</p>
+    <div class="mj">\[ \begin{aligned} \text{direct} &amp;= O(n^2 k^2) \\ \text{FFT} &amp;= O(n^2 \log n) + O(n^2) \end{aligned} \]</div>
+    <p>In words: direct does \(k^2\) multiply-adds per output. FFT pays for the transforms (\(n^2 \log n\)) and one complex multiply per frequency (\(n^2\)), with no dependence on \(k\) at all. For a whole layer the transforms are shared:</p>
+    <div class="mj">\[ \begin{aligned} \text{direct} &amp;= O\big(N C_{in} C_{out} \cdot n^2 k^2\big) \\ \text{products} &amp;= O\big(N C_{in} C_{out} \cdot n^2\big) \\ \text{transforms} &amp;= O\big(T \cdot n^2 \log n\big) \\ T &amp;= N C_{in} + C_{in} C_{out} + N C_{out} \end{aligned} \]</div>
+    <p>In words: FFT pays for products and transforms. Every input map, kernel and output map is transformed once (\(T\) transforms), and those transforms are reused across the other channel dimension. With many channels and a batch larger than about \(\log n\) (or cached kernel transforms), the pointwise products dominate. Against direct, they save a factor of about \(k^2\), but each complex multiply-add is about four real ones (two, on average, with real-input FFTs, which only need half the frequencies).</p>
+    <p><strong>When it pays:</strong> large kernels (roughly 7×7 and up, and very large ones like 31×31), large maps, and long 1D signals. Long-convolution sequence models (S4, Hyena) apply kernels as long as the sequence itself, and compute them by FFT in \(O(n \log n)\) instead of \(O(n^2)\).</p>
+    <p id="fft-3x3"><strong>Why it doesn't pay for 3×3:</strong></p>
+    <ul>
+      <li><strong>Little to save.</strong> The best case is about \(k^2 = 9\) times fewer multiply-adds, and complex arithmetic takes back a factor of two to four.</li>
+      <li><strong>Padding the kernel to the image.</strong> A 9-number kernel becomes a \(P \times Q\) complex array, for every one of the \(C_{in} C_{out}\) kernels: far more memory and memory traffic than the kernels themselves.</li>
+      <li><strong>Fixed costs and waste.</strong> Transforms cost \(n^2 \log n\) per map whatever \(k\) is; padding is large relative to small late-layer maps; a stride-2 layer throws away three quarters of what FFT computed; rounding error hurts in fp16.</li>
+      <li><strong>Winograd does it better:</strong> 2.25–4× fewer multiplications for 3×3, with tiny tiles, in real arithmetic (next).</li>
+    </ul>
+
+    <h3 id="overlap-add">Overlap-add for big images</h3>
+    <p>One FFT over a large image, with a small kernel padded to the same large size, wastes work (the transform's \(\log n\) grows with the image) and memory. Instead, cut the image into \(B \times B\) tiles, FFT-convolve each tile with the kernel (both padded to \(B + k - 1\)), and add each tile's result into place. Each tile's output spills \(k - 1\) pixels past its edge, and where neighbouring outputs overlap their contributions add: that's the “add”. Overlap-save is the mirror image: overlapping input tiles, and the wrapped-around outputs of each tile are discarded.</p>
+    <div class="mj">\[ \begin{aligned} \text{cost} &amp;\approx \Big(\frac{n}{B}\Big)^2 (B + k - 1)^2 \log(B + k - 1) \\ &amp;= O\big(n^2 \log k\big) \quad \text{for tiles } B \propto k \end{aligned} \]</div>
+    <p>In words: the number of tiles times the cost per tile. With tiles a small multiple of the kernel size, the log factor depends on the kernel, not the image, and the memory needed is bounded by the tile. cuDNN's “FFT tiling” algorithm works this way, and it's how long audio filters are applied to streams.</p>
+
+    <h3 id="winograd">Winograd: fewer multiplications for small kernels</h3>
+    <p>The idea: for a small tile of outputs, combine inputs and filter taps with cheap additions first, so that fewer of the expensive multiplications are needed. The filter's combinations are computed once and reused for every tile. Winograd's notation \(F(m, r)\) means \(m\) outputs of an \(r\)-tap filter. For \(F(2, 3)\), the target is two outputs of a 3-tap cross-correlation, six multiplications done directly:</p>
+    <div class="mj">\[ \begin{aligned} y_0 &amp;= d_0 g_0 + d_1 g_1 + d_2 g_2 \\ y_1 &amp;= d_1 g_0 + d_2 g_1 + d_3 g_2 \end{aligned} \]</div>
+    <p>Winograd computes the same two numbers with four multiplications:</p>
+    <div class="mj">\[ \begin{aligned} m_1 &amp;= (d_0 - d_2)\; g_0 \\ m_2 &amp;= (d_1 + d_2)\; \tfrac{1}{2}(g_0 + g_1 + g_2) \\ m_3 &amp;= (d_2 - d_1)\; \tfrac{1}{2}(g_0 - g_1 + g_2) \\ m_4 &amp;= (d_1 - d_3)\; g_2 \\ y_0 &amp;= m_1 + m_2 + m_3 \\ y_1 &amp;= m_2 - m_3 - m_4 \end{aligned} \]</div>
+    <p>In words: \(d_0, \dots, d_3\) are four inputs and \(g_0, g_1, g_2\) the filter taps. The bracketed filter terms are fixed per filter, so they're precomputed; per tile only four multiplications remain. Expanding \(m_1 + m_2 + m_3\) gives back \(y_0\) exactly. It's an exact algorithm, not an approximation.</p>
+    <p>In matrix form, with \(B^\top\) transforming the input tile, \(G\) the filter, \(A^\top\) mapping back, and \(\odot\) the only general multiplications:</p>
+    <div class="mj">\[ \begin{aligned} \text{1D:}\quad Y &amp;= A^\top \big[(G g) \odot (B^\top d)\big] \\ \text{2D:}\quad Y &amp;= A^\top \big[(G g G^\top) \odot (B^\top d B)\big] A \end{aligned} \]</div>
+    <p>In words: 2D nests the 1D algorithm along rows and columns, so a \(4 \times 4\) input tile and a 3×3 filter give a \(2 \times 2\) output tile. The multiplication counts:</p>
+    <div class="mj">\[ \text{mults}\big(F(m \times m,\, r \times r)\big) = (m + r - 1)^2 \]</div>
+    <p>In words: one multiplication per element of the transformed \((m + r - 1)^2\) tile, against \(r^2\) per output, \(m^2 r^2\) in all, directly. Bigger tiles save more:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Tile</th><th>Winograd</th><th>Direct</th><th>Saving</th></tr></thead>
+      <tbody>
+        <tr><td>\(F(2, 3)\), 1D</td><td>4</td><td>6</td><td>1.5×</td></tr>
+        <tr><td>\(F(2 \times 2, 3 \times 3)\)</td><td>16</td><td>36</td><td>2.25×</td></tr>
+        <tr><td>\(F(4 \times 4, 3 \times 3)\)</td><td>36</td><td>144</td><td>4×</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>With channels it's GEMMs again.</strong> Each input tile is transformed once and shared by all \(C_{out}\) filters, and the sum over input channels happens in the transformed domain, so the products become \((m + r - 1)^2\) independent matrix multiplies, \((C_{out} \times C_{in})\) by \((C_{in} \times \text{tiles})\).</li>
+      <li><strong>Numerical stability.</strong> Larger tiles need transform matrices with larger, more fractional entries, so rounding error grows fast with tile size. \(F(2 \times 2, 3 \times 3)\) is safe in fp32 and usually fp16; \(F(4 \times 4, 3 \times 3)\) needs care in fp16; int8 is hard because transformed values need a wider range.</li>
+      <li><strong>Narrow scope.</strong> Stride 1 and small kernels (3×3 mainly); strides and dilations need the problem split up; transformed tiles take extra memory, and additions grow with tile size.</li>
+      <li><strong>Its relation to FFT:</strong> both multiply polynomials by evaluating them at some points, multiplying the values and interpolating back. FFT uses complex roots of unity (stable at any size); Winograd at a few small real points (0, ±1 and ∞ for \(F(2, 3)\); a correlation algorithm is the transpose of a product algorithm), giving the fewest multiplications for a tiny tile but instability as tiles grow.</li>
+    </ul>
+
+    <h3 id="cudnn">How a library chooses</h3>
+    <p>cuDNN implements several algorithms for each convolution: implicit GEMM (plus a variant with precomputed indices), explicit GEMM (im2col), FFT, FFT with tiling, and Winograd (fused and non-fused). Which is fastest depends on the kernel size, stride, channel counts, batch, map size, data type, GPU, and how much scratch memory (“workspace”) it's allowed.</p>
+    <ul>
+      <li><strong><code>torch.backends.cudnn.benchmark = True</code></strong> times every candidate on the first call with each new input shape and caches the winner. That's good when shapes are fixed, as in most training. It's bad when shapes change every batch (variable image sizes): every new shape triggers another round of timing. With it off, cuDNN picks by heuristics.</li>
+      <li><strong>Determinism:</strong> the fastest algorithm may be non-deterministic (some backward kernels add with atomics in arbitrary order). <code>torch.backends.cudnn.deterministic = True</code> restricts the choice to reproducible ones.</li>
+      <li><strong>Typical winners</strong>, as a rule of thumb: Winograd or implicit GEMM for stride-1 3×3; plain GEMM for 1×1; FFT or implicit GEMM for large kernels; dedicated direct kernels for depthwise. Layout matters too: NHWC (“channels last”) suits tensor cores.</li>
+    </ul>
+
+    <h3>Model-level savings</h3>
+    <p>The algorithms above change <em>how</em> a layer is computed; these change <em>what</em> is computed:</p>
+    <ul>
+      <li><strong>Cheaper layers:</strong> depthwise separable and grouped convs (section <a href="#separable">05</a>), and 1×1 bottlenecks before each 3×3.</li>
+      <li><strong>Downsample early:</strong> ResNet's stem (a stride-2 7×7 conv, then a stride-2 max pool) and ConvNeXt's stride-4 patchify make every later layer run on 1/16 of the positions.</li>
+      <li><strong>Lower precision:</strong> fp16 or bf16 halve memory and run on tensor cores; int8 inference is 4 times smaller than fp32, at the price of calibration or quantization-aware training. Fold BN into the conv (section <a href="#block">06</a>) and fuse conv, bias and ReLU into one kernel.</li>
+      <li><strong>FLOPs aren't latency.</strong> A layer is compute-bound only if its arithmetic intensity beats the hardware's ratio of FLOPs to memory bandwidth (the roofline model); otherwise memory traffic sets the time, which is why depthwise convs disappoint on GPUs.</li>
+    </ul>
+
+    <!-- upsample -->
+    <h2 id="upsample"><span class="pn">09</span>Recovering spatial resolution</h2>
+    <p>Dense prediction needs a full-size output: segmentation masks, depth maps, keypoint heat maps, super-resolution, image generators (GAN generators, VAE decoders, diffusion U-Nets). Yet encoders downsample, often by 32 times, because that's how they grow the receptive field cheaply. Either upsample back in a decoder or downsample less in the first place; either way, the fine detail destroyed by downsampling has to come from somewhere, and that's the job of skip connections.</p>
+
+    <h3 id="transposed">Transposed convolution</h3>
+    <p><strong>What it computes:</strong> each input value scales a copy of the kernel and stamps it onto the output, with stamps placed \(s\) pixels apart; where stamps overlap, they add.</p>
+    <div class="mj">\[ y_{oab} = \sum_{c, i, j} x_{cij}\; w_{c,\, o,\, a - si,\, b - sj} \]</div>
+    <p>In words: input pixel \((i, j)\) contributes its kernel, scaled by its value, with the kernel's corner at \((si, sj)\) (terms where \(a - si\) or \(b - sj\) fall outside the kernel are zero; \(p\) is then cropped from each side). The stride now spreads the <em>inputs</em> apart instead of skipping outputs. The same result comes from inserting \(s - 1\) zeros between input pixels, padding by \(k - 1 - p\) (plus \(p_{\text{out}}\) on one side), and running an ordinary stride-1 convolution with the spatially flipped kernel and its input and output channel axes swapped (for \(d = 1\)). That's why it's also called a fractionally strided convolution: stride \(1/s\).</p>
+    <p><strong>Why it's the gradient of a convolution.</strong> Write a convolution as a sparse matrix \(C\) acting on the flattened input (each row holds the kernel's weights at one window's positions):</p>
+    <div class="mj">\[ \begin{aligned} y &amp;= C x \\ \frac{\partial L}{\partial x} &amp;= C^\top \frac{\partial L}{\partial y} \\ z &amp;= C^\top y \quad \text{(transposed convolution)} \end{aligned} \]</div>
+    <p>In words: backprop through a linear map multiplies by its transpose (the input gradient of section <a href="#backward">02</a>), and a transposed convolution is that operation used as a forward layer: the same connections with the arrows reversed, mapping the output's shape back to the input's. Frameworks implement it with the conv's backward-data routine. It restores the shape, not the values: \(C^\top C \ne I\), so it isn't an inverse, and “deconvolution” is a misnomer. Its kernel is learned, so the network learns whatever upsampling the task needs.</p>
+    <div class="mj">\[ \begin{aligned} H_{out} &amp;= (H_{in} - 1)\, s - 2p \\ &amp;\quad + d\,(k - 1) + p_{\text{out}} + 1 \end{aligned} \]</div>
+    <p>In words: \((H_{in} - 1)s\) is the distance from the first stamp to the last; adding the kernel's span, \(d(k - 1) + 1\), gives the full output; \(p\) is cropped from each side (it undoes the forward conv's padding); and the output padding \(p_{\text{out}}\), between 0 and \(s - 1\), adds rows on one side.</p>
+    <p><strong>Why output padding exists:</strong> the forward conv's floor maps \(s\) different input sizes to the same output size, so the transpose can't know which one you want back. Choosing the remainder that the floor dropped recovers exactly \(H\):</p>
+    <div class="mj">\[ p_{\text{out}} = \big(H + 2p - d(k - 1) - 1\big) \bmod s \]</div>
+    <div class="tbl"><table>
+      <thead><tr><th>\(k\)</th><th>\(s\)</th><th>\(p\)</th><th>\(p_{\text{out}}\)</th><th>Output</th></tr></thead>
+      <tbody>
+        <tr><td>2</td><td>2</td><td>0</td><td>0</td><td>\(2H\), stamps don't overlap</td></tr>
+        <tr><td>4</td><td>2</td><td>1</td><td>0</td><td>\(2H\), every interior pixel covered twice</td></tr>
+        <tr><td>3</td><td>2</td><td>1</td><td>1</td><td>\(2H\), uneven coverage</td></tr>
+      </tbody>
+    </table></div>
+    <p>Parameters are those of a conv with the channel roles swapped: PyTorch stores the weights as \((C_{in}, C_{out}/g, k, k)\).</p>
+
+    <h3 id="checkerboard">Checkerboard artifacts</h3>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 384 288" style="min-width:0;max-width:520px" role="img" aria-label="Transposed convolution in one dimension with stride 2. Each of four inputs stamps the kernel onto the output two cells apart. With kernel size 3 the output cells are covered alternately once and twice; with kernel size 4 every interior cell is covered twice."><text x="8" y="18" text-anchor="start" style="fill:var(--ink);font-weight:600">k = 3, stride 2: uneven, 1, 2, 1, 2, …</text><text class="lbl" x="8" y="49" text-anchor="start">input</text><text class="lbl" x="8" y="84" text-anchor="start">stamps</text><text class="lbl" x="8" y="123" text-anchor="start">output</text><rect class="cellon" x="106.0" y="32" width="26" height="24"/><path d="M119.0 56 V66" style="stroke:var(--hid);stroke-width:1.2;fill:none"/><rect x="76" y="66" width="86" height="12" rx="3" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/><rect class="cellon" x="166.0" y="32" width="26" height="24"/><path d="M179.0 56 V84" style="stroke:var(--hid);stroke-width:1.2;fill:none"/><rect x="136" y="84" width="86" height="12" rx="3" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/><rect class="cellon" x="226.0" y="32" width="26" height="24"/><path d="M239.0 56 V66" style="stroke:var(--hid);stroke-width:1.2;fill:none"/><rect x="196" y="66" width="86" height="12" rx="3" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/><rect class="cellon" x="286.0" y="32" width="26" height="24"/><path d="M299.0 56 V84" style="stroke:var(--hid);stroke-width:1.2;fill:none"/><rect x="256" y="84" width="86" height="12" rx="3" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/><rect class="celloff" x="76" y="104" width="26" height="28"/><text x="89.0" y="123" text-anchor="middle" style="fill:var(--ink-3)">1</text><rect class="celloff" x="106" y="104" width="26" height="28"/><text x="119.0" y="123" text-anchor="middle" style="fill:var(--ink-3)">1</text><rect class="cellon" x="136" y="104" width="26" height="28"/><text x="149.0" y="123" text-anchor="middle" style="fill:var(--ink);font-weight:600">2</text><rect class="celloff" x="166" y="104" width="26" height="28"/><text x="179.0" y="123" text-anchor="middle" style="fill:var(--ink-3)">1</text><rect class="cellon" x="196" y="104" width="26" height="28"/><text x="209.0" y="123" text-anchor="middle" style="fill:var(--ink);font-weight:600">2</text><rect class="celloff" x="226" y="104" width="26" height="28"/><text x="239.0" y="123" text-anchor="middle" style="fill:var(--ink-3)">1</text><rect class="cellon" x="256" y="104" width="26" height="28"/><text x="269.0" y="123" text-anchor="middle" style="fill:var(--ink);font-weight:600">2</text><rect class="celloff" x="286" y="104" width="26" height="28"/><text x="299.0" y="123" text-anchor="middle" style="fill:var(--ink-3)">1</text><rect class="celloff" x="316" y="104" width="26" height="28"/><text x="329.0" y="123" text-anchor="middle" style="fill:var(--ink-3)">1</text><text x="8" y="164" text-anchor="start" style="fill:var(--ink);font-weight:600">k = 4, stride 2: even inside, 2, 2, 2, …</text><text class="lbl" x="8" y="195" text-anchor="start">input</text><text class="lbl" x="8" y="230" text-anchor="start">stamps</text><text class="lbl" x="8" y="269" text-anchor="start">output</text><rect class="cellon" x="121.0" y="178" width="26" height="24"/><path d="M134.0 202 V212" style="stroke:var(--hid);stroke-width:1.2;fill:none"/><rect x="76" y="212" width="116" height="12" rx="3" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/><rect class="cellon" x="181.0" y="178" width="26" height="24"/><path d="M194.0 202 V230" style="stroke:var(--hid);stroke-width:1.2;fill:none"/><rect x="136" y="230" width="116" height="12" rx="3" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/><rect class="cellon" x="241.0" y="178" width="26" height="24"/><path d="M254.0 202 V212" style="stroke:var(--hid);stroke-width:1.2;fill:none"/><rect x="196" y="212" width="116" height="12" rx="3" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/><rect class="cellon" x="301.0" y="178" width="26" height="24"/><path d="M314.0 202 V230" style="stroke:var(--hid);stroke-width:1.2;fill:none"/><rect x="256" y="230" width="116" height="12" rx="3" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/><rect class="celloff" x="76" y="250" width="26" height="28"/><text x="89.0" y="269" text-anchor="middle" style="fill:var(--ink-3)">1</text><rect class="celloff" x="106" y="250" width="26" height="28"/><text x="119.0" y="269" text-anchor="middle" style="fill:var(--ink-3)">1</text><rect class="cellon" x="136" y="250" width="26" height="28"/><text x="149.0" y="269" text-anchor="middle" style="fill:var(--ink);font-weight:600">2</text><rect class="cellon" x="166" y="250" width="26" height="28"/><text x="179.0" y="269" text-anchor="middle" style="fill:var(--ink);font-weight:600">2</text><rect class="cellon" x="196" y="250" width="26" height="28"/><text x="209.0" y="269" text-anchor="middle" style="fill:var(--ink);font-weight:600">2</text><rect class="cellon" x="226" y="250" width="26" height="28"/><text x="239.0" y="269" text-anchor="middle" style="fill:var(--ink);font-weight:600">2</text><rect class="cellon" x="256" y="250" width="26" height="28"/><text x="269.0" y="269" text-anchor="middle" style="fill:var(--ink);font-weight:600">2</text><rect class="cellon" x="286" y="250" width="26" height="28"/><text x="299.0" y="269" text-anchor="middle" style="fill:var(--ink);font-weight:600">2</text><rect class="celloff" x="316" y="250" width="26" height="28"/><text x="329.0" y="269" text-anchor="middle" style="fill:var(--ink-3)">1</text><rect class="celloff" x="346" y="250" width="26" height="28"/><text x="359.0" y="269" text-anchor="middle" style="fill:var(--ink-3)">1</text></svg>
+      </div>
+      <figcaption>Transposed convolution in 1D with stride 2. With \(k = 3\), output pixels are covered alternately by 1 and 2 stamps; with \(k = 4\), every interior pixel is covered by exactly 2. In 2D the uneven 1D pattern multiplies into a checkerboard.</figcaption>
+    </figure>
+    <div class="mj">\[ \text{stamps per pixel} \in \Big\{ \Big\lfloor \frac{k}{s} \Big\rfloor,\; \Big\lceil \frac{k}{s} \Big\rceil \Big\} \]</div>
+    <p>In words: when \(k\) isn't divisible by \(s\), neighbouring output pixels receive different numbers of contributions, alternating with period \(s\); in 2D the row and column patterns multiply into a grid of strong and weak pixels. Even a flat input then gives a patterned output unless the weights balance exactly, which training rarely achieves, and stacked layers compound it (Odena et al., 2016).</p>
+    <p>Unevenly learned weights can leave a fainter version even when \(s\) divides \(k\). The pattern also appears in <em>gradients</em>, since a strided conv's backward pass is a transposed conv: a GAN generator can get checkerboards from its discriminator.</p>
+    <ul>
+      <li><strong>Kernel divisible by stride</strong> (\(k = 4\) or \(2\) with \(s = 2\)): even coverage; reduces the problem but doesn't guarantee it's gone.</li>
+      <li><strong>Resize, then convolve:</strong> every output pixel is computed the same way, so the artifact can't arise. This is the standard fix.</li>
+      <li><strong>Pixel shuffle with ICNR initialization</strong> (defined under pixel shuffle below), or a small blur after upsampling.</li>
+    </ul>
+
+    <h3>Resize, then convolve</h3>
+    <p>Upsample with a fixed interpolation, then let a stride-1 3×3 conv learn the refinement. <strong>Nearest neighbour</strong> copies each pixel into an \(s \times s\) block; <strong>bilinear</strong> takes a distance-weighted average of the four nearest input pixels.</p>
+    <p><strong>Pros:</strong> no checkerboard, no parameters in the resize, any scale factor. <strong>Cons:</strong> the conv runs at the high resolution, on \(s^2\) times as many positions, and interpolation blurs, so the conv has to sharpen. Bilinear ×2 upsampling is itself a fixed transposed conv (kernel 4, stride 2), which is how FCN initialized its learned upsamplers. Nearest + conv is common in modern decoders, including diffusion-model U-Nets.</p>
+
+    <h3>Max-unpooling with saved indices (SegNet)</h3>
+    <p>Every encoder max-pool remembers where each maximum came from. The matching decoder step puts each value back at its remembered position and fills the rest with zeros; the convs that follow fill in the sparse map.</p>
+    <p><strong>Pros:</strong> sharp boundary locations, no parameters, and almost no memory (one small index per pooled value, against a full feature map per level for U-Net). <strong>Cons:</strong> the unpooled map is mostly zeros and needs convs to densify, it only pairs with max pooling, and it passes on <em>where</em> the maxima were, not the encoder's features.</p>
+
+    <h3>Pixel shuffle (sub-pixel convolution)</h3>
+    <p>Run a conv at low resolution that outputs \(C r^2\) channels, then rearrange each group of \(r^2\) channels into an \(r \times r\) block of pixels:</p>
+    <div class="mj">\[ \begin{aligned} y_{c,\; ri + a,\; rj + b} &amp;= x_{cr^2 + ar + b,\; i,\; j} \\ a, b &amp;\in \{0, \dots, r - 1\} \end{aligned} \]</div>
+    <p>In words: the \(r^2\) channels at one low-resolution position become the \(r \times r\) output pixels there. The rearrangement is pure reindexing, with no arithmetic.</p>
+    <p><strong>Pros:</strong> all the convolution happens at low resolution, so it's cheap, and every output pixel has its own weights, with no uneven overlap; it's equivalent to a particular transposed conv, computed more efficiently (Shi et al., 2016), and standard in super-resolution. <strong>Cons:</strong> at random initialization the \(r^2\) sub-pixel channels disagree, which itself makes a checkerboard; ICNR initialization starts the \(r^2\) channels of each group identical, so the layer begins as nearest-neighbour upsampling.</p>
+
+    <h3 id="dilated">Dilated (atrous) convolution: don't downsample</h3>
+    <div class="mj">\[ y[i] = \sum_{u=0}^{k-1} w[u]\; x[i + d u] \]</div>
+    <p>In words: the same \(k\) taps, spaced \(d\) apart, so the kernel spans \(d(k - 1) + 1\) pixels with only \(k\) weights. Stacking rates \(1, 2, 4, \dots\) grows the receptive field exponentially while the map keeps its full size (section <a href="#rf">03</a>).</p>
+    <ul>
+      <li><strong>DeepLab</strong> removes the strides of a ResNet's last stages and dilates their convs instead, so the output is 1/8 or 1/16 of the input instead of 1/32. Its ASPP module runs parallel 3×3 convs at several rates (such as 6, 12, 18) plus image-level pooling for multi-scale context, and the logits are upsampled bilinearly. In 1D the same idea is WaveNet.</li>
+      <li><strong>The cost:</strong> the deep, wide layers now run at high resolution: 1/8 instead of 1/32 means 16 times the positions, in compute and in activation memory.</li>
+      <li><strong>Gridding:</strong> a stack with one constant rate \(d\) only reads inputs on a lattice of spacing \(d\), leaving holes. Rates with no common factor that grow gradually, each no larger than the span covered so far (such as 1, 2, 3 or 1, 2, 4), cover every pixel.</li>
+    </ul>
+
+    <h3 id="unet">Encoder–decoders: FCN and U-Net</h3>
+    <p><strong>FCN</strong> (Long et al., 2015) made a classifier fully convolutional: its dense layers became convs, so a 1×1 conv scores every position and the network outputs a coarse class map at stride 32. A transposed conv, initialized to bilinear, upsamples it to \(H \times W\). On its own (FCN-32s) the result is blobby. FCN-16s and FCN-8s <em>add</em> scores predicted from the stride-16 and stride-8 feature maps: the first skip connections for segmentation.</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 640 284" role="img" aria-label="U-Net: the encoder goes down three levels, halving resolution and doubling channels from C at H by W to 8C at H/8 by W/8; the decoder comes back up, and at each level a skip connection copies the encoder map across to be concatenated."><path class="cell" d="M160 57.0 H476" marker-end="url(#a-cell)"/><path class="cell" d="M205 121.0 H431" marker-end="url(#a-cell)"/><path class="cell" d="M250 185.0 H386" marker-end="url(#a-cell)"/><text class="lbl" x="320" y="48" text-anchor="middle" style="fill:var(--cell)">skip: copy, then concatenate</text><rect class="box" x="30" y="40" width="130" height="34" rx="8"/><text x="95.0" y="62" text-anchor="middle">C, H × W</text><rect class="box" x="480" y="40" width="130" height="34" rx="8"/><text x="545.0" y="62" text-anchor="middle">C, H × W</text><rect class="box" x="75" y="104" width="130" height="34" rx="8"/><text x="140.0" y="126" text-anchor="middle">2C, H/2 × W/2</text><rect class="box" x="435" y="104" width="130" height="34" rx="8"/><text x="500.0" y="126" text-anchor="middle">2C, H/2 × W/2</text><rect class="box" x="120" y="168" width="130" height="34" rx="8"/><text x="185.0" y="190" text-anchor="middle">4C, H/4 × W/4</text><rect class="box" x="390" y="168" width="130" height="34" rx="8"/><text x="455.0" y="190" text-anchor="middle">4C, H/4 × W/4</text><rect class="gbox" x="255" y="232" width="130" height="34" rx="8"/><text x="320.0" y="254" text-anchor="middle">8C, H/8 × W/8</text><path class="hid" d="M90 74 L135 101" marker-end="url(#a-hid)"/><path class="hid" d="M135 138 L180 165" marker-end="url(#a-hid)"/><path class="hid" d="M190 202 L275 229" marker-end="url(#a-hid)"/><path class="hid" d="M365 232 L450 205" marker-end="url(#a-hid)"/><path class="hid" d="M460 168 L505 141" marker-end="url(#a-hid)"/><path class="hid" d="M505 104 L550 77" marker-end="url(#a-hid)"/><text class="lbl" x="142" y="94" text-anchor="start">↓ downsample ×2</text><text class="lbl" x="498" y="94" text-anchor="end">upsample ×2 ↑</text><text class="lbl" x="95.0" y="26" text-anchor="middle">input image</text><text class="lbl" x="545.0" y="26" text-anchor="middle">1×1 conv → K × H × W</text><text class="lbl" x="70" y="254" text-anchor="middle">encoder</text><text class="lbl" x="570" y="254" text-anchor="middle">decoder</text></svg>
+      </div>
+      <figcaption>U-Net. The encoder halves the resolution and doubles the channels at each level; the decoder upsamples, concatenates the encoder map of the same resolution (the skip), and convolves. A final 1×1 conv gives \(K\) class scores per pixel.</figcaption>
+    </figure>
+    <p><strong>U-Net</strong> (Ronneberger et al., 2015) is symmetric. Each decoder step upsamples by 2 (a 2×2 transposed conv that halves the channels), concatenates the encoder map of the same resolution, and applies two 3×3 convs. <strong>Why the skips are needed:</strong></p>
+    <ul>
+      <li><strong>Downsampling destroys information.</strong> A stride-2 step keeps a quarter of the positions, and aliasing folds fine detail into coarse values. No upsampler can recreate detail that is no longer in its input; it can only interpolate.</li>
+      <li><strong>What and where.</strong> Deep features know <em>what</em> is there (large receptive field, semantics) but only roughly <em>where</em>. Early features know <em>where</em> exactly (edges, boundaries) but not <em>what</em>. The decoder needs both, and the skips hand it the high-resolution “where” directly.</li>
+      <li><strong>Without them,</strong> masks come out blobby, boundaries can be off by up to the total stride, and thin structures (vessels, poles, cracks) disappear.</li>
+      <li><strong>Gradients:</strong> the skips also give early layers short paths to the loss.</li>
+    </ul>
+    <p><strong>Concatenate or add:</strong> U-Net concatenates, so the decoder learns how to weigh the two sources, at the cost of channels and memory; FCN and feature pyramid networks add, which is cheaper but needs matching channels. <strong>Details:</strong> the original U-Net used valid convs and had to centre-crop encoder maps before concatenating; modern versions use same padding. \(H\) and \(W\) must be divisible by \(2^{\text{levels}}\) (or padded), and all encoder maps stay in memory until the decoder uses them.</p>
+
+    <div class="tbl"><table>
+      <thead><tr><th>Option</th><th>Artifacts</th><th>Cost</th><th>Typical use</th></tr></thead>
+      <tbody>
+        <tr><td>Transposed conv</td><td>Checkerboard if \(s \nmid k\)</td><td>Low</td><td>Classic decoders, GAN generators</td></tr>
+        <tr><td>Resize + conv</td><td>None</td><td>Conv at high resolution</td><td>Modern decoders, diffusion U-Nets</td></tr>
+        <tr><td>Max-unpooling</td><td>Sparse output</td><td>Lowest memory</td><td>SegNet</td></tr>
+        <tr><td>Pixel shuffle</td><td>At initialization (ICNR fixes)</td><td>Conv at low resolution</td><td>Super-resolution</td></tr>
+        <tr><td>Dilated convs</td><td>Gridding</td><td>High-resolution maps throughout</td><td>DeepLab, WaveNet</td></tr>
+        <tr><td>Bilinear upsampling of logits</td><td>Blurry boundaries</td><td>Negligible</td><td>DeepLab's last step</td></tr>
+        <tr><td>Skip connections</td><td>—</td><td>Memory for encoder maps</td><td>Combined with any of the above</td></tr>
+      </tbody>
+    </table></div>
+
+    <!-- transfer -->
+    <h2 id="transfer"><span class="pn">10</span>Transfer learning, fine-tuning and augmentation</h2>
+    <p><strong>Why a pretrained network helps:</strong> early layers learn generic features (edge and colour detectors, Gabor-like filters, textures) that look almost the same whatever the training images were; deeper layers become increasingly specific to the pretraining task (Yosinski et al., 2014). A backbone pretrained on a large dataset (ImageNet's 1.3M images, or self-supervised and image–text models trained on far more) is a learned prior, so a few hundred labelled images can be enough.</p>
+    <h3>The recipe</h3>
+    <ol>
+      <li><strong>Swap the head</strong> for one with your \(K\) classes, and preprocess exactly as in pretraining: resolution, channel order, and the same per-channel mean and standard deviation. Different statistics shift every activation in the network.</li>
+      <li><strong>Linear probe:</strong> freeze the backbone and train only the head. It's cheap (the features can even be computed once and cached) and already strong when your images resemble the pretraining data.</li>
+      <li><strong>Unfreeze the top blocks</strong> with a smaller learning rate than the head's, and train them together.</li>
+      <li><strong>Optionally unfreeze everything,</strong> with discriminative (layer-wise) learning rates:</li>
+    </ol>
+    <div class="mj">\[ \eta_l = \eta_{\text{head}} \cdot \xi^{\,L - l}, \qquad 0 &lt; \xi &lt; 1 \]</div>
+    <p>In words: each block further from the head gets its learning rate multiplied by another factor \(\xi\), so the earliest, most generic layers move least.</p>
+    <ul>
+      <li><strong>Why the head goes first:</strong> a randomly initialized head sends large, noisy gradients into the backbone and wrecks pretrained features in the first few steps (catastrophic forgetting). Even when accuracy recovers in-domain, fine-tuning from a random head distorts the features and can hurt out-of-distribution accuracy; probing first, then fine-tuning (LP-FT) avoids it (Kumar et al., 2022).</li>
+      <li><strong>BatchNorm in eval mode for small batches:</strong> the BN layers hold running statistics from pretraining. With a handful of images per batch, batch statistics are noisy, and updating the running averages with them overwrites good estimates with bad ones. Keep BN layers in eval mode (often with \(\gamma, \beta\) frozen too: “frozen BN”), and note that <code>model.train()</code> switches them back. If the domain is very different (X-rays vs photos), re-estimate the statistics on your own data, or use a GroupNorm backbone.</li>
+    </ul>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Similar to pretraining</th><th>Different domain</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Small data</strong></td><td>Linear probe, maybe the last block</td><td>Fine-tune the top blocks gently, or probe features from an earlier block, which are less task-specific</td></tr>
+        <tr><td><strong>Large data</strong></td><td>Fine-tune everything, small learning rate</td><td>Fine-tune everything; training from scratch becomes an option</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Data augmentation, and why it works</h3>
+    <div class="mj">\[ \min_\theta\; \mathbb E_{(x, y)}\; \mathbb E_{t \sim \mathcal T}\; \ell\big(f_\theta(t(x)),\; y\big) \]</div>
+    <p>In words: train on random transformations \(t\) of each image, drawn from a set \(\mathcal T\) that shouldn't change the label.</p>
+    <ul>
+      <li><strong>It teaches invariances the architecture lacks.</strong> A CNN is built to handle shifts, not rotation, scale, lighting, colour or viewpoint. Augmentation shows the model that these don't change the answer.</li>
+      <li><strong>It enlarges the effective dataset,</strong> which reduces variance, and the less data there is, the more it helps.</li>
+      <li><strong>It regularizes:</strong> the model can't memorize exact pixels when they change every epoch.</li>
+      <li><strong>Common choices:</strong> random resized crops, horizontal flips, colour jitter, small rotations; stronger ones are RandAugment, Mixup (blend two images and their labels), CutMix (paste a patch from one image into another, mixing labels by area) and random erasing.</li>
+      <li><strong>It must preserve the label.</strong> No horizontal flips for text or where left and right matter (some medical images); rotation turns a 6 into a 9; aggressive crops can cut the object out. Test-time augmentation averages predictions over a few augmented copies.</li>
+    </ul>
+
+    <!-- vit -->
+    <h2 id="vit"><span class="pn">11</span>CNN vs vision transformer</h2>
+    <p><strong>A ViT in one paragraph:</strong> cut the image into \(P \times P\) patches (often 16×16), flatten each and project it to a \(D\)-dimensional token (exactly a conv with kernel \(P\), stride \(P\) and \(D\) output channels), add a learned position embedding, and run a transformer encoder, where every token attends to every other. Classify from a class token or the mean of the tokens. The mechanics of attention are in <a href="./transformers.html#tf">Transformers</a>.</p>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>CNN</th><th>ViT</th></tr></thead>
+      <tbody>
+        <tr><td>Built-in assumptions</td><td>Locality, translation equivariance, hierarchy</td><td>Almost none beyond the patches; layout learned from position embeddings</td></tr>
+        <tr><td>Context per layer</td><td>Local \(k \times k\), growing with depth</td><td>Global from the first layer</td></tr>
+        <tr><td>Mixing weights</td><td>Fixed per relative offset, the same for every image</td><td>Computed from the content (attention)</td></tr>
+        <tr><td>Data needed</td><td>Less; trains well from scratch on ImageNet-1k</td><td>More: large pretraining, or heavy augmentation and distillation</td></tr>
+        <tr><td>Cost in pixels</td><td>Linear</td><td>Quadratic in tokens</td></tr>
+        <tr><td>Features</td><td>Multi-scale pyramid, natural for detection</td><td>Single scale (plain ViT)</td></tr>
+        <tr><td>With more data</td><td>Gains level off sooner</td><td>Keeps improving with data and size</td></tr>
+      </tbody>
+    </table></div>
+    <div class="mj">\[ \begin{aligned} \text{conv layer} &amp;= O\big(H W\, k^2 C^2\big) \\ \text{self-attention layer} &amp;= O\big(N^2 D + N D^2\big) \\ N &amp;= \frac{H W}{P^2} \end{aligned} \]</div>
+    <p>In words: a conv's cost grows linearly with the number of pixels. Attention compares every token with every other, so doubling the image side multiplies the attention term by 16. That's why high-resolution tasks (detection, segmentation, medical images) use CNNs or windowed attention: Swin restricts attention to \(M \times M\) windows, which costs \(O(N M^2 D)\), linear in \(N\).</p>
+    <ul>
+      <li><strong>Bias vs data:</strong> trained on ImageNet-1k alone, the original ViTs trailed ResNets of similar size; pretrained on 14M to 300M images, they matched or beat them (Dosovitskiy et al., 2021). DeiT later trained competitive ViTs on ImageNet-1k with heavy augmentation and distillation from a CNN teacher. A strong bias is free knowledge when data is scarce and a ceiling when data is plentiful.</li>
+      <li><strong>Attention generalizes convolution:</strong> multi-head self-attention with relative position encodings can express any convolution (Cordonnier et al., 2020). A convolution is like attention whose weights depend only on relative position, inside a fixed local window, and are the same for every image.</li>
+      <li><strong>Hybrids:</strong> convolutional stems help ViTs train (“early convolutions help transformers see better”); Swin adds local windows and a CNN-like pyramid; CoAtNet uses conv stages early and attention late; ConvNeXt goes the other way, a pure CNN redesigned with transformer-era choices.</li>
+      <li><strong>Choosing:</strong> small or medium data, high resolution, edge devices or tight latency favour a CNN (or a pretrained hybrid). Lots of data, a strong pretrained foundation model (CLIP, DINOv2), or multimodal work favour a ViT. In practice, the pretraining and data behind a backbone matter more than its family.</li>
+    </ul>
+
+    <!-- whatif -->
+    <h2 id="whatif"><span class="pn">12</span>What if…</h2>
+    <ul>
+      <li><strong>…there's no padding?</strong> Every 3×3 layer shrinks the height and width by 2 each (by \(k - 1\) in general), so a deep stack runs out of map, and border pixels sit inside fewer windows than central ones, so they barely influence the output. Encoder–decoders then need cropping to line up skips (the original U-Net). The upside: no fake zeros, no artificial edge for the network to read position from.</li>
+      <li><strong>…there's no pooling or striding at all?</strong> Every layer runs at full resolution, so compute and activation memory are \(HW\)-sized at every depth, and the receptive field grows by only \(k - 1\) per layer: seeing a whole \(H\)-pixel image takes about \(H/2\) stride-1 3×3 layers. The fix, if you need full resolution, is dilation (section <a href="#dilated">09</a>).</li>
+      <li><strong>…you replace a 5×5 conv with two 3×3s?</strong> Same 5×5 receptive field, \(18C^2\) weights instead of \(25C^2\) (and the same saving in multiply-adds), plus an extra non-linearity. The costs are an extra layer of stored activations, one more sequential step, and a restricted family: the stack can't express every 5×5 filter. VGG and nearly every network since chose the stack.</li>
+      <li><strong>…you remove BatchNorm?</strong> A shallow CNN still trains with care. A deep plain one trains much more slowly, needs a smaller learning rate and careful He initialization, and loses more units to dying. Deep ResNets can do without it given special initialization (Fixup) or adaptive gradient clipping (NF-Nets). Inference is unaffected in cost, since BN folds away anyway.</li>
+      <li><strong>…you use tanh instead of ReLU?</strong> tanh saturates, so its slope is near 0 for large inputs and gradients shrink layer after layer: deep stacks train far more slowly (AlexNet reported ReLU reaching a target training error about six times faster). Initialization changes too (Xavier rather than He). BatchNorm softens it by keeping inputs near 0, where tanh is steep. Its one advantage, zero-centred outputs, matters less once BN centres the inputs.</li>
+      <li><strong>…you remove the skip connections from a ResNet?</strong> Before training, you get a plain deep network: the degradation problem returns, with higher training error than a shallower net, because the gradient must pass through every block's Jacobian (its matrix of slopes, \(\partial F/\partial x\)). After training, removing the skips destroys the network, since every block was trained to output a correction to its input, not a whole representation. (Deleting one block's residual branch while keeping its identity skip barely hurts.)</li>
+      <li><strong>…the first layer has a larger stride?</strong> Every later layer runs on \(1/s^2\) as many positions, which saves compute and memory and grows the receptive field quickly. But fine detail and small objects are lost before any feature can capture them, aliasing gets worse, and if the kernel is smaller than the stride (\(k &lt; s\)) some pixels are never read at all.<br>It works when \(k \ge s\) and the channels are wide enough to absorb the detail: ConvNeXt's 4×4 stride-4 stem turns each \(4 \times 4 \times 3 = 48\)-value patch into 96 channels, so nothing has to be lost.</li>
+      <li><strong>…you shift the input by one pixel?</strong> The conv maps shift with it, but every stride-2 step now samples different positions, so the pooled features, and sometimes the predicted class, change. That's aliasing (section <a href="#pool">04</a>); blur before subsampling, or train with shifts.</li>
+    </ul>
+
+    <!-- code -->
+    <h2 id="code"><span class="pn">13</span>Pseudocode</h2>
+    <p>NumPy-style and checked against reference implementations. Shapes in the comments.</p>
+
+    <h3>A naive convolution (stride, padding, dilation)</h3>
+    <pre class="code"><code><span class="cm"># x: (N, C_in, H, W)   w: (C_out, C_in, k, k)   b: (C_out,)</span>
+def conv2d_naive(x, w, b, s=1, p=0, d=1):
+    N, C_in, H, W = x.shape
+    C_out, _, k, _ = w.shape
+    x = pad(x, ((0, 0), (0, 0), (p, p), (p, p)))  <span class="cm"># zeros</span>
+    Ho = (H + 2*p - d*(k - 1) - 1) // s + 1
+    Wo = (W + 2*p - d*(k - 1) - 1) // s + 1
+    y = zeros((N, C_out, Ho, Wo))
+    for n in range(N):
+      for o in range(C_out):
+        for i in range(Ho):
+          for j in range(Wo):
+            acc = b[o]
+            for c in range(C_in):
+              for u in range(k):
+                for v in range(k):
+                  acc += w[o, c, u, v] * x[n, c, i*s + u*d, j*s + v*d]
+            y[n, o, i, j] = acc        <span class="cm"># cross-correlation: no flip</span>
+    return y                           <span class="cm"># MACs: N*C_out*Ho*Wo*C_in*k*k</span></code></pre>
+
+    <h3>im2col + one matrix multiply</h3>
+    <pre class="code"><code>def im2col(x, k, s, p):                <span class="cm"># x: (C, H, W)</span>
+    C, H, W = x.shape
+    x = pad(x, ((0, 0), (p, p), (p, p)))
+    Ho, Wo = (H + 2*p - k)//s + 1, (W + 2*p - k)//s + 1
+    cols = empty((C*k*k, Ho*Wo))      <span class="cm"># ~k*k/(s*s) times the input</span>
+    for i in range(Ho):
+        for j in range(Wo):
+            patch = x[:, i*s:i*s+k, j*s:j*s+k]   <span class="cm"># (C, k, k)</span>
+            cols[:, i*Wo + j] = patch.reshape(-1)
+    return cols, Ho, Wo
+
+def conv_gemm(x, w, b, s=1, p=0):      <span class="cm"># w: (C_out, C_in, k, k)</span>
+    C_out, C_in, k, _ = w.shape
+    cols, Ho, Wo = im2col(x, k, s, p)        <span class="cm"># (C_in*k*k, Ho*Wo)</span>
+    W_row = w.reshape(C_out, -1)             <span class="cm"># (C_out, C_in*k*k)</span>
+    y = W_row @ cols + b[:, None]            <span class="cm"># one GEMM: (C_out, Ho*Wo)</span>
+    return y.reshape(C_out, Ho, Wo)
+<span class="cm"># a batch: stack every image's columns side by side,</span>
+<span class="cm"># cols: (C_in*k*k, N*Ho*Wo), still one GEMM</span></code></pre>
+
+    <h3>FFT convolution (cross-correlation, stride 1)</h3>
+    <pre class="code"><code>def fft_conv2d(x, w):                  <span class="cm"># x: (C_in, H, W)  w: (C_out, C_in, k, k)</span>
+    C_in, H, W = x.shape
+    C_out, _, k, _ = w.shape
+    P, Q = H + k - 1, W + k - 1        <span class="cm"># H+k-1 for full/same; H is enough for valid</span>
+    X  = rfft2(x, s=(P, Q))            <span class="cm"># (C_in, P, Q//2+1) complex</span>
+    Wf = rfft2(w, s=(P, Q))            <span class="cm"># (C_out, C_in, P, Q//2+1); cache at inference</span>
+    <span class="cm"># multiply per frequency, sum over input channels;</span>
+    <span class="cm"># conj() turns convolution into cross-correlation</span>
+    Y = einsum('cpq,ocpq->opq', X, conj(Wf))
+    y = irfft2(Y, s=(P, Q))            <span class="cm"># (C_out, P, Q)</span>
+    return y[:, :H-k+1, :W-k+1]        <span class="cm"># valid part; stride = y[:, ::s, ::s]</span></code></pre>
+
+    <h3>Winograd F(2, 3)</h3>
+    <pre class="code"><code>def winograd_f23(d, g):        <span class="cm"># d: 4 inputs, g: 3 taps -&gt; 2 outputs</span>
+    <span class="cm"># filter transform: once per filter, reused for every tile</span>
+    G = [g[0], (g[0]+g[1]+g[2])/2, (g[0]-g[1]+g[2])/2, g[2]]
+    m1 = (d[0] - d[2]) * G[0]
+    m2 = (d[1] + d[2]) * G[1]
+    m3 = (d[2] - d[1]) * G[2]
+    m4 = (d[1] - d[3]) * G[3]
+    return [m1 + m2 + m3, m2 - m3 - m4]    <span class="cm"># 4 multiplies, not 6</span>
+<span class="cm"># a 1D layer: slide over the input in steps of 2 outputs,</span>
+<span class="cm"># reading 4 inputs per tile (tiles overlap by r - 1 = 2)</span></code></pre>
+
+    <h3>Transposed convolution and a U-Net decoder step</h3>
+    <pre class="code"><code>def conv_transpose2d(x, w, s=1, p=0, p_out=0):
+    <span class="cm"># x: (C_in, H, W)   w: (C_in, C_out, k, k)  (PyTorch layout)</span>
+    C_in, H, W = x.shape
+    _, C_out, k, _ = w.shape
+    Hf, Wf = (H - 1)*s + k, (W - 1)*s + k        <span class="cm"># full, before cropping</span>
+    y = zeros((C_out, Hf + p_out, Wf + p_out))
+    for c in range(C_in):
+        for i in range(H):
+            for j in range(W):
+                <span class="cm"># stamp the kernel, scaled by this input value</span>
+                y[:, i*s:i*s+k, j*s:j*s+k] += x[c, i, j] * w[c]
+    Ho = (H - 1)*s - 2*p + k + p_out
+    Wo = (W - 1)*s - 2*p + k + p_out
+    return y[:, p:p+Ho, p:p+Wo]       <span class="cm"># the adjoint of conv2d with the same w</span>
+
+<span class="cm"># one U-Net decoder step (PyTorch)</span>
+class Up(nn.Module):
+    def __init__(self, c):                    <span class="cm"># c: channels coming up</span>
+        super().__init__()
+        self.up = nn.ConvTranspose2d(c, c // 2, kernel_size=2, stride=2)
+        <span class="cm"># or: nn.Upsample(scale_factor=2, mode="nearest") + 3x3 conv</span>
+        self.conv = nn.Sequential(
+            nn.Conv2d(c, c // 2, 3, padding=1, bias=False),
+            nn.BatchNorm2d(c // 2), nn.ReLU(),
+            nn.Conv2d(c // 2, c // 2, 3, padding=1, bias=False),
+            nn.BatchNorm2d(c // 2), nn.ReLU())
+
+    def forward(self, x, skip):
+        x = self.up(x)                        <span class="cm"># (N, c, h, w) -&gt; (N, c/2, 2h, 2w)</span>
+        x = torch.cat([skip, x], dim=1)       <span class="cm"># skip: (N, c/2, 2h, 2w) -&gt; (N, c, 2h, 2w)</span>
+        return self.conv(x)                   <span class="cm"># (N, c/2, 2h, 2w)</span>
+
+<span class="cm"># pixel shuffle: (C*r*r, H, W) -&gt; (C, r*H, r*W), no arithmetic</span>
+def pixel_shuffle(x, r):
+    Cr2, H, W = x.shape
+    C = Cr2 // (r * r)
+    return x.reshape(C, r, r, H, W).transpose(0, 3, 1, 4, 2).reshape(C, H*r, W*r)</code></pre>
+
+    <!-- questions -->
+    <h2 id="questions"><span class="pn">14</span>Interview questions</h2>
+    <p>Answer out loud first, then open the answer.</p>
+
+    <details class="qa"><summary><span class="qn">1</span>Why use a CNN rather than a dense network for images?</summary><div class="ans">
+      <p><strong>Images have local patterns that repeat across positions, and a convolution builds both facts in: each output reads a small patch (locality), and the same filter is used everywhere (weight sharing).</strong></p>
+      <div class="mj">\[ \begin{aligned} P_{\text{dense}} &amp;= (H W C_{in}) \cdot (H W C_{out}) \\ P_{\text{conv}} &amp;= k^2 C_{in} C_{out} \end{aligned} \]</div>
+      <p>In words: for a same-sized output, a dense layer's weights grow with the square of the image area; a conv's don't depend on the image size.</p>
+      <ul>
+        <li><strong>Locality:</strong> useful early features (edges, textures) are local; a dense layer must learn that most of its weights should be zero.</li>
+        <li><strong>Sharing:</strong> a detector useful in one place is useful everywhere. Far fewer parameters, and translation equivariance: shift the input and the map shifts with it. A dense layer must relearn each pattern at each position.</li>
+        <li><strong>Hierarchy:</strong> stacking grows the receptive field from edges to parts to objects, and conv layers accept any input size.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> these are assumptions. When they hold, the CNN needs far less data; when they don't (shuffled pixels, table columns, layouts where absolute position is the signal), they hurt. Equivariance covers only shifts; rotation and scale come from augmentation. (<a href="#why">01</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">2</span>What does a 1×1 convolution do?</summary><div class="ans">
+      <p><strong>It applies the same small dense layer to every pixel's channel vector: it mixes channels and changes their number, with no mixing across space.</strong></p>
+      <div class="mj">\[ \begin{aligned} y[:, i, j] &amp;= W\, x[:, i, j] + b \\ W &amp;\in \mathbb R^{C_{out} \times C_{in}} \end{aligned} \]</div>
+      <p>In words: \(C_{in}\) numbers in, \(C_{out}\) out, through one matrix shared by all positions; \(C_{in} C_{out}\) weights and \(H W C_{in} C_{out}\) multiply-adds.</p>
+      <ul>
+        <li><strong>Bottlenecks:</strong> squeeze channels before an expensive 3×3 and expand after; ResNet's bottleneck on \(C\) channels costs about what a basic block on \(C/4\) does.</li>
+        <li><strong>Mixing and projection:</strong> recombine Inception's branches, U-Net's skips, or a depthwise conv's channels; match shapes on a residual skip.</li>
+        <li><strong>Per-pixel classifier:</strong> the last layer of FCN and U-Net.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> it's linear, so alone it adds no power; the activation after it adds a cheap non-linearity. It's a per-token linear layer; two 1×1 convs with an activation between them make a transformer's feed-forward block. (<a href="#one-by-one">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">3</span>Compute the output size, parameters and cost of a conv layer.</summary><div class="ans">
+      <p><strong>Count where the window can start for the size; filter weights plus a bias per output channel for the parameters, independent of image size; outputs times filter weights for the multiply-adds.</strong></p>
+      <div class="mj">\[ \begin{aligned} H_{out} &amp;= \Big\lfloor \frac{H + 2p - k}{s} \Big\rfloor + 1 \\ \text{params} &amp;= k^2 C_{in} C_{out} / g + C_{out} \\ \text{MACs} &amp;= H_{out} W_{out} \cdot k^2 C_{in} C_{out} / g \end{aligned} \]</div>
+      <ul>
+        <li><strong>Size:</strong> the window starts at \(0, s, 2s, \dots\) and must fit inside \(H + 2p\). The fraction counts the steps, the \(+1\) the first start, and the floor drops a window that would hang off the edge. With dilation \(d\), replace \(k\) by the span \(d(k - 1) + 1\).</li>
+        <li><strong>Parameters:</strong> one \(C_{in}/g \times k \times k\) filter plus a bias per output channel, reused at every position, so nothing depends on \(H\) or \(W\).</li>
+        <li><strong>Compute:</strong> one multiply-add per output value per filter weight; FLOPs are about twice that.</li>
+      </ul>
+      <p><strong>Rules of thumb:</strong> “same” padding \(p = (k - 1)/2\) keeps the size at stride 1, and stride 2 halves it. Parameters live in the late, wide layers and activation memory in the early, high-resolution ones; compute is roughly level per layer. (<a href="#op">02</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">4</span>What is the receptive field, and how do you grow it?</summary><div class="ans">
+      <p><strong>The region of the input that can affect a unit. Each layer widens it by \((k - 1)d\) times the product of all earlier strides.</strong></p>
+      <div class="mj">\[ \begin{aligned} r_l &amp;= r_{l-1} + (k_l - 1)\, d_l\, j_{l-1} \\ j_l &amp;= j_{l-1}\, s_l \end{aligned} \]</div>
+      <p>In words: \(j\) is the spacing in input pixels between neighbouring units. Each layer adds its kernel's extra span in units of that spacing, then multiplies the spacing by its stride. \(L\) stride-1 3×3 layers see \(2L + 1\) pixels.</p>
+      <ul>
+        <li><strong>Why it matters:</strong> a unit can't use anything outside its field; classification needs the whole object, segmentation needs context at every pixel.</li>
+        <li><strong>Effective vs theoretical:</strong> central pixels reach the unit through many more paths, so the real influence is a Gaussian blob whose radius grows like \(\sqrt L\), not \(L\).</li>
+        <li><strong>Growing it:</strong> more layers (slow), downsampling (fast, loses resolution), dilation (fast at full resolution, but costly and prone to gridding), larger depthwise kernels, or global operations (pooling, attention).</li>
+      </ul>
+      <p><strong>Follow-up:</strong> a theoretical field that covers the image doesn't mean the unit uses all of it; the effective field is much smaller, and training widens it only somewhat. (<a href="#rf">03</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">5</span>Is a CNN translation invariant?</summary><div class="ans">
+      <p><strong>Conv layers are translation <em>equivariant</em>; pooling adds local invariance and global pooling makes a classifier roughly invariant. It isn't exactly invariant, because strided subsampling aliases.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{equivariant:}\quad f(T x) &amp;= T f(x) \\ \text{invariant:}\quad g(T x) &amp;= g(x) \end{aligned} \]</div>
+      <ul>
+        <li><strong>Equivariance</strong> comes from weight sharing; it's exact for stride 1 away from the borders.</li>
+        <li><strong>Invariance</strong> comes from summarizing: a window's max ignores small shifts inside it; global average pooling ignores position entirely.</li>
+        <li><strong>Why it breaks:</strong> a stride-2 step keeps every other sample with no low-pass filter first, so fine detail aliases, and a one-pixel shift can change the prediction. Zero padding also lets the network sense the border.</li>
+      </ul>
+      <p><strong>Fixes:</strong> blur before subsampling (BlurPool) and shift augmentation. Detection and segmentation <em>want</em> equivariance, so they keep spatial maps. (<a href="#pool">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">6</span>Why stack two 3×3 convs instead of one 5×5?</summary><div class="ans">
+      <p><strong>Same 5×5 receptive field, \(18C^2\) instead of \(25C^2\) weights and multiply-adds, and an extra non-linearity.</strong></p>
+      <div class="mj">\[ \begin{aligned} P_{5 \times 5} &amp;= 25\, C^2 \\ P_{2 \times (3 \times 3)} &amp;= 18\, C^2 \end{aligned} \]</div>
+      <p>In words: each stride-1 3×3 adds 2 to the field, so two reach 5 (three reach 7, for \(27C^2\) against \(49C^2\)).</p>
+      <ul>
+        <li><strong>More expressive per weight:</strong> two ReLUs instead of one.</li>
+        <li><strong>The catch:</strong> it can't express every 5×5 filter, stores an extra layer of activations, and adds a sequential step.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> this was VGG's design. Large kernels came back (7×7 in ConvNeXt) as depthwise convs, where they cost only \(k^2\) per channel. (<a href="#arch">07</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">7</span>Why can ResNets go so much deeper than plain networks?</summary><div class="ans">
+      <p><strong>Residual blocks, \(x + F(x)\), make the identity the default and give gradients a direct path, which fixes the degradation problem that stopped plain networks at about 20 layers.</strong></p>
+      <div class="mj">\[ \begin{aligned} x_{l+1} &amp;= x_l + F(x_l) \\ \frac{\partial L}{\partial x_l} &amp;= \frac{\partial L}{\partial x_L} \prod_{m=l}^{L-1} \Big(I + \frac{\partial F_m}{\partial x_m}\Big) \end{aligned} \]</div>
+      <p>In words: multiplied out, the product is a sum over paths, one of which is the plain identity, so the error reaches early layers without passing through every block's Jacobian (its matrix of slopes).</p>
+      <ul>
+        <li><strong>Degradation:</strong> a 56-layer plain net had higher <em>training</em> error than a 20-layer one. Not overfitting: the deeper net could copy the shallower one plus identity layers, but the optimizer couldn't find that, because an exact identity through convs and ReLUs is hard to learn.</li>
+        <li><strong>With a skip,</strong> the identity is just \(F = 0\), which weight decay already favours, so extra blocks can't easily hurt.</li>
+        <li><strong>Also:</strong> a smoother loss surface, and ensemble-like behaviour (deleting one block barely hurts).</li>
+      </ul>
+      <p><strong>Details:</strong> a 1×1 conv (stride 2 when halving) on the skip when shapes change; bottleneck blocks; BatchNorm after every conv. (<a href="#resnet">07</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">8</span>How is convolution implemented efficiently in practice?</summary><div class="ans">
+      <p><strong>Mostly as matrix multiplication (im2col or implicit GEMM), with FFT for large kernels and Winograd for small ones; cuDNN times the options and picks the fastest per layer.</strong></p>
+      <ul>
+        <li><strong>im2col + GEMM:</strong> unfold every \(C_{in} \times k \times k\) patch into a column and multiply by the filters as rows: \((C_{out} \times C_{in} k^2)\) times \((C_{in} k^2 \times N H'W')\). Same arithmetic as the loops, but GEMM runs near peak on BLAS and tensor cores because tiling reuses every loaded number many times. Cost: the patch matrix is about \(k^2/s^2\) times the input; implicit GEMM builds tiles on the fly instead.</li>
+        <li><strong>FFT:</strong> convolution in space is multiplication in frequency. Pad, transform, multiply per frequency (summing over input channels), transform back: \(O(n^2 \log n)\) per channel pair instead of \(O(n^2 k^2)\). Pays for large kernels.</li>
+        <li><strong>Winograd:</strong> precombine inputs and filter taps with additions so fewer multiplications are needed: 16 instead of 36 for a 2×2 output tile of a 3×3 conv (2.25×), 36 instead of 144 for 4×4 (4×). The usual choice for stride-1 3×3.</li>
+        <li><strong>Choosing:</strong> <code>cudnn.benchmark = True</code> times each algorithm for each new input shape and caches the winner.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> the model can save more than the algorithm: depthwise separable convs (about \(1/k^2\) the cost), bottlenecks, early downsampling, fp16 or int8. But FLOPs aren't latency: depthwise convs are memory-bound. (<a href="#compute">08</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">9</span>What does the Fourier transform do, and why does convolution become multiplication?</summary><div class="ans">
+      <p><strong>It rewrites a signal as a sum of waves of different frequencies. A convolution can only rescale and phase-shift each wave, never mix them, so in frequency space it's one multiplication per frequency.</strong></p>
+      <div class="mj">\[ \begin{aligned} X[f] &amp;= \sum_{t} x[t]\, e^{-2\pi i f t / n} \\ \mathcal F(x \circledast w) &amp;= \mathcal F(x) \cdot \mathcal F(w) \end{aligned} \]</div>
+      <ul>
+        <li><strong>The transform:</strong> \(X[f]\) is the dot product of the signal with a wave of \(f\) cycles; its size is that wave's amplitude, its angle the phase. Low frequencies are smooth shading, high ones edges and texture. The inverse adds the waves back, losing nothing.</li>
+        <li><strong>Why multiplication:</strong> sliding a kernel over a pure wave returns the same wave, rescaled and shifted, since a weighted sum of shifted copies of a wave is a wave of the same frequency. The factor is the kernel's own transform \(W[f]\): shifting by \(u\) multiplies frequency \(f\) by \(e^{-2\pi i f u/n}\), and the convolution's weighted sum of shifts collects those phases into \(W[f]\).</li>
+        <li><strong>Catches:</strong> the theorem is for circular convolution, so zero-pad to \(n + k - 1\); and CNNs compute cross-correlation, so conjugate the kernel's transform.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> the FFT gets the transform in \(O(n \log n)\) by recursively splitting even and odd samples. A blur is a low-pass filter because its transform is large at low frequencies and small at high ones. (<a href="#conv-theorem">08</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">10</span>Why not use the FFT for 3×3 kernels?</summary><div class="ans">
+      <p><strong>The most it can save is about \(k^2 = 9\) times in multiplications, and its overheads eat that: complex arithmetic, transforms, padding every kernel to the image size, and wasted outputs under stride. Winograd gets 2.25–4× more cheaply.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{direct} &amp;= O(n^2 k^2) \\ \text{FFT} &amp;= O(n^2 \log n) + O(n^2) \end{aligned} \]</div>
+      <p>In words: per channel pair, FFT's cost doesn't depend on \(k\), so it wins only when \(k^2\) is large next to its fixed costs.</p>
+      <ul>
+        <li><strong>Complex numbers:</strong> a complex multiply-add is about four real ones (two with real-input FFTs).</li>
+        <li><strong>Kernel padding:</strong> each 9-number kernel becomes a \(P \times Q\) complex array, for all \(C_{in} C_{out}\) kernels.</li>
+        <li><strong>Fixed costs and waste:</strong> transforms cost \(n^2 \log n\) per map whatever \(k\) is; padding is large relative to small late maps; a stride-2 layer discards three quarters of the outputs; rounding error hurts in fp16.</li>
+      </ul>
+      <p><strong>Where FFT wins:</strong> kernels of about 7×7 and up, big maps, and long 1D convolutions (S4, Hyena); overlap-add keeps big images tractable. (<a href="#fft-3x3">08</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">11</span>How does Winograd reduce multiplications, and why isn't it used everywhere?</summary><div class="ans">
+      <p><strong>It computes a small output tile from linear combinations of inputs and of filter taps (the filter side precomputed), so a 2×2 tile of a 3×3 conv takes 16 multiplications instead of 36. It suits only small kernels at stride 1, and grows unstable as tiles grow.</strong></p>
+      <div class="mj">\[ \begin{aligned} Y &amp;= A^\top \big[(G g G^\top) \odot (B^\top d B)\big] A \\ \text{mults} &amp;= (m + r - 1)^2 \ \text{ instead of } \ m^2 r^2 \end{aligned} \]</div>
+      <p>In words: transform the input tile with \(B\) and the filter with \(G\) (once), multiply elementwise (the only general multiplications), transform back with \(A\).</p>
+      <ul>
+        <li><strong>1D, \(F(2, 3)\):</strong> two outputs of a 3-tap filter take 6 multiplications directly and 4 with Winograd, because filter combinations such as \(\tfrac12(g_0 + g_1 + g_2)\) are reused for every tile. It's exact.</li>
+        <li><strong>With channels,</strong> the products become \((m + r - 1)^2\) batched GEMMs over channels, so it still runs on matrix hardware.</li>
+        <li><strong>Limits:</strong> bigger tiles save more (4× for 4×4) but need larger, fractional transform entries, so rounding error grows; fp16 needs small tiles and int8 is hard. Strides and dilation need the problem split; large kernels suit FFT better.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> FFT and Winograd are one idea, polynomial multiplication by evaluate–multiply–interpolate: FFT at complex roots of unity, Winograd at a few small real points (0, ±1 and ∞ for \(F(2, 3)\)). (<a href="#winograd">08</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">12</span>How does backprop work through a conv layer and through max pooling?</summary><div class="ans">
+      <p><strong>The weight gradient is the input cross-correlated with the output gradient; the input gradient is the output gradient convolved with the kernel, a transposed convolution. Max pooling routes each window's gradient to its maximum.</strong></p>
+      <div class="mj">\[ \begin{aligned} \frac{\partial L}{\partial w_{ocuv}} &amp;= \sum_{n, i, j} \delta_{noij}\; x_{n,\, c,\, i+u,\, j+v} \\ \frac{\partial L}{\partial x_{ncab}} &amp;= \sum_{o, u, v} \delta_{n,\, o,\, a-u,\, b-v}\; w_{ocuv} \end{aligned} \]</div>
+      <ul>
+        <li><strong>Weights:</strong> a shared weight collects one term per position (summed, not averaged): the upstream gradient times the input it multiplied there.</li>
+        <li><strong>Input:</strong> each pixel collects from every window covering it, through the weight it met there. The minus signs make this a true convolution (flipped kernel over the zero-padded gradient); with stride \(s\), a stride-\(s\) transposed conv.</li>
+        <li><strong>Bias and pooling:</strong> the bias gets the gradient summed over the batch and positions. Max pooling passes each window's gradient to the saved argmax and 0 elsewhere; average pooling splits it equally.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> a filter whose ReLU output is 0 everywhere, for every image, never gets a gradient again: a dead filter. (<a href="#backward">02</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">13</span>What is a transposed convolution, and why is it called the gradient of a convolution?</summary><div class="ans">
+      <p><strong>A learned upsampling layer: each input value stamps a scaled copy of the kernel onto the output, \(s\) pixels apart, and overlaps add. It computes \(C^\top z\) for an input \(z\) shaped like a conv's output, where \(C\) is that ordinary convolution's matrix, which is exactly how backprop passes a conv's gradient to its input.</strong></p>
+      <div class="mj">\[ \begin{aligned} y &amp;= C x \\ \frac{\partial L}{\partial x} &amp;= C^\top \frac{\partial L}{\partial y} \\ H_{out} &amp;= (H_{in} - 1)\, s - 2p \\ &amp;\quad + d(k - 1) + p_{\text{out}} + 1 \end{aligned} \]</div>
+      <ul>
+        <li><strong>Shape, not values:</strong> \(C^\top\) maps the output's shape back to the input's with the connections reversed. \(C^\top C \ne I\), so it isn't an inverse; “deconvolution” is a misnomer.</li>
+        <li><strong>Equivalent view:</strong> insert \(s - 1\) zeros between input pixels, pad by \(k - 1 - p\), run a stride-1 conv with the flipped kernel and its channel axes swapped (output padding adds \(p_{\text{out}}\) on one side): “fractionally strided”.</li>
+        <li><strong>Output padding</strong> (0 to \(s - 1\)) picks which of the \(s\) input sizes that a stride-\(s\) conv maps to one output size you get back. Common 2× settings: kernel 2 with stride 2, or kernel 4 with stride 2 and padding 1.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> cheap and learned, but uneven overlap causes checkerboard artifacts (Q15). (<a href="#transposed">09</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">14</span>How do you get back the original H×W from a downsampled feature map?</summary><div class="ans">
+      <p><strong>Upsample in a decoder (transposed conv, resize + conv, max-unpooling, pixel shuffle) or avoid most downsampling with dilated convs, and in either case restore fine detail with skip connections from the encoder (U-Net).</strong></p>
+      <ul>
+        <li><strong>Transposed conv:</strong> learned, cheap; checkerboard artifacts when \(k\) isn't divisible by \(s\).</li>
+        <li><strong>Resize, then conv:</strong> nearest or bilinear, then a 3×3 conv. No artifacts, any scale; the conv runs at high resolution and interpolation blurs. The usual modern choice.</li>
+        <li><strong>Max-unpooling (SegNet):</strong> the encoder saves each max-pool's argmax; the decoder puts values back there and zeros elsewhere. Tiny memory and sharp boundaries, but sparse maps and no encoder features.</li>
+        <li><strong>Pixel shuffle:</strong> a low-resolution conv outputs \(C r^2\) channels, reshaped into an \(r\)-times-larger map. Cheap, no uneven overlap; needs ICNR initialization.</li>
+        <li><strong>Dilated convs (DeepLab):</strong> replace the last strides with dilation, keep 1/8 resolution instead of 1/32, upsample the logits bilinearly. Much more compute and memory; constant rates cause gridding.</li>
+        <li><strong>Skip connections:</strong> the essential partner of any upsampler. Downsampling destroys detail that no upsampler can recreate; U-Net concatenates the encoder map of the same resolution at each step, FCN and FPN add.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> a sound default is a U-Net with resize + conv; transposed convs are fine with \(k\) divisible by \(s\). (<a href="#upsample">09</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">15</span>What causes checkerboard artifacts, and how do you avoid them?</summary><div class="ans">
+      <p><strong>Uneven overlap in a transposed convolution: when the kernel size isn't divisible by the stride, neighbouring output pixels receive different numbers of kernel stamps, leaving a periodic grid.</strong></p>
+      <div class="mj">\[ \text{stamps per pixel} \in \Big\{ \Big\lfloor \frac{k}{s} \Big\rfloor,\; \Big\lceil \frac{k}{s} \Big\rceil \Big\} \]</div>
+      <p>In words: with \(k = 3\) and \(s = 2\), outputs are covered alternately by 1 and 2 stamps; in 2D the row and column patterns multiply into a checkerboard.</p>
+      <ul>
+        <li><strong>Why training doesn't fix it:</strong> a flat input gives a flat output only if the weights balance exactly across strong and weak positions, which is unlikely, and stacked layers compound it.</li>
+        <li><strong>Gradients too:</strong> a strided conv's backward pass is a transposed conv, so a GAN generator can receive checkerboard gradients from its discriminator.</li>
+      </ul>
+      <p><strong>Fixes:</strong> resize then a stride-1 conv (every output computed the same way); a kernel divisible by the stride (reduces, doesn't guarantee); pixel shuffle with ICNR initialization; a blur after upsampling. (<a href="#checkerboard">09</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">16</span>Why does U-Net need skip connections?</summary><div class="ans">
+      <p><strong>Downsampling destroys spatial detail that no decoder can recreate; the skips hand the decoder the encoder's high-resolution features, so it combines “what” from deep layers with “where” from early ones.</strong></p>
+      <ul>
+        <li><strong>Information loss:</strong> each stride-2 step keeps a quarter of the positions, and aliasing folds fine detail into coarse values. An upsampler can only interpolate what its input still holds.</li>
+        <li><strong>What vs where:</strong> deep features know the class but are located only to within the total stride; early features know exact edges but not what they belong to.</li>
+        <li><strong>Without skips:</strong> blobby masks, boundaries off by up to the stride, thin structures lost. The skips also give early layers short gradient paths.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> concatenating (U-Net) lets the decoder weigh both sources but adds channels; adding (FCN, FPN) is cheaper. Encoder maps stay in memory until the decoder uses them. (<a href="#unet">09</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">17</span>What does a depthwise separable convolution cost compared with a standard one?</summary><div class="ans">
+      <p><strong>About \(1/C_{out} + 1/k^2\) of the cost, so roughly 8–9 times cheaper for 3×3: filter each channel spatially on its own, then mix channels with a 1×1 conv.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{cost}_{\text{std}} &amp;= H'W' \cdot k^2 C_{in} C_{out} \\ \text{cost}_{\text{sep}} &amp;= H'W' \cdot \big(k^2 C_{in} + C_{in} C_{out}\big) \\ \frac{\text{cost}_{\text{sep}}}{\text{cost}_{\text{std}}} &amp;= \frac{1}{C_{out}} + \frac{1}{k^2} \end{aligned} \]</div>
+      <p>In words: the depthwise step pays \(k^2\) per channel, the pointwise step \(C_{in} C_{out}\); with many output channels the ratio is about \(1/k^2\). Parameters shrink by the same ratio.</p>
+      <ul>
+        <li><strong>The assumption:</strong> spatial filtering and channel mixing can be learned separately; each layer is a little weaker, and the savings buy more layers or channels.</li>
+        <li><strong>The catch:</strong> FLOPs aren't speed. A depthwise conv does little arithmetic per value loaded, so on GPUs it's memory-bound and gains far less than its FLOP count suggests; it shines on phone CPUs.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> it's grouped convolution with \(g = C_{in}\); MobileNetV2 wraps it in an inverted residual with a linear bottleneck. (<a href="#separable">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">18</span>BatchNorm before or after the ReLU?</summary><div class="ans">
+      <p><strong>The standard is conv → BN → ReLU, so the ReLU always sees a standardized input; after the ReLU also trains well, and the accuracy difference is usually small.</strong></p>
+      <ul>
+        <li><strong>Before:</strong> BN centres and scales each channel's pre-activations, so the ReLU's threshold sits inside the data and roughly half the units fire; without it a channel can drift all negative (dead) or all positive (linear). \(\gamma, \beta\) learn what fraction fires.</li>
+        <li><strong>Bias:</strong> BN removes the mean, so the conv before it uses <code>bias=False</code>.</li>
+        <li><strong>Inference:</strong> BN right after a conv folds into its weights exactly, so it costs nothing deployed:</li>
+      </ul>
+      <div class="mj">\[ \begin{aligned} w'_o &amp;= \frac{\gamma_o}{\sqrt{\sigma_o^2 + \epsilon}}\; w_o \\ b'_o &amp;= \beta_o + \frac{\gamma_o\, (b_o - \mu_o)}{\sqrt{\sigma_o^2 + \epsilon}} \end{aligned} \]</div>
+      <ul>
+        <li><strong>After:</strong> BN normalizes the next conv's input instead, sometimes reported marginally better; it can only fold into the next conv, and not exactly at the borders because of zero padding.</li>
+        <li><strong>Pre-activation ResNets</strong> use BN → ReLU → conv so the skip path stays a pure identity.</li>
+      </ul>
+      <p><strong>Follow-ups:</strong> CNN BatchNorm pools statistics per channel over the batch and all positions, which keeps it shift-equivariant. With one or two images per GPU those statistics are too noisy, so use GroupNorm (per example, over groups of channels), synchronized BN, or frozen BN. (<a href="#norm">06</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">19</span>Global average pooling vs flatten: why did GAP win?</summary><div class="ans">
+      <p><strong>GAP averages each channel to one number, so the head has \(HW\) times fewer parameters, works at any input size and ignores where the object is; flatten keeps position but pays in parameters, overfitting and a fixed input size.</strong></p>
+      <div class="mj">\[ \begin{aligned} P_{\text{flatten}} &amp;= H W C \cdot K + K \\ P_{\text{GAP}} &amp;= C \cdot K + K \end{aligned} \]</div>
+      <ul>
+        <li><strong>Parameters:</strong> VGG's flattened dense head held most of its 138M parameters; GAP heads are tiny and overfit less.</li>
+        <li><strong>Any input size,</strong> and invariance: “is this feature present anywhere?” is the right summary for classification.</li>
+        <li><strong>Interpretability:</strong> each channel maps to class evidence, which class activation maps exploit.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> it throws away position, which is wrong when position is the signal. (<a href="#pool">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">20</span>How would you fine-tune a pretrained CNN on a small dataset?</summary><div class="ans">
+      <p><strong>Replace the head, train it alone on a frozen backbone (a linear probe), then unfreeze the top blocks with smaller learning rates, keeping BatchNorm in eval mode, preprocessing exactly as in pretraining, and augmenting heavily.</strong></p>
+      <div class="mj">\[ \eta_l = \eta_{\text{head}} \cdot \xi^{\,L - l}, \qquad 0 &lt; \xi &lt; 1 \]</div>
+      <p>In words: discriminative learning rates; each block further from the head moves more slowly, since early features are generic and already good.</p>
+      <ul>
+        <li><strong>Why it works:</strong> early layers learn generic edges and textures, late ones task-specific parts; with little data, fewer trainable weights means less overfitting.</li>
+        <li><strong>Head first:</strong> a random head sends large, noisy gradients into the backbone and wrecks its features (catastrophic forgetting); probing first (LP-FT) also protects out-of-distribution accuracy.</li>
+        <li><strong>BatchNorm:</strong> small batches give noisy statistics that would overwrite the pretrained running averages, so keep BN in eval mode (and set it again after <code>model.train()</code>).</li>
+        <li><strong>Preprocessing:</strong> the pretraining resolution and per-channel normalization.</li>
+        <li><strong>How much to unfreeze:</strong> similar domain, freeze more; different domain (X-rays), unfreeze more of the later stages.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> stop early on a validation split; augmentation matters most when data is small. (<a href="#transfer">10</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">21</span>Why does data augmentation work, and when can it hurt?</summary><div class="ans">
+      <p><strong>It trains on transformed copies whose label shouldn't change, which teaches invariances the architecture lacks, enlarges the effective dataset and regularizes. It hurts when a transformation changes the label or the data distribution.</strong></p>
+      <div class="mj">\[ \min_\theta\; \mathbb E_{(x, y)}\; \mathbb E_{t \sim \mathcal T}\; \ell\big(f_\theta(t(x)),\; y\big) \]</div>
+      <ul>
+        <li><strong>Invariances:</strong> a CNN handles shifts by design, not rotation, scale, lighting or colour; augmentation teaches those.</li>
+        <li><strong>Variance and regularization:</strong> more effective samples, and exact pixels change every epoch, so they can't be memorized; Mixup and CutMix also soften the targets.</li>
+        <li><strong>When it hurts:</strong> flips on text or where left and right matter; rotations that turn a 6 into a 9; crops that cut the object out; colour jitter when colour is the signal. Too strong, and the training distribution drifts from the test one.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> test-time augmentation averages predictions over a few augmented copies. (<a href="#transfer">10</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">22</span>CNN vs ViT: what's the difference, and when would you choose each?</summary><div class="ans">
+      <p><strong>A CNN builds in locality and translation equivariance, so it learns from less data and costs linear in pixels; a ViT builds in almost nothing, attends globally from the first layer and scales better with data, but costs quadratic in tokens and needs large pretraining.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{conv layer} &amp;= O\big(H W\, k^2 C^2\big) \\ \text{attention term} &amp;= O\big(N^2 D\big) \\ N &amp;= \frac{H W}{P^2} \end{aligned} \]</div>
+      <p>In words: doubling the image side quadruples a conv layer's cost but multiplies the attention term by 16.</p>
+      <ul>
+        <li><strong>Bias vs data:</strong> on ImageNet-1k alone the original ViTs trailed ResNets; with 14M–300M pretraining images they matched or beat them. DeiT closed the gap with heavy augmentation and distillation.</li>
+        <li><strong>Context and weights:</strong> a CNN's field grows with depth and its mixing weights are fixed per offset; a ViT relates any two patches in one layer with weights computed from the content.</li>
+        <li><strong>Structure:</strong> CNNs give a multi-scale pyramid, handy for detection and segmentation; plain ViTs are single-scale.</li>
+        <li><strong>Hybrids:</strong> conv stems for ViTs, Swin's local windows and pyramid (linear cost), CoAtNet, and ConvNeXt, a CNN that matches Swin with transformer-era design.</li>
+      </ul>
+      <p><strong>Choose a CNN</strong> for small or medium data, high resolution, edge devices and tight latency; <strong>a ViT</strong> for large data, strong pretrained foundation models (CLIP, DINOv2) or multimodal work. The pretraining behind a backbone often matters more than its family. (<a href="#vit">11</a>)</p>
+    </div></details>
+
+    <!-- sheet -->
+    <h2 id="sheet"><span class="pn">15</span>Cheat sheet</h2>
+    <div class="sheet">
+      <h3>Shapes and sizes</h3>
+      <div class="mj">\[ \begin{aligned} x &amp;: (N, C_{in}, H, W) \\ w &amp;: (C_{out}, C_{in}/g, k, k) \\ H_{out} &amp;= \Big\lfloor \frac{H + 2p - d(k - 1) - 1}{s} \Big\rfloor + 1 \\ p_{\text{same}} &amp;= d(k - 1)/2 \quad (s = 1,\ k \text{ odd}) \end{aligned} \]</div>
+      <h3>Parameters and cost</h3>
+      <div class="mj">\[ \begin{aligned} \text{params} &amp;= k^2 C_{in} C_{out}/g + C_{out} \\ \text{MACs} &amp;= H_{out} W_{out}\, k^2 C_{in} C_{out}/g \\ P_{\text{dense}} / P_{\text{conv}} &amp;= (HW)^2 / k^2 \\ \text{sep} / \text{std} &amp;= 1/C_{out} + 1/k^2 \\ P_{\text{bottleneck}} &amp;= \tfrac{17}{16} C^2 \end{aligned} \]</div>
+      <p>MACs are per image; FLOPs are about twice the MACs. A bottleneck block costs \(\tfrac{17}{16} C^2\) against \(18 C^2\) for two full 3×3s.</p>
+      <h3>Receptive field</h3>
+      <div class="mj">\[ \begin{aligned} r_l &amp;= r_{l-1} + (k_l - 1)\, d_l\, j_{l-1} \\ j_l &amp;= j_{l-1}\, s_l \\ r_{L \times 3\times3} &amp;= 2L + 1 \\ r_{\text{dilated}} &amp;= 2^{L+1} - 1 \end{aligned} \]</div>
+      <p>The last two: \(L\) stride-1 3×3 layers, and 3×3 layers with dilations \(1, 2, \dots, 2^{L-1}\). Effective field: Gaussian, radius \(\propto \sqrt L\). Two 3×3s: same field as a 5×5 with \(18C^2\) instead of \(25C^2\) weights.</p>
+      <h3>Computing it</h3>
+      <div class="mj">\[ \begin{aligned} \text{im2col:}\quad Y &amp;= W_{\text{row}}\, X_{\text{col}} \\ \text{size}(X_{\text{col}}) &amp;\approx (k^2/s^2) \cdot \text{size}(x) \\ \mathcal F(x \circledast w) &amp;= \mathcal F(x) \cdot \mathcal F(w) \\ \mathcal F(x \star w) &amp;= \mathcal F(x) \cdot \overline{\mathcal F(w)} \\ \text{direct} &amp;= O(n^2 k^2) \\ \text{FFT} &amp;= O(n^2 \log n) \\ \text{Winograd} &amp;= (m + r - 1)^2 \ \text{vs}\ m^2 r^2 \end{aligned} \]</div>
+      <p>Pad to \(n + k - 1\) for linear convolution. Overlap-add: tiles of size \(B \propto k\), cost \(O(n^2 \log k)\). Winograd: \(F(2 \times 2, 3 \times 3)\) 16 vs 36 (2.25×), \(F(4 \times 4, 3 \times 3)\) 36 vs 144 (4×); stable for small tiles only. FFT for large kernels, Winograd for 3×3, GEMM for 1×1; <code>cudnn.benchmark</code> picks.</p>
+      <h3>Getting H×W back</h3>
+      <div class="mj">\[ \begin{aligned} H_{out} &amp;= (H_{in} - 1)\, s - 2p \\ &amp;\quad + d(k - 1) + p_{\text{out}} + 1 \\ p_{\text{out}} &amp;= (H + 2p - k) \bmod s \\ y_{c,\, ri + a,\, rj + b} &amp;= x_{cr^2 + ar + b,\, i,\, j} \end{aligned} \]</div>
+      <p>Transposed conv output size, output padding (for \(d = 1\)), then pixel shuffle. A transposed conv computes \(C^\top y\), the conv's input gradient. Checkerboard when \(s \nmid k\): use resize + conv, \(k\) divisible by \(s\), or ICNR. Dilation avoids downsampling (watch gridding). Skips (U-Net) restore the detail downsampling destroyed.</p>
+      <h3>Normalization</h3>
+      <p>BatchNorm in a CNN: statistics per channel over \((N, H, W)\). GroupNorm: per example, over \((C/G, H, W)\). Folding BN into the conv before it:</p>
+      <div class="mj">\[ \begin{aligned} w'_o &amp;= \frac{\gamma_o\, w_o}{\sqrt{\sigma_o^2 + \epsilon}} \\ b'_o &amp;= \beta_o + \frac{\gamma_o (b_o - \mu_o)}{\sqrt{\sigma_o^2 + \epsilon}} \end{aligned} \]</div>
+      <h3>Architectures in one line each</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Network</th><th>Remember it for</th></tr></thead>
+        <tbody>
+          <tr><td>LeNet, AlexNet</td><td>Conv–pool–dense; then the same at GPU scale with ReLU, dropout, augmentation</td></tr>
+          <tr><td>VGG</td><td>Only stacked 3×3s; huge dense head</td></tr>
+          <tr><td>Inception</td><td>Parallel kernel sizes, 1×1 reductions, GAP</td></tr>
+          <tr><td>ResNet</td><td>\(x + F(x)\) fixes degradation; bottlenecks</td></tr>
+          <tr><td>DenseNet</td><td>Concatenate all earlier maps; growth rate</td></tr>
+          <tr><td>MobileNet</td><td>Depthwise separable; inverted residuals (V2)</td></tr>
+          <tr><td>EfficientNet</td><td>\(\alpha \beta^2 \gamma^2 \approx 2\) compound scaling</td></tr>
+          <tr><td>ConvNeXt</td><td>ResNet with transformer-era design; matches Swin</td></tr>
+        </tbody>
+      </table></div>
+      <h3>CNN vs ViT</h3>
+      <p>CNN: locality and equivariance built in, less data, cost linear in pixels, multi-scale. ViT: global from layer 1, content-dependent mixing, more data, cost \(O(N^2 D)\) with \(N = HW/P^2\). Hybrids: conv stems, Swin, CoAtNet; ConvNeXt from the other side.</p>
+    </div>
+
+    <footer>Sources: LeCun et al. 1998 (LeNet); Chellapilla et al. 2006 (unrolled convolution); Krizhevsky et al. 2012 (AlexNet); Lin et al. 2013 (Network in Network); Simonyan and Zisserman 2014 (VGG); Szegedy et al. 2015 and 2016 (Inception); He et al. 2016 (ResNet; pre-activation ResNets); Chetlur et al. 2014 (cuDNN); Mathieu et al. 2014 and Vasilache et al. 2015 (FFT convolutions); Lavin and Gray 2016 (Winograd); Long et al. 2015 (FCN); Ronneberger et al. 2015 (U-Net); Badrinarayanan et al. 2017 (SegNet); Chen et al. 2017 (DeepLab); Wang et al. 2018 (hybrid dilated convolution); Shi et al. 2016 (pixel shuffle); Odena et al. 2016 (checkerboard artifacts); Aitken et al. 2017 (ICNR); Luo et al. 2016 (effective receptive field); Yosinski et al. 2014 (transferability); Veit et al. 2016; Huang et al. 2017 (DenseNet); Howard et al. 2017 and Sandler et al. 2018 (MobileNet); Chollet 2017 (Xception); Xie et al. 2017 (ResNeXt); Wu and He 2018 (GroupNorm); Li et al. 2018 (loss landscapes); Zhang et al. 2019 (Fixup); Tan and Le 2019 (EfficientNet); Azulay and Weiss 2019; Zhang 2019 (anti-aliased CNNs); Cordonnier et al. 2020; Dosovitskiy et al. 2021 (ViT); Touvron et al. 2021 (DeiT); Liu et al. 2021 (Swin); Xiao et al. 2021 (early convolutions); Dai et al. 2021 (CoAtNet); Brock et al. 2021 (NF-Nets); Kumar et al. 2022 (LP-FT); Liu et al. 2022 (ConvNeXt); Ding et al. 2022 (RepLKNet).<span class="site-nav"><a href="./">More study notes</a> · <a href="../">Deepam Minda</a></span></footer>
+
+  </article>
+</div>
+<a class="jump" href="#tldr">Contents ↑</a>
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+  svg: { fontCache: "global" },
+  options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script>
+(function () {
+  var d = document.getElementById("tocd");
+  var wide = window.matchMedia("(min-width: 1081px)");
+  function sync() { d.open = wide.matches; }
+  sync();
+  if (wide.addEventListener) wide.addEventListener("change", sync);
+  var jump = document.querySelector(".jump");
+  jump.addEventListener("click", function () { if (!wide.matches) d.open = true; });
+  d.addEventListener("click", function (e) {
+    if (!wide.matches && e.target.closest("a")) d.open = false;
+  });
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+  function spy() {
+    var y = window.scrollY + 120, cur = 0;
+    targets.forEach(function (t, i) { if (t && t.getBoundingClientRect().top + window.scrollY <= y) cur = i; });
+    links.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
+  }
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+})();
+</script>
+
+<script>
+(function () {
+  var root = document.documentElement, b = document.getElementById("theme-toggle");
+  function cur() { return root.getAttribute("data-theme") === "light" ? "light" : "dark"; }
+  function label() { b.setAttribute("aria-label", "Switch to " + (cur() === "dark" ? "light" : "dark") + " mode"); }
+  b.addEventListener("click", function () {
+    var n = cur() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", n);
+    try { localStorage.setItem("deepam-theme", n); } catch (e) {}
+    label();
+  });
+  label();
+})();
+</script>
+</body>
+</html>
