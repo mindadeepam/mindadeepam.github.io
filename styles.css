@@ -854,24 +854,19 @@ footer p {
   margin: 0;
 }
 
+/* list pages: the dot tag is the page's only heading, and the list follows it closely */
 .page-head {
   width: min(100%, 760px);
   margin-inline: auto;
-  padding: 74px 0 22px;
-}
-
-.page-head h1 {
-  font-size: var(--fs-title);
-  font-weight: 600;
-  line-height: 1.08;
-  letter-spacing: -0.035em;
+  padding: 72px 0 0;
 }
 
 .blog-eyebrow {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 0 0 16px;
+  margin: 0;
+  letter-spacing: 0;
   color: var(--amber);
   font-family: var(--font-mono);
   font-size: var(--fs-tag);
@@ -891,7 +886,7 @@ footer p {
 .blog-list {
   width: min(100%, 760px);
   margin-inline: auto;
-  padding: 24px 0 88px;
+  padding: 10px 0 88px;
 }
 
 .note-row-text {
@@ -1314,7 +1309,7 @@ footer p {
   }
 
   .page-head {
-    padding: 56px 0 18px;
+    padding: 48px 0 0;
   }
 
   .article {

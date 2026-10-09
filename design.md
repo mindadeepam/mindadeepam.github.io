@@ -28,7 +28,7 @@ Use this as a generic design brief for this portfolio and similar personal techn
 - Use monospace sparingly for labels, metadata, and technical accents.
 - One sans (Geist) and one mono (IBM Plex Mono) on every page, study notes included. No display serif.
 - One type scale for every page (the `--fs-*` tokens in styles.css): page titles 30–40px, the home name up to 60px, section headings 22px, list titles 19px, body 16.5px, labels 13px mono.
-- Eyebrow labels use the home page's tag: a small green dot and a mono label.
+- Eyebrow labels use the home page's tag: a small green dot and a mono label. On list pages (blog, study notes) that tag is the page's only heading (the `h1`); no big title above the list.
 
 ## Copy
 
