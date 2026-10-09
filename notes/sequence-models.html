@@ -516,7 +516,7 @@ for t in range(T):
         <p>The tanh before it keeps \(h\) bounded, because \(c\) is a sum of writes and can grow.</p></div>
     </div>
 
-    <aside class="note ask" id="why-h"><p class="nl">A common question</p>
+    <aside class="note ask" id="why-h"><p class="nl">A natural question</p>
       <p class="q">Why does \(h\) go to the next step if the notebook \(c\) already holds everything?</p>
       <ul>
         <li><strong>\(h\) is read from the notebook.</strong> It's \(o \odot \tanh(c)\), so the next step's gates do see the notebook, through this filtered readout.</li>
@@ -616,7 +616,7 @@ for t in range(T):
       <li><strong>The cost of tying.</strong> Every write erases the same fraction, and the state is an average of old and new, so it stays within the draft's range and can't count. It wins some of this back because the draft reads the old state through \(r\): old memory can ride inside the new write.</li>
     </ul>
 
-    <aside class="note ask"><p class="nl">A common question</p>
+    <aside class="note ask"><p class="nl">A natural question</p>
       <p class="q">In the LSTM the input gate multiplies the draft, \(i \odot g\). Why does the GRU's \(r\) act on \(h_{t-1}\) inside the draft instead?</p>
       <ul>
         <li><strong>Because it has a different job.</strong> “How much to write” is already done by \(z\). If \(r\) multiplied the draft's output, it would be a second volume knob for the same thing. Acting on the draft's <em>input</em> gives it a new job: choosing what the draft is computed from.</li>

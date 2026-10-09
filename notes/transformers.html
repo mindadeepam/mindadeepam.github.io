@@ -825,7 +825,7 @@ for batch in corpus_batches:                      <span class="cm"># (B, n + 1) 
         <tr><td>Adapters / LoRA</td><td>Small added matrices; the backbone stays frozen</td><td>Limited memory, many tasks sharing one base model</td></tr>
       </tbody>
     </table></div>
-    <aside class="note ask"><p class="nl">A common question</p><p class="q">Why can a frozen backbone with a linear head beat a model trained from scratch, or a much bigger fine-tuned one?</p><p>The pretrained embeddings already encode the structure, learned from far more data than the labelled set. With little labelled data, training millions of parameters overfits, while a linear head has few parameters, so low variance. A model trained from scratch has to learn the representation and the task from the same small dataset.</p></aside>
+    <aside class="note ask"><p class="nl">Worth knowing</p><p class="q">Why can a frozen backbone with a linear head beat a model trained from scratch, or a much bigger fine-tuned one?</p><p>The pretrained embeddings already encode the structure, learned from far more data than the labelled set. With little labelled data, training millions of parameters overfits, while a linear head has few parameters, so low variance. A model trained from scratch has to learn the representation and the task from the same small dataset.</p></aside>
 
     <h3>LoRA</h3>
     <div class="mj">\[ W' = W + \frac{\alpha}{r} B A, \qquad B \in \mathbb{R}^{d \times r},\ A \in \mathbb{R}^{r \times k},\ r \ll \min(d, k) \]</div>
