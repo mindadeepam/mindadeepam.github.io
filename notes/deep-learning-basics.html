@@ -390,16 +390,50 @@ for p, g in [(W1, dW1), (b1, db1), (W2, dW2), (b2, db2)]:
       <li><strong>Mini-batch SGD:</strong> each step uses the gradient on a small batch, a noisy but cheap estimate of the full gradient. The noise even helps escape sharp minima.</li>
       <li><strong>Momentum</strong> keeps a decaying sum \(u\) of recent gradients (named \(u\) so it isn't confused with Adam's \(v\)), so steps build up speed in consistent directions and zig-zags cancel out.</li>
       <li><strong>RMSProp</strong> divides each weight's step by a running average of its squared gradient, so rarely-updated and steep directions get sensibly sized steps.</li>
-      <li><strong>Adam</strong> does both. The bias correction (\(\hat m, \hat v\)) matters early on: \(m\) and \(v\) start at 0, so their early values are pulled towards 0, and dividing by \(1 - \beta^t\) removes that pull. \(v\) is pulled far more than \(m\), because \(\beta_2\) is closer to 1, so without the correction \(\sqrt{v}\) would be too small and the first steps too large.</li>
-      <li><strong>AdamW</strong> applies weight decay directly to the weights (\(\theta \leftarrow \theta - \eta\lambda\theta\)) instead of adding \(\lambda\theta\) to the gradient, where Adam's scaling would distort it. It's the default for transformers.</li>
+      <li><strong>Adam</strong> does both: \(m\) is a running average of the gradient (the direction), \(v\) of its square (the typical size), and each weight steps by \(\eta\,\hat m/\sqrt{\hat v}\). The hats are the bias correction, which undoes the fact that both averages start at 0. Why it's needed, why \(\beta_2\) is so close to 1, and why warmup is still needed afterwards: <a href="#adam-bias">Adam's bias correction, step by step</a>.</li>
+      <li><strong>AdamW</strong> applies weight decay directly to the weights instead of adding \(\lambda\theta\) to the gradient, where Adam's per-weight scaling would distort it. It's the default for transformers. The two update steps side by side: <a href="#adamw">Adam + L2 vs AdamW</a>.</li>
       <li><strong>The learning rate</strong> is the most important hyperparameter: warm it up at the start, then decay it (step, cosine).
         <ul>
-          <li><strong>Why warm up:</strong> at first Adam's \(\hat v\) is averaged over only a few gradients, so \(\hat m/\sqrt{\hat v}\) is close to \(\pm 1\) for every weight (exactly \(\pm 1\) on the first step), and even weights whose gradients are mostly noise take a full step \(\eta\). And right after initialization the gradients are large and change fast, so a full-size step can overshoot and diverge. A short ramp from near 0 lets the network reach a calmer region where big steps are safe.</li>
+          <li><strong>Why warm up:</strong> at first Adam's averages hold only a few gradients, so it can't tell signal from noise and every weight takes a full step \(\eta\) (details in <a href="#adam-bias">the bias-correction walkthrough</a>). And right after initialization the gradients are large and change fast, so a full-size step can overshoot and diverge. A short ramp from near 0 lets the network reach a calmer region where big steps are safe.</li>
           <li><strong>Why decay:</strong> mini-batch noise keeps the weights bouncing around a minimum by an amount that grows with the learning rate. Lowering it lets them settle.</li>
         </ul>
       </li>
       <li><strong>Batch size.</strong> A mini-batch gradient averages \(B\) per-example gradients, so its variance falls as \(1/B\). A bigger batch can usually take a proportionally bigger learning rate (the linear scaling rule, for SGD; Adam usually needs a gentler increase): one step with a \(k\) times bigger batch and rate covers about the same ground as \(k\) small steps, as long as the gradient barely changes over them. Small-batch noise also helps generalization, by bouncing the weights out of sharp minima.</li>
     </ul>
+
+    <h3 id="adam-bias">Adam's bias correction, step by step</h3>
+    <p><strong>What the two averages are for.</strong> Per weight, Adam wants</p>
+    <div class="mj">\[ \begin{aligned} m &amp;\approx \mathbb E[g] &amp;&amp; \text{the average direction} \\ v &amp;\approx \mathbb E[g^2] &amp;&amp; \text{the average squared size} \end{aligned} \]</div>
+    <p>and steps by \(\eta\, m/\sqrt v\). Since \(|\mathbb E[g]| \le \sqrt{\mathbb E[g^2]}\), that ratio lies between \(-1\) and \(1\): near \(\pm 1\) when the gradient points the same way every batch (signal, so a full step \(\eta\)), near 0 when it flips sign from batch to batch (noise, so almost no step).</p>
+    <p><strong>Starting at zero makes both averages too small.</strong> Each update keeps \(\beta\) of the old value and adds \(1 - \beta\) of the new gradient. Unrolled after \(t\) steps:</p>
+    <div class="mj">\[ m_t = (1 - \beta_1)\sum_{i=1}^{t} \beta_1^{\,t-i}\, g_i \]</div>
+    <p>Its weights on the gradients sum to</p>
+    <div class="mj">\[ (1 - \beta_1)\sum_{k=0}^{t-1}\beta_1^{\,k} = 1 - \beta_1^{\,t} \]</div>
+    <p>A proper average's weights sum to 1. The missing \(\beta_1^{\,t}\) went to the starting value, 0. So \(m_t\) is the true average shrunk by \(1 - \beta_1^{\,t}\), and \(v_t\) is shrunk by \(1 - \beta_2^{\,t}\). With \(\beta_1 = 0.9\) the missing share dies out within a few dozen steps; with \(\beta_2 = 0.999\) it takes thousands. So \(v\) is under-estimated far more, and for far longer, than \(m\).</p>
+    <p><strong>Without correction, the steps are too big.</strong> On the very first step \(m_1 = (1 - \beta_1)\,g\) and \(v_1 = (1 - \beta_2)\,g^2\), so</p>
+    <div class="mj">\[ \frac{m_1}{\sqrt{v_1}} = \frac{1 - \beta_1}{\sqrt{1 - \beta_2}}\; \text{sign}(g) \]</div>
+    <p>which is about \(3\) with the defaults: every weight steps three times further than Adam's intended maximum. \(m\) recovers quickly, but \(v\) stays shrunk, so the oversized steps go on for a while.</p>
+    <p><strong>The correction divides each average by its own missing share:</strong></p>
+    <div class="mj">\[ \begin{aligned} \hat m_t &amp;= \frac{m_t}{1 - \beta_1^{\,t}} \\ \hat v_t &amp;= \frac{v_t}{1 - \beta_2^{\,t}} \end{aligned} \]</div>
+    <p>Each is now a proper average, with weights summing to 1. \(v\) is scaled up by more than \(m\), but only because it was shrunk by more: the two effects cancel exactly, and neither average is distorted. On step 1 this gives \(\hat m_1 = g\) and \(\hat v_1 = g^2\), so the step is exactly \(\pm\eta\), as intended.</p>
+    <p><strong>Why warmup is still needed.</strong> The correction removes the bias: on average \(\hat v\) is right. It can't remove the noise. Early on, \(\hat v\) averages only a handful of squared gradients (on step 1, a single one), so \(\hat m/\sqrt{\hat v} \approx \pm 1\) for every weight, and a weight whose gradient is pure noise takes the same full step as one with a real signal. Later, with many samples, that noisy weight's \(\hat m\) is near 0 and it barely moves. Warmup keeps \(\eta\) small through this early, undiscriminating phase. RAdam builds the same idea into the optimizer.</p>
+    <p><strong>Why \(\beta_1 = 0.9\) and \(\beta_2 = 0.999\).</strong> An average with factor \(\beta\) remembers roughly the last \(1/(1 - \beta)\) steps.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Average</th><th>Default</th><th>Memory</th><th>Why that length</th></tr></thead>
+      <tbody>
+        <tr><td>\(m\), direction</td><td>\(\beta_1 = 0.9\)</td><td>About 10 steps</td><td>The right direction changes as the weights move, so the memory must be short enough to stay current but long enough to smooth out mini-batch noise. This is momentum.</td></tr>
+        <tr><td>\(v\), scale</td><td>\(\beta_2 = 0.999\)</td><td>About 1,000 steps</td><td>A weight's typical gradient size changes slowly, and squared gradients are very noisy, so estimating it needs many samples. \(v\) also sits in the denominator: a noisy, momentarily small \(v\) means a huge step. A long memory keeps it stable.</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>\(\beta_2\) too close to 1:</strong> when the gradient scale jumps suddenly (a loss spike, an unusual batch), \(v\) catches up too slowly, stays too small, and \(m/\sqrt v\) explodes. That's why large language-model runs often use \(\beta_2 = 0.95\) (GPT-3, LLaMA).</li>
+      <li><strong>\(\beta_2\) as small as \(\beta_1\):</strong> \(v\) just tracks the last few squared gradients, \(m/\sqrt v\) stays near \(\pm 1\) for almost every weight, and Adam degenerates into stepping by the sign of the gradient. It loses the signal-versus-noise distinction that makes it useful.</li>
+    </ul>
+
+    <h3 id="adamw">Adam + L2 vs AdamW</h3>
+    <p>Both start from the loss gradient \(\nabla L\) and differ only in where the decay \(\lambda\theta\) enters:</p>
+    <div class="mj">\[ \begin{aligned} \text{Adam + L2:}\quad g &amp;= \nabla L + \lambda\theta \\ \theta &amp;\leftarrow \theta - \eta\,\frac{\hat m}{\sqrt{\hat v} + \epsilon} \\ \text{AdamW:}\quad g &amp;= \nabla L \\ \theta &amp;\leftarrow \theta - \eta\Big(\frac{\hat m}{\sqrt{\hat v} + \epsilon} + \lambda\theta\Big) \end{aligned} \]</div>
+    <p>Here \(\hat m\) and \(\hat v\) are built from \(g\) as above. In words: with L2, the decay term goes into \(m\) and \(v\), so it ends up divided by \(\sqrt{\hat v}\). Weights with a large gradient history are then barely decayed, and rarely-updated ones are decayed hard, which isn't what the regularizer intends. AdamW keeps the decay outside the adaptive scaling, so every weight shrinks by the same fraction \(\eta\lambda\) per step. With plain SGD the two are identical, since there's no per-weight scaling to distort the decay.</p>
 
     <h3>Adam / AdamW, in code</h3>
     <pre class="code"><code>m = beta1 * m + (1 - beta1) * g             <span class="cm"># running mean of gradients</span>
@@ -831,6 +865,7 @@ for o in range(C_out):
         <li><strong>Why decay at all:</strong> smaller weights give a smoother function that changes less when the input changes a little, which tends to generalize better.</li>
       </ul>
       <p><strong>Follow-up:</strong> biases and normalization gains are usually left out of weight decay; there are few of them, they don't drive overfitting, and decaying the gains just fights the normalization.</p>
+          <p>The two update steps side by side: <a href="#adamw">Adam + L2 vs AdamW</a>.</p>
     </div></details>
     <details class="qa"><summary><span class="qn">13</span>Adam vs SGD with momentum. Why does Adam need bias correction?</summary><div class="ans">
       <p><strong>Momentum smooths the gradient's direction; Adam also gives every weight its own step size by dividing by the root of its recent squared gradients. Bias correction undoes the fact that Adam's running averages start at zero.</strong></p>
@@ -840,16 +875,15 @@ for o in range(C_out):
         <li><strong>Why per-weight steps help:</strong> gradient sizes differ hugely across weights (rare embeddings, layers at different depths), so one global learning rate is too big for some and too small for others. Adam evens this out, needs less tuning, and is the default for transformers.</li>
         <li><strong>Where SGD wins:</strong> with a tuned schedule, SGD with momentum often generalizes slightly better on image classification. Adam also stores two extra numbers per weight.</li>
       </ul>
-      <p><strong>Why bias correction:</strong> \(m_0 = v_0 = 0\), so early averages are pulled towards 0. With \(\mathbb{E}\) the average over random batches, and gradients that hover around a fixed mean:</p>
-      <div class="mj">\[ \begin{aligned} \mathbb{E}[m_t] &amp;= (1 - \beta_1^t)\, \mathbb{E}[g] \\ \mathbb{E}[\hat m_t] &amp;= \mathbb{E}[g] \end{aligned} \]</div>
-      <p>In words: dividing by \(1 - \beta^t\) removes the pull. Without it, \(v\) (whose \(\beta_2\) is closer to 1) is shrunk far more than \(m\), so \(\sqrt{v}\) is too small and the first steps too large. Even with it, \(\hat v\) is averaged over only a few gradients at first, so \(\hat m/\sqrt{\hat v}\) is close to \(\pm 1\) for every weight (exactly \(\pm 1\) on the first step), and even noise-dominated weights take a full step \(\eta\). That's what warmup guards against (Q14).</p>
+      <p><strong>Why bias correction:</strong> \(m\) and \(v\) start at 0, so after \(t\) steps they are the true averages shrunk by \(1 - \beta_1^{\,t}\) and \(1 - \beta_2^{\,t}\). \(v\)'s shrink is much larger and lasts much longer (\(\beta_2\) is closer to 1), so uncorrected \(m/\sqrt v\) is too large: about three times the intended step on step 1. Dividing each by its own factor cancels the shrink exactly. Even then, early \(\hat v\) averages only a few gradients, so every weight takes a full step: that's what warmup guards against (Q14).</p>
+      <p>Full walkthrough, including why \(\beta_1 = 0.9\) but \(\beta_2 = 0.999\) (or 0.95 for large language models): <a href="#adam-bias">Adam's bias correction, step by step</a>.</p>
     </div></details>
     <details class="qa"><summary><span class="qn">14</span>Why warm up the learning rate, and why decay it later?</summary><div class="ans">
       <p><strong>Warmup ramps the learning rate up from near 0 over the first steps, because the earliest updates are the least reliable. Decay lowers it later, so the weights settle into a minimum instead of jittering around it.</strong></p>
       <div class="mj">\[ \begin{aligned} \eta_t &amp;= \eta_{\max}\, t / T_w \\ \eta_t &amp;= \eta_{\min} + \tfrac12 (\eta_{\max} - \eta_{\min}) \big(1 + \cos(\pi\, \tfrac{t - T_w}{T - T_w})\big) \end{aligned} \]</div>
       <p>In words: the first line is a straight ramp up, used for the first \(T_w\) steps; the second, used after that, is a smooth cosine glide down to a floor by the last step \(T\).</p>
       <ul>
-        <li><strong>Adam's estimates are poor at first:</strong> \(\hat v\) is averaged over only a few gradients, so \(\hat m/\sqrt{\hat v}\) is close to \(\pm 1\) for every weight (exactly \(\pm 1\) on the first step). Even weights whose gradients are mostly noise take a full step \(\eta\). A small learning rate limits the damage until the averages settle.</li>
+        <li><strong>Adam's estimates are poor at first:</strong> \(\hat v\) is averaged over only a few gradients, so \(\hat m/\sqrt{\hat v}\) is close to \(\pm 1\) for every weight (exactly \(\pm 1\) on the first step). Even weights whose gradients are mostly noise take a full step \(\eta\). A small learning rate limits the damage until the averages settle. Bias correction fixes the averages' scale but not this noise; see <a href="#adam-bias">the walkthrough</a>.</li>
         <li><strong>Early training is unstable:</strong> right after initialization the gradients are large and change fast, so a full-size step can overshoot and diverge. A short ramp lets the network reach a calmer region where big steps are safe.</li>
         <li><strong>Transformers and big batches:</strong> post-norm transformers, \(\text{Norm}(x + F(x))\), start with large gradients in the layers near the output, so they diverge without warmup. The linear scaling rule (bigger batch, bigger learning rate) also only holds after a warmup.</li>
         <li><strong>Why decay:</strong> mini-batch noise keeps the weights bouncing around a minimum by an amount that grows with the learning rate. Lowering it shrinks the bounce, so the loss keeps dropping late in training.</li>
