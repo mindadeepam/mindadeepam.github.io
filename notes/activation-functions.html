@@ -1,0 +1,1001 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070707">
+<title>Activation functions · Deepam Minda</title>
+<meta name="description" content="Why networks need a non-linearity, how each activation shapes the gradient, dead ReLUs, GELU and SwiGLU, output activations and pairing with initialization.">
+<meta property="og:title" content="Activation functions">
+<meta property="og:description" content="Why networks need a non-linearity, how each activation shapes the gradient, dead ReLUs, GELU and SwiGLU, output activations and pairing with initialization.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem("deepam-theme"); } catch (e) {}
+  if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<link rel="stylesheet" href="../assets/design/tokens.css?v=1">
+<link rel="stylesheet" href="../assets/design/components.css?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<style>
+/* Green graph-paper theme for the recurrent-notebook content.
+   Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
+   One sans for text, one mono for labels; MathJax draws the maths. Green = the cell / notebook,
+   slate = the hidden state, orange only for gradients. */
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
+body {
+  margin: 0; color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: 50% 0;
+  font: 16.5px/1.7 var(--sans); letter-spacing: -.003em;
+  padding-inline: 20px; padding-block: 44px 88px;
+  -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 640px) { body { font-size: 16px; padding-inline: 16px; padding-block: 24px 80px; } }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+table, button { font: inherit; }
+code { font: .86em var(--mono); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; }
+
+.page { max-width: 1200px; margin: 0 auto; display: grid; gap: 52px; grid-template-columns: 220px minmax(0, 860px); justify-content: center; }
+@media (max-width: 1080px) { .page { grid-template-columns: minmax(0, 860px); gap: 0; } }
+
+/* contents */
+.toc { position: sticky; top: 28px; align-self: start; font: 13.5px/1.4 var(--sans); max-height: calc(100vh - 56px); overflow-y: auto; }
+.toc summary { display: none; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--ink-2); text-decoration: none; }
+.toc a:hover { background: var(--surface); color: var(--ink); }
+.toc a.on { color: var(--ink); background: var(--surface); box-shadow: inset 2px 0 0 var(--cell); }
+.toc .n { font: 500 11px var(--mono); color: var(--ink-3); margin-right: 8px; }
+.toc .label { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 10px 10px; }
+.toc li.part { font: 500 10.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 14px 10px 4px; }
+@media (max-width: 1080px) {
+  .toc { position: static; margin-bottom: 26px; max-height: none; }
+  .toc .label { display: none; }
+  .toc details { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  .toc summary { display: block; cursor: pointer; padding: 12px 14px; font: 500 14px var(--sans); list-style: none; }
+  .toc summary::-webkit-details-marker { display: none; }
+  .toc summary::after { content: "+"; float: right; color: var(--ink-3); }
+  .toc details[open] summary::after { content: "–"; }
+  .toc details ol { padding: 0 6px 10px; }
+}
+.jump {
+  display: none; position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+  font: 500 13px var(--sans); color: var(--ink); background: var(--surface); text-decoration: none;
+  border: 1px solid var(--rule); border-radius: 999px; padding: 9px 14px;
+}
+@media (max-width: 1080px) { .jump { display: block; } }
+
+/* article */
+article { min-width: 0; }
+header.hero { display: grid; gap: 10px; margin-bottom: 26px; }
+.kicker { font: 500 12px/1 var(--mono); color: var(--ink-3); letter-spacing: .02em; }
+h1 { margin: 0; font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.6rem); line-height: 1.1; font-weight: 600; letter-spacing: -.028em; text-wrap: balance; }
+.dek { margin: 0; font-size: 1.1rem; line-height: 1.55; color: var(--ink-2); max-width: 40em; }
+.meta { font: 12px/1.5 var(--mono); color: var(--ink-3); }
+.key { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.key span::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--c); margin-right: 6px; vertical-align: middle; }
+
+h2 { font-size: 1.36rem; line-height: 1.25; font-weight: 600; letter-spacing: -.018em; margin: 56px 0 12px; text-wrap: balance; scroll-margin-top: 16px; }
+h2 .pn { font: 500 .74em/1 var(--mono); color: var(--ink-3); margin-right: .7em; letter-spacing: 0; }
+h3 { font-size: 1.04rem; font-weight: 600; letter-spacing: -.01em; margin: 30px 0 6px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 1.25em; }
+li { margin-bottom: 5px; }
+li::marker { color: var(--ink-3); }
+strong { font-weight: 600; }
+.mj { overflow-x: auto; overflow-y: hidden; margin: 4px 0 16px; padding: 2px 0; }
+mjx-container[display="true"] { margin: 0 !important; }
+
+/* plan and summary panels */
+.tldr { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 22px 6px; margin-bottom: 14px; }
+.tldr h2 { margin: 0 0 10px; font: 500 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.tldr ol { padding-left: 1.3em; }
+.tldr li { margin-bottom: 8px; }
+.tldr p { margin: 0 0 12px; font-size: 15.5px; }
+.tldr .tbl { margin: 4px 0 12px; }
+
+/* notes: quote-style, coloured by kind */
+.note { margin: 16px 0 20px; padding: 2px 0 2px 16px; border-left: 2px solid var(--c); color: var(--ink-2); font-size: .97em; }
+.note > .nl { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); margin: 4px 0 8px; }
+.note strong { color: var(--ink); }
+.note.ask { --c: var(--cell); }
+.note.say { --c: var(--hid); }
+.note.trap { --c: var(--grad); }
+.note.lab { --c: var(--cell); }
+.note .q { font-style: italic; color: var(--ink); }
+.note ul { margin: 0 0 10px; }
+.note li { margin-bottom: 5px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 6px 0 20px; }
+table { border-collapse: collapse; width: 100%; font-size: .93em; line-height: 1.5; }
+th { text-align: left; vertical-align: bottom; font: 500 11px/1.4 var(--mono); color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; padding: 0 14px 8px 0; border-bottom: 1px solid var(--ink-3); }
+td { padding: 8px 14px 8px 0; vertical-align: top; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+td .src { display: block; font: 11.5px/1.4 var(--mono); color: var(--ink-3); margin-top: 2px; }
+
+/* gate cards */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0 20px; }
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.gc { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 4px; font-size: 15.5px; line-height: 1.6; }
+.gc h4 { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.gc h4 .tag { font: 500 11px var(--mono); color: var(--c); }
+.gc.g1 { --c: var(--cell); }
+.gc.g2 { --c: var(--ink-3); }
+.gc p { margin-bottom: 10px; }
+
+/* figures */
+figure { margin: 18px 0 24px; }
+.plate { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 10px; overflow-x: auto; }
+.plate svg { display: block; width: 100%; height: auto; min-width: 460px; max-width: 700px; margin: 0 auto; }
+@media (max-width: 500px) { .plate svg { max-width: none; } }
+figcaption { font-size: .86rem; line-height: 1.5; color: var(--ink-3); margin-top: 10px; }
+.dg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink-2); }
+.dg .v { font-family: var(--serif); font-style: italic; font-size: 19px; fill: var(--ink); }
+.dg .v .s { font-size: 12.5px; }
+.dg .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; fill: var(--ink-3); }
+.dg .gl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--gate); }
+.dg .gs { font-family: var(--serif); font-style: normal; font-size: 12px; fill: var(--ink-3); }
+.dg .cl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--ink); }
+.dg .cs { font-family: var(--sans); font-size: 12px; fill: var(--ink-2); }
+.dg .optx { font: 500 17px var(--sans); fill: var(--ink); }
+.dg .cell { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.dg .hid { stroke: var(--hid); stroke-width: 2.4; fill: none; }
+.dg .hid.thick { stroke-width: 3.6; }
+.dg .in { stroke: var(--ink-3); stroke-width: 1.5; fill: none; }
+.dg .gw { stroke: var(--gate); stroke-width: 1.6; fill: none; }
+.dg .cw { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+.dg .grad { stroke: var(--grad); fill: none; stroke-linecap: round; }
+.dg .gbox { fill: var(--gate-wash); stroke: var(--gate); stroke-width: 1.3; }
+.dg .box { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .op { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.3; }
+.dg .dot { fill: var(--ink-2); }
+.dg .cellon { fill: var(--cell-wash); stroke: var(--cell); stroke-width: 1; }
+.dg .celloff { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.dg .stream { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.mk-cell { fill: var(--cell); } .mk-hid { fill: var(--hid); } .mk-in { fill: var(--ink-3); }
+.mk-gate { fill: var(--gate); } .mk-cw { fill: var(--ink-2); } .mk-grad { fill: var(--grad); }
+
+/* questions */
+details.qa { border-bottom: 1px solid var(--rule); }
+details.qa:first-of-type { border-top: 1px solid var(--rule); }
+details.qa summary { cursor: pointer; padding: 11px 2px; font-weight: 500; font-size: 15.5px; line-height: 1.45; list-style: none; display: flex; gap: 12px; }
+details.qa summary::-webkit-details-marker { display: none; }
+details.qa summary .qn { font: 500 11.5px/1.9 var(--mono); color: var(--ink-3); flex: none; min-width: 1.9em; }
+details.qa summary::after { content: "+"; margin-left: auto; color: var(--ink-3); flex: none; }
+details.qa[open] summary::after { content: "–"; }
+details.qa .ans { padding: 0 4px 12px 32px; font-size: 15.5px; color: var(--ink-2); }
+summary:focus-visible, a:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+
+.sheet { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 6px; }
+.sheet h3 { margin: 4px 0 6px; font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: .9rem; color: var(--ink-3); }
+
+/* code blocks */
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; margin: 8px 0 20px; overflow-x: auto; font: 12.8px/1.6 var(--mono); color: var(--ink); white-space: pre; }
+pre.code code { font: inherit; background: none; border: 0; padding: 0; }
+pre.code .cm { color: var(--ink-3); }
+@media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
+
+/* public copy: colours, fonts and sizes come from the site's tokens.css; this maps the notebook's
+   token names onto them (green_theme.css's own token block is left out of public pages). */
+:root {
+  --paper: var(--void); --ink: var(--text); --ink-2: var(--soft); --ink-3: var(--muted);
+  --accent: var(--amber);
+  --cell: var(--green); --cell-wash: var(--green-wash); --hid: var(--blue); --hid-wash: var(--blue-wash);
+  --gate: var(--neutral); --gate-wash: var(--neutral-wash); --grad: var(--orange); --grad-wash: var(--orange-wash);
+  --sans: var(--font-sans); --mono: var(--font-mono);
+  --serif: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
+}
+body { padding-block-start: 0; letter-spacing: 0; }
+/* the shared header sits inside the notebook's side padding */
+.site-header { width: min(100%, 1260px); margin-bottom: 40px; }
+.site-header a:hover { text-decoration: none; }
+@media (max-width: 720px) { .site-header { width: 100%; margin-bottom: 26px; } }
+/* the site's type scale */
+h1 { font-weight: 600; font-size: var(--fs-title); line-height: 1.12; letter-spacing: -.02em; }
+h2 { font-size: var(--fs-h2); letter-spacing: -.01em; }
+h3 { font-size: var(--fs-h3); }
+.dek { font-size: 18px; }
+.toc a.on { box-shadow: inset 2px 0 0 var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline-color: var(--accent); }
+footer .site-nav { display: block; margin-top: 10px; }
+.next { margin-top: 36px; font-weight: 500; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="a-cell" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path class="mk-cell" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-hid" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto"><path class="mk-hid" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-in" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-in" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-gate" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-cw" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-cw" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-grad" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path class="mk-grad" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">study notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
+<div class="page">
+  <nav class="toc" aria-label="Contents">
+    <details id="tocd" open>
+      <summary>Contents</summary>
+      <div class="label">Contents</div>
+      <ol>
+        <li><a href="#tldr"><span class="n">00</span>In short</a></li>
+        <li><a href="#why"><span class="n">01</span>Why a non-linearity at all</a></li>
+        <li><a href="#sigmoid"><span class="n">02</span>Sigmoid and tanh</a></li>
+        <li><a href="#relu"><span class="n">03</span>ReLU</a></li>
+        <li><a href="#variants"><span class="n">04</span>ReLU variants</a></li>
+        <li><a href="#smooth"><span class="n">05</span>Smooth activations: GELU, SiLU and Mish</a></li>
+        <li><a href="#glu"><span class="n">06</span>Gated linear units: GLU, GEGLU and SwiGLU</a></li>
+        <li><a href="#outputs"><span class="n">07</span>Output activations and losses</a></li>
+        <li><a href="#dynamics"><span class="n">08</span>Activations and training dynamics</a></li>
+        <li><a href="#choosing"><span class="n">09</span>Choosing an activation</a></li>
+        <li><a href="#code"><span class="n">10</span>Pseudocode</a></li>
+        <li><a href="#questions"><span class="n">11</span>Interview questions</a></li>
+        <li><a href="#sheet"><span class="n">12</span>Cheat sheet</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <article>
+    <header class="hero">
+      <div class="tag">Study notes · Neural networks</div>
+      <h1>Activation functions</h1>
+      <p class="dek">Why a network needs a bend between its layers, how each activation shapes the gradient that flows back through it, and how to choose one: sigmoid and tanh, ReLU and its variants, GELU and SiLU, gated units like SwiGLU, and the output layer.</p>
+      <div class="meta">About 35 minutes · formulas, derivations, figures and 20 questions · pairs with Deep learning basics</div>
+    </header>
+
+    <section class="tldr" id="tldr" aria-labelledby="tldr-h">
+      <h2 id="tldr-h">In short</h2>
+      <ol>
+        <li>An activation is the element-wise bend in \(a = f(z)\). Without it, any stack of layers is one affine map. With it, one wide hidden layer can approximate any continuous function, and depth multiplies the number of linear pieces a ReLU network can draw.</li>
+        <li>Backprop multiplies the error by \(f'(z)\) at every layer, so an activation is judged by its slope. The sigmoid's slope is at most 1/4, and both sigmoid and tanh saturate (slope near 0 in the tails), so gradients vanish with depth.</li>
+        <li>ReLU's slope is exactly 1 when on and 0 when off: fast, sparse and cheap, but a unit whose input is always negative gets no gradient and dies. Leaky ReLU, ELU, SELU, GELU and SiLU each fix part of that.</li>
+        <li>GELU, \(z\Phi(z)\), and SiLU, \(z\sigma(z)\), are smooth, slightly non-monotonic ReLUs; GELU is the BERT and GPT default. SwiGLU, \((\text{SiLU}(xW) \odot xV)W_2\), is the feed-forward block of most modern LLMs, with the hidden width cut to \(\tfrac23 \cdot 4d\) to keep the parameter count.</li>
+        <li>Output activations follow the target and pair with a likelihood loss, so the gradient at the logits is prediction minus target: identity with MSE, sigmoid with BCE, softmax with cross-entropy, softplus for positive values. Pass logits, not probabilities, to the loss.</li>
+        <li>Initialization must match the activation (LeCun or Xavier for tanh, LeCun normal for SELU, He's \(2/n\) for ReLU). A softmax saturates just like a sigmoid, which is why attention divides its scores by \(\sqrt{d_k}\).</li>
+      </ol>
+    </section>
+
+    <!-- why -->
+    <h2 id="why"><span class="pn">01</span>Why a non-linearity at all</h2>
+    <p>A layer computes a weighted sum, then bends it:</p>
+    <div class="mj">\[ z = W x + b \qquad a = f(z) \]</div>
+    <p>The activation \(f\) acts on each unit's own pre-activation, separately. (Softmax is the one exception, and it lives at the output.) It's the only part of a layer that isn't a straight line. Three facts explain why it's needed and what it buys.</p>
+
+    <h3>Stacked linear layers collapse</h3>
+    <p>Remove \(f\) and compose two layers:</p>
+    <div class="mj">\[ \begin{aligned} y &amp;= W_2\,(W_1 x + b_1) + b_2 \\ &amp;= (W_2 W_1)\,x + (W_2 b_1 + b_2) \\ &amp;= W' x + b' \end{aligned} \]</div>
+    <p><strong>In words:</strong> a linear map of a linear map is linear. A 100-layer network without activations is linear regression; put a sigmoid on the end and it's logistic regression. It can only draw flat decision boundaries, so it can't even solve XOR.</p>
+    <ul>
+      <li>The product \(W_2 W_1\) has rank at most the narrowest layer's width, so a deep linear network with a bottleneck is a low-rank linear map, never more.</li>
+      <li>Its loss is still non-convex in the weights, with saddle points. Deep linear networks are a useful model of training dynamics, even though they represent nothing new.</li>
+    </ul>
+
+    <h3>Universal approximation: what it promises and what it doesn't</h3>
+    <p><strong>The theorem</strong> (Cybenko 1989 for sigmoids; Hornik 1991; Leshno et al. 1993 in general): one hidden layer, with any continuous activation that is not a polynomial, can approximate any continuous function \(g\) on a closed, bounded region \(K\) as closely as you like, given enough units \(N\):</p>
+    <div class="mj">\[ \sup_{x \in K}\, \Big\lvert\, g(x) - \sum_{i=1}^{N} c_i\, f\big(w_i^\top x + b_i\big) \Big\rvert &lt; \varepsilon \]</div>
+    <p><strong>Why "not a polynomial":</strong> with a polynomial activation of degree \(k\), the whole network is a polynomial of degree at most \(k\), however wide it is, and those can't approximate everything. ReLU, sigmoid, tanh and GELU all qualify.</p>
+    <p><strong>What it does not promise:</strong></p>
+    <ul>
+      <li><strong>Size.</strong> \(N\) can be enormous; for some functions it grows exponentially with the input dimension.</li>
+      <li><strong>Learnability.</strong> The weights exist; nothing says gradient descent finds them.</li>
+      <li><strong>Generalization.</strong> Approximating a function is not learning it from finite data.</li>
+      <li><strong>Extrapolation.</strong> It holds only on \(K\). Outside the data, a ReLU net continues linearly and a sigmoid net goes flat.</li>
+    </ul>
+
+    <h3>ReLU networks are piecewise linear</h3>
+    <p>Fix an input. Every ReLU is either on (it acts as the identity) or off (it outputs 0). For that on/off pattern, the whole network is a product of masked matrices: an affine map. Inputs that share a pattern form a convex region. So a ReLU network is a continuous, piecewise-linear function: flat facets glued along the hyperplanes where some unit's pre-activation crosses 0.</p>
+    <div class="mj">\[ \begin{aligned} f(x) &amp;= A_r\, x + c_r \qquad \text{on region } r \\ A_r &amp;= W_L\, D^{(r)}_{L-1}\, W_{L-1} \cdots D^{(r)}_1\, W_1 \end{aligned} \]</div>
+    <p>Here \(D^{(r)}_l\) is the diagonal 0/1 mask of which units in layer \(l\) are on in region \(r\).</p>
+    <p><strong>How the number of regions grows:</strong></p>
+    <ul>
+      <li><strong>Width grows the count polynomially.</strong> One hidden layer of \(n\) units cuts \(d\)-dimensional input space with \(n\) hyperplanes, giving at most \(\sum_{i=0}^{d} \binom{n}{i}\) regions, on the order of \(n^d\). On a 1-D input, that's just \(n + 1\) pieces.</li>
+      <li><strong>Depth multiplies.</strong> Each layer can fold the space handed to it by the layer below, so every later piece is reused in every fold. The maximum count grows exponentially with depth (Montúfar et al. 2014).</li>
+    </ul>
+    <p>The cleanest example is the <strong>tent map</strong>, two ReLUs that map \([0, 1]\) up to 1 and back down:</p>
+    <div class="mj">\[ t(x) = 2\,\text{ReLU}(x) - 4\,\text{ReLU}\big(x - \tfrac12\big) \]</div>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 700 200" role="img" aria-label="The tent map t built from two ReLUs, then composed with itself: one layer gives 2 linear pieces, two layers 4, three layers 8. Each extra layer doubles the number of pieces with only two more units."><path d="M40 40 V170" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M127.5 40 V170" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M215 40 V170" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M40 40 H215" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M40 170 H215" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><path d="M40 40 V170" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><text class="lbl" x="40" y="185" text-anchor="middle">0</text><text class="lbl" x="127.5" y="185" text-anchor="middle">0.5</text><text class="lbl" x="215" y="185" text-anchor="middle">1</text><text class="lbl" x="34" y="44" text-anchor="end">1</text><text x="127.5" y="30" text-anchor="middle" style="fill:var(--ink);font-weight:600">t(x): 1 layer, 2 pieces</text><text class="lbl" x="219" y="174">x</text><path d="M40 170 L127.5 40 L215 170" style="stroke:var(--hid);stroke-width:2.2;fill:none;stroke-linejoin:round"/><path d="M265 40 V170" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M352.5 40 V170" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M440 40 V170" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M265 40 H440" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M265 170 H440" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><path d="M265 40 V170" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><text class="lbl" x="265" y="185" text-anchor="middle">0</text><text class="lbl" x="352.5" y="185" text-anchor="middle">0.5</text><text class="lbl" x="440" y="185" text-anchor="middle">1</text><text class="lbl" x="259" y="44" text-anchor="end">1</text><text x="352.5" y="30" text-anchor="middle" style="fill:var(--ink);font-weight:600">t(t(x)): 2 layers, 4 pieces</text><text class="lbl" x="444" y="174">x</text><path d="M265 170 L308.8 40 L352.5 170 L396.2 40 L440 170" style="stroke:var(--hid);stroke-width:2.2;fill:none;stroke-linejoin:round"/><path d="M490 40 V170" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M577.5 40 V170" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M665 40 V170" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M490 40 H665" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M490 170 H665" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><path d="M490 40 V170" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><text class="lbl" x="490" y="185" text-anchor="middle">0</text><text class="lbl" x="577.5" y="185" text-anchor="middle">0.5</text><text class="lbl" x="665" y="185" text-anchor="middle">1</text><text class="lbl" x="484" y="44" text-anchor="end">1</text><text x="577.5" y="30" text-anchor="middle" style="fill:var(--ink);font-weight:600">t(t(t(x))): 3 layers, 8 pieces</text><text class="lbl" x="669" y="174">x</text><path d="M490 170 L511.9 40 L533.8 170 L555.6 40 L577.5 170 L599.4 40 L621.2 170 L643.1 40 L665 170" style="stroke:var(--hid);stroke-width:2.2;fill:none;stroke-linejoin:round"/></svg>
+      </div>
+      <figcaption>Each layer folds \([0, 1]\) onto itself and doubles the pieces. \(L\) layers of 2 units give \(2^L\) pieces; one hidden layer would need at least \(2^L - 1\) units for the same (Telgarsky 2016).</figcaption>
+    </figure>
+    <ul>
+      <li><strong>The maximum isn't typical.</strong> Trained networks have far fewer regions than the bound: the count grows with the total number of units, about as it would for a shallow network of the same size, not exponentially with depth (Hanin and Rolnick 2019). Depth's advantage is real but more modest in practice.</li>
+      <li><strong>Piecewise linear is still universal for smooth targets.</strong> Sawtooths let a deep ReLU net approximate \(x^2\) with error shrinking exponentially in depth (Yarotsky 2017). Products follow from \(xy = \tfrac12\big[(x + y)^2 - x^2 - y^2\big]\), and polynomials and smooth functions from products.</li>
+    </ul>
+    <aside class="note trap"><p class="nl">Trap</p><p>“ReLU is linear on each side, so a ReLU network is linear.” Only inside one region. Each unit bends along its own hyperplane, and a sum of functions bent in different places is not a line. The network would be linear only if every unit were on for every input.</p></aside>
+
+    <!-- sigmoid -->
+    <h2 id="sigmoid"><span class="pn">02</span>Sigmoid and tanh</h2>
+    <div class="mj">\[ \sigma(z) = \frac{1}{1 + e^{-z}} \qquad \tanh z = \frac{e^{z} - e^{-z}}{e^{z} + e^{-z}} \]</div>
+    <p>The sigmoid squashes any score into \((0, 1)\), and tanh into \((-1, 1)\). Their slopes:</p>
+    <div class="mj">\[ \begin{aligned} \sigma'(z) &amp;= \frac{e^{-z}}{(1 + e^{-z})^2} \\ &amp;= \frac{1}{1 + e^{-z}} \cdot \frac{e^{-z}}{1 + e^{-z}} \\ &amp;= \sigma(z)\,\big(1 - \sigma(z)\big) \end{aligned} \]</div>
+    <p>A product \(p(1 - p)\) peaks at \(p = \tfrac12\), so the sigmoid's slope is at most 1/4, reached at \(z = 0\).</p>
+    <div class="mj">\[ \begin{aligned} \tanh' z &amp;= \frac{\cosh^2 z - \sinh^2 z}{\cosh^2 z} \\ &amp;= 1 - \tanh^2 z \end{aligned} \]</div>
+    <p>tanh's slope peaks at 1, at \(z = 0\). Both slopes are written in terms of the output, so backprop reuses the stored activation instead of recomputing an exponential.</p>
+    <p><strong>tanh is a rescaled sigmoid.</strong> Multiply top and bottom by \(e^{z}\) in the third line:</p>
+    <div class="mj">\[ \begin{aligned} 2\sigma(2z) - 1 &amp;= \frac{2}{1 + e^{-2z}} - 1 \\ &amp;= \frac{1 - e^{-2z}}{1 + e^{-2z}} \\ &amp;= \frac{e^{z} - e^{-z}}{e^{z} + e^{-z}} \\ &amp;= \tanh z \end{aligned} \]</div>
+    <ul>
+      <li><strong>The slope:</strong> differentiating gives \(\tanh'(z) = 4\sigma'(2z)\), so tanh's peak slope is four times the sigmoid's.</li>
+      <li><strong>The same function class:</strong> the 2 inside folds into this layer's weights and bias, and the \(\times 2\) and \(-1\) fold into the next layer's. A tanh network is a sigmoid network with rescaled parameters. Every difference between them is about optimization: slope and centring.</li>
+    </ul>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 700 270" role="img" aria-label="Left: sigmoid rises from 0 to 1 and tanh from minus 1 to 1, both flat at the ends. Right: their slopes, bell shapes peaking at one quarter for sigmoid and at 1 for tanh at z equals 0, and near zero beyond about plus or minus 4."><path d="M200 16 H222" style="stroke:var(--hid);stroke-width:2.6;fill:none"/><text x="228" y="20" style="fill:var(--hid)">sigmoid σ(z)</text><path d="M344.4 16 H366.4" style="stroke:var(--grad);stroke-width:2.6;fill:none"/><text x="372.4" y="20" style="fill:var(--grad)">tanh z</text><path d="M78 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M130 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M182 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M234 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M286 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M52 229.8 H312" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M52 188.9 H312" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M52 107.1 H312" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M52 66.2 H312" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M52 148 H312" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><path d="M182 58 V238" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><text class="lbl" x="78" y="253" text-anchor="middle">−4</text><text class="lbl" x="130" y="253" text-anchor="middle">−2</text><text class="lbl" x="182" y="253" text-anchor="middle">0</text><text class="lbl" x="234" y="253" text-anchor="middle">2</text><text class="lbl" x="286" y="253" text-anchor="middle">4</text><text class="lbl" x="46" y="233.8" text-anchor="end">−1</text><text class="lbl" x="46" y="192.9" text-anchor="end">−0.5</text><text class="lbl" x="46" y="111.1" text-anchor="end">0.5</text><text class="lbl" x="46" y="70.2" text-anchor="end">1</text><text x="182" y="48" text-anchor="middle" style="fill:var(--ink);font-weight:600">the function</text><text class="lbl" x="316" y="152">z</text><path d="M418 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M470 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M522 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M574 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M626 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M392 191 H652" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M392 151.9 H652" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M392 112.8 H652" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M392 73.7 H652" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M392 230.2 H652" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><path d="M522 58 V238" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><text class="lbl" x="418" y="253" text-anchor="middle">−4</text><text class="lbl" x="470" y="253" text-anchor="middle">−2</text><text class="lbl" x="522" y="253" text-anchor="middle">0</text><text class="lbl" x="574" y="253" text-anchor="middle">2</text><text class="lbl" x="626" y="253" text-anchor="middle">4</text><text class="lbl" x="386" y="195" text-anchor="end">0.25</text><text class="lbl" x="386" y="155.9" text-anchor="end">0.5</text><text class="lbl" x="386" y="116.8" text-anchor="end">0.75</text><text class="lbl" x="386" y="77.7" text-anchor="end">1</text><text x="522" y="48" text-anchor="middle" style="fill:var(--ink);font-weight:600">its slope</text><text class="lbl" x="656" y="234.2">z</text><path d="M52 147.5 L53.6 147.4 L55.3 147.4 L56.9 147.3 L58.5 147.3 L60.2 147.3 L61.8 147.2 L63.4 147.2 L65.1 147.1 L66.7 147 L68.4 147 L70 146.9 L71.6 146.8 L73.3 146.8 L74.9 146.7 L76.5 146.6 L78.2 146.5 L79.8 146.4 L81.4 146.3 L83.1 146.2 L84.7 146.1 L86.3 146 L88 145.9 L89.6 145.7 L91.2 145.6 L92.9 145.4 L94.5 145.3 L96.2 145.1 L97.8 144.9 L99.4 144.7 L101.1 144.5 L102.7 144.3 L104.3 144.1 L106 143.8 L107.6 143.6 L109.2 143.3 L110.9 143 L112.5 142.7 L114.1 142.4 L115.8 142.1 L117.4 141.7 L119 141.3 L120.7 140.9 L122.3 140.5 L123.9 140.1 L125.6 139.6 L127.2 139.1 L128.9 138.6 L130.5 138.1 L132.1 137.5 L133.8 136.9 L135.4 136.3 L137 135.7 L138.7 135 L140.3 134.3 L141.9 133.6 L143.6 132.8 L145.2 132 L146.8 131.2 L148.5 130.3 L150.1 129.4 L151.7 128.5 L153.4 127.6 L155 126.6 L156.7 125.6 L158.3 124.6 L159.9 123.5 L161.6 122.4 L163.2 121.3 L164.8 120.1 L166.5 119 L168.1 117.8 L169.7 116.6 L171.4 115.3 L173 114.1 L174.6 112.8 L176.3 111.6 L177.9 110.3 L179.5 109 L181.2 107.7 L182.8 106.4 L184.5 105.2 L186.1 103.9 L187.7 102.6 L189.4 101.3 L191 100.1 L192.6 98.8 L194.3 97.6 L195.9 96.4 L197.5 95.2 L199.2 94.1 L200.8 92.9 L202.4 91.8 L204.1 90.7 L205.7 89.6 L207.3 88.6 L209 87.6 L210.6 86.6 L212.3 85.7 L213.9 84.7 L215.5 83.9 L217.2 83 L218.8 82.2 L220.4 81.4 L222.1 80.6 L223.7 79.9 L225.3 79.2 L227 78.5 L228.6 77.9 L230.2 77.2 L231.9 76.7 L233.5 76.1 L235.1 75.6 L236.8 75.1 L238.4 74.6 L240.1 74.1 L241.7 73.7 L243.3 73.3 L245 72.9 L246.6 72.5 L248.2 72.1 L249.9 71.8 L251.5 71.5 L253.1 71.2 L254.8 70.9 L256.4 70.6 L258 70.4 L259.7 70.1 L261.3 69.9 L262.9 69.7 L264.6 69.5 L266.2 69.3 L267.8 69.1 L269.5 68.9 L271.1 68.8 L272.8 68.6 L274.4 68.5 L276 68.3 L277.7 68.2 L279.3 68.1 L280.9 68 L282.6 67.9 L284.2 67.8 L285.8 67.7 L287.5 67.6 L289.1 67.5 L290.7 67.4 L292.4 67.3 L294 67.3 L295.6 67.2 L297.3 67.1 L298.9 67.1 L300.6 67 L302.2 67 L303.8 66.9 L305.5 66.9 L307.1 66.8 L308.7 66.8 L310.4 66.8 L312 66.7" style="stroke:var(--hid);stroke-width:2.2;fill:none;stroke-linejoin:round"/><path d="M52 229.8 L53.6 229.8 L55.3 229.8 L56.9 229.8 L58.5 229.8 L60.2 229.8 L61.8 229.8 L63.4 229.8 L65.1 229.8 L66.7 229.8 L68.4 229.8 L70 229.8 L71.6 229.8 L73.3 229.8 L74.9 229.8 L76.5 229.8 L78.2 229.8 L79.8 229.8 L81.4 229.7 L83.1 229.7 L84.7 229.7 L86.3 229.7 L88 229.7 L89.6 229.7 L91.2 229.7 L92.9 229.6 L94.5 229.6 L96.2 229.6 L97.8 229.6 L99.4 229.5 L101.1 229.5 L102.7 229.5 L104.3 229.4 L106 229.3 L107.6 229.3 L109.2 229.2 L110.9 229.1 L112.5 229 L114.1 228.9 L115.8 228.8 L117.4 228.7 L119 228.5 L120.7 228.4 L122.3 228.2 L123.9 228 L125.6 227.7 L127.2 227.4 L128.9 227.1 L130.5 226.8 L132.1 226.4 L133.8 225.9 L135.4 225.4 L137 224.8 L138.7 224.2 L140.3 223.5 L141.9 222.6 L143.6 221.7 L145.2 220.7 L146.8 219.6 L148.5 218.3 L150.1 216.9 L151.7 215.3 L153.4 213.5 L155 211.6 L156.7 209.4 L158.3 207.1 L159.9 204.5 L161.6 201.7 L163.2 198.6 L164.8 195.3 L166.5 191.8 L168.1 188 L169.7 184 L171.4 179.7 L173 175.2 L174.6 170.6 L176.3 165.7 L177.9 160.8 L179.5 155.7 L181.2 150.6 L182.8 145.4 L184.5 140.3 L186.1 135.2 L187.7 130.3 L189.4 125.4 L191 120.8 L192.6 116.3 L194.3 112 L195.9 108 L197.5 104.2 L199.2 100.7 L200.8 97.4 L202.4 94.3 L204.1 91.5 L205.7 88.9 L207.3 86.6 L209 84.4 L210.6 82.5 L212.3 80.7 L213.9 79.1 L215.5 77.7 L217.2 76.4 L218.8 75.3 L220.4 74.3 L222.1 73.4 L223.7 72.5 L225.3 71.8 L227 71.2 L228.6 70.6 L230.2 70.1 L231.9 69.6 L233.5 69.2 L235.1 68.9 L236.8 68.6 L238.4 68.3 L240.1 68 L241.7 67.8 L243.3 67.6 L245 67.5 L246.6 67.3 L248.2 67.2 L249.9 67.1 L251.5 67 L253.1 66.9 L254.8 66.8 L256.4 66.7 L258 66.7 L259.7 66.6 L261.3 66.5 L262.9 66.5 L264.6 66.5 L266.2 66.4 L267.8 66.4 L269.5 66.4 L271.1 66.4 L272.8 66.3 L274.4 66.3 L276 66.3 L277.7 66.3 L279.3 66.3 L280.9 66.3 L282.6 66.3 L284.2 66.2 L285.8 66.2 L287.5 66.2 L289.1 66.2 L290.7 66.2 L292.4 66.2 L294 66.2 L295.6 66.2 L297.3 66.2 L298.9 66.2 L300.6 66.2 L302.2 66.2 L303.8 66.2 L305.5 66.2 L307.1 66.2 L308.7 66.2 L310.4 66.2 L312 66.2" style="stroke:var(--grad);stroke-width:2.2;fill:none;stroke-linejoin:round"/><path d="M392 229.1 L393.6 229.1 L395.3 229 L396.9 228.9 L398.5 228.8 L400.2 228.8 L401.8 228.7 L403.4 228.6 L405.1 228.5 L406.7 228.4 L408.4 228.2 L410 228.1 L411.6 228 L413.3 227.9 L414.9 227.7 L416.5 227.6 L418.2 227.4 L419.8 227.2 L421.4 227 L423.1 226.8 L424.7 226.6 L426.3 226.4 L428 226.2 L429.6 225.9 L431.2 225.7 L432.9 225.4 L434.5 225.1 L436.2 224.8 L437.8 224.5 L439.4 224.2 L441.1 223.8 L442.7 223.4 L444.3 223 L446 222.6 L447.6 222.2 L449.2 221.7 L450.9 221.2 L452.5 220.7 L454.1 220.2 L455.8 219.6 L457.4 219.1 L459 218.4 L460.7 217.8 L462.3 217.2 L463.9 216.5 L465.6 215.8 L467.2 215 L468.9 214.3 L470.5 213.5 L472.1 212.7 L473.8 211.9 L475.4 211 L477 210.1 L478.7 209.3 L480.3 208.4 L481.9 207.4 L483.6 206.5 L485.2 205.6 L486.8 204.6 L488.5 203.7 L490.1 202.7 L491.7 201.8 L493.4 200.9 L495 199.9 L496.7 199 L498.3 198.2 L499.9 197.3 L501.6 196.5 L503.2 195.7 L504.8 195 L506.5 194.3 L508.1 193.7 L509.7 193.1 L511.4 192.6 L513 192.2 L514.6 191.8 L516.3 191.5 L517.9 191.3 L519.5 191.1 L521.2 191.1 L522.8 191.1 L524.5 191.1 L526.1 191.3 L527.7 191.5 L529.4 191.8 L531 192.2 L532.6 192.6 L534.3 193.1 L535.9 193.7 L537.5 194.3 L539.2 195 L540.8 195.7 L542.4 196.5 L544.1 197.3 L545.7 198.2 L547.3 199 L549 199.9 L550.6 200.9 L552.3 201.8 L553.9 202.7 L555.5 203.7 L557.2 204.6 L558.8 205.6 L560.4 206.5 L562.1 207.4 L563.7 208.4 L565.3 209.3 L567 210.1 L568.6 211 L570.2 211.9 L571.9 212.7 L573.5 213.5 L575.1 214.3 L576.8 215 L578.4 215.8 L580.1 216.5 L581.7 217.2 L583.3 217.8 L585 218.4 L586.6 219.1 L588.2 219.6 L589.9 220.2 L591.5 220.7 L593.1 221.2 L594.8 221.7 L596.4 222.2 L598 222.6 L599.7 223 L601.3 223.4 L602.9 223.8 L604.6 224.2 L606.2 224.5 L607.8 224.8 L609.5 225.1 L611.1 225.4 L612.8 225.7 L614.4 225.9 L616 226.2 L617.7 226.4 L619.3 226.6 L620.9 226.8 L622.6 227 L624.2 227.2 L625.8 227.4 L627.5 227.6 L629.1 227.7 L630.7 227.9 L632.4 228 L634 228.1 L635.6 228.2 L637.3 228.4 L638.9 228.5 L640.6 228.6 L642.2 228.7 L643.8 228.8 L645.5 228.8 L647.1 228.9 L648.7 229 L650.4 229.1 L652 229.1" style="stroke:var(--hid);stroke-width:2.2;fill:none;stroke-linejoin:round"/><path d="M392 230.1 L393.6 230.1 L395.3 230.1 L396.9 230.1 L398.5 230.1 L400.2 230.1 L401.8 230.1 L403.4 230.1 L405.1 230.1 L406.7 230.1 L408.4 230.1 L410 230.1 L411.6 230 L413.3 230 L414.9 230 L416.5 230 L418.2 230 L419.8 229.9 L421.4 229.9 L423.1 229.9 L424.7 229.8 L426.3 229.8 L428 229.7 L429.6 229.7 L431.2 229.6 L432.9 229.5 L434.5 229.4 L436.2 229.3 L437.8 229.2 L439.4 229.1 L441.1 228.9 L442.7 228.8 L444.3 228.6 L446 228.4 L447.6 228.1 L449.2 227.9 L450.9 227.6 L452.5 227.2 L454.1 226.8 L455.8 226.4 L457.4 225.9 L459 225.3 L460.7 224.7 L462.3 224 L463.9 223.1 L465.6 222.2 L467.2 221.2 L468.9 220 L470.5 218.7 L472.1 217.2 L473.8 215.6 L475.4 213.7 L477 211.7 L478.7 209.4 L480.3 206.8 L481.9 203.9 L483.6 200.7 L485.2 197.2 L486.8 193.4 L488.5 189.1 L490.1 184.5 L491.7 179.5 L493.4 174 L495 168.1 L496.7 161.9 L498.3 155.3 L499.9 148.3 L501.6 141.1 L503.2 133.6 L504.8 126.1 L506.5 118.5 L508.1 111.1 L509.7 103.9 L511.4 97.1 L513 91 L514.6 85.5 L516.3 81 L517.9 77.5 L519.5 75 L521.2 73.8 L522.8 73.8 L524.5 75 L526.1 77.5 L527.7 81 L529.4 85.5 L531 91 L532.6 97.1 L534.3 103.9 L535.9 111.1 L537.5 118.5 L539.2 126.1 L540.8 133.6 L542.4 141.1 L544.1 148.3 L545.7 155.3 L547.3 161.9 L549 168.1 L550.6 174 L552.3 179.5 L553.9 184.5 L555.5 189.1 L557.2 193.4 L558.8 197.2 L560.4 200.7 L562.1 203.9 L563.7 206.8 L565.3 209.4 L567 211.7 L568.6 213.7 L570.2 215.6 L571.9 217.2 L573.5 218.7 L575.1 220 L576.8 221.2 L578.4 222.2 L580.1 223.1 L581.7 224 L583.3 224.7 L585 225.3 L586.6 225.9 L588.2 226.4 L589.9 226.8 L591.5 227.2 L593.1 227.6 L594.8 227.9 L596.4 228.1 L598 228.4 L599.7 228.6 L601.3 228.8 L602.9 228.9 L604.6 229.1 L606.2 229.2 L607.8 229.3 L609.5 229.4 L611.1 229.5 L612.8 229.6 L614.4 229.7 L616 229.7 L617.7 229.8 L619.3 229.8 L620.9 229.9 L622.6 229.9 L624.2 229.9 L625.8 230 L627.5 230 L629.1 230 L630.7 230 L632.4 230 L634 230.1 L635.6 230.1 L637.3 230.1 L638.9 230.1 L640.6 230.1 L642.2 230.1 L643.8 230.1 L645.5 230.1 L647.1 230.1 L648.7 230.1 L650.4 230.1 L652 230.1" style="stroke:var(--grad);stroke-width:2.2;fill:none;stroke-linejoin:round"/><text class="lbl" x="571.4" y="183.2">max 1/4</text><text class="lbl" x="531.1" y="77.7">max 1</text><text class="lbl" x="397.2" y="133.1">saturated:</text><text class="lbl" x="397.2" y="146.1">slope ≈ 0</text></svg>
+      </div>
+      <figcaption>Both curves flatten in the tails, where their slopes are close to 0: saturation. The sigmoid's slope never exceeds 1/4; tanh's reaches 1 at the origin but falls off faster.</figcaption>
+    </figure>
+
+    <h3>Saturation</h3>
+    <p>Far from 0 both curves go flat. For large \(\lvert z \rvert\), their slopes decay exponentially:</p>
+    <div class="mj">\[ \begin{aligned} \sigma'(z) &amp;\approx e^{-\lvert z \rvert} \\ \tanh'(z) &amp;\approx 4\, e^{-2\lvert z \rvert} \end{aligned} \]</div>
+    <p>A unit whose pre-activation sits out there is <strong>saturated</strong>: its output barely moves when its weights move, so it gets almost no gradient, even in a shallow network. tanh saturates sooner (the 2 in the exponent). Typical causes are unscaled inputs, weights initialized too large, and weights that grew during training.</p>
+
+    <h3>Vanishing gradients through depth</h3>
+    <p>Backprop passes the error \(\delta_l = \partial L / \partial z_l\) down one layer at a time: through the weights, then through the activation's slope. Unrolled from the top layer \(L\) down to layer 1 (the product is ordered, \(l = 1\) on the left):</p>
+    <div class="mj">\[ \begin{aligned} \delta_l &amp;= \operatorname{diag}\big(f'(z_l)\big)\, W_{l+1}^\top\, \delta_{l+1} \\ \delta_1 &amp;= \Big[\prod_{l=1}^{L-1} \operatorname{diag}\big(f'(z_l)\big)\, W_{l+1}^\top\Big]\, \delta_L \end{aligned} \]</div>
+    <p>Taking norms, each layer contributes its largest slope times its weight matrix's norm:</p>
+    <div class="mj">\[ \lVert \delta_1 \rVert \le \lVert \delta_L \rVert\, \prod_{l=1}^{L-1} \Big(\max_i \big\lvert f'(z_{l,i}) \big\rvert\Big)\, \lVert W_{l+1} \rVert \]</div>
+    <ul>
+      <li><strong>For sigmoids</strong> every slope factor is at most 1/4, so the bound shrinks like \(4^{-(L-1)}\) unless the weight matrices' norms average (as a geometric mean) more than 4.</li>
+      <li><strong>Bigger weights don't rescue it.</strong> They spread the pre-activations into the tails, where the slope is far below 1/4.</li>
+      <li><strong>The result:</strong> the error reaching the early layers shrinks exponentially with depth. That's the <strong>vanishing gradient</strong>. The early layers barely move, and the network trains like a shallow model sitting on random features.</li>
+      <li><strong>A second sigmoid problem:</strong> its outputs average about 0.5, not 0. Glorot and Bengio (2010) saw the top hidden layer of deep sigmoid nets drive itself into saturation near 0 early in training, and recover only slowly.</li>
+    </ul>
+    <p>tanh helps (peak slope 1) but still saturates. The mirror image, factors above 1 at every layer, is the exploding gradient. That's more a weights problem than an activation problem, handled by initialization (section <a href="#dynamics">08</a>), normalization and clipping.</p>
+
+    <h3>Zero-centring and the zig-zag</h3>
+    <p>The gradient for a weight into unit \(i\) is that unit's error times the input the weight saw:</p>
+    <div class="mj">\[ \frac{\partial L}{\partial W_{l,ij}} = \delta_{l,i}\; a_{l-1,j} \]</div>
+    <p>If every input \(a_{l-1,j}\) is positive, as sigmoid outputs always are, every entry of row \(i\) has the sign of \(\delta_{l,i}\). On one example, all the weights into a unit must go up together or down together. If the best move is “this weight up, that one down”, the updates can only get there by zig-zagging.</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 700 262" role="img" aria-label="Left: with all-positive inputs, one example's gradient moves a unit's two weights only into the both-up or both-down quadrant. Right: reaching a target that needs one weight up and one down takes a zig-zag of such steps, while zero-centred inputs allow the direct diagonal step."><text x="175" y="22" text-anchor="middle" style="fill:var(--ink);font-weight:600">One example's update to two weights</text><rect x="175" y="58" width="115" height="82" style="fill:var(--hid-wash)"/><rect x="60" y="140" width="115" height="80" style="fill:var(--hid-wash)"/><path d="M50 140 H300" class="in" marker-end="url(#a-in)"/><path d="M175 228 V50" class="in" marker-end="url(#a-in)"/><text class="lbl" x="304" y="144">Δw₁</text><text class="lbl" x="183" y="56">Δw₂</text><text class="lbl" x="233" y="104" text-anchor="middle">both up</text><text class="lbl" x="117" y="184" text-anchor="middle">both down</text><text class="lbl" x="175" y="252" text-anchor="middle">all inputs positive: shaded quadrants only</text><path d="M350 34 V246" style="stroke:var(--rule);stroke-width:1;fill:none"/><text x="530" y="22" text-anchor="middle" style="fill:var(--ink);font-weight:600">Reaching a mixed-sign target</text><path d="M400 60 L633 205.6" style="stroke:var(--cell);stroke-width:2;fill:none;stroke-dasharray:6 5" marker-end="url(#a-cell)"/><path d="M400 60 L505 35" style="stroke:var(--grad);stroke-width:2;fill:none" marker-end="url(#a-grad)"/><path d="M505 35 L480 110" style="stroke:var(--grad);stroke-width:2;fill:none" marker-end="url(#a-grad)"/><path d="M480 110 L585 85" style="stroke:var(--grad);stroke-width:2;fill:none" marker-end="url(#a-grad)"/><path d="M585 85 L560 160" style="stroke:var(--grad);stroke-width:2;fill:none" marker-end="url(#a-grad)"/><path d="M560 160 L665 135" style="stroke:var(--grad);stroke-width:2;fill:none" marker-end="url(#a-grad)"/><path d="M665 135 L640 210" style="stroke:var(--grad);stroke-width:2;fill:none" marker-end="url(#a-grad)"/><circle class="dot" cx="400" cy="60" r="4"/><circle cx="640" cy="210" r="6" style="fill:none;stroke:var(--cell);stroke-width:2"/><text class="lbl" x="392" y="64" text-anchor="end">start</text><text class="lbl" x="628" y="214" text-anchor="end">best weights</text><text class="lbl" x="530" y="238" text-anchor="middle" style="fill:var(--grad)">orange: sigmoid inputs, zig-zag</text><text class="lbl" x="530" y="252" text-anchor="middle" style="fill:var(--cell)">green: zero-centred inputs, direct</text></svg>
+      </div>
+      <figcaption>With all-positive inputs, each example's update to a unit's weights lies in the “both up” or “both down” quadrant. A target that needs mixed signs is reached by zig-zagging. Zero-centred inputs, like tanh outputs, allow the direct step.</figcaption>
+    </figure>
+    <ul>
+      <li><strong>Mini-batches soften it.</strong> Averaging examples whose errors have different signs lets a batch update point anywhere. That's why it's a secondary effect next to saturation.</li>
+      <li><strong>The same issue, seen through curvature.</strong> For a linear unit with squared loss, the Hessian is the inputs' second-moment matrix. With input mean \(\mu\):</li>
+    </ul>
+    <div class="mj">\[ \mathbb E\big[a\, a^\top\big] = \operatorname{Cov}(a) + \mu\, \mu^\top \]</div>
+    <p>The \(\mu\mu^\top\) term adds one large eigenvalue along \(\mu\), which stretches the loss bowl and forces a small learning rate (LeCun et al. 1998). Centring removes it. It's the same reason input features are standardized, one layer deeper.</p>
+
+    <h3>Where they're still used</h3>
+    <ul>
+      <li><strong>Gates (sigmoid):</strong> LSTM and GRU gates, squeeze-and-excitation, GLU. A gate means “what fraction to let through”, which needs \((0, 1)\). Saturation is even useful here: a gate can be fully open or fully shut.</li>
+      <li><strong>Bounded, signed states (tanh):</strong> the LSTM candidate and cell output, the vanilla RNN state. A recurrence applies the same weights at every step, and tanh's bound stops the state blowing up. The LSTM escapes vanishing gradients through its additive cell path, not through its activations.</li>
+      <li><strong>Output layers:</strong> sigmoid for a probability (binary, or each label of a multi-label problem); tanh for targets in \([-1, 1]\), such as a GAN generator's pixels.</li>
+      <li><strong>Inside other functions:</strong> SiLU is \(z\sigma(z)\), GELU's fast approximation uses tanh, and Gemma 2 caps attention and output logits smoothly with \(c \tanh(s / c)\).</li>
+      <li><strong>Not</strong> as the hidden activation of a deep feed-forward stack. With 2–3 layers either trains fine; the problem compounds with depth.</li>
+    </ul>
+
+    <!-- relu -->
+    <h2 id="relu"><span class="pn">03</span>ReLU</h2>
+    <div class="mj">\[ \begin{aligned} \text{ReLU}(z) &amp;= \max(0, z) \\ \text{ReLU}'(z) &amp;= \begin{cases} 1 &amp; z &gt; 0 \\ 0 &amp; z &lt; 0 \end{cases} \end{aligned} \]</div>
+
+    <h3>Why it trains fast</h3>
+    <ul>
+      <li><strong>Slope exactly 1 when on.</strong> In the backward product above, \(\operatorname{diag}(f')\) becomes a 0/1 mask. Along active paths the activation multiplies the error by exactly 1, so it never shrinks it; only the weights scale the signal, and initialization controls those. AlexNet (2012) reported that a ReLU network reached 25% training error on CIFAR-10 about six times faster than the same network with tanh.</li>
+      <li><strong>No saturation for \(z &gt; 0\).</strong> A large positive input still has slope 1.</li>
+      <li><strong>Sparsity.</strong> With pre-activations symmetric around 0, about half the units output exactly 0 for any input. Each input effectively trains its own sub-network, and sparse codes are cheap.</li>
+      <li><strong>Cheap.</strong> One comparison forward; a stored mask backward. No exponentials.</li>
+    </ul>
+    <p>One more property: ReLU is <strong>positively homogeneous</strong>, \(\text{ReLU}(cz) = c\,\text{ReLU}(z)\) for \(c &gt; 0\). Scaling one layer's weights by \(c\) and the next layer's by \(1/c\) leaves the function unchanged. Weight decay breaks this symmetry (it prefers the balanced scaling), and a normalization layer after the weights makes their scale irrelevant altogether.</p>
+
+    <h3>The derivative at 0</h3>
+    <p>ReLU has a corner at 0, so it has no derivative there. Any value in \([0, 1]\) is a valid <strong>subgradient</strong>: the slope of a line that touches the function at the corner and stays below it. PyTorch, TensorFlow and JAX all use 0. In float32 it rarely matters, because a pre-activation is seldom exactly 0. Exact zeros are commoner than they look, though (zero padding, sparse inputs, dead units upstream, rounding), and in 16-bit training the choice can measurably change results (Bertoin et al. 2021). Above all, pick one value and use it consistently.</p>
+
+    <h3>Dead ReLUs</h3>
+    <p>A unit is <strong>dead</strong> when its pre-activation is negative for every input in the data. Then its slope is 0 on every example, so every gradient reaching its weights is exactly 0. With \(g_i(x)\) the gradient arriving at unit \(i\)'s output and \(a(x)\) its input vector:</p>
+    <div class="mj">\[ \begin{aligned} \frac{\partial L}{\partial w_i} &amp;= \sum_{x} g_i(x)\; \mathbf 1\big[z_i(x) &gt; 0\big]\; a(x) \\ &amp;= 0 \qquad \text{if } z_i(x) \le 0 \text{ for every } x \end{aligned} \]</div>
+    <p>Nothing moves the weights, so it stays dead. It revives only if the layers below change its inputs enough to push some \(z_i\) back above 0.</p>
+    <p><strong>Why it happens:</strong></p>
+    <ul>
+      <li><strong>One large update.</strong> A learning rate that's too high, or an outlier batch, pushes the bias far negative or swings the weights away from all the data.</li>
+      <li><strong>Non-negative inputs make it sticky.</strong> A hidden ReLU's inputs are other ReLUs' outputs, all \(\ge 0\). A unit whose incoming weights are all negative, with a negative bias, is off for every possible input, not just the training data.</li>
+      <li><strong>Bad initialization:</strong> large negative biases, or weights so large that one step overshoots.</li>
+    </ul>
+    <p><strong>How to detect it:</strong> over many batches, record for each unit (each channel, in a CNN) whether it was ever active. Being 0 on one example is normal; being 0 on every example of a large sample is dead. Track the dead fraction per layer over training. A jump right after a learning-rate spike is the signature. The monitor is in section <a href="#code">10</a>.</p>
+    <p><strong>How to fix it:</strong> a lower learning rate or warmup; He initialization; normalization before the activation, which re-centres each unit's pre-activations every batch so it fires on about half the batch; gradient clipping; or an activation with a non-zero negative side (Leaky ReLU, ELU, GELU, SiLU). Some practitioners reinitialize dead units in place.</p>
+
+    <h3>Not zero-centred, and unbounded</h3>
+    <p>ReLU outputs are never negative. For a Gaussian pre-activation with mean 0 and standard deviation \(s\):</p>
+    <div class="mj">\[ \begin{aligned} \mathbb E\big[\text{ReLU}(z)\big] &amp;= \frac{s}{\sqrt{2\pi}} \\ \mathbb E\big[\text{ReLU}(z)^2\big] &amp;= \frac{s^2}{2} \end{aligned} \]</div>
+    <ul>
+      <li><strong>The positive mean</strong> (about \(0.4\,s\)) gives the next layer a milder version of the sigmoid's zig-zag. The next layer's bias and normalization layers absorb it.</li>
+      <li><strong>The second moment</strong> is what sets He initialization, below.</li>
+      <li><strong>Unbounded above.</strong> That's why it doesn't saturate, but activations can grow without limit: in a recurrence they can explode, and in low-precision arithmetic their range isn't known in advance (hence ReLU6, section <a href="#variants">04</a>).</li>
+    </ul>
+
+    <h3>He initialization: why ReLU needs the factor 2</h3>
+    <p>To keep a signal's size steady through depth, each layer must preserve the variance of its pre-activations. Take a unit with \(n_{\text{in}}\) inputs, coming from a previous layer whose pre-activations \(z_{\text{prev}}\) are symmetric around 0. Section <a href="#dynamics">08</a> derives the first line below; the second uses the fact that ReLU zeroes the negative half:</p>
+    <div class="mj">\[ \begin{aligned} \operatorname{Var}(z) &amp;= n_{\text{in}}\, \operatorname{Var}(w)\, \mathbb E[a^2] \\ &amp;= n_{\text{in}}\, \operatorname{Var}(w) \cdot \tfrac12 \operatorname{Var}(z_{\text{prev}}) \end{aligned} \]</div>
+    <p>Setting \(\operatorname{Var}(z)\) equal to \(\operatorname{Var}(z_{\text{prev}})\):</p>
+    <div class="mj">\[ \operatorname{Var}(w) = \frac{2}{n_{\text{in}}} \]</div>
+    <p>A nearly linear activation keeps the whole variance, which gives \(1/n_{\text{in}}\). ReLU keeps half, so the weights must make up the lost half. Without the 2, the variance halves at every layer and the signal vanishes in a deep network. With Leaky ReLU or PReLU of slope \(\alpha\), the 2 becomes \(2/(1 + \alpha^2)\).</p>
+
+    <!-- variants -->
+    <h2 id="variants"><span class="pn">04</span>ReLU variants</h2>
+    <p>Each variant keeps ReLU's slope of 1 for positive inputs and changes the negative side, to stop units dying, to centre the outputs, or to bound them.</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 700 270" role="img" aria-label="Left: ReLU is zero for negative z and the identity for positive z; Leaky ReLU has a small negative slope; ELU curves smoothly down to minus alpha. Right: slopes. ReLU jumps from 0 to 1 at zero, Leaky ReLU from 0.1 to 1, and ELU rises smoothly as e to the z up to 1."><path d="M120 16 H142" style="stroke:var(--hid);stroke-width:2.6;fill:none"/><text x="148" y="20" style="fill:var(--hid)">ReLU</text><path d="M198.8 16 H220.8" style="stroke:var(--grad);stroke-width:2.6;fill:none;stroke-dasharray:6 4"/><text x="226.8" y="20" style="fill:var(--grad)">Leaky ReLU (α = 0.1)</text><path d="M408.8 16 H430.8" style="stroke:var(--cell);stroke-width:2.6;fill:none"/><text x="436.8" y="20" style="fill:var(--cell)">ELU (α = 1)</text><path d="M95.3 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M138.7 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M182 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M225.3 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M268.7 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M52 229.4 H312" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M52 143.7 H312" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M52 100.9 H312" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M52 58 H312" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M52 186.6 H312" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><path d="M182 58 V238" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><text class="lbl" x="95.3" y="253" text-anchor="middle">−2</text><text class="lbl" x="138.7" y="253" text-anchor="middle">−1</text><text class="lbl" x="182" y="253" text-anchor="middle">0</text><text class="lbl" x="225.3" y="253" text-anchor="middle">1</text><text class="lbl" x="268.7" y="253" text-anchor="middle">2</text><text class="lbl" x="46" y="233.4" text-anchor="end">−1</text><text class="lbl" x="46" y="147.7" text-anchor="end">1</text><text class="lbl" x="46" y="104.9" text-anchor="end">2</text><text class="lbl" x="46" y="62" text-anchor="end">3</text><text x="182" y="48" text-anchor="middle" style="fill:var(--ink);font-weight:600">the function</text><text class="lbl" x="316" y="190.6">z</text><path d="M435.3 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M478.7 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M522 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M565.3 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M608.7 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M392 154.9 H652" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M392 85.7 H652" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M392 224.2 H652" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><path d="M522 58 V238" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><text class="lbl" x="435.3" y="253" text-anchor="middle">−2</text><text class="lbl" x="478.7" y="253" text-anchor="middle">−1</text><text class="lbl" x="522" y="253" text-anchor="middle">0</text><text class="lbl" x="565.3" y="253" text-anchor="middle">1</text><text class="lbl" x="608.7" y="253" text-anchor="middle">2</text><text class="lbl" x="386" y="158.9" text-anchor="end">0.5</text><text class="lbl" x="386" y="89.7" text-anchor="end">1</text><text x="522" y="48" text-anchor="middle" style="fill:var(--ink);font-weight:600">its slope</text><text class="lbl" x="656" y="228.2">z</text><path d="M52 186.6 L53.6 186.6 L55.3 186.6 L56.9 186.6 L58.5 186.6 L60.2 186.6 L61.8 186.6 L63.4 186.6 L65.1 186.6 L66.7 186.6 L68.4 186.6 L70 186.6 L71.6 186.6 L73.3 186.6 L74.9 186.6 L76.5 186.6 L78.2 186.6 L79.8 186.6 L81.4 186.6 L83.1 186.6 L84.7 186.6 L86.3 186.6 L88 186.6 L89.6 186.6 L91.2 186.6 L92.9 186.6 L94.5 186.6 L96.2 186.6 L97.8 186.6 L99.4 186.6 L101.1 186.6 L102.7 186.6 L104.3 186.6 L106 186.6 L107.6 186.6 L109.2 186.6 L110.9 186.6 L112.5 186.6 L114.1 186.6 L115.8 186.6 L117.4 186.6 L119 186.6 L120.7 186.6 L122.3 186.6 L123.9 186.6 L125.6 186.6 L127.2 186.6 L128.9 186.6 L130.5 186.6 L132.1 186.6 L133.8 186.6 L135.4 186.6 L137 186.6 L138.7 186.6 L140.3 186.6 L141.9 186.6 L143.6 186.6 L145.2 186.6 L146.8 186.6 L148.5 186.6 L150.1 186.6 L151.7 186.6 L153.4 186.6 L155 186.6 L156.7 186.6 L158.3 186.6 L159.9 186.6 L161.6 186.6 L163.2 186.6 L164.8 186.6 L166.5 186.6 L168.1 186.6 L169.7 186.6 L171.4 186.6 L173 186.6 L174.6 186.6 L176.3 186.6 L177.9 186.6 L179.5 186.6 L181.2 186.6 L182.8 185.8 L184.5 184.1 L186.1 182.5 L187.7 180.9 L189.4 179.3 L191 177.7 L192.6 176.1 L194.3 174.4 L195.9 172.8 L197.5 171.2 L199.2 169.6 L200.8 168 L202.4 166.4 L204.1 164.7 L205.7 163.1 L207.3 161.5 L209 159.9 L210.6 158.3 L212.3 156.7 L213.9 155 L215.5 153.4 L217.2 151.8 L218.8 150.2 L220.4 148.6 L222.1 146.9 L223.7 145.3 L225.3 143.7 L227 142.1 L228.6 140.5 L230.2 138.9 L231.9 137.2 L233.5 135.6 L235.1 134 L236.8 132.4 L238.4 130.8 L240.1 129.2 L241.7 127.5 L243.3 125.9 L245 124.3 L246.6 122.7 L248.2 121.1 L249.9 119.5 L251.5 117.8 L253.1 116.2 L254.8 114.6 L256.4 113 L258 111.4 L259.7 109.8 L261.3 108.1 L262.9 106.5 L264.6 104.9 L266.2 103.3 L267.8 101.7 L269.5 100 L271.1 98.4 L272.8 96.8 L274.4 95.2 L276 93.6 L277.7 92 L279.3 90.3 L280.9 88.7 L282.6 87.1 L284.2 85.5 L285.8 83.9 L287.5 82.3 L289.1 80.6 L290.7 79 L292.4 77.4 L294 75.8 L295.6 74.2 L297.3 72.6 L298.9 70.9 L300.6 69.3 L302.2 67.7 L303.8 66.1 L305.5 64.5 L307.1 62.9 L308.7 61.2 L310.4 59.6 L312 58" style="stroke:var(--hid);stroke-width:3.2;fill:none;stroke-linejoin:round"/><path d="M52 227.3 L53.6 227.2 L55.3 227.1 L56.9 227 L58.5 226.9 L60.2 226.9 L61.8 226.8 L63.4 226.6 L65.1 226.5 L66.7 226.4 L68.4 226.3 L70 226.2 L71.6 226.1 L73.3 225.9 L74.9 225.8 L76.5 225.7 L78.2 225.5 L79.8 225.4 L81.4 225.2 L83.1 225.1 L84.7 224.9 L86.3 224.7 L88 224.5 L89.6 224.3 L91.2 224.2 L92.9 223.9 L94.5 223.7 L96.2 223.5 L97.8 223.3 L99.4 223.1 L101.1 222.8 L102.7 222.6 L104.3 222.3 L106 222 L107.6 221.7 L109.2 221.4 L110.9 221.1 L112.5 220.8 L114.1 220.5 L115.8 220.1 L117.4 219.8 L119 219.4 L120.7 219 L122.3 218.6 L123.9 218.2 L125.6 217.8 L127.2 217.3 L128.9 216.9 L130.5 216.4 L132.1 215.9 L133.8 215.3 L135.4 214.8 L137 214.2 L138.7 213.7 L140.3 213.1 L141.9 212.4 L143.6 211.8 L145.2 211.1 L146.8 210.4 L148.5 209.7 L150.1 208.9 L151.7 208.1 L153.4 207.3 L155 206.4 L156.7 205.6 L158.3 204.6 L159.9 203.7 L161.6 202.7 L163.2 201.7 L164.8 200.6 L166.5 199.5 L168.1 198.3 L169.7 197.1 L171.4 195.9 L173 194.6 L174.6 193.3 L176.3 191.9 L177.9 190.4 L179.5 188.9 L181.2 187.4 L182.8 185.8 L184.5 184.1 L186.1 182.5 L187.7 180.9 L189.4 179.3 L191 177.7 L192.6 176.1 L194.3 174.4 L195.9 172.8 L197.5 171.2 L199.2 169.6 L200.8 168 L202.4 166.4 L204.1 164.7 L205.7 163.1 L207.3 161.5 L209 159.9 L210.6 158.3 L212.3 156.7 L213.9 155 L215.5 153.4 L217.2 151.8 L218.8 150.2 L220.4 148.6 L222.1 146.9 L223.7 145.3 L225.3 143.7 L227 142.1 L228.6 140.5 L230.2 138.9 L231.9 137.2 L233.5 135.6 L235.1 134 L236.8 132.4 L238.4 130.8 L240.1 129.2 L241.7 127.5 L243.3 125.9 L245 124.3 L246.6 122.7 L248.2 121.1 L249.9 119.5 L251.5 117.8 L253.1 116.2 L254.8 114.6 L256.4 113 L258 111.4 L259.7 109.8 L261.3 108.1 L262.9 106.5 L264.6 104.9 L266.2 103.3 L267.8 101.7 L269.5 100 L271.1 98.4 L272.8 96.8 L274.4 95.2 L276 93.6 L277.7 92 L279.3 90.3 L280.9 88.7 L282.6 87.1 L284.2 85.5 L285.8 83.9 L287.5 82.3 L289.1 80.6 L290.7 79 L292.4 77.4 L294 75.8 L295.6 74.2 L297.3 72.6 L298.9 70.9 L300.6 69.3 L302.2 67.7 L303.8 66.1 L305.5 64.5 L307.1 62.9 L308.7 61.2 L310.4 59.6 L312 58" style="stroke:var(--cell);stroke-width:2.2;fill:none;stroke-linejoin:round"/><path d="M52 199.4 L53.6 199.3 L55.3 199.1 L56.9 198.9 L58.5 198.8 L60.2 198.6 L61.8 198.5 L63.4 198.3 L65.1 198.1 L66.7 198 L68.4 197.8 L70 197.6 L71.6 197.5 L73.3 197.3 L74.9 197.2 L76.5 197 L78.2 196.8 L79.8 196.7 L81.4 196.5 L83.1 196.4 L84.7 196.2 L86.3 196 L88 195.9 L89.6 195.7 L91.2 195.5 L92.9 195.4 L94.5 195.2 L96.2 195.1 L97.8 194.9 L99.4 194.7 L101.1 194.6 L102.7 194.4 L104.3 194.3 L106 194.1 L107.6 193.9 L109.2 193.8 L110.9 193.6 L112.5 193.4 L114.1 193.3 L115.8 193.1 L117.4 193 L119 192.8 L120.7 192.6 L122.3 192.5 L123.9 192.3 L125.6 192.2 L127.2 192 L128.9 191.8 L130.5 191.7 L132.1 191.5 L133.8 191.3 L135.4 191.2 L137 191 L138.7 190.9 L140.3 190.7 L141.9 190.5 L143.6 190.4 L145.2 190.2 L146.8 190 L148.5 189.9 L150.1 189.7 L151.7 189.6 L153.4 189.4 L155 189.2 L156.7 189.1 L158.3 188.9 L159.9 188.8 L161.6 188.6 L163.2 188.4 L164.8 188.3 L166.5 188.1 L168.1 187.9 L169.7 187.8 L171.4 187.6 L173 187.5 L174.6 187.3 L176.3 187.1 L177.9 187 L179.5 186.8 L181.2 186.7 L182.8 185.8 L184.5 184.1 L186.1 182.5 L187.7 180.9 L189.4 179.3 L191 177.7 L192.6 176.1 L194.3 174.4 L195.9 172.8 L197.5 171.2 L199.2 169.6 L200.8 168 L202.4 166.4 L204.1 164.7 L205.7 163.1 L207.3 161.5 L209 159.9 L210.6 158.3 L212.3 156.7 L213.9 155 L215.5 153.4 L217.2 151.8 L218.8 150.2 L220.4 148.6 L222.1 146.9 L223.7 145.3 L225.3 143.7 L227 142.1 L228.6 140.5 L230.2 138.9 L231.9 137.2 L233.5 135.6 L235.1 134 L236.8 132.4 L238.4 130.8 L240.1 129.2 L241.7 127.5 L243.3 125.9 L245 124.3 L246.6 122.7 L248.2 121.1 L249.9 119.5 L251.5 117.8 L253.1 116.2 L254.8 114.6 L256.4 113 L258 111.4 L259.7 109.8 L261.3 108.1 L262.9 106.5 L264.6 104.9 L266.2 103.3 L267.8 101.7 L269.5 100 L271.1 98.4 L272.8 96.8 L274.4 95.2 L276 93.6 L277.7 92 L279.3 90.3 L280.9 88.7 L282.6 87.1 L284.2 85.5 L285.8 83.9 L287.5 82.3 L289.1 80.6 L290.7 79 L292.4 77.4 L294 75.8 L295.6 74.2 L297.3 72.6 L298.9 70.9 L300.6 69.3 L302.2 67.7 L303.8 66.1 L305.5 64.5 L307.1 62.9 L308.7 61.2 L310.4 59.6 L312 58" style="stroke:var(--grad);stroke-width:2.2;fill:none;stroke-linejoin:round;stroke-dasharray:6 4"/><path d="M392 224.2 L392.8 224.2 L393.6 224.2 L394.5 224.2 L395.3 224.2 L396.1 224.2 L396.9 224.2 L397.7 224.2 L398.5 224.2 L399.4 224.2 L400.2 224.2 L401 224.2 L401.8 224.2 L402.6 224.2 L403.4 224.2 L404.3 224.2 L405.1 224.2 L405.9 224.2 L406.7 224.2 L407.5 224.2 L408.3 224.2 L409.2 224.2 L410 224.2 L410.8 224.2 L411.6 224.2 L412.4 224.2 L413.3 224.2 L414.1 224.2 L414.9 224.2 L415.7 224.2 L416.5 224.2 L417.3 224.2 L418.2 224.2 L419 224.2 L419.8 224.2 L420.6 224.2 L421.4 224.2 L422.2 224.2 L423.1 224.2 L423.9 224.2 L424.7 224.2 L425.5 224.2 L426.3 224.2 L427.1 224.2 L428 224.2 L428.8 224.2 L429.6 224.2 L430.4 224.2 L431.2 224.2 L432 224.2 L432.9 224.2 L433.7 224.2 L434.5 224.2 L435.3 224.2 L436.1 224.2 L437 224.2 L437.8 224.2 L438.6 224.2 L439.4 224.2 L440.2 224.2 L441 224.2 L441.9 224.2 L442.7 224.2 L443.5 224.2 L444.3 224.2 L445.1 224.2 L445.9 224.2 L446.8 224.2 L447.6 224.2 L448.4 224.2 L449.2 224.2 L450 224.2 L450.8 224.2 L451.7 224.2 L452.5 224.2 L453.3 224.2 L454.1 224.2 L454.9 224.2 L455.8 224.2 L456.6 224.2 L457.4 224.2 L458.2 224.2 L459 224.2 L459.8 224.2 L460.7 224.2 L461.5 224.2 L462.3 224.2 L463.1 224.2 L463.9 224.2 L464.7 224.2 L465.6 224.2 L466.4 224.2 L467.2 224.2 L468 224.2 L468.8 224.2 L469.6 224.2 L470.5 224.2 L471.3 224.2 L472.1 224.2 L472.9 224.2 L473.7 224.2 L474.6 224.2 L475.4 224.2 L476.2 224.2 L477 224.2 L477.8 224.2 L478.6 224.2 L479.5 224.2 L480.3 224.2 L481.1 224.2 L481.9 224.2 L482.7 224.2 L483.5 224.2 L484.4 224.2 L485.2 224.2 L486 224.2 L486.8 224.2 L487.6 224.2 L488.4 224.2 L489.3 224.2 L490.1 224.2 L490.9 224.2 L491.7 224.2 L492.5 224.2 L493.3 224.2 L494.2 224.2 L495 224.2 L495.8 224.2 L496.6 224.2 L497.4 224.2 L498.3 224.2 L499.1 224.2 L499.9 224.2 L500.7 224.2 L501.5 224.2 L502.3 224.2 L503.2 224.2 L504 224.2 L504.8 224.2 L505.6 224.2 L506.4 224.2 L507.2 224.2 L508.1 224.2 L508.9 224.2 L509.7 224.2 L510.5 224.2 L511.3 224.2 L512.1 224.2 L513 224.2 L513.8 224.2 L514.6 224.2 L515.4 224.2 L516.2 224.2 L517.1 224.2 L517.9 224.2 L518.7 224.2 L519.5 224.2 L520.3 224.2 L521.1 224.2 L522 224.2 M522 85.7 L522.9 85.7 L523.7 85.7 L524.5 85.7 L525.3 85.7 L526.1 85.7 L526.9 85.7 L527.8 85.7 L528.6 85.7 L529.4 85.7 L530.2 85.7 L531 85.7 L531.9 85.7 L532.7 85.7 L533.5 85.7 L534.3 85.7 L535.1 85.7 L535.9 85.7 L536.8 85.7 L537.6 85.7 L538.4 85.7 L539.2 85.7 L540 85.7 L540.8 85.7 L541.7 85.7 L542.5 85.7 L543.3 85.7 L544.1 85.7 L544.9 85.7 L545.7 85.7 L546.6 85.7 L547.4 85.7 L548.2 85.7 L549 85.7 L549.8 85.7 L550.7 85.7 L551.5 85.7 L552.3 85.7 L553.1 85.7 L553.9 85.7 L554.7 85.7 L555.6 85.7 L556.4 85.7 L557.2 85.7 L558 85.7 L558.8 85.7 L559.6 85.7 L560.5 85.7 L561.3 85.7 L562.1 85.7 L562.9 85.7 L563.7 85.7 L564.5 85.7 L565.4 85.7 L566.2 85.7 L567 85.7 L567.8 85.7 L568.6 85.7 L569.4 85.7 L570.3 85.7 L571.1 85.7 L571.9 85.7 L572.7 85.7 L573.5 85.7 L574.4 85.7 L575.2 85.7 L576 85.7 L576.8 85.7 L577.6 85.7 L578.4 85.7 L579.3 85.7 L580.1 85.7 L580.9 85.7 L581.7 85.7 L582.5 85.7 L583.3 85.7 L584.2 85.7 L585 85.7 L585.8 85.7 L586.6 85.7 L587.4 85.7 L588.2 85.7 L589.1 85.7 L589.9 85.7 L590.7 85.7 L591.5 85.7 L592.3 85.7 L593.2 85.7 L594 85.7 L594.8 85.7 L595.6 85.7 L596.4 85.7 L597.2 85.7 L598.1 85.7 L598.9 85.7 L599.7 85.7 L600.5 85.7 L601.3 85.7 L602.1 85.7 L603 85.7 L603.8 85.7 L604.6 85.7 L605.4 85.7 L606.2 85.7 L607 85.7 L607.9 85.7 L608.7 85.7 L609.5 85.7 L610.3 85.7 L611.1 85.7 L612 85.7 L612.8 85.7 L613.6 85.7 L614.4 85.7 L615.2 85.7 L616 85.7 L616.9 85.7 L617.7 85.7 L618.5 85.7 L619.3 85.7 L620.1 85.7 L620.9 85.7 L621.8 85.7 L622.6 85.7 L623.4 85.7 L624.2 85.7 L625 85.7 L625.8 85.7 L626.7 85.7 L627.5 85.7 L628.3 85.7 L629.1 85.7 L629.9 85.7 L630.7 85.7 L631.6 85.7 L632.4 85.7 L633.2 85.7 L634 85.7 L634.8 85.7 L635.7 85.7 L636.5 85.7 L637.3 85.7 L638.1 85.7 L638.9 85.7 L639.7 85.7 L640.6 85.7 L641.4 85.7 L642.2 85.7 L643 85.7 L643.8 85.7 L644.6 85.7 L645.5 85.7 L646.3 85.7 L647.1 85.7 L647.9 85.7 L648.7 85.7 L649.5 85.7 L650.4 85.7 L651.2 85.7 L652 85.7" style="stroke:var(--hid);stroke-width:3.2;fill:none;stroke-linejoin:round"/><path d="M392 217.3 L393.6 217 L395.3 216.7 L396.9 216.4 L398.5 216.1 L400.2 215.8 L401.8 215.5 L403.4 215.2 L405.1 214.8 L406.7 214.5 L408.4 214.1 L410 213.7 L411.6 213.3 L413.3 212.9 L414.9 212.5 L416.5 212 L418.2 211.5 L419.8 211.1 L421.4 210.6 L423.1 210 L424.7 209.5 L426.3 208.9 L428 208.3 L429.6 207.7 L431.2 207.1 L432.9 206.4 L434.5 205.8 L436.2 205.1 L437.8 204.3 L439.4 203.6 L441.1 202.8 L442.7 201.9 L444.3 201.1 L446 200.2 L447.6 199.3 L449.2 198.3 L450.9 197.3 L452.5 196.3 L454.1 195.2 L455.8 194.1 L457.4 193 L459 191.8 L460.7 190.5 L462.3 189.2 L463.9 187.9 L465.6 186.5 L467.2 185 L468.9 183.5 L470.5 182 L472.1 180.4 L473.8 178.7 L475.4 176.9 L477 175.1 L478.7 173.2 L480.3 171.3 L481.9 169.2 L483.6 167.1 L485.2 164.9 L486.8 162.6 L488.5 160.3 L490.1 157.8 L491.7 155.3 L493.4 152.6 L495 149.9 L496.7 147 L498.3 144 L499.9 141 L501.6 137.8 L503.2 134.4 L504.8 131 L506.5 127.4 L508.1 123.7 L509.7 119.8 L511.4 115.8 L513 111.6 L514.6 107.3 L516.3 102.8 L517.9 98.2 L519.5 93.3 L521.2 88.3 L522.8 85.7 L524.5 85.7 L526.1 85.7 L527.7 85.7 L529.4 85.7 L531 85.7 L532.6 85.7 L534.3 85.7 L535.9 85.7 L537.5 85.7 L539.2 85.7 L540.8 85.7 L542.4 85.7 L544.1 85.7 L545.7 85.7 L547.3 85.7 L549 85.7 L550.6 85.7 L552.3 85.7 L553.9 85.7 L555.5 85.7 L557.2 85.7 L558.8 85.7 L560.4 85.7 L562.1 85.7 L563.7 85.7 L565.3 85.7 L567 85.7 L568.6 85.7 L570.2 85.7 L571.9 85.7 L573.5 85.7 L575.1 85.7 L576.8 85.7 L578.4 85.7 L580.1 85.7 L581.7 85.7 L583.3 85.7 L585 85.7 L586.6 85.7 L588.2 85.7 L589.9 85.7 L591.5 85.7 L593.1 85.7 L594.8 85.7 L596.4 85.7 L598 85.7 L599.7 85.7 L601.3 85.7 L602.9 85.7 L604.6 85.7 L606.2 85.7 L607.8 85.7 L609.5 85.7 L611.1 85.7 L612.8 85.7 L614.4 85.7 L616 85.7 L617.7 85.7 L619.3 85.7 L620.9 85.7 L622.6 85.7 L624.2 85.7 L625.8 85.7 L627.5 85.7 L629.1 85.7 L630.7 85.7 L632.4 85.7 L634 85.7 L635.6 85.7 L637.3 85.7 L638.9 85.7 L640.6 85.7 L642.2 85.7 L643.8 85.7 L645.5 85.7 L647.1 85.7 L648.7 85.7 L650.4 85.7 L652 85.7" style="stroke:var(--cell);stroke-width:2.2;fill:none;stroke-linejoin:round"/><path d="M392 210.3 L392.8 210.3 L393.6 210.3 L394.5 210.3 L395.3 210.3 L396.1 210.3 L396.9 210.3 L397.7 210.3 L398.5 210.3 L399.4 210.3 L400.2 210.3 L401 210.3 L401.8 210.3 L402.6 210.3 L403.4 210.3 L404.3 210.3 L405.1 210.3 L405.9 210.3 L406.7 210.3 L407.5 210.3 L408.3 210.3 L409.2 210.3 L410 210.3 L410.8 210.3 L411.6 210.3 L412.4 210.3 L413.3 210.3 L414.1 210.3 L414.9 210.3 L415.7 210.3 L416.5 210.3 L417.3 210.3 L418.2 210.3 L419 210.3 L419.8 210.3 L420.6 210.3 L421.4 210.3 L422.2 210.3 L423.1 210.3 L423.9 210.3 L424.7 210.3 L425.5 210.3 L426.3 210.3 L427.1 210.3 L428 210.3 L428.8 210.3 L429.6 210.3 L430.4 210.3 L431.2 210.3 L432 210.3 L432.9 210.3 L433.7 210.3 L434.5 210.3 L435.3 210.3 L436.1 210.3 L437 210.3 L437.8 210.3 L438.6 210.3 L439.4 210.3 L440.2 210.3 L441 210.3 L441.9 210.3 L442.7 210.3 L443.5 210.3 L444.3 210.3 L445.1 210.3 L445.9 210.3 L446.8 210.3 L447.6 210.3 L448.4 210.3 L449.2 210.3 L450 210.3 L450.8 210.3 L451.7 210.3 L452.5 210.3 L453.3 210.3 L454.1 210.3 L454.9 210.3 L455.8 210.3 L456.6 210.3 L457.4 210.3 L458.2 210.3 L459 210.3 L459.8 210.3 L460.7 210.3 L461.5 210.3 L462.3 210.3 L463.1 210.3 L463.9 210.3 L464.7 210.3 L465.6 210.3 L466.4 210.3 L467.2 210.3 L468 210.3 L468.8 210.3 L469.6 210.3 L470.5 210.3 L471.3 210.3 L472.1 210.3 L472.9 210.3 L473.7 210.3 L474.6 210.3 L475.4 210.3 L476.2 210.3 L477 210.3 L477.8 210.3 L478.6 210.3 L479.5 210.3 L480.3 210.3 L481.1 210.3 L481.9 210.3 L482.7 210.3 L483.5 210.3 L484.4 210.3 L485.2 210.3 L486 210.3 L486.8 210.3 L487.6 210.3 L488.4 210.3 L489.3 210.3 L490.1 210.3 L490.9 210.3 L491.7 210.3 L492.5 210.3 L493.3 210.3 L494.2 210.3 L495 210.3 L495.8 210.3 L496.6 210.3 L497.4 210.3 L498.3 210.3 L499.1 210.3 L499.9 210.3 L500.7 210.3 L501.5 210.3 L502.3 210.3 L503.2 210.3 L504 210.3 L504.8 210.3 L505.6 210.3 L506.4 210.3 L507.2 210.3 L508.1 210.3 L508.9 210.3 L509.7 210.3 L510.5 210.3 L511.3 210.3 L512.1 210.3 L513 210.3 L513.8 210.3 L514.6 210.3 L515.4 210.3 L516.2 210.3 L517.1 210.3 L517.9 210.3 L518.7 210.3 L519.5 210.3 L520.3 210.3 L521.1 210.3 L522 210.3 M522 85.7 L522.9 85.7 L523.7 85.7 L524.5 85.7 L525.3 85.7 L526.1 85.7 L526.9 85.7 L527.8 85.7 L528.6 85.7 L529.4 85.7 L530.2 85.7 L531 85.7 L531.9 85.7 L532.7 85.7 L533.5 85.7 L534.3 85.7 L535.1 85.7 L535.9 85.7 L536.8 85.7 L537.6 85.7 L538.4 85.7 L539.2 85.7 L540 85.7 L540.8 85.7 L541.7 85.7 L542.5 85.7 L543.3 85.7 L544.1 85.7 L544.9 85.7 L545.7 85.7 L546.6 85.7 L547.4 85.7 L548.2 85.7 L549 85.7 L549.8 85.7 L550.7 85.7 L551.5 85.7 L552.3 85.7 L553.1 85.7 L553.9 85.7 L554.7 85.7 L555.6 85.7 L556.4 85.7 L557.2 85.7 L558 85.7 L558.8 85.7 L559.6 85.7 L560.5 85.7 L561.3 85.7 L562.1 85.7 L562.9 85.7 L563.7 85.7 L564.5 85.7 L565.4 85.7 L566.2 85.7 L567 85.7 L567.8 85.7 L568.6 85.7 L569.4 85.7 L570.3 85.7 L571.1 85.7 L571.9 85.7 L572.7 85.7 L573.5 85.7 L574.4 85.7 L575.2 85.7 L576 85.7 L576.8 85.7 L577.6 85.7 L578.4 85.7 L579.3 85.7 L580.1 85.7 L580.9 85.7 L581.7 85.7 L582.5 85.7 L583.3 85.7 L584.2 85.7 L585 85.7 L585.8 85.7 L586.6 85.7 L587.4 85.7 L588.2 85.7 L589.1 85.7 L589.9 85.7 L590.7 85.7 L591.5 85.7 L592.3 85.7 L593.2 85.7 L594 85.7 L594.8 85.7 L595.6 85.7 L596.4 85.7 L597.2 85.7 L598.1 85.7 L598.9 85.7 L599.7 85.7 L600.5 85.7 L601.3 85.7 L602.1 85.7 L603 85.7 L603.8 85.7 L604.6 85.7 L605.4 85.7 L606.2 85.7 L607 85.7 L607.9 85.7 L608.7 85.7 L609.5 85.7 L610.3 85.7 L611.1 85.7 L612 85.7 L612.8 85.7 L613.6 85.7 L614.4 85.7 L615.2 85.7 L616 85.7 L616.9 85.7 L617.7 85.7 L618.5 85.7 L619.3 85.7 L620.1 85.7 L620.9 85.7 L621.8 85.7 L622.6 85.7 L623.4 85.7 L624.2 85.7 L625 85.7 L625.8 85.7 L626.7 85.7 L627.5 85.7 L628.3 85.7 L629.1 85.7 L629.9 85.7 L630.7 85.7 L631.6 85.7 L632.4 85.7 L633.2 85.7 L634 85.7 L634.8 85.7 L635.7 85.7 L636.5 85.7 L637.3 85.7 L638.1 85.7 L638.9 85.7 L639.7 85.7 L640.6 85.7 L641.4 85.7 L642.2 85.7 L643 85.7 L643.8 85.7 L644.6 85.7 L645.5 85.7 L646.3 85.7 L647.1 85.7 L647.9 85.7 L648.7 85.7 L649.5 85.7 L650.4 85.7 L651.2 85.7 L652 85.7" style="stroke:var(--grad);stroke-width:2.2;fill:none;stroke-linejoin:round;stroke-dasharray:6 4"/><text class="lbl" x="56.3" y="156.6">ELU floor: −α</text><text class="lbl" x="396.3" y="141.1">ReLU: slope 0</text></svg>
+      </div>
+      <figcaption>All three are the identity for \(z &gt; 0\), so their curves coincide there. They differ on the negative side: ReLU is flat (slope 0, the dead zone), Leaky ReLU keeps a small slope (drawn with \(\alpha = 0.1\) to be visible; 0.01 is typical), and ELU curves smoothly down to \(-\alpha\).</figcaption>
+    </figure>
+
+    <h3>Leaky ReLU, PReLU and RReLU</h3>
+    <div class="mj">\[ \begin{aligned} \text{LeakyReLU}(z) &amp;= \begin{cases} z &amp; z &gt; 0 \\ \alpha z &amp; z \le 0 \end{cases} \\ \text{LeakyReLU}'(z) &amp;= \begin{cases} 1 &amp; z &gt; 0 \\ \alpha &amp; z \le 0 \end{cases} \end{aligned} \]</div>
+    <ul>
+      <li><strong>Leaky ReLU</strong> (\(\alpha = 0.01\) typically; 0.2 in GAN discriminators): an off unit still passes a fraction \(\alpha\) of the gradient, so it can climb back. It can't die.</li>
+      <li><strong>PReLU</strong> learns \(\alpha\), usually one per channel (He et al. 2015 started it at 0.25). Its gradient is \(\partial f / \partial \alpha = \min(0, z)\). Don't apply weight decay to \(\alpha\): it would pull \(\alpha\) toward 0, back to ReLU.</li>
+      <li><strong>RReLU</strong> samples \(\alpha\) uniformly from a range, such as \([1/8, 1/3]\), during training and uses the range's mean at test time: a small regularizer in the spirit of dropout.</li>
+      <li><strong>Why not always use Leaky?</strong> Once initialization and normalization are right, the gains over ReLU are small and inconsistent, and ReLU's exact zeros give sparsity.</li>
+    </ul>
+
+    <h3>ELU: smooth, with a negative floor</h3>
+    <div class="mj">\[ \begin{aligned} \text{ELU}(z) &amp;= \begin{cases} z &amp; z &gt; 0 \\ \alpha\,(e^{z} - 1) &amp; z \le 0 \end{cases} \\ \text{ELU}'(z) &amp;= \begin{cases} 1 &amp; z &gt; 0 \\ \text{ELU}(z) + \alpha &amp; z \le 0 \end{cases} \end{aligned} \]</div>
+    <ul>
+      <li><strong>Negative outputs pull the mean toward 0.</strong> For a standard-normal input the mean output is about 0.16, against ReLU's 0.40, so the next layer's inputs are closer to centred. Clevert et al. (2015) argue this speeds learning in the same way centring does.</li>
+      <li><strong>Saturates on the negative side,</strong> at \(-\alpha\). That's deliberate: a strongly negative input gives a fixed “off” value that's robust to noise, instead of one that keeps changing like Leaky ReLU's.</li>
+      <li><strong>Differentiable at 0 when \(\alpha = 1\):</strong> the slope from the left, \(\alpha e^{0}\), then equals the slope from the right, 1. (The second derivative still jumps.)</li>
+      <li><strong>Cost:</strong> an exponential on the negative side.</li>
+    </ul>
+
+    <h3>SELU and self-normalizing networks</h3>
+    <div class="mj">\[ \begin{aligned} \text{SELU}(z) &amp;= \lambda \begin{cases} z &amp; z &gt; 0 \\ \alpha\,(e^{z} - 1) &amp; z \le 0 \end{cases} \\ \lambda &amp;\approx 1.0507, \qquad \alpha \approx 1.6733 \end{aligned} \]</div>
+    <p>SELU is a scaled ELU whose two constants make activations normalize themselves, layer after layer, without BatchNorm (Klambauer et al. 2017).</p>
+    <p><strong>The fixed point.</strong> Track the mean \(\mu\) and variance \(\nu\) of a layer's activations. The paper's analysis assumes each unit's weights are normalized:</p>
+    <div class="mj">\[ \begin{aligned} \textstyle\sum_j w_j &amp;= 0 \\ \textstyle\sum_j w_j^2 &amp;= 1 \end{aligned} \]</div>
+    <p>Then a unit's pre-activation is roughly Gaussian with mean 0 and variance \(\nu\), and the layer maps \((\mu, \nu)\) to a new pair \((\tilde\mu, \tilde\nu)\). \(\lambda\) and \(\alpha\) are the unique pair that makes \((0, 1)\) a fixed point of that map: two equations, two unknowns.</p>
+    <div class="mj">\[ \begin{aligned} \mathbb E_{z \sim \mathcal N(0, 1)}\big[\text{SELU}(z)\big] &amp;= 0 \\ \mathbb E_{z \sim \mathcal N(0, 1)}\big[\text{SELU}(z)^2\big] &amp;= 1 \end{aligned} \]</div>
+    <ul>
+      <li><strong>It's attracting.</strong> The paper proves the map is a contraction near \((0, 1)\), so deviations shrink with every layer: activations settle at mean 0 and variance 1, and gradients can neither vanish nor explode.</li>
+      <li><strong>Why it works:</strong> \(\lambda &gt; 1\) makes the positive side stretch the variance when it's too small, and the negative side, saturating at \(-\lambda\alpha \approx -1.76\), damps it when it's too large.</li>
+    </ul>
+    <p><strong>What it requires</strong> (break any one and the guarantee is gone):</p>
+    <ul>
+      <li><strong>LeCun normal initialization,</strong> \(w \sim \mathcal N(0, 1/n_{\text{in}})\). It makes \(\sum_j w_j^2\) close to 1 for every unit. \(\sum_j w_j\) is 0 only on average (it varies by about \(\pm 1\) from unit to unit), but it multiplies the input mean, which standardized inputs keep near 0.</li>
+      <li><strong>Standardized inputs,</strong> mean 0 and variance 1.</li>
+      <li><strong>AlphaDropout instead of dropout.</strong> Ordinary dropout sets units to 0, which isn't SELU's resting value, and it shifts the mean and variance. AlphaDropout sets dropped units to the negative saturation value \(\alpha' = -\lambda\alpha\), then applies an affine correction that restores mean 0 and variance 1.</li>
+      <li><strong>A plain feed-forward stack.</strong> Residual additions and normalization layers change the variance between layers and break the fixed-point argument, one reason SELU never caught on in CNNs or transformers.</li>
+    </ul>
+    <p>AlphaDropout, with a random keep-mask \(m\) and keep probability \(r\); \(a\) and \(b\) are exactly the corrections that restore mean 0 and variance 1 when \(x\) has them:</p>
+    <div class="mj">\[ \begin{aligned} y &amp;= a\,\big(x\, m + \alpha'(1 - m)\big) + b \\ m &amp;\sim \text{Bernoulli}(r) \\ a &amp;= \big(r + \alpha'^2\, r\,(1 - r)\big)^{-1/2} \\ b &amp;= -a\, \alpha'\, (1 - r) \end{aligned} \]</div>
+
+    <h3>ReLU6, hard-sigmoid and hard-swish for mobile</h3>
+    <div class="mj">\[ \begin{aligned} \text{ReLU6}(z) &amp;= \min\big(\max(0, z),\, 6\big) \\ \text{hardsigmoid}(z) &amp;= \text{ReLU6}(z + 3) / 6 \\ \text{hardswish}(z) &amp;= z \cdot \text{ReLU6}(z + 3) / 6 \end{aligned} \]</div>
+    <ul>
+      <li><strong>ReLU6</strong> (used in MobileNetV1 and V2) caps outputs at 6, so the activation range is known in advance, which keeps 8-bit fixed-point quantization accurate.</li>
+      <li><strong>Hard-sigmoid and hard-swish</strong> (MobileNetV3) are piecewise-linear stand-ins for \(\sigma\) and SiLU: no exponential, cheap on phone CPUs, and quantization-friendly. Hard-swish's slope is 0 below \(-3\), \((2z + 3)/6\) between \(-3\) and 3, and 1 above 3.</li>
+    </ul>
+
+    <h3>Maxout</h3>
+    <div class="mj">\[ h(x) = \max_{j = 1, \dots, k}\, \big(w_j^\top x + b_j\big) \]</div>
+    <p>A maxout unit takes the largest of \(k\) linear functions of its input (Goodfellow et al. 2013), so it learns its own convex, piecewise-linear activation. ReLU is the case \(k = 2\) with one piece fixed at 0, and Leaky ReLU is \(\max(\alpha z, z)\). The gradient flows to whichever piece wins, and some piece always wins, so a maxout unit can't die. The price is \(k\) times the parameters per unit. It was designed to pair with dropout and is now rare.</p>
+
+    <h3>Hard thresholds: the straight-through estimator</h3>
+    <p>A step function or sign, used to binarize weights or activations, has slope 0 almost everywhere, so backprop gets nothing through it. The <strong>straight-through estimator</strong> uses the hard function forward and pretends it was the identity backward, usually only where \(\lvert z \rvert \le 1\):</p>
+    <div class="mj">\[ \begin{aligned} \text{forward: } y &amp;= \operatorname{sign}(z) \\ \text{backward: } \frac{\partial L}{\partial z} &amp;\approx \frac{\partial L}{\partial y}\; \mathbf 1\big[\lvert z \rvert \le 1\big] \end{aligned} \]</div>
+    <p>Quantization-aware training treats rounding the same way. For sampling a discrete category, <strong>Gumbel-softmax</strong> adds Gumbel noise to the logits and takes a softmax at temperature \(T\): a differentiable stand-in for a one-hot sample, which approaches a true one-hot sample as \(T \to 0\) (temperature is covered in section <a href="#outputs">07</a>).</p>
+
+    <!-- smooth -->
+    <h2 id="smooth"><span class="pn">05</span>Smooth activations: GELU, SiLU and Mish</h2>
+    <p>Write ReLU as \(z\) times a hard switch. The smooth versions replace the switch with a soft one between 0 and 1:</p>
+    <div class="mj">\[ \begin{aligned} \text{ReLU}(z) &amp;= z \cdot \mathbf 1[z &gt; 0] \\ \text{GELU}(z) &amp;= z \cdot \Phi(z) \\ \text{SiLU}(z) &amp;= z \cdot \sigma(z) \end{aligned} \]</div>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 700 270" role="img" aria-label="Left: GELU, SiLU and Mish against a dashed ReLU. All three follow ReLU far from zero, bend smoothly near zero, and dip slightly below zero for small negative z. Right: their slopes rise smoothly from about 0 to about 1, going slightly negative on the left and slightly above 1 on the right, unlike ReLU's step."><path d="M150 16 H172" style="stroke:var(--ink-3);stroke-width:2.6;fill:none;stroke-dasharray:4 4"/><text x="178" y="20" style="fill:var(--ink-3)">ReLU</text><path d="M228.8 16 H250.8" style="stroke:var(--hid);stroke-width:2.6;fill:none"/><text x="256.8" y="20" style="fill:var(--hid)">GELU</text><path d="M307.6 16 H329.6" style="stroke:var(--grad);stroke-width:2.6;fill:none"/><text x="335.6" y="20" style="fill:var(--grad)">SiLU</text><path d="M386.40000000000003 16 H408.40000000000003" style="stroke:var(--cell);stroke-width:2.6;fill:none"/><text x="414.40000000000003" y="20" style="fill:var(--cell)">Mish</text><path d="M89.1 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M126.3 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M163.4 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M200.6 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M237.7 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M274.9 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M52 158 H312" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M52 108 H312" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M52 58 H312" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M52 208 H312" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><path d="M200.6 58 V238" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><text class="lbl" x="89.1" y="253" text-anchor="middle">−3</text><text class="lbl" x="126.3" y="253" text-anchor="middle">−2</text><text class="lbl" x="163.4" y="253" text-anchor="middle">−1</text><text class="lbl" x="200.6" y="253" text-anchor="middle">0</text><text class="lbl" x="237.7" y="253" text-anchor="middle">1</text><text class="lbl" x="274.9" y="253" text-anchor="middle">2</text><text class="lbl" x="46" y="162" text-anchor="end">1</text><text class="lbl" x="46" y="112" text-anchor="end">2</text><text class="lbl" x="46" y="62" text-anchor="end">3</text><text x="182" y="48" text-anchor="middle" style="fill:var(--ink);font-weight:600">the function</text><text class="lbl" x="316" y="212">z</text><path d="M429.1 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M466.3 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M503.4 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M540.6 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M577.7 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M614.9 58 V238" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M392 148 H652" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M392 83.7 H652" style="stroke:var(--rule);stroke-width:1;fill:none"/><path d="M392 212.3 H652" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><path d="M540.6 58 V238" style="stroke:var(--ink-3);stroke-width:1.2;fill:none"/><text class="lbl" x="429.1" y="253" text-anchor="middle">−3</text><text class="lbl" x="466.3" y="253" text-anchor="middle">−2</text><text class="lbl" x="503.4" y="253" text-anchor="middle">−1</text><text class="lbl" x="540.6" y="253" text-anchor="middle">0</text><text class="lbl" x="577.7" y="253" text-anchor="middle">1</text><text class="lbl" x="614.9" y="253" text-anchor="middle">2</text><text class="lbl" x="386" y="152" text-anchor="end">0.5</text><text class="lbl" x="386" y="87.7" text-anchor="end">1</text><text x="522" y="48" text-anchor="middle" style="fill:var(--ink);font-weight:600">its slope</text><text class="lbl" x="656" y="216.3">z</text><path d="M52 208 L53.6 208 L55.3 208 L56.9 208 L58.5 208 L60.2 208 L61.8 208 L63.4 208 L65.1 208 L66.7 208 L68.4 208 L70 208 L71.6 208 L73.3 208 L74.9 208 L76.5 208 L78.2 208 L79.8 208 L81.4 208 L83.1 208 L84.7 208 L86.3 208 L88 208 L89.6 208 L91.2 208 L92.9 208 L94.5 208 L96.2 208 L97.8 208 L99.4 208 L101.1 208 L102.7 208 L104.3 208 L106 208 L107.6 208 L109.2 208 L110.9 208 L112.5 208 L114.1 208 L115.8 208 L117.4 208 L119 208 L120.7 208 L122.3 208 L123.9 208 L125.6 208 L127.2 208 L128.9 208 L130.5 208 L132.1 208 L133.8 208 L135.4 208 L137 208 L138.7 208 L140.3 208 L141.9 208 L143.6 208 L145.2 208 L146.8 208 L148.5 208 L150.1 208 L151.7 208 L153.4 208 L155 208 L156.7 208 L158.3 208 L159.9 208 L161.6 208 L163.2 208 L164.8 208 L166.5 208 L168.1 208 L169.7 208 L171.4 208 L173 208 L174.6 208 L176.3 208 L177.9 208 L179.5 208 L181.2 208 L182.8 208 L184.5 208 L186.1 208 L187.7 208 L189.4 208 L191 208 L192.6 208 L194.3 208 L195.9 208 L197.5 208 L199.2 208 L200.8 207.7 L202.4 205.5 L204.1 203.3 L205.7 201.1 L207.3 198.9 L209 196.7 L210.6 194.5 L212.3 192.3 L213.9 190.1 L215.5 187.9 L217.2 185.7 L218.8 183.5 L220.4 181.3 L222.1 179.1 L223.7 176.9 L225.3 174.7 L227 172.5 L228.6 170.3 L230.2 168.1 L231.9 165.9 L233.5 163.7 L235.1 161.5 L236.8 159.3 L238.4 157.1 L240.1 154.9 L241.7 152.7 L243.3 150.5 L245 148.3 L246.6 146.1 L248.2 143.8 L249.9 141.6 L251.5 139.4 L253.1 137.2 L254.8 135 L256.4 132.8 L258 130.6 L259.7 128.4 L261.3 126.2 L262.9 124 L264.6 121.8 L266.2 119.6 L267.8 117.4 L269.5 115.2 L271.1 113 L272.8 110.8 L274.4 108.6 L276 106.4 L277.7 104.2 L279.3 102 L280.9 99.8 L282.6 97.6 L284.2 95.4 L285.8 93.2 L287.5 91 L289.1 88.8 L290.7 86.6 L292.4 84.4 L294 82.2 L295.6 80 L297.3 77.8 L298.9 75.6 L300.6 73.4 L302.2 71.2 L303.8 69 L305.5 66.8 L307.1 64.6 L308.7 62.4 L310.4 60.2 L312 58" style="stroke:var(--ink-3);stroke-width:1.6;fill:none;stroke-linejoin:round;stroke-dasharray:4 4"/><path d="M52 211.6 L53.6 211.7 L55.3 211.9 L56.9 212 L58.5 212.1 L60.2 212.3 L61.8 212.4 L63.4 212.5 L65.1 212.7 L66.7 212.8 L68.4 213 L70 213.1 L71.6 213.3 L73.3 213.5 L74.9 213.6 L76.5 213.8 L78.2 214 L79.8 214.2 L81.4 214.4 L83.1 214.5 L84.7 214.7 L86.3 214.9 L88 215.1 L89.6 215.3 L91.2 215.5 L92.9 215.8 L94.5 216 L96.2 216.2 L97.8 216.4 L99.4 216.6 L101.1 216.9 L102.7 217.1 L104.3 217.3 L106 217.6 L107.6 217.8 L109.2 218.1 L110.9 218.3 L112.5 218.6 L114.1 218.8 L115.8 219 L117.4 219.3 L119 219.5 L120.7 219.8 L122.3 220 L123.9 220.3 L125.6 220.5 L127.2 220.8 L128.9 221 L130.5 221.2 L132.1 221.4 L133.8 221.7 L135.4 221.9 L137 222.1 L138.7 222.3 L140.3 222.5 L141.9 222.6 L143.6 222.8 L145.2 222.9 L146.8 223.1 L148.5 223.2 L150.1 223.3 L151.7 223.3 L153.4 223.4 L155 223.4 L156.7 223.4 L158.3 223.4 L159.9 223.4 L161.6 223.3 L163.2 223.2 L164.8 223 L166.5 222.9 L168.1 222.7 L169.7 222.4 L171.4 222.1 L173 221.8 L174.6 221.4 L176.3 220.9 L177.9 220.5 L179.5 219.9 L181.2 219.3 L182.8 218.7 L184.5 218 L186.1 217.3 L187.7 216.5 L189.4 215.6 L191 214.7 L192.6 213.7 L194.3 212.6 L195.9 211.5 L197.5 210.3 L199.2 209.1 L200.8 207.8 L202.4 206.5 L204.1 205 L205.7 203.5 L207.3 202 L209 200.4 L210.6 198.7 L212.3 197 L213.9 195.3 L215.5 193.4 L217.2 191.6 L218.8 189.7 L220.4 187.7 L222.1 185.7 L223.7 183.6 L225.3 181.5 L227 179.4 L228.6 177.3 L230.2 175.1 L231.9 172.9 L233.5 170.6 L235.1 168.4 L236.8 166.1 L238.4 163.8 L240.1 161.4 L241.7 159.1 L243.3 156.7 L245 154.4 L246.6 152 L248.2 149.6 L249.9 147.2 L251.5 144.8 L253.1 142.5 L254.8 140.1 L256.4 137.7 L258 135.3 L259.7 132.9 L261.3 130.5 L262.9 128.1 L264.6 125.7 L266.2 123.3 L267.8 120.9 L269.5 118.6 L271.1 116.2 L272.8 113.8 L274.4 111.5 L276 109.1 L277.7 106.8 L279.3 104.4 L280.9 102.1 L282.6 99.8 L284.2 97.4 L285.8 95.1 L287.5 92.8 L289.1 90.5 L290.7 88.2 L292.4 85.9 L294 83.6 L295.6 81.3 L297.3 79 L298.9 76.8 L300.6 74.5 L302.2 72.2 L303.8 70 L305.5 67.7 L307.1 65.4 L308.7 63.2 L310.4 60.9 L312 58.7" style="stroke:var(--cell);stroke-width:2.2;fill:none;stroke-linejoin:round"/><path d="M52 211.6 L53.6 211.7 L55.3 211.8 L56.9 212 L58.5 212.1 L60.2 212.2 L61.8 212.4 L63.4 212.5 L65.1 212.6 L66.7 212.8 L68.4 212.9 L70 213.1 L71.6 213.2 L73.3 213.4 L74.9 213.6 L76.5 213.7 L78.2 213.9 L79.8 214.1 L81.4 214.2 L83.1 214.4 L84.7 214.6 L86.3 214.8 L88 215 L89.6 215.2 L91.2 215.4 L92.9 215.6 L94.5 215.8 L96.2 216 L97.8 216.2 L99.4 216.4 L101.1 216.6 L102.7 216.8 L104.3 217 L106 217.2 L107.6 217.5 L109.2 217.7 L110.9 217.9 L112.5 218.1 L114.1 218.3 L115.8 218.6 L117.4 218.8 L119 219 L120.7 219.2 L122.3 219.4 L123.9 219.6 L125.6 219.8 L127.2 220 L128.9 220.2 L130.5 220.4 L132.1 220.6 L133.8 220.8 L135.4 220.9 L137 221.1 L138.7 221.2 L140.3 221.4 L141.9 221.5 L143.6 221.6 L145.2 221.7 L146.8 221.8 L148.5 221.8 L150.1 221.9 L151.7 221.9 L153.4 221.9 L155 221.9 L156.7 221.9 L158.3 221.8 L159.9 221.7 L161.6 221.6 L163.2 221.5 L164.8 221.3 L166.5 221.1 L168.1 220.9 L169.7 220.6 L171.4 220.3 L173 220 L174.6 219.6 L176.3 219.2 L177.9 218.7 L179.5 218.2 L181.2 217.7 L182.8 217.1 L184.5 216.5 L186.1 215.9 L187.7 215.2 L189.4 214.4 L191 213.6 L192.6 212.8 L194.3 211.9 L195.9 210.9 L197.5 210 L199.2 208.9 L200.8 207.8 L202.4 206.7 L204.1 205.5 L205.7 204.3 L207.3 203 L209 201.7 L210.6 200.3 L212.3 198.9 L213.9 197.4 L215.5 195.9 L217.2 194.4 L218.8 192.8 L220.4 191.1 L222.1 189.5 L223.7 187.7 L225.3 186 L227 184.2 L228.6 182.3 L230.2 180.5 L231.9 178.5 L233.5 176.6 L235.1 174.6 L236.8 172.6 L238.4 170.6 L240.1 168.5 L241.7 166.4 L243.3 164.3 L245 162.1 L246.6 160 L248.2 157.8 L249.9 155.6 L251.5 153.3 L253.1 151.1 L254.8 148.8 L256.4 146.5 L258 144.2 L259.7 141.9 L261.3 139.6 L262.9 137.2 L264.6 134.9 L266.2 132.5 L267.8 130.2 L269.5 127.8 L271.1 125.4 L272.8 123 L274.4 120.6 L276 118.2 L277.7 115.8 L279.3 113.4 L280.9 111 L282.6 108.6 L284.2 106.1 L285.8 103.7 L287.5 101.3 L289.1 98.9 L290.7 96.5 L292.4 94 L294 91.6 L295.6 89.2 L297.3 86.8 L298.9 84.4 L300.6 81.9 L302.2 79.5 L303.8 77.1 L305.5 74.7 L307.1 72.3 L308.7 69.9 L310.4 67.5 L312 65.1" style="stroke:var(--grad);stroke-width:2.2;fill:none;stroke-linejoin:round"/><path d="M52 208 L53.6 208 L55.3 208 L56.9 208 L58.5 208 L60.2 208 L61.8 208 L63.4 208 L65.1 208 L66.7 208 L68.4 208 L70 208 L71.6 208 L73.3 208.1 L74.9 208.1 L76.5 208.1 L78.2 208.1 L79.8 208.1 L81.4 208.1 L83.1 208.1 L84.7 208.1 L86.3 208.2 L88 208.2 L89.6 208.2 L91.2 208.2 L92.9 208.3 L94.5 208.3 L96.2 208.3 L97.8 208.4 L99.4 208.4 L101.1 208.5 L102.7 208.6 L104.3 208.6 L106 208.7 L107.6 208.8 L109.2 208.9 L110.9 208.9 L112.5 209.1 L114.1 209.2 L115.8 209.3 L117.4 209.4 L119 209.5 L120.7 209.7 L122.3 209.9 L123.9 210 L125.6 210.2 L127.2 210.4 L128.9 210.6 L130.5 210.8 L132.1 211 L133.8 211.2 L135.4 211.5 L137 211.7 L138.7 212 L140.3 212.2 L141.9 212.5 L143.6 212.8 L145.2 213.1 L146.8 213.4 L148.5 213.6 L150.1 213.9 L151.7 214.2 L153.4 214.5 L155 214.7 L156.7 215 L158.3 215.3 L159.9 215.5 L161.6 215.7 L163.2 215.9 L164.8 216.1 L166.5 216.2 L168.1 216.3 L169.7 216.4 L171.4 216.5 L173 216.5 L174.6 216.5 L176.3 216.4 L177.9 216.3 L179.5 216.1 L181.2 215.9 L182.8 215.6 L184.5 215.2 L186.1 214.8 L187.7 214.3 L189.4 213.8 L191 213.1 L192.6 212.4 L194.3 211.7 L195.9 210.8 L197.5 209.9 L199.2 208.9 L200.8 207.8 L202.4 206.7 L204.1 205.5 L205.7 204.2 L207.3 202.8 L209 201.3 L210.6 199.8 L212.3 198.2 L213.9 196.5 L215.5 194.8 L217.2 193 L218.8 191.1 L220.4 189.2 L222.1 187.2 L223.7 185.2 L225.3 183.1 L227 180.9 L228.6 178.8 L230.2 176.5 L231.9 174.3 L233.5 172 L235.1 169.6 L236.8 167.3 L238.4 164.9 L240.1 162.5 L241.7 160.1 L243.3 157.6 L245 155.2 L246.6 152.7 L248.2 150.2 L249.9 147.8 L251.5 145.3 L253.1 142.8 L254.8 140.3 L256.4 137.8 L258 135.4 L259.7 132.9 L261.3 130.4 L262.9 127.9 L264.6 125.5 L266.2 123 L267.8 120.6 L269.5 118.2 L271.1 115.8 L272.8 113.4 L274.4 111 L276 108.6 L277.7 106.2 L279.3 103.8 L280.9 101.5 L282.6 99.1 L284.2 96.8 L285.8 94.5 L287.5 92.1 L289.1 89.8 L290.7 87.5 L292.4 85.2 L294 83 L295.6 80.7 L297.3 78.4 L298.9 76.1 L300.6 73.9 L302.2 71.6 L303.8 69.4 L305.5 67.1 L307.1 64.9 L308.7 62.7 L310.4 60.4 L312 58.2" style="stroke:var(--hid);stroke-width:2.2;fill:none;stroke-linejoin:round"/><path d="M392 212.3 L392.9 212.3 L393.9 212.3 L394.8 212.3 L395.7 212.3 L396.7 212.3 L397.6 212.3 L398.5 212.3 L399.5 212.3 L400.4 212.3 L401.3 212.3 L402.3 212.3 L403.2 212.3 L404.1 212.3 L405.1 212.3 L406 212.3 L406.9 212.3 L407.9 212.3 L408.8 212.3 L409.7 212.3 L410.7 212.3 L411.6 212.3 L412.6 212.3 L413.5 212.3 L414.4 212.3 L415.4 212.3 L416.3 212.3 L417.2 212.3 L418.2 212.3 L419.1 212.3 L420 212.3 L421 212.3 L421.9 212.3 L422.8 212.3 L423.8 212.3 L424.7 212.3 L425.6 212.3 L426.6 212.3 L427.5 212.3 L428.4 212.3 L429.4 212.3 L430.3 212.3 L431.2 212.3 L432.2 212.3 L433.1 212.3 L434 212.3 L435 212.3 L435.9 212.3 L436.8 212.3 L437.8 212.3 L438.7 212.3 L439.6 212.3 L440.6 212.3 L441.5 212.3 L442.4 212.3 L443.4 212.3 L444.3 212.3 L445.2 212.3 L446.2 212.3 L447.1 212.3 L448.1 212.3 L449 212.3 L449.9 212.3 L450.9 212.3 L451.8 212.3 L452.7 212.3 L453.7 212.3 L454.6 212.3 L455.5 212.3 L456.5 212.3 L457.4 212.3 L458.3 212.3 L459.3 212.3 L460.2 212.3 L461.1 212.3 L462.1 212.3 L463 212.3 L463.9 212.3 L464.9 212.3 L465.8 212.3 L466.7 212.3 L467.7 212.3 L468.6 212.3 L469.5 212.3 L470.5 212.3 L471.4 212.3 L472.3 212.3 L473.3 212.3 L474.2 212.3 L475.1 212.3 L476.1 212.3 L477 212.3 L477.9 212.3 L478.9 212.3 L479.8 212.3 L480.7 212.3 L481.7 212.3 L482.6 212.3 L483.5 212.3 L484.5 212.3 L485.4 212.3 L486.4 212.3 L487.3 212.3 L488.2 212.3 L489.2 212.3 L490.1 212.3 L491 212.3 L492 212.3 L492.9 212.3 L493.8 212.3 L494.8 212.3 L495.7 212.3 L496.6 212.3 L497.6 212.3 L498.5 212.3 L499.4 212.3 L500.4 212.3 L501.3 212.3 L502.2 212.3 L503.2 212.3 L504.1 212.3 L505 212.3 L506 212.3 L506.9 212.3 L507.8 212.3 L508.8 212.3 L509.7 212.3 L510.6 212.3 L511.6 212.3 L512.5 212.3 L513.4 212.3 L514.4 212.3 L515.3 212.3 L516.2 212.3 L517.2 212.3 L518.1 212.3 L519 212.3 L520 212.3 L520.9 212.3 L521.9 212.3 L522.8 212.3 L523.7 212.3 L524.7 212.3 L525.6 212.3 L526.5 212.3 L527.5 212.3 L528.4 212.3 L529.3 212.3 L530.3 212.3 L531.2 212.3 L532.1 212.3 L533.1 212.3 L534 212.3 L534.9 212.3 L535.9 212.3 L536.8 212.3 L537.7 212.3 L538.7 212.3 L539.6 212.3 L540.5 212.3 M540.6 83.7 L541.3 83.7 L542 83.7 L542.7 83.7 L543.4 83.7 L544.1 83.7 L544.8 83.7 L545.5 83.7 L546.2 83.7 L546.9 83.7 L547.6 83.7 L548.3 83.7 L549 83.7 L549.7 83.7 L550.4 83.7 L551.1 83.7 L551.8 83.7 L552.5 83.7 L553.2 83.7 L553.9 83.7 L554.6 83.7 L555.3 83.7 L556 83.7 L556.7 83.7 L557.4 83.7 L558.1 83.7 L558.8 83.7 L559.5 83.7 L560.2 83.7 L560.9 83.7 L561.6 83.7 L562.3 83.7 L563 83.7 L563.7 83.7 L564.4 83.7 L565.1 83.7 L565.8 83.7 L566.5 83.7 L567.2 83.7 L567.9 83.7 L568.6 83.7 L569.3 83.7 L570 83.7 L570.7 83.7 L571.4 83.7 L572.1 83.7 L572.8 83.7 L573.5 83.7 L574.2 83.7 L574.9 83.7 L575.6 83.7 L576.3 83.7 L577 83.7 L577.7 83.7 L578.4 83.7 L579.1 83.7 L579.8 83.7 L580.5 83.7 L581.2 83.7 L581.9 83.7 L582.6 83.7 L583.3 83.7 L584 83.7 L584.7 83.7 L585.4 83.7 L586.1 83.7 L586.8 83.7 L587.5 83.7 L588.2 83.7 L588.9 83.7 L589.6 83.7 L590.3 83.7 L591 83.7 L591.8 83.7 L592.5 83.7 L593.2 83.7 L593.9 83.7 L594.6 83.7 L595.3 83.7 L596 83.7 L596.7 83.7 L597.4 83.7 L598.1 83.7 L598.8 83.7 L599.5 83.7 L600.2 83.7 L600.9 83.7 L601.6 83.7 L602.3 83.7 L603 83.7 L603.7 83.7 L604.4 83.7 L605.1 83.7 L605.8 83.7 L606.5 83.7 L607.2 83.7 L607.9 83.7 L608.6 83.7 L609.3 83.7 L610 83.7 L610.7 83.7 L611.4 83.7 L612.1 83.7 L612.8 83.7 L613.5 83.7 L614.2 83.7 L614.9 83.7 L615.6 83.7 L616.3 83.7 L617 83.7 L617.7 83.7 L618.4 83.7 L619.1 83.7 L619.8 83.7 L620.5 83.7 L621.2 83.7 L621.9 83.7 L622.6 83.7 L623.3 83.7 L624 83.7 L624.7 83.7 L625.4 83.7 L626.1 83.7 L626.8 83.7 L627.5 83.7 L628.2 83.7 L628.9 83.7 L629.6 83.7 L630.3 83.7 L631 83.7 L631.7 83.7 L632.4 83.7 L633.1 83.7 L633.8 83.7 L634.5 83.7 L635.2 83.7 L635.9 83.7 L636.6 83.7 L637.3 83.7 L638 83.7 L638.7 83.7 L639.4 83.7 L640.1 83.7 L640.8 83.7 L641.5 83.7 L642.2 83.7 L642.9 83.7 L643.6 83.7 L644.3 83.7 L645 83.7 L645.7 83.7 L646.4 83.7 L647.1 83.7 L647.8 83.7 L648.5 83.7 L649.2 83.7 L649.9 83.7 L650.6 83.7 L651.3 83.7 L652 83.7" style="stroke:var(--ink-3);stroke-width:1.6;fill:none;stroke-linejoin:round;stroke-dasharray:4 4"/><path d="M392 219.2 L393.6 219.4 L395.3 219.6 L396.9 219.8 L398.5 220 L400.2 220.2 L401.8 220.4 L403.4 220.7 L405.1 220.9 L406.7 221.1 L408.4 221.3 L410 221.6 L411.6 221.8 L413.3 222 L414.9 222.3 L416.5 222.5 L418.2 222.7 L419.8 223 L421.4 223.2 L423.1 223.4 L424.7 223.7 L426.3 223.9 L428 224.1 L429.6 224.4 L431.2 224.6 L432.9 224.8 L434.5 225 L436.2 225.2 L437.8 225.4 L439.4 225.6 L441.1 225.8 L442.7 226 L444.3 226.1 L446 226.3 L447.6 226.4 L449.2 226.5 L450.9 226.6 L452.5 226.7 L454.1 226.7 L455.8 226.7 L457.4 226.8 L459 226.7 L460.7 226.7 L462.3 226.6 L463.9 226.5 L465.6 226.3 L467.2 226.1 L468.9 225.9 L470.5 225.6 L472.1 225.2 L473.8 224.8 L475.4 224.4 L477 223.9 L478.7 223.3 L480.3 222.7 L481.9 222 L483.6 221.2 L485.2 220.3 L486.8 219.4 L488.5 218.4 L490.1 217.3 L491.7 216.1 L493.4 214.8 L495 213.4 L496.7 211.9 L498.3 210.4 L499.9 208.7 L501.6 206.9 L503.2 205 L504.8 202.9 L506.5 200.8 L508.1 198.6 L509.7 196.2 L511.4 193.7 L513 191.1 L514.6 188.5 L516.3 185.7 L517.9 182.8 L519.5 179.7 L521.2 176.6 L522.8 173.5 L524.5 170.2 L526.1 166.8 L527.7 163.4 L529.4 159.9 L531 156.4 L532.6 152.8 L534.3 149.2 L535.9 145.5 L537.5 141.9 L539.2 138.3 L540.8 134.6 L542.4 131 L544.1 127.5 L545.7 123.9 L547.3 120.5 L549 117.1 L550.6 113.8 L552.3 110.6 L553.9 107.5 L555.5 104.5 L557.2 101.6 L558.8 98.9 L560.4 96.3 L562.1 93.8 L563.7 91.5 L565.3 89.3 L567 87.2 L568.6 85.3 L570.2 83.6 L571.9 82 L573.5 80.5 L575.1 79.2 L576.8 78 L578.4 77 L580.1 76 L581.7 75.2 L583.3 74.5 L585 74 L586.6 73.5 L588.2 73.1 L589.9 72.8 L591.5 72.6 L593.1 72.4 L594.8 72.4 L596.4 72.3 L598 72.4 L599.7 72.5 L601.3 72.6 L602.9 72.8 L604.6 73 L606.2 73.2 L607.8 73.5 L609.5 73.8 L611.1 74.1 L612.8 74.4 L614.4 74.7 L616 75 L617.7 75.4 L619.3 75.7 L620.9 76 L622.6 76.4 L624.2 76.7 L625.8 77 L627.5 77.3 L629.1 77.6 L630.7 77.9 L632.4 78.2 L634 78.5 L635.6 78.8 L637.3 79.1 L638.9 79.3 L640.6 79.6 L642.2 79.8 L643.8 80 L645.5 80.2 L647.1 80.4 L648.7 80.6 L650.4 80.8 L652 81" style="stroke:var(--cell);stroke-width:2.2;fill:none;stroke-linejoin:round"/><path d="M392 219.1 L393.6 219.2 L395.3 219.4 L396.9 219.6 L398.5 219.8 L400.2 220 L401.8 220.2 L403.4 220.4 L405.1 220.6 L406.7 220.8 L408.4 221 L410 221.2 L411.6 221.5 L413.3 221.7 L414.9 221.9 L416.5 222.1 L418.2 222.3 L419.8 222.5 L421.4 222.7 L423.1 222.9 L424.7 223.1 L426.3 223.3 L428 223.5 L429.6 223.7 L431.2 223.8 L432.9 224 L434.5 224.2 L436.2 224.3 L437.8 224.5 L439.4 224.6 L441.1 224.7 L442.7 224.8 L444.3 224.9 L446 225 L447.6 225.1 L449.2 225.1 L450.9 225.1 L452.5 225.1 L454.1 225.1 L455.8 225 L457.4 225 L459 224.8 L460.7 224.7 L462.3 224.5 L463.9 224.3 L465.6 224.1 L467.2 223.8 L468.9 223.5 L470.5 223.1 L472.1 222.7 L473.8 222.2 L475.4 221.7 L477 221.1 L478.7 220.5 L480.3 219.8 L481.9 219.1 L483.6 218.3 L485.2 217.4 L486.8 216.5 L488.5 215.5 L490.1 214.4 L491.7 213.3 L493.4 212.1 L495 210.8 L496.7 209.4 L498.3 208 L499.9 206.5 L501.6 204.9 L503.2 203.2 L504.8 201.5 L506.5 199.7 L508.1 197.8 L509.7 195.8 L511.4 193.8 L513 191.7 L514.6 189.5 L516.3 187.2 L517.9 184.9 L519.5 182.5 L521.2 180.1 L522.8 177.6 L524.5 175 L526.1 172.4 L527.7 169.8 L529.4 167.1 L531 164.4 L532.6 161.6 L534.3 158.9 L535.9 156.1 L537.5 153.3 L539.2 150.4 L540.8 147.6 L542.4 144.8 L544.1 141.9 L545.7 139.1 L547.3 136.3 L549 133.6 L550.6 130.8 L552.3 128.1 L553.9 125.4 L555.5 122.8 L557.2 120.2 L558.8 117.7 L560.4 115.2 L562.1 112.8 L563.7 110.4 L565.3 108.1 L567 105.9 L568.6 103.7 L570.2 101.6 L571.9 99.6 L573.5 97.7 L575.1 95.8 L576.8 94 L578.4 92.3 L580.1 90.6 L581.7 89.1 L583.3 87.6 L585 86.2 L586.6 84.8 L588.2 83.6 L589.9 82.4 L591.5 81.3 L593.1 80.2 L594.8 79.3 L596.4 78.3 L598 77.5 L599.7 76.7 L601.3 76 L602.9 75.3 L604.6 74.7 L606.2 74.2 L607.8 73.7 L609.5 73.2 L611.1 72.8 L612.8 72.4 L614.4 72.1 L616 71.8 L617.7 71.6 L619.3 71.4 L620.9 71.3 L622.6 71.1 L624.2 71 L625.8 70.9 L627.5 70.9 L629.1 70.9 L630.7 70.9 L632.4 70.9 L634 71 L635.6 71 L637.3 71.1 L638.9 71.2 L640.6 71.3 L642.2 71.4 L643.8 71.6 L645.5 71.7 L647.1 71.9 L648.7 72 L650.4 72.2 L652 72.4" style="stroke:var(--grad);stroke-width:2.2;fill:none;stroke-linejoin:round"/><path d="M392 212.4 L393.6 212.4 L395.3 212.4 L396.9 212.4 L398.5 212.4 L400.2 212.4 L401.8 212.5 L403.4 212.5 L405.1 212.5 L406.7 212.5 L408.4 212.6 L410 212.6 L411.6 212.7 L413.3 212.7 L414.9 212.8 L416.5 212.9 L418.2 213 L419.8 213.1 L421.4 213.2 L423.1 213.3 L424.7 213.4 L426.3 213.5 L428 213.7 L429.6 213.9 L431.2 214.1 L432.9 214.3 L434.5 214.5 L436.2 214.7 L437.8 215 L439.4 215.3 L441.1 215.6 L442.7 215.9 L444.3 216.3 L446 216.7 L447.6 217.1 L449.2 217.5 L450.9 218 L452.5 218.5 L454.1 219 L455.8 219.5 L457.4 220 L459 220.6 L460.7 221.2 L462.3 221.8 L463.9 222.4 L465.6 223 L467.2 223.6 L468.9 224.2 L470.5 224.8 L472.1 225.4 L473.8 226 L475.4 226.5 L477 227 L478.7 227.5 L480.3 227.9 L481.9 228.2 L483.6 228.5 L485.2 228.7 L486.8 228.8 L488.5 228.9 L490.1 228.8 L491.7 228.6 L493.4 228.3 L495 227.8 L496.7 227.2 L498.3 226.4 L499.9 225.5 L501.6 224.4 L503.2 223.2 L504.8 221.8 L506.5 220.1 L508.1 218.3 L509.7 216.3 L511.4 214.1 L513 211.7 L514.6 209.2 L516.3 206.4 L517.9 203.4 L519.5 200.3 L521.2 197 L522.8 193.5 L524.5 189.8 L526.1 186 L527.7 182.1 L529.4 178 L531 173.9 L532.6 169.6 L534.3 165.3 L535.9 160.8 L537.5 156.4 L539.2 151.9 L540.8 147.4 L542.4 142.8 L544.1 138.4 L545.7 133.9 L547.3 129.5 L549 125.2 L550.6 120.9 L552.3 116.8 L553.9 112.8 L555.5 108.9 L557.2 105.1 L558.8 101.5 L560.4 98.1 L562.1 94.8 L563.7 91.7 L565.3 88.8 L567 86.1 L568.6 83.6 L570.2 81.2 L571.9 79.1 L573.5 77.1 L575.1 75.4 L576.8 73.8 L578.4 72.4 L580.1 71.2 L581.7 70.2 L583.3 69.3 L585 68.6 L586.6 68.1 L588.2 67.6 L589.9 67.4 L591.5 67.2 L593.1 67.1 L594.8 67.2 L596.4 67.3 L598 67.6 L599.7 67.9 L601.3 68.2 L602.9 68.7 L604.6 69.1 L606.2 69.7 L607.8 70.2 L609.5 70.8 L611.1 71.4 L612.8 72 L614.4 72.6 L616 73.2 L617.7 73.8 L619.3 74.4 L620.9 75 L622.6 75.6 L624.2 76.1 L625.8 76.7 L627.5 77.2 L629.1 77.7 L630.7 78.2 L632.4 78.6 L634 79 L635.6 79.4 L637.3 79.8 L638.9 80.2 L640.6 80.5 L642.2 80.8 L643.8 81.1 L645.5 81.3 L647.1 81.6 L648.7 81.8 L650.4 82 L652 82.2" style="stroke:var(--hid);stroke-width:2.2;fill:none;stroke-linejoin:round"/><text class="lbl" x="55.7" y="168">dips below 0</text><text class="lbl" x="395.7" y="132.6">slope dips below 0</text><text class="lbl" x="581.4" y="109.4">overshoots 1</text></svg>
+      </div>
+      <figcaption>GELU, SiLU and Mish (defined below) follow ReLU far from 0. Near 0 they bend smoothly, dip slightly below 0 for small negative inputs, and have slopes that go a little negative on the left and a little above 1 on the right.</figcaption>
+    </figure>
+
+    <h3>GELU</h3>
+    <p>Here \(\Phi\) is the standard normal CDF and \(\varphi\) is its density:</p>
+    <div class="mj">\[ \begin{aligned} \Phi(z) &amp;= \tfrac12\big[1 + \operatorname{erf}(z/\sqrt2)\big] \\ \varphi'(z) &amp;= -z\, \varphi(z) \end{aligned} \]</div>
+    <p>By the product rule:</p>
+    <div class="mj">\[ \begin{aligned} \text{GELU}'(z) &amp;= \Phi(z) + z\,\varphi(z) \\ \text{GELU}''(z) &amp;= 2\,\varphi(z) + z\,\varphi'(z) \\ &amp;= \varphi(z)\,\big(2 - z^2\big) \end{aligned} \]</div>
+    <ul>
+      <li><strong>The slope</strong> peaks at about 1.13 at \(z = \sqrt2\) and bottoms out at about \(-0.13\) at \(z = -\sqrt2\).</li>
+      <li><strong>The function</strong> bottoms out at about \(-0.17\), near \(z = -0.75\).</li>
+      <li><strong>The tails:</strong> far right it's \(z\); far left it goes to 0 at a Gaussian rate, faster than any exponential.</li>
+    </ul>
+    <p><strong>The stochastic-regularizer reading.</strong> Hendrycks and Gimpel (2016) derived GELU as the expected value of a random mask whose keep-probability depends on the input:</p>
+    <div class="mj">\[ \begin{aligned} m &amp;\sim \text{Bernoulli}\big(\Phi(z)\big) \\ \mathbb E[\, z\, m \,] &amp;= z\, \Phi(z) \\ &amp;= \text{GELU}(z) \end{aligned} \]</div>
+    <ul>
+      <li><strong>Dropout</strong> keeps a unit with a fixed probability, whatever its value.</li>
+      <li><strong>ReLU</strong> keeps it with probability 1 if it's positive and 0 if not.</li>
+      <li><strong>GELU</strong> keeps it with probability \(\Phi(z)\): the larger \(z\) is compared with a standard normal, which normalized pre-activations roughly are, the more likely it's kept. Taking the expectation makes it deterministic. There's no noise in practice; the reading explains the shape.</li>
+    </ul>
+    <p><strong>The tanh approximation.</strong> Early implementations, including OpenAI's GPT and GPT-2, used a cheaper tanh form:</p>
+    <div class="mj">\[ \begin{aligned} \text{GELU}(z) &amp;\approx \tfrac12\, z\, \big(1 + \tanh u\big) \\ u &amp;= \sqrt{2/\pi}\, \big(z + 0.044715\, z^3\big) \end{aligned} \]</div>
+    <ul>
+      <li><strong>Where it comes from:</strong> it replaces \(\operatorname{erf}(z/\sqrt2)\) with a tanh. The \(\sqrt{2/\pi}\) matches erf's slope at 0, and the cubic term bends the tails. Matching the Taylor series at 0 would give a cubic coefficient of \(2/(3\pi) - 1/6 \approx 0.0455\); the standard 0.044715 is tuned for accuracy over a wider range.</li>
+      <li><strong>Accuracy:</strong> its largest error is about \(5 \times 10^{-4}\). A cruder version, \(z\,\sigma(1.702z)\), is off by up to about 0.02.</li>
+      <li><strong>In PyTorch:</strong> <code>nn.GELU(approximate="tanh")</code>. Use whichever form a pretrained model was trained with.</li>
+    </ul>
+    <p><strong>Why BERT and GPT use it.</strong> The honest answer is empirical and historical:</p>
+    <ul>
+      <li>The GELU paper reported small, consistent gains over ReLU and ELU on vision, speech and language tasks. GPT (2018) adopted it, BERT (2018) followed GPT, and later models (GPT-2 and 3, ViT) kept it. The original 2017 transformer used ReLU.</li>
+      <li>Controlled comparisons in transformer feed-forward blocks later found GELU roughly level with ReLU (within noise on perplexity, a little ahead on some downstream tasks), and gated variants clearly ahead of both (Shazeer 2020; Narang et al. 2021).</li>
+      <li>The mechanisms usually offered: it's smooth, so the gradient changes continuously instead of jumping at 0; moderately negative inputs still get gradient, so units rarely die; the small dip lets a unit say “slightly no” instead of only “no”; and with LayerNorm keeping pre-activations near unit scale, the inputs land in exactly the curved region where these differences matter.</li>
+      <li>Any gain over ReLU is small. “It works at least as well, and its smoothness may help optimization” is accurate; “it's fundamentally better” isn't.</li>
+    </ul>
+
+    <h3>SiLU, also called Swish</h3>
+    <div class="mj">\[ \text{Swish}_\beta(z) = z\, \sigma(\beta z) \qquad \text{SiLU}(z) = z\, \sigma(z) \]</div>
+    <div class="mj">\[ \begin{aligned} \text{SiLU}'(z) &amp;= \sigma(z) + z\, \sigma(z)\, \big(1 - \sigma(z)\big) \\ &amp;= \sigma(z)\, \big(1 + z\, (1 - \sigma(z))\big) \end{aligned} \]</div>
+    <ul>
+      <li><strong>Found by search.</strong> Ramachandran, Zoph and Le (2017) searched automatically over small compositions of unary and binary functions. \(z\sigma(\beta z)\) came out on top and gave small gains over ReLU on ImageNet. The same function had already been named SiLU in the GELU paper (Hendrycks and Gimpel 2016) and used by Elfwing et al. (2017) in reinforcement learning.</li>
+      <li><strong>\(\beta\) interpolates:</strong> \(\beta = 0\) gives the linear \(z/2\), and \(\beta \to \infty\) gives ReLU. GELU is close to \(\beta \approx 1.7\), which is why GELU hugs ReLU more tightly than SiLU does.</li>
+      <li><strong>Self-gated:</strong> the input gates itself through \(\sigma\). Gated linear units (section <a href="#glu">06</a>) give the gate its own projection instead.</li>
+      <li><strong>The non-monotonic bump:</strong> the minimum is about \(-0.28\) at \(z \approx -1.28\), and the slope ranges from about \(-0.10\) to 1.10. Left of the minimum the slope is negative: raising \(z\) lowers the output. That's harmless for gradient descent, and the bump keeps gradients alive for slightly negative inputs.</li>
+      <li><strong>The left tail</strong> decays like \(z e^{z}\), slower than GELU's, so SiLU passes more gradient to strongly negative inputs.</li>
+      <li><strong>Used in</strong> EfficientNet, the YOLOv5 family of detectors, and inside SwiGLU.</li>
+    </ul>
+
+    <h3>Mish</h3>
+    <div class="mj">\[ \begin{aligned} \text{Mish}(z) &amp;= z \tanh\big(\text{softplus}(z)\big) \\ \text{softplus}(z) &amp;= \log\big(1 + e^{z}\big) \end{aligned} \]</div>
+    <p>The same family: smooth, non-monotonic (minimum about \(-0.31\) near \(z = -1.19\)), ReLU-like far from 0. YOLOv4 used it. It costs an exp, a log and a tanh, and its gains over SiLU are small, so it's rarely the default.</p>
+    <aside class="note trap"><p class="nl">Trap</p><p>“GELU and SiLU units can't die.” Their slope is 0 only at a single point, so a unit can't be stuck over a whole region the way a ReLU can. But far to the left their slopes are tiny (GELU's falls off like a Gaussian), so a unit pushed far negative is nearly stuck in practice.</p></aside>
+
+    <!-- glu -->
+    <h2 id="glu"><span class="pn">06</span>Gated linear units: GLU, GEGLU and SwiGLU</h2>
+    <p>A gated linear unit makes two projections of the same input and multiplies them element by element. One goes through an activation and acts as the gate; the other is a plain linear “value”:</p>
+    <div class="mj">\[ \begin{aligned} \text{GLU}(x) &amp;= \sigma(xW + b) \odot (xV + c) \\ \text{ReGLU}(x) &amp;= \text{ReLU}(xW) \odot xV \\ \text{GEGLU}(x) &amp;= \text{GELU}(xW) \odot xV \\ \text{SwiGLU}(x) &amp;= \text{SiLU}(xW) \odot xV \end{aligned} \]</div>
+    <p>GLU comes from gated convolutional language models (Dauphin et al. 2017). Shazeer (2020) swapped the sigmoid for other activations and used the result as the transformer's feed-forward block. This section uses the convention of code: tokens are rows, so a layer is written \(xW\) rather than \(Wx\).</p>
+
+    <h3>The SwiGLU feed-forward block</h3>
+    <p>The plain transformer feed-forward network (FFN), and the SwiGLU version, with biases dropped as in most LLMs:</p>
+    <div class="mj">\[ \begin{aligned} \text{FFN}(x) &amp;= \text{GELU}(x W_1)\, W_2 \\ \text{FFN}_{\text{SwiGLU}}(x) &amp;= \big(\text{SiLU}(xW) \odot xV\big)\, W_2 \end{aligned} \]</div>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 700 300" role="img" aria-label="Top: a plain feed-forward block, x times W1 of size d by 4d, GELU, then W2 of size 4d by d. Bottom: SwiGLU, where x is projected twice, by a gate matrix W and a value matrix V, each d by d_ff; SiLU of the gate branch multiplies the value branch element by element, and W2 of size d_ff by d maps back to width d."><text x="20" y="24" style="fill:var(--ink);font-weight:600">Plain FFN: 2 matrices</text><rect class="box" x="20" y="40" width="64" height="36" rx="8"/><text x="52.0" y="63.0" text-anchor="middle">x</text><rect class="gbox" x="130" y="40" width="120" height="36" rx="8"/><text x="190.0" y="63.0" text-anchor="middle">· W₁</text><rect class="box" x="296" y="40" width="88" height="36" rx="8"/><text x="340.0" y="63.0" text-anchor="middle">GELU</text><rect class="gbox" x="430" y="40" width="120" height="36" rx="8"/><text x="490.0" y="63.0" text-anchor="middle">· W₂</text><rect class="box" x="596" y="40" width="84" height="36" rx="8"/><text x="638.0" y="63.0" text-anchor="middle">out</text><path class="hid" d="M84 58 H127" marker-end="url(#a-hid)"/><path class="hid" d="M250 58 H293" marker-end="url(#a-hid)"/><path class="hid" d="M384 58 H427" marker-end="url(#a-hid)"/><path class="hid" d="M550 58 H593" marker-end="url(#a-hid)"/><text class="lbl" x="52" y="92" text-anchor="middle">N × d</text><text class="lbl" x="190" y="92" text-anchor="middle">d × 4d</text><text class="lbl" x="340" y="92" text-anchor="middle">N × 4d</text><text class="lbl" x="490" y="92" text-anchor="middle">4d × d</text><text class="lbl" x="638" y="92" text-anchor="middle">N × d</text><path d="M20 112 H680" style="stroke:var(--rule);stroke-width:1;fill:none"/><text x="20" y="140" style="fill:var(--ink);font-weight:600">SwiGLU FFN: 3 matrices, hidden width ⅔ · 4d</text><rect class="box" x="20" y="196" width="64" height="36" rx="8"/><text x="52.0" y="219.0" text-anchor="middle">x</text><rect class="gbox" x="130" y="156" width="120" height="36" rx="8"/><text x="190.0" y="179.0" text-anchor="middle">· W  (gate)</text><rect class="gbox" x="130" y="236" width="120" height="36" rx="8"/><text x="190.0" y="259.0" text-anchor="middle">· V  (value)</text><rect class="box" x="296" y="156" width="88" height="36" rx="8"/><text x="340.0" y="179.0" text-anchor="middle">SiLU</text><circle class="op" cx="440" cy="214" r="14"/><text class="optx" x="440" y="220" text-anchor="middle">⊙</text><rect class="gbox" x="490" y="196" width="100" height="36" rx="8"/><text x="540.0" y="219.0" text-anchor="middle">· W₂</text><rect class="box" x="626" y="196" width="54" height="36" rx="8"/><text x="653.0" y="219.0" text-anchor="middle">out</text><path class="hid" d="M84 214 H104 V174 H127" marker-end="url(#a-hid)"/><path class="hid" d="M104 214 V254 H127" marker-end="url(#a-hid)"/><path class="hid" d="M250 174 H293" marker-end="url(#a-hid)"/><path class="hid" d="M384 174 H440 V197" marker-end="url(#a-hid)"/><path class="hid" d="M250 254 H440 V231" marker-end="url(#a-hid)"/><path class="hid" d="M454 214 H487" marker-end="url(#a-hid)"/><path class="hid" d="M590 214 H623" marker-end="url(#a-hid)"/><text class="lbl" x="52" y="248" text-anchor="middle">N × d</text><text class="lbl" x="190" y="208" text-anchor="middle">d × d_ff</text><text class="lbl" x="190" y="288" text-anchor="middle">d × d_ff</text><text class="lbl" x="340" y="208" text-anchor="middle">N × d_ff</text><text class="lbl" x="340" y="270" text-anchor="middle">N × d_ff</text><text class="lbl" x="540" y="248" text-anchor="middle">d_ff × d</text><text class="lbl" x="653" y="248" text-anchor="middle">N × d</text><text class="lbl" x="470" y="190" text-anchor="start">gate × value</text></svg>
+      </div>
+      <figcaption>The plain FFN widens each token to \(4d\), bends it, and projects back. SwiGLU makes two projections of width \(d_{ff}\): the SiLU of one gates the other, element by element, before the down-projection. Every token is processed independently.</figcaption>
+    </figure>
+    <div class="tbl"><table>
+      <thead><tr><th>Tensor</th><th>Shape</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>\(x\)</td><td>\(N \times d\)</td><td>\(N\) = batch × sequence length; each token is handled separately</td></tr>
+        <tr><td>\(W\) (gate), \(V\) (value, or “up”)</td><td>\(d \times d_{ff}\)</td><td>Two separate projections of the same \(x\)</td></tr>
+        <tr><td>\(xW\), \(xV\), \(\text{SiLU}(xW) \odot xV\)</td><td>\(N \times d_{ff}\)</td><td>The element-wise product keeps the shape</td></tr>
+        <tr><td>\(W_2\) (“down”)</td><td>\(d_{ff} \times d\)</td><td>Back to the model width</td></tr>
+        <tr><td>Output</td><td>\(N \times d\)</td><td>Added to the residual stream</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Why the hidden size is two-thirds of 4d</h3>
+    <p>The plain block has two \(d \times d_{ff}\) matrices, with \(d_{ff} = 4d\); SwiGLU has three. To keep the parameter count, and with it the compute per token, the same:</p>
+    <div class="mj">\[ \begin{aligned} P_{\text{plain}} &amp;= 2\, d\, d_{ff} \\ &amp;= 8\, d^2 \qquad (d_{ff} = 4d) \\ P_{\text{SwiGLU}} &amp;= 3\, d\, d_{ff}' \\ 3\, d\, d_{ff}' &amp;= 8\, d^2 \\ d_{ff}' &amp;= \tfrac{8}{3}\, d \\ &amp;= \tfrac{2}{3} \cdot 4d \end{aligned} \]</div>
+    <ul>
+      <li><strong>Equal parameters mean equal FLOPs.</strong> A matrix multiply costs about two FLOPs per parameter per token; the extra element-wise product is negligible. Shazeer's comparisons were made this way, at equal compute, which is why the gains count.</li>
+      <li><strong>In practice:</strong> LLaMA rounds \(\tfrac83 d\) up to a multiple of 256 (its 7B model has \(d = 4096\) and \(d_{ff} = 11008\)). PaLM kept \(d_{ff} = 4d\) and simply paid for the third matrix. Later models such as Mistral 7B and Llama 3 8B use \(3.5d\).</li>
+    </ul>
+
+    <h3>Why gating helps</h3>
+    <ul>
+      <li><strong>Multiplicative interactions.</strong> A plain FFN unit is a function of one projection, \(f(w \cdot x)\). A gated unit is a product of two, \(\text{SiLU}(w \cdot x)\,(v \cdot x)\). Near the origin that's a quadratic form in \(x\), so each unit directly computes a second-order interaction that a plain FFN has to assemble from many units. Even with no activation at all, the bilinear block \((xW \odot xV)W_2\) is non-linear, and in Shazeer's comparisons it beat the plain ReLU FFN.</li>
+      <li><strong>Input-dependent feature selection.</strong> The gate decides, per token, how much of each value feature passes, like an LSTM gate or an attention weight, instead of applying one fixed bend.</li>
+      <li><strong>A clean gradient path.</strong> The value branch is linear, so its gradient is just the gate's value, not multiplied by an activation's slope. This was Dauphin et al.'s argument for GLU over tanh-gated units. With \(h = \text{SiLU}(xW) \odot xV\), element by element:</li>
+    </ul>
+    <div class="mj">\[ \begin{aligned} \frac{\partial h}{\partial (xV)} &amp;= \text{SiLU}(xW) \\ \frac{\partial h}{\partial (xW)} &amp;= \text{SiLU}'(xW) \odot xV \end{aligned} \]</div>
+    <p>None of this is a proof. Shazeer credited the gains, “as all else, to divine benevolence”. The evidence is empirical, and it has held up at scale.</p>
+
+    <h3>Where it's used</h3>
+    <ul>
+      <li><strong>SwiGLU:</strong> PaLM, LLaMA 1–3, Mistral, Qwen and most open LLMs since 2023.</li>
+      <li><strong>GEGLU:</strong> T5 v1.1 and Gemma.</li>
+      <li><strong>Plain GELU FFN:</strong> encoders such as BERT and ViT, and GPT-2 and 3.</li>
+    </ul>
+
+    <h3>What if the FFN had no activation?</h3>
+    <p>The plain block collapses to \(x W_1 W_2\), a single \(d \times d\) linear map, with \(8d^2\) parameters doing the work of \(d^2\). Each token's processing becomes linear, and the FFN loses its role as a per-token store of learned features. The transformer as a whole stays non-linear, because attention's softmax, the product of attention weights with values, and LayerNorm are all non-linear in \(x\), but it's much weaker. For SwiGLU, removing SiLU leaves the bilinear block, which is still non-linear and still trains reasonably.</p>
+
+    <h3>ReLU's comeback: activation sparsity</h3>
+    <p>Smooth activations and SwiGLU almost never output exactly 0, so every row of \(W_2\) is used for every token. ReLU's exact zeros let inference skip the rows of \(W_2\) whose activations are 0. Two lines of work bring ReLU back for that reason:</p>
+    <ul>
+      <li><strong>Squared ReLU,</strong> \(\text{ReLU}(z)^2\), came out of an architecture search for transformers (Primer, So et al. 2021) and improved on ReLU and GELU in that setting.</li>
+      <li><strong>“ReLUfication”</strong> swaps a pretrained LLM's GELU or SiLU for ReLU and fine-tunes briefly. Most FFN activations then become exactly 0, which speeds up inference with little loss in quality (Mirzadeh et al. 2023).</li>
+    </ul>
+
+    <!-- outputs -->
+    <h2 id="outputs"><span class="pn">07</span>Output activations and losses</h2>
+    <p>Hidden activations are about gradient flow. The output activation is about the <strong>range of the target</strong>, and it comes paired with a loss: the negative log-likelihood of the distribution the output describes. For the standard pairs, the gradient at the logits is simply prediction minus target.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Target</th><th>Output and loss</th><th>Gradient at the logit</th></tr></thead>
+      <tbody>
+        <tr><td>Any real number</td><td>Identity; MSE (Gaussian NLL)</td><td>\(\hat y - y\)</td></tr>
+        <tr><td>One probability</td><td>Sigmoid; binary cross-entropy</td><td>\(\sigma(z) - y\)</td></tr>
+        <tr><td>One of \(K\) classes</td><td>Softmax; cross-entropy</td><td>\(p - y\)</td></tr>
+        <tr><td>Several independent labels</td><td>A sigmoid and a BCE per label</td><td>\(\sigma(z_k) - y_k\)</td></tr>
+        <tr><td>A count</td><td>Exp; Poisson NLL</td><td>\(\lambda - y\)</td></tr>
+        <tr><td>A positive scale or variance</td><td>Softplus \(+\,\epsilon\); Gaussian NLL</td><td>Through the variance term</td></tr>
+        <tr><td>A value in \([-1, 1]\)</td><td>tanh; MSE</td><td>Includes \(1 - \tanh^2\)</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Sigmoid with binary cross-entropy</h3>
+    <p>Two log identities do the work:</p>
+    <div class="mj">\[ \begin{aligned} \log \sigma(z) &amp;= z - \log\big(1 + e^{z}\big) \\ \log\big(1 - \sigma(z)\big) &amp;= -\log\big(1 + e^{z}\big) \end{aligned} \]</div>
+    <p>Substituting them:</p>
+    <div class="mj">\[ \begin{aligned} L &amp;= -y \log \sigma(z) - (1 - y) \log\big(1 - \sigma(z)\big) \\ &amp;= \log\big(1 + e^{z}\big) - y\, z \\ \frac{\partial L}{\partial z} &amp;= \sigma(z) - y \end{aligned} \]</div>
+    <p>The log's steep slope near 0 exactly cancels the sigmoid's flat tail, so a confidently wrong prediction still gets a gradient of nearly \(\pm 1\).</p>
+    <aside class="note trap"><p class="nl">Trap: a sigmoid output with MSE</p><p>Here the slope doesn't cancel:</p>
+      <div class="mj">\[ \begin{aligned} L &amp;= \tfrac12\big(\sigma(z) - y\big)^2 \\ \frac{\partial L}{\partial z} &amp;= \big(\sigma(z) - y\big)\, \sigma'(z) \\ &amp;= \big(\sigma(z) - y\big)\, \sigma(z)\, \big(1 - \sigma(z)\big) \end{aligned} \]</div>
+      <p>The extra \(\sigma(1 - \sigma)\) is near 0 whenever the output is saturated, including saturated at the wrong answer, so learning stalls exactly when the model is most wrong. The complaint that sigmoids make gradients vanish applies to hidden layers and to MSE outputs, not to sigmoid with cross-entropy.</p></aside>
+
+    <h3>Softmax with cross-entropy</h3>
+    <div class="mj">\[ p_i = \frac{e^{z_i}}{\sum_k e^{z_k}} \]</div>
+    <p>Softmax is the one activation that isn't element-wise: each output depends on every logit, because the classes compete for one unit of probability. Its Jacobian is easiest through the log:</p>
+    <div class="mj">\[ \begin{aligned} \log p_i &amp;= z_i - \log \textstyle\sum_k e^{z_k} \\ \frac{\partial \log p_i}{\partial z_j} &amp;= \delta_{ij} - p_j \\ \frac{\partial p_i}{\partial z_j} &amp;= p_i\, \big(\delta_{ij} - p_j\big) \end{aligned} \]</div>
+    <p>In matrix form:</p>
+    <div class="mj">\[ J = \operatorname{diag}(p) - p\, p^\top \]</div>
+    <ul>
+      <li><strong>Symmetric and positive semi-definite,</strong> with rank \(K - 1\).</li>
+      <li><strong>Every row sums to 0.</strong> Adding the same constant to every logit changes nothing: \(\operatorname{softmax}(z + c\mathbf 1) = \operatorname{softmax}(z)\). That's why implementations subtract \(\max z\) before exponentiating: no overflow, same answer.</li>
+      <li><strong>\(J \to 0\) as \(p\) becomes one-hot.</strong> A saturated softmax passes no gradient through itself, just like a saturated sigmoid. This matters in attention (section <a href="#dynamics">08</a>).</li>
+      <li><strong>The sigmoid is the two-class case.</strong> With logits \((z, 0)\):</li>
+    </ul>
+    <div class="mj">\[ \begin{aligned} \operatorname{softmax}\big((z, 0)\big)_1 &amp;= \frac{e^{z}}{e^{z} + 1} \\ &amp;= \sigma(z) \end{aligned} \]</div>
+    <p>With cross-entropy, the Jacobian collapses to prediction minus target. The last step uses \(\sum_i y_i = 1\), which also holds with label smoothing:</p>
+    <div class="mj">\[ \begin{aligned} L &amp;= -\textstyle\sum_i y_i \log p_i \\ \frac{\partial L}{\partial z_j} &amp;= -\textstyle\sum_i y_i\, \big(\delta_{ij} - p_j\big) \\ &amp;= -y_j + p_j \textstyle\sum_i y_i \\ &amp;= p_j - y_j \end{aligned} \]</div>
+
+    <h3>Temperature</h3>
+    <div class="mj">\[ p_i(T) = \frac{e^{z_i / T}}{\sum_k e^{z_k / T}} \]</div>
+    <ul>
+      <li><strong>\(T \to 0\):</strong> differences between logits are magnified, and \(p\) becomes one-hot on the largest logit (split evenly among ties): the hard argmax.</li>
+      <li><strong>\(T \to \infty\):</strong> differences vanish, and \(p\) becomes uniform, \(1/K\) each.</li>
+      <li><strong>The ranking never changes.</strong> \(T\) changes confidence, not the argmax. That's why temperature scaling, fitting one \(T\) on validation data, calibrates a classifier without touching its accuracy.</li>
+      <li><strong>Gradient:</strong> with a temperature, the cross-entropy gradient at the logits is \((p - y)/T\), and a small \(T\) also saturates \(p\), so very low temperatures make training brittle.</li>
+      <li><strong>Distillation</strong> trains a student on the teacher's softmax at \(T &gt; 1\), which exposes the relative sizes of the wrong-class probabilities. The soft loss is multiplied by \(T^2\), because its gradients shrink like \(1/T^2\) (Hinton et al. 2015).</li>
+      <li><strong>Sampling</strong> from a language model at \(T &lt; 1\) is more conservative; at \(T &gt; 1\), more diverse.</li>
+    </ul>
+    <p><strong>Why “softmax”:</strong> log-sum-exp is a smooth maximum, and the softmax is its gradient. The bounds below squeeze it onto the max as \(T \to 0\), so its gradient becomes the one-hot argmax. A more accurate name would be “soft argmax”.</p>
+    <div class="mj">\[ \begin{aligned} T \log \textstyle\sum_k e^{z_k / T} &amp;\ge \max_k z_k \\ T \log \textstyle\sum_k e^{z_k / T} &amp;\le \max_k z_k + T \log K \end{aligned} \]</div>
+
+    <h3>Softplus for positive outputs</h3>
+    <div class="mj">\[ \begin{aligned} \text{softplus}(z) &amp;= \log\big(1 + e^{z}\big) \\ \text{softplus}'(z) &amp;= \sigma(z) \end{aligned} \]</div>
+    <p>Softplus is strictly positive and smooth: close to \(z\) for large \(z\), and close to \(e^{z}\) for very negative \(z\). Use it when an output must be positive: a standard deviation or variance, a rate, a scale. For example, a network that predicts a mean \(\mu\) and a variance \(v\), trained with the Gaussian negative log-likelihood:</p>
+    <div class="mj">\[ \begin{aligned} L &amp;= \tfrac12 \log v + \frac{(y - \mu)^2}{2\, v} \\ v &amp;= \text{softplus}(z_v) + \epsilon \end{aligned} \]</div>
+    <ul>
+      <li><strong>Why not exp:</strong> exp grows exponentially, so one large logit gives a huge variance and huge gradients. Softplus grows linearly.</li>
+      <li><strong>Why the \(\epsilon\):</strong> without a floor the variance can collapse toward 0 on a point the mean fits exactly, sending the loss toward \(-\infty\).</li>
+      <li><strong>The alternative:</strong> predict \(\log v\) directly with an identity output. Also common, and fine with care.</li>
+    </ul>
+
+    <h3>Multi-class or multi-label</h3>
+    <ul>
+      <li><strong>Multi-class</strong> (exactly one true class): softmax with cross-entropy. Raising one class's probability necessarily lowers the others'.</li>
+      <li><strong>Multi-label</strong> (any subset can be true, like tags or diagnoses): one sigmoid per label, each with its own BCE. The labels don't compete, and the probabilities needn't sum to 1. A softmax would force true labels to split one unit of probability between them.</li>
+    </ul>
+
+    <h3>Why you pass logits to the loss</h3>
+    <ul>
+      <li><strong>Numerical stability.</strong> In float32, \(\sigma(z)\) rounds to exactly 1 once \(z\) is above about 17, so \(\log(1 - \sigma(z))\) becomes \(\log 0\). The logit form computes softplus stably as \(\max(z, 0) + \log(1 + e^{-\lvert z \rvert})\), and cross-entropy uses log-sum-exp with the max subtracted. Nothing overflows, and nothing hits \(\log 0\).</li>
+      <li><strong>An exact gradient.</strong> The fused loss returns \(p - y\) directly, instead of multiplying a huge \(1/p\) by a tiny \(\sigma'\) that may already have underflowed.</li>
+      <li><strong>No double activation.</strong> PyTorch's <code>CrossEntropyLoss</code> and <code>BCEWithLogitsLoss</code> apply log-softmax or log-sigmoid inside. Feeding them probabilities applies the activation twice: there's no error, the model just trains badly. (<code>NLLLoss</code> expects log-probabilities from <code>log_softmax</code>.)</li>
+      <li><strong>Low precision.</strong> In float16, \(e^{z}\) overflows once \(z\) is above about 11 (the largest float16 is 65504), so mixed-precision training computes softmax, log-softmax and the loss in float32; PyTorch's autocast does this for you. bfloat16 has float32's range but much less precision.</li>
+      <li>Apply the sigmoid or softmax only when you need probabilities, at inference.</li>
+    </ul>
+
+    <!-- dynamics -->
+    <h2 id="dynamics"><span class="pn">08</span>Activations and training dynamics</h2>
+
+    <h3>Initialization from variance propagation</h3>
+    <p>Take one unit, \(z = \sum_{j=1}^{n} w_j\, a_j\), with \(n\) inputs. Assume the weights are independent, have mean 0, and are independent of the inputs. Then the terms are uncorrelated with mean 0, and their variances add:</p>
+    <div class="mj">\[ \begin{aligned} \operatorname{Var}(z) &amp;= \sum_{j=1}^{n} \operatorname{Var}(w_j\, a_j) \\ &amp;= n\, \Big(\mathbb E[w^2]\, \mathbb E[a^2] - \big(\mathbb E[w]\, \mathbb E[a]\big)^2\Big) \\ &amp;= n\, \operatorname{Var}(w)\, \mathbb E[a^2] \end{aligned} \]</div>
+    <p>Note \(\mathbb E[a^2]\), the second moment, not \(\operatorname{Var}(a)\): ReLU and sigmoid outputs don't have mean 0. The signal keeps its size when this equals the previous layer's pre-activation variance:</p>
+    <div class="mj">\[ n\, \operatorname{Var}(w)\, \frac{\mathbb E[a^2]}{\operatorname{Var}(z_{\text{prev}})} = 1 \]</div>
+    <p>The ratio \(\mathbb E[a^2] / \operatorname{Var}(z_{\text{prev}})\) depends only on the activation, so each activation gets its own weight variance. For ReLU, with \(z\) symmetric around 0 (second line) and mean 0 (third line):</p>
+    <div class="mj">\[ \begin{aligned} \mathbb E\big[\text{ReLU}(z)^2\big] &amp;= \mathbb E\big[z^2\, \mathbf 1[z &gt; 0]\big] \\ &amp;= \tfrac12\, \mathbb E\big[z^2\big] \\ &amp;= \tfrac12\, \operatorname{Var}(z) \end{aligned} \]</div>
+    <div class="tbl"><table>
+      <thead><tr><th>Activation</th><th>\(\mathbb E[a^2] / \operatorname{Var}(z)\)</th><th>\(\operatorname{Var}(w)\)</th></tr></thead>
+      <tbody>
+        <tr><td>Linear, or tanh near 0</td><td>About 1</td><td>\(1/n_{\text{in}}\) (LeCun)</td></tr>
+        <tr><td>tanh, balancing both passes</td><td>About 1</td><td>\(2/(n_{\text{in}} + n_{\text{out}})\) (Xavier, or Glorot)</td></tr>
+        <tr><td>ReLU</td><td>1/2</td><td>\(2/n_{\text{in}}\) (He, or Kaiming)</td></tr>
+        <tr><td>Leaky ReLU or PReLU, slope \(\alpha\)</td><td>\((1 + \alpha^2)/2\)</td><td>\(2/\big((1 + \alpha^2)\, n_{\text{in}}\big)\)</td></tr>
+        <tr><td>SELU</td><td>1 at its fixed point</td><td>\(1/n_{\text{in}}\) (LeCun normal)</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Why it matters so much:</strong> over \(L\) layers the variance is multiplied by that factor \(L\) times. Anything other than 1 shrinks or grows exponentially before training has even started.</li>
+      <li><strong>Xavier's \(2/(n_{\text{in}} + n_{\text{out}})\):</strong> the backward pass sends the error through \(W^\top\), which sums over \(n_{\text{out}}\) terms, so preserving the gradient's variance wants \(1/n_{\text{out}}\) (for tanh near 0, where the slope is about 1). Glorot and Bengio averaged the two. As a uniform distribution the limits are \(\pm\sqrt{6/(n_{\text{in}} + n_{\text{out}})}\), since a uniform on \([-a, a]\) has variance \(a^2/3\).</li>
+      <li><strong>He, fan-in or fan-out:</strong> for ReLU the backward condition is the same with \(n_{\text{out}}\) (the mean squared slope is also 1/2). He et al. showed either one suffices: the other pass is then off by a constant factor overall, not an exponential one.</li>
+      <li><strong>Sigmoid fits none of these.</strong> Its output mean is 1/2, so \(\mathbb E[a^2]\) is at least 1/4 even when \(z = 0\), and its slope at 0 is only 1/4. One more reason it's kept for gates and outputs.</li>
+      <li><strong>Defaults:</strong> PyTorch's <code>nn.Linear</code> starts with \(\operatorname{Var}(w) = 1/(3 n_{\text{in}})\), smaller than He. ReLU codebases often call <code>kaiming_normal_</code> explicitly; <code>calculate_gain</code> gives \(\sqrt2\) for ReLU and 5/3 for tanh.</li>
+    </ul>
+
+    <h3>Where normalization goes</h3>
+    <ul>
+      <li><strong>Linear or conv → BatchNorm → ReLU</strong> is the standard order. The BatchNorm paper normalized pre-activations, which are closer to Gaussian than half-rectified outputs. Normalizing \(z\) every batch keeps each unit centred on ReLU's corner, so it fires on about half the batch, and keeps tanh and sigmoid inputs out of their flat tails. BatchNorm's learned shift \(\beta\) then sets each channel's firing threshold. A bias before BatchNorm is redundant: BatchNorm subtracts it.</li>
+      <li><strong>Pre-activation ResNets</strong> (He et al. 2016) order each residual branch BatchNorm → ReLU → conv and leave the skip path untouched. The original ResNet applied a ReLU after the addition, putting a bend on the identity path; removing it gave a clean gradient highway and trained deeper networks better.</li>
+      <li><strong>Transformers</strong> put the activation only inside the FFN branch: \(x + W_2\, f\big(W_1\, \text{LN}(x)\big)\) in the pre-LN layout. The residual stream itself never passes through an activation. A ReLU on the stream would zero part of the representation and mask the identity path's gradient.</li>
+      <li><strong>LayerNorm or RMSNorm</strong> before the FFN keeps its pre-activations near unit scale, which is where GELU's and SiLU's curved region lies.</li>
+    </ul>
+
+    <h3>What the backward pass must store</h3>
+    <ul>
+      <li><strong>ReLU</strong> needs only which units were on, and its output already says that, so it can run in place.</li>
+      <li><strong>Sigmoid and tanh</strong> need only their output, which is kept anyway (their slopes are written in terms of it).</li>
+      <li><strong>GELU and SiLU</strong> need their input, a full extra tensor per layer.</li>
+      <li><strong>A SwiGLU block</strong> keeps its input and both \(N \times d_{ff}\) projections, and often the gated product too, so FFN activations are a large share of training memory in LLMs.</li>
+      <li><strong>The remedies:</strong> activation checkpointing (store less, recompute during the backward pass) and fused kernels that compute an activation and its slope without materializing intermediates.</li>
+    </ul>
+
+    <h3>Activation statistics as a debugging tool</h3>
+    <p>Log these per layer every few hundred steps (forward hooks in PyTorch):</p>
+    <ul>
+      <li>the mean and standard deviation of the pre-activations;</li>
+      <li>for ReLU, the fraction of units that never fired over a window of batches (dead), and the fraction of zeros per batch (sparsity);</li>
+      <li>for tanh, the fraction of outputs beyond \(\pm 0.99\); for sigmoid, below 0.01 or above 0.99 (saturated);</li>
+      <li>the gradient norm per layer, and the ratio of update size to weight size (around \(10^{-3}\) is a common healthy range).</li>
+    </ul>
+    <div class="tbl"><table>
+      <thead><tr><th>What you see</th><th>What it means</th><th>What to try</th></tr></thead>
+      <tbody>
+        <tr><td>Pre-activation spread shrinks layer by layer</td><td>The signal is vanishing: initialization too small, or wrong for the activation</td><td>He for ReLU, LeCun or Xavier for tanh; normalization</td></tr>
+        <tr><td>Spread grows layer by layer; loss goes NaN</td><td>Exploding: initialization or learning rate too large</td><td>Smaller initialization or learning rate, clipping, normalization</td></tr>
+        <tr><td>tanh or sigmoid outputs piled at the ends</td><td>Saturation</td><td>Standardize inputs, smaller initialization, normalize before the activation</td></tr>
+        <tr><td>Dead fraction jumps after a learning-rate spike</td><td>Dead ReLUs</td><td>Lower learning rate or warmup, clipping, Leaky ReLU or GELU</td></tr>
+        <tr><td>Early layers' gradient norms far below later layers'</td><td>Vanishing gradients</td><td>A ReLU-family activation, residual connections, normalization</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Attention's softmax saturates too: the square root of d<sub>k</sub></h3>
+    <p>Attention scores are dot products of queries and keys. If their components are independent with mean 0 and variance 1:</p>
+    <div class="mj">\[ \begin{aligned} \operatorname{Var}(q \cdot k) &amp;= \sum_{i=1}^{d_k} \operatorname{Var}(q_i\, k_i) \\ &amp;= \sum_{i=1}^{d_k} \mathbb E\big[q_i^2\big]\, \mathbb E\big[k_i^2\big] \\ &amp;= d_k \end{aligned} \]</div>
+    <p>So raw scores have a standard deviation of \(\sqrt{d_k}\), which grows with the head size. Large scores push each row's softmax toward one-hot, its Jacobian \(\operatorname{diag}(p) - pp^\top\) goes to 0, and the queries and keys stop getting gradient. It's the sigmoid's saturation problem again, inside attention. Dividing by \(\sqrt{d_k}\) restores unit variance, the same variance-preserving logic as initialization:</p>
+    <div class="mj">\[ \text{Attention}(Q, K, V) = \operatorname{softmax}\Big(\frac{Q K^\top}{\sqrt{d_k}}\Big)\, V \]</div>
+    <p>Equivalently, \(\sqrt{d_k}\) is a fixed softmax temperature. During training, query and key norms can still grow and re-saturate attention in large models. The fixes are normalizing queries and keys (QK-norm, used in ViT-22B and several recent LLMs) and tanh soft-capping of the scores.</p>
+
+    <!-- choosing -->
+    <h2 id="choosing"><span class="pn">09</span>Choosing an activation</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Where</th><th>Default</th><th>Alternatives, and why</th></tr></thead>
+      <tbody>
+        <tr><td>MLP or CNN hidden layers</td><td>ReLU, with BatchNorm and He initialization</td><td>Leaky ReLU if many units die; SiLU or GELU in modern CNNs (EfficientNet, ConvNeXt) for a small gain</td></tr>
+        <tr><td>Deep MLP with no normalization</td><td>SELU with LeCun normal initialization and AlphaDropout</td><td>Or add LayerNorm and use ReLU with He initialization</td></tr>
+        <tr><td>Small MLP on tabular data</td><td>ReLU</td><td>With few layers almost anything trains; tune other things first</td></tr>
+        <tr><td>Transformer FFN: encoders, ViT, GPT-2-style</td><td>GELU</td><td>The BERT, GPT and ViT standard</td></tr>
+        <tr><td>Transformer FFN: modern LLMs</td><td>SwiGLU, \(d_{ff} \approx \tfrac23 \cdot 4d\)</td><td>GEGLU (T5 v1.1, Gemma)</td></tr>
+        <tr><td>RNN, LSTM, GRU</td><td>tanh for the state and candidate, sigmoid for gates</td><td>ReLU RNNs only with identity initialization and clipping</td></tr>
+        <tr><td>GAN</td><td>Leaky ReLU (0.2) in the discriminator; tanh at the generator's output</td><td>Images scaled to \([-1, 1]\)</td></tr>
+        <tr><td>Mobile, 8-bit inference</td><td>ReLU6, hard-swish, hard-sigmoid</td><td>Piecewise linear, bounded, no exponentials</td></tr>
+        <tr><td>Gates (LSTM, squeeze-and-excitation)</td><td>Sigmoid</td><td>SiLU or GELU gates in GLU variants</td></tr>
+        <tr><td>Output: regression</td><td>Identity, with MSE or Huber</td><td>tanh or a scaled sigmoid for a bounded target</td></tr>
+        <tr><td>Output: positive value or variance</td><td>Softplus \(+\,\epsilon\)</td><td>Exp with a Poisson loss for counts; or predict \(\log \sigma^2\)</td></tr>
+        <tr><td>Output: binary or multi-label</td><td>A sigmoid per output, with BCE on logits</td><td>Class weights or focal loss for imbalance</td></tr>
+        <tr><td>Output: multi-class</td><td>Softmax with cross-entropy on logits</td><td>Temperature-scale afterwards for calibration</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Three things never to do:</strong> sigmoid or tanh as the hidden activation of a deep plain stack; a ReLU on an output that must be a probability; a softmax or sigmoid before a loss that expects logits.</p>
+
+    <!-- code -->
+    <h2 id="code"><span class="pn">10</span>Pseudocode</h2>
+    <p>NumPy-style, with each forward pass caching what its backward pass needs. Every backward function takes <code>dy</code>, the gradient of the loss with respect to the output, and returns the gradient with respect to the input.</p>
+
+    <h3>ReLU</h3>
+    <pre class="code"><code>def relu_fwd(z):
+    mask = z &gt; 0                 <span class="cm"># cache: which units were on</span>
+    return z * mask, mask
+
+def relu_bwd(dy, mask):
+    return dy * mask             <span class="cm"># slope 1 where on, 0 where off</span></code></pre>
+
+    <h3>GELU, tanh approximation</h3>
+    <pre class="code"><code>C = sqrt(2 / pi)
+
+def gelu_fwd(z):
+    u = C * (z + 0.044715 * z**3)
+    t = tanh(u)
+    return 0.5 * z * (1 + t), (z, t)
+
+def gelu_bwd(dy, cache):
+    z, t = cache
+    du = C * (1 + 3 * 0.044715 * z**2)     <span class="cm"># du/dz</span>
+    dz = 0.5 * (1 + t) + 0.5 * z * (1 - t**2) * du
+    return dy * dz                         <span class="cm"># product rule, tanh' = 1 - t^2</span></code></pre>
+
+    <h3>SiLU</h3>
+    <pre class="code"><code>def silu_fwd(z):
+    s = sigmoid(z)
+    return z * s, (z, s)
+
+def silu_bwd(dy, cache):
+    z, s = cache
+    return dy * s * (1 + z * (1 - s))      <span class="cm"># sigma (1 + z (1 - sigma))</span></code></pre>
+
+    <h3>SwiGLU feed-forward block, with shapes</h3>
+    <pre class="code"><code><span class="cm"># X: (N, d), N = batch * seq_len</span>
+<span class="cm"># W, V: (d, f)   W2: (f, d)   f = d_ff, about 8d/3</span>
+def swiglu_fwd(X, W, V, W2):
+    G = X @ W                    <span class="cm"># (N, f) gate pre-activation</span>
+    U = X @ V                    <span class="cm"># (N, f) value branch</span>
+    S = sigmoid(G)
+    A = G * S                    <span class="cm"># (N, f) SiLU(gate)</span>
+    H = A * U                    <span class="cm"># (N, f) gated hidden</span>
+    Y = H @ W2                   <span class="cm"># (N, d)</span>
+    return Y, (X, G, S, A, U, H)
+
+def swiglu_bwd(dY, cache, W, V, W2):
+    X, G, S, A, U, H = cache
+    dW2 = H.T @ dY               <span class="cm"># (f, d)</span>
+    dH = dY @ W2.T               <span class="cm"># (N, f)</span>
+    dA = dH * U                  <span class="cm"># product rule: each factor</span>
+    dU = dH * A                  <span class="cm">#   gets the other one</span>
+    dG = dA * S * (1 + G * (1 - S))   <span class="cm"># SiLU slope</span>
+    dW = X.T @ dG                <span class="cm"># (d, f)</span>
+    dV = X.T @ dU                <span class="cm"># (d, f)</span>
+    dX = dG @ W.T + dU @ V.T     <span class="cm"># (N, d): X feeds both branches</span>
+    return dX, dW, dV, dW2</code></pre>
+    <p>The forward and backward passes above were checked against finite differences. Note the two terms in <code>dX</code>: \(X\) is used twice, so its gradient is the sum over both paths.</p>
+
+    <h3>A dead-unit and saturation monitor (PyTorch)</h3>
+    <pre class="code"><code>alive, sat = {}, {}              <span class="cm"># layer name -&gt; stats</span>
+
+def watch(name):
+    def hook(module, inp, out):  <span class="cm"># out: (..., units)</span>
+        flat = (out &gt; 0).reshape(-1, out.shape[-1])
+        on = flat.any(dim=0)               <span class="cm"># fired on any row</span>
+        alive[name] = alive.get(name, on) | on
+    return hook
+
+def watch_tanh(name):
+    def hook(module, inp, out):  <span class="cm"># saturated share</span>
+        frac = (out.abs() &gt; 0.99).float().mean().item()
+        sat.setdefault(name, []).append(frac)
+    return hook
+
+for name, m in model.named_modules():
+    if isinstance(m, nn.ReLU):
+        m.register_forward_hook(watch(name))
+    if isinstance(m, nn.Tanh):
+        m.register_forward_hook(watch_tanh(name))
+
+<span class="cm"># run ~50 batches under torch.no_grad(), then:</span>
+for name, a in alive.items():
+    print(name, "dead:", 1 - a.float().mean().item())
+for name, f in sat.items():
+    print(name, "saturated:", sum(f) / len(f))
+alive.clear(); sat.clear()       <span class="cm"># start a new window</span></code></pre>
+    <ul>
+      <li><strong>Dead means never fired over the whole window,</strong> not zero on one batch.</li>
+      <li><strong>Units on the last axis:</strong> the reshape handles both \(B \times \text{units}\) and transformer-style \(B \times T \times \text{units}\).</li>
+      <li><strong>For conv layers</strong> (<code>out</code> of shape \(B \times C \times H \times W\)), the units are channels on axis 1, so reduce over every other axis: <code>(out &gt; 0).any(dim=(0, 2, 3))</code>.</li>
+      <li><strong>Hooks see modules, not calls.</strong> A single <code>nn.ReLU</code> reused in several places mixes their statistics, and functional <code>F.relu</code> calls aren't hooked at all. In those cases, hook the preceding linear layer and test its output, the pre-activation, for \(&gt; 0\).</li>
+    </ul>
+
+    <!-- questions -->
+    <h2 id="questions"><span class="pn">11</span>Interview questions</h2>
+    <p>Answer out loud first, then open the answer.</p>
+    <details class="qa"><summary><span class="qn">1</span>Why do networks need non-linear activations? What does a deep network without them compute?</summary><div class="ans"><p>Each layer would be affine, and a composition of affine maps is affine:</p><div class="mj">\[ \begin{aligned} y &amp;= W_2(W_1 x + b_1) + b_2 \\ &amp;= (W_2 W_1)\, x + (W_2 b_1 + b_2) \\ &amp;= W' x + b' \end{aligned} \]</div><p>So any depth is one linear layer: linear or logistic regression, with flat decision boundaries and no XOR. Training is still non-convex, and a narrow layer limits the rank, but the set of functions never grows. The activation is what lets each layer build new features from the last layer's. (<a href="#why">01</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">2</span>What does the universal approximation theorem promise, and what doesn't it?</summary><div class="ans"><p>One hidden layer with any continuous, non-polynomial activation can approximate any continuous function on a closed, bounded region as closely as you like, given enough units. It doesn't bound the number of units (exponential in the input dimension for some functions), doesn't say gradient descent will find the weights, says nothing about generalizing from finite data, and nothing outside that region. It's an existence result; the practical case for depth is efficiency. (<a href="#why">01</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">3</span>If one hidden layer is enough, why go deep?</summary><div class="ans"><p>Efficiency. A ReLU network is piecewise linear. On a 1-D input, one hidden layer of \(n\) units makes at most \(n + 1\) pieces, but each extra layer can fold the input and double the pieces: the tent map composed \(L\) times gives \(2^L\) pieces from \(2L\) units. Some functions need exponentially many units in a shallow network and only polynomially many in a deep one. Depth also reuses features hierarchically. The caveat: trained networks use far fewer regions than the theoretical maximum. (<a href="#why">01</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">4</span>Can a network with only ReLUs approximate a smooth function?</summary><div class="ans"><p>Yes, as closely as you like on a bounded region. ReLU isn't a polynomial, so the universal approximation theorem applies, and deep ReLU nets approximate \(x^2\), and from it products and polynomials, with error falling exponentially in depth. But the result is always piecewise linear: its slope is piecewise constant and its second derivative is 0 almost everywhere. If you need smooth derivatives of the output with respect to the input (physics-informed losses, forces as gradients of an energy), use a smooth activation such as tanh, SiLU or softplus. (<a href="#why">01</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">5</span>Why not use sigmoid in hidden layers?</summary><div class="ans"><ul><li><strong>Small slope:</strong> \(\sigma'(z) = \sigma(z)(1 - \sigma(z))\), at most 1/4, so backprop shrinks the error by at least 4× per layer from the slopes alone, about \(4^{-L}\) over \(L\) layers.</li><li><strong>Saturation:</strong> in the tails the slope is about \(e^{-\lvert z\rvert}\), so saturated units get no gradient.</li><li><strong>Not zero-centred:</strong> outputs are all positive (mean about 0.5), so a unit's weight gradients share one sign per example (zig-zag), and the next layer's loss surface is badly conditioned.</li><li><strong>Cost:</strong> an exponential per unit.</li></ul><p>It's fine at the output with BCE, and as a gate. (<a href="#sigmoid">02</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">6</span>Derive tanh′, and show tanh(z) = 2σ(2z) − 1. Why is tanh better than sigmoid in hidden layers?</summary><div class="ans"><div class="mj">\[ \begin{aligned} \tanh' z &amp;= 1 - \tanh^2 z \\ 2\sigma(2z) - 1 &amp;= \frac{1 - e^{-2z}}{1 + e^{-2z}} \\ &amp;= \tanh z \end{aligned} \]</div><p>So tanh is a sigmoid stretched and centred: the same function class, since the rescaling folds into weights and biases. It's better for optimization: four times the peak slope (1 against 1/4), and zero-centred outputs, so the weights into a unit can move in different directions on one example. It still saturates, with a slope of about \(4e^{-2\lvert z\rvert}\) in the tails. (<a href="#sigmoid">02</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">7</span>Why does ReLU train faster than tanh? What is its derivative at 0?</summary><div class="ans"><p>On active units the slope is exactly 1, so the activation never shrinks the backpropagated error; it doesn't saturate for positive inputs; about half the units are off, so representations are sparse; and it's a comparison forward and a mask backward. AlexNet reported about 6× faster training to the same error. At 0 there's a corner: any value in \([0, 1]\) is a subgradient. Frameworks use 0. It rarely matters in float32, but in low precision exact zeros are common enough that the choice can change training. (<a href="#relu">03</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">8</span>What is a dead ReLU? How do you detect and fix it?</summary><div class="ans"><p>A unit whose pre-activation is negative on every input: its output and slope are 0 everywhere, so all its weight and bias gradients are exactly 0, and it never recovers unless the layers below shift its inputs. The usual cause is a too-large update (high learning rate, outlier batch) driving the bias negative; non-negative inputs from earlier ReLUs make all-negative weights fatal. <strong>Detect:</strong> per unit, track whether it fired at least once over many batches, and plot the dead fraction per layer over training. <strong>Fix:</strong> lower learning rate or warmup, He initialization, BatchNorm before the ReLU, gradient clipping, or Leaky ReLU, ELU or GELU. (<a href="#relu">03</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">9</span>What happens if all of a layer's pre-activations are negative?</summary><div class="ans"><p><strong>For one example:</strong> a ReLU layer outputs all zeros, the next layer sees only its biases, and no gradient flows below this layer for that example. <strong>For every example:</strong> the network's output is constant, every layer below gets zero gradient for good, and the loss sits at the best constant prediction. With Leaky ReLU the layer still passes \(\alpha\) times the gradient; with GELU or SiLU small negative outputs and gradients survive, though they're tiny far from 0. With sigmoid or tanh, strongly negative pre-activations give the same failure as saturation: outputs pinned near 0 or \(-1\), with slopes near 0. (<a href="#relu">03</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">10</span>Derive He initialization. Why the factor 2?</summary><div class="ans"><p>For \(z = \sum_j w_j a_j\) with \(n\) independent, mean-zero weights, the variances of the terms add (first line). For ReLU and a symmetric previous pre-activation, half the mass is zeroed (second line):</p><div class="mj">\[ \begin{aligned} \operatorname{Var}(z) &amp;= n\, \operatorname{Var}(w)\, \mathbb E[a^2] \\ &amp;= n\, \operatorname{Var}(w) \cdot \tfrac12 \operatorname{Var}(z_{\text{prev}}) \end{aligned} \]</div><p>Setting \(\operatorname{Var}(z)\) equal to \(\operatorname{Var}(z_{\text{prev}})\):</p><div class="mj">\[ \operatorname{Var}(w) = \frac{2}{n} \]</div><p>The 2 puts back the half that ReLU removes; without it the variance halves at every layer. tanh, nearly linear near 0, gets \(1/n\) (or Xavier's \(2/(n_{\text{in}} + n_{\text{out}})\) to balance the backward pass), and SELU gets LeCun normal. (<a href="#dynamics">08</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">11</span>Leaky ReLU, PReLU, ELU and SELU: what does each fix? What does SELU need?</summary><div class="ans"><ul><li><strong>Leaky ReLU:</strong> a fixed small negative slope, so units can't die.</li><li><strong>PReLU:</strong> the negative slope is learned, usually per channel.</li><li><strong>ELU:</strong> a smooth negative side that saturates at \(-\alpha\), pulling mean activations toward 0 and giving a noise-robust “off” value.</li><li><strong>SELU:</strong> a scaled ELU whose constants (\(\lambda \approx 1.0507\), \(\alpha \approx 1.6733\)) make mean 0 and variance 1 an attracting fixed point, so activations self-normalize without BatchNorm.</li></ul><p>SELU needs LeCun normal initialization, standardized inputs, AlphaDropout instead of dropout, and a plain feed-forward stack: residual additions and normalization layers break the argument. (<a href="#variants">04</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">12</span>What is GELU, and why do BERT and GPT use it?</summary><div class="ans"><p>\(\text{GELU}(z) = z\Phi(z)\): the expected value of \(z\) times a Bernoulli mask with keep-probability \(\Phi(z)\), an input-dependent blend of ReLU and dropout. It's smooth, ReLU-like far from 0, dips slightly negative, and keeps some gradient for moderately negative inputs. GPT adopted it after the GELU paper showed small gains over ReLU and ELU, BERT followed GPT, and later controlled comparisons in transformer FFNs found it roughly level with ReLU, with gated variants clearly ahead. Smoothness and fewer dead units are the usual explanations, but any gain over ReLU is small. The 2017 transformer used ReLU, and most recent LLMs moved on to SwiGLU. (<a href="#smooth">05</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">13</span>GELU or SiLU? Is a non-monotonic activation a problem?</summary><div class="ans"><p>Both are \(z\) times a soft switch: \(\Phi(z)\) for GELU, \(\sigma(z)\) for SiLU. GELU is close to \(z\sigma(1.702z)\), so its switch is steeper and it hugs ReLU more closely; its left tail dies off at a Gaussian rate, while SiLU's decays like \(ze^{z}\). Both have a small dip (minimum about \(-0.17\) for GELU, \(-0.28\) for SiLU). Non-monotonicity isn't a problem: gradient descent doesn't need it, the negative-slope region is small, and the bump keeps gradients alive for slightly negative inputs. (<a href="#smooth">05</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">14</span>What is SwiGLU, and why does it use 2/3 of the usual hidden size?</summary><div class="ans"><p>\(\text{FFN}(x) = (\text{SiLU}(xW) \odot xV)\, W_2\): a SiLU gate multiplies a linear value projection, element by element. That's three matrices instead of two. To match a plain FFN with \(d_{ff} = 4d\), which has \(8d^2\) parameters and the same FLOPs per token:</p><div class="mj">\[ \begin{aligned} 3\, d\, d_{ff}' &amp;= 2\, d \cdot 4d \\ d_{ff}' &amp;= \tfrac83\, d \end{aligned} \]</div><p>That's two-thirds of \(4d\). LLaMA rounds it up to a multiple of 256 (11008 for \(d = 4096\)). Shazeer's comparisons were at equal compute, so the gain isn't just extra parameters; PaLM kept \(4d\) and paid for the third matrix. (<a href="#glu">06</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">15</span>What happens if you remove the activation from a transformer's FFN?</summary><div class="ans"><p>The plain FFN becomes \(xW_1W_2\), one \(d \times d\) linear map, so each token's processing is linear and the FFN stops working as a per-token store of learned features. The model isn't linear overall, because attention (the softmax, and attention weights multiplying values) and LayerNorm are non-linear in \(x\), but it's much weaker. In SwiGLU, removing SiLU leaves the bilinear \((xW \odot xV)W_2\), which is still non-linear (quadratic) and trains reasonably. (<a href="#glu">06</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">16</span>Softmax temperature: what happens as T → 0 and T → ∞? What's the softmax Jacobian?</summary><div class="ans"><p>With \(p = \operatorname{softmax}(z/T)\): as \(T \to 0\), \(p\) becomes one-hot on the argmax (a hard max); as \(T \to \infty\), it becomes uniform, \(1/K\). The ranking never changes, only the confidence, so temperature scaling calibrates without changing accuracy, and LLM sampling uses it to trade predictability for diversity. The Jacobian is \(\operatorname{diag}(p) - pp^\top\): symmetric, rows summing to 0 (shift invariance), and going to 0 as \(p\) becomes one-hot, which is why a saturated softmax passes no gradient. With cross-entropy the gradient at the logits is \(p - y\), divided by \(T\) when there's a temperature. (<a href="#outputs">07</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">17</span>Why pass logits rather than probabilities to the loss? Why not MSE on a sigmoid output?</summary><div class="ans"><p>Stability and an exact gradient. In float32, \(\sigma(z)\) rounds to 1 above \(z \approx 17\), so \(\log(1 - \sigma)\) becomes \(\log 0\); the logit form uses softplus and log-sum-exp with the max subtracted, and returns \(p - y\) directly. Passing probabilities to <code>CrossEntropyLoss</code> or <code>BCEWithLogitsLoss</code> applies the activation twice and silently trains badly. MSE on a sigmoid output has gradient \((\sigma - y)\,\sigma(1 - \sigma)\), which vanishes whenever the output is saturated, even at the wrong answer; cross-entropy's log cancels that factor. (<a href="#outputs">07</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">18</span>Multi-class or multi-label output? And how would you output a variance?</summary><div class="ans"><p><strong>Multi-class</strong> (exactly one label): softmax with cross-entropy; the classes compete. <strong>Multi-label</strong> (any subset): an independent sigmoid with BCE per label; the probabilities needn't sum to 1, and a softmax would force true labels to split probability. <strong>A variance</strong>, or any positive quantity: \(\text{softplus}(z) + \epsilon\) (linear growth, stable gradients, and a floor so the variance can't collapse), trained with the Gaussian NLL; or predict \(\log \sigma^2\) with an identity output. Counts: exp with a Poisson loss. (<a href="#outputs">07</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">19</span>Why is attention scaled by the square root of d<sub>k</sub>?</summary><div class="ans"><p>With independent mean-0, variance-1 components, \(\operatorname{Var}(q \cdot k) = d_k\), so raw scores have standard deviation \(\sqrt{d_k}\). Large scores saturate the softmax toward one-hot, its Jacobian \(\operatorname{diag}(p) - pp^\top\) goes to 0, and the queries and keys stop learning: the same saturation that stalls sigmoid units. Dividing by \(\sqrt{d_k}\) restores unit variance. Not \(d_k\), because it's the variance that grows with \(d_k\), so the standard deviation grows with \(\sqrt{d_k}\). QK-norm and logit soft-capping handle the same problem when norms grow during training. (<a href="#dynamics">08</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">20</span>Why do LSTM gates use sigmoid and the candidate tanh? Could an RNN use ReLU?</summary><div class="ans"><p>A gate is a fraction to let through, so it needs \((0, 1)\), and saturation is useful for a gate (fully open or shut). The candidate and the cell output are signed values that must stay bounded in a loop applied hundreds of times, so they use tanh's \((-1, 1)\). The LSTM resists vanishing gradients through its additive cell update, not through its activations. A vanilla RNN can use ReLU only with care: it's unbounded, and with the same weights reused every step the state and gradients can explode; identity initialization of the recurrent weights (IRNN) plus gradient clipping makes it trainable. (<a href="#sigmoid">02</a>)</p></div></details>
+
+    <!-- sheet -->
+    <h2 id="sheet"><span class="pn">12</span>Cheat sheet</h2>
+    <div class="sheet">
+      <h3>Functions and slopes</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Function and slope</th><th>Range · use it for</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Sigmoid</strong><br>\(1/(1 + e^{-z})\)<br><span class="src">slope:</span> \(\sigma(1 - \sigma)\), at most 1/4</td><td>\((0, 1)\) · gates; binary and multi-label outputs</td></tr>
+          <tr><td><strong>tanh</strong><br>\(2\sigma(2z) - 1\)<br><span class="src">slope:</span> \(1 - \tanh^2\), at most 1</td><td>\((-1, 1)\) · RNN states; bounded outputs</td></tr>
+          <tr><td><strong>ReLU</strong><br>\(\max(0, z)\)<br><span class="src">slope:</span> 1 if \(z &gt; 0\), else 0</td><td>\([0, \infty)\) · default MLP and CNN hidden layers</td></tr>
+          <tr><td><strong>Leaky ReLU, PReLU</strong><br>\(\max(\alpha z, z)\)<br><span class="src">slope:</span> 1 or \(\alpha\)</td><td>All reals · nets losing units; GANs</td></tr>
+          <tr><td><strong>ELU</strong><br>\(z\); \(\alpha(e^{z} - 1)\) if \(z \le 0\)<br><span class="src">slope:</span> 1, or \(\text{ELU}(z) + \alpha\)</td><td>\((-\alpha, \infty)\) · smoother, mean nearer 0</td></tr>
+          <tr><td><strong>SELU</strong><br>\(\lambda \cdot \text{ELU}_\alpha(z)\)<br><span class="src">slope:</span> \(\lambda\), or \(\lambda\alpha e^{z}\)</td><td>\((-\lambda\alpha, \infty)\) · self-normalizing MLPs</td></tr>
+          <tr><td><strong>ReLU6</strong><br>\(\min(\max(0, z), 6)\)<br><span class="src">slope:</span> 1 on \((0, 6)\), else 0</td><td>\([0, 6]\) · mobile, 8-bit</td></tr>
+          <tr><td><strong>Hard-swish</strong><br>\(z \cdot \text{ReLU6}(z + 3)/6\)<br><span class="src">slope:</span> 0, \((2z + 3)/6\), or 1</td><td>\([-3/8, \infty)\) · MobileNetV3</td></tr>
+          <tr><td><strong>Softplus</strong><br>\(\log(1 + e^{z})\)<br><span class="src">slope:</span> \(\sigma(z)\)</td><td>\((0, \infty)\) · positive outputs, variances</td></tr>
+          <tr><td><strong>GELU</strong><br>\(z\Phi(z)\)<br><span class="src">slope:</span> \(\Phi(z) + z\varphi(z)\)</td><td>From about \(-0.17\) · BERT, GPT, ViT FFNs</td></tr>
+          <tr><td><strong>SiLU (Swish)</strong><br>\(z\sigma(z)\)<br><span class="src">slope:</span> \(\sigma(1 + z(1 - \sigma))\)</td><td>From about \(-0.28\) · EfficientNet; inside SwiGLU</td></tr>
+          <tr><td><strong>Mish</strong><br>\(z \tanh(\text{softplus}(z))\)<br><span class="src">slope:</span> Smooth, about \(-0.11\) to 1.09</td><td>From about \(-0.31\) · YOLOv4</td></tr>
+          <tr><td><strong>SwiGLU</strong><br>\((\text{SiLU}(xW) \odot xV)\, W_2\)<br><span class="src">slope:</span> Gate and value paths</td><td>All reals · LLM FFNs, \(d_{ff} \approx \tfrac83 d\)</td></tr>
+          <tr><td><strong>Softmax</strong><br>\(e^{z_i} / \sum_k e^{z_k}\)<br><span class="src">slope:</span> \(\operatorname{diag}(p) - pp^\top\)</td><td>Probability simplex · multi-class outputs; attention</td></tr>
+        </tbody>
+      </table></div>
+      <h3>Initialization</h3>
+      <div class="mj">\[ \begin{aligned} \operatorname{Var}(z) &amp;= n\, \operatorname{Var}(w)\, \mathbb E[a^2] \\ \text{LeCun: } \operatorname{Var}(w) &amp;= 1/n_{\text{in}} \\ \text{Xavier: } \operatorname{Var}(w) &amp;= 2/(n_{\text{in}} + n_{\text{out}}) \\ \text{He: } \operatorname{Var}(w) &amp;= 2/n_{\text{in}} \end{aligned} \]</div>
+      <p>LeCun for SELU (and tanh), Xavier for tanh, He for ReLU; scale He by \(1/(1 + \alpha^2)\) for a leaky slope \(\alpha\). Sigmoid fits none of them well.</p>
+      <h3>Outputs and saturation</h3>
+      <p>Sigmoid with BCE and softmax with cross-entropy both give prediction minus target at the logits. A saturated softmax passes no gradient, hence the attention scaling.</p>
+      <div class="mj">\[ \begin{aligned} \partial L / \partial z &amp;= p - y \\ J_{\text{softmax}} &amp;= \operatorname{diag}(p) - pp^\top \\ \text{scores} &amp;= QK^\top / \sqrt{d_k} \end{aligned} \]</div>
+      <h3>Identities worth remembering</h3>
+      <div class="mj">\[ \begin{aligned} \tanh z &amp;= 2\sigma(2z) - 1 \\ \text{GELU}''(z) &amp;= \varphi(z)\,(2 - z^2) \\ \text{softplus}'(z) &amp;= \sigma(z) \\ d_{ff}^{\text{SwiGLU}} &amp;= \tfrac23 \cdot 4d \end{aligned} \]</div>
+    </div>
+
+    <footer>Sources: Cybenko 1989; Hornik 1991; Leshno et al. 1993; LeCun et al., “Efficient BackProp” 1998; Glorot and Bengio 2010; Goodfellow et al. 2013 (maxout); Krizhevsky et al. 2012 (AlexNet); Montúfar et al. 2014; He et al. 2015 (PReLU, He initialization) and 2016 (pre-activation ResNets); Clevert et al. 2015 (ELU); Hinton et al. 2015 (distillation); Hendrycks and Gimpel 2016 (GELU); Telgarsky 2016; Dauphin et al. 2017 (GLU); Klambauer et al. 2017 (SELU); Ramachandran et al. 2017 (Swish); Elfwing et al. 2017 (SiLU); Vaswani et al. 2017; Yarotsky 2017; Sandler et al. 2018 (MobileNetV2); Howard et al. 2019 (MobileNetV3); Hanin and Rolnick 2019; Misra 2019 (Mish); Shazeer 2020 (GLU variants); Narang et al. 2021; So et al. 2021 (Primer); Bertoin et al. 2021; Mirzadeh et al. 2023 (ReLU sparsity).<span class="site-nav"><a href="./">More study notes</a> · <a href="../">Deepam Minda</a></span></footer>
+
+  </article>
+</div>
+<a class="jump" href="#tldr">Contents ↑</a>
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+  svg: { fontCache: "global" },
+  options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script>
+(function () {
+  var d = document.getElementById("tocd");
+  var wide = window.matchMedia("(min-width: 1081px)");
+  function sync() { d.open = wide.matches; }
+  sync();
+  if (wide.addEventListener) wide.addEventListener("change", sync);
+  var jump = document.querySelector(".jump");
+  jump.addEventListener("click", function () { if (!wide.matches) d.open = true; });
+  d.addEventListener("click", function (e) {
+    if (!wide.matches && e.target.closest("a")) d.open = false;
+  });
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+  function spy() {
+    var y = window.scrollY + 120, cur = 0;
+    targets.forEach(function (t, i) { if (t && t.getBoundingClientRect().top + window.scrollY <= y) cur = i; });
+    links.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
+  }
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+})();
+</script>
+
+<script>
+(function () {
+  var root = document.documentElement, b = document.getElementById("theme-toggle");
+  function cur() { return root.getAttribute("data-theme") === "light" ? "light" : "dark"; }
+  function label() { b.setAttribute("aria-label", "Switch to " + (cur() === "dark" ? "light" : "dark") + " mode"); }
+  b.addEventListener("click", function () {
+    var n = cur() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", n);
+    try { localStorage.setItem("deepam-theme", n); } catch (e) {}
+    label();
+  });
+  label();
+})();
+</script>
+</body>
+</html>

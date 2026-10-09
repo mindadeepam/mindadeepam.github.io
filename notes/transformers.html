@@ -279,8 +279,8 @@ footer .site-nav { display: block; margin-top: 10px; }
 
     <h3>1. Seq2seq: encode, then decode (Sutskever, Vinyals and Le, 2014)</h3>
     <p>An LSTM <strong>encoder</strong> reads the source sentence. Its last state is handed to an LSTM <strong>decoder</strong>, which writes the output one token at a time, each output becoming the next input:</p>
-    <div class="mj">\[ h_j = \text{LSTM}_{\text{enc}}(x_j, h_{j-1}) \qquad c = h_T \]</div>
-    <div class="mj">\[ s_t = \text{LSTM}_{\text{dec}}(y_{t-1}, s_{t-1}),\ \ s_0 = c \qquad p(y_t \mid y_{&lt;t}, x) = \text{softmax}(W s_t) \qquad L = -\sum_t \log p(y_t \mid y_{&lt;t}, x) \]</div>
+    <div class="mj">\[ \begin{aligned} h_j &amp;= \text{LSTM}_{\text{enc}}(x_j, h_{j-1}) \\ c &amp;= h_T \end{aligned} \]</div>
+    <div class="mj">\[ \begin{aligned} s_0 &amp;= c \\ s_t &amp;= \text{LSTM}_{\text{dec}}(y_{t-1}, s_{t-1}) \\ p(y_t \mid y_{&lt;t}, x) &amp;= \text{softmax}(W s_t) \\ L &amp;= -\sum_t \log p(y_t \mid y_{&lt;t}, x) \end{aligned} \]</div>
     <figure>
       <div class="plate">
         <svg class="dg" viewBox="0 0 720 250" role="img" aria-label="Seq2seq. An LSTM encoder reads the, cat, sat, end; its last state is the only thing passed to an LSTM decoder, which outputs le, chat, assis, end, feeding each output back in as the next input.">
@@ -320,8 +320,8 @@ footer .site-nav { display: block; margin-top: 10px; }
 
     <h3>2. Attention: let the decoder look back (Bahdanau, Cho and Bengio, 2014)</h3>
     <p>Keep <em>every</em> encoder state. At each decoder step, score each one against the decoder's current state, softmax the scores into weights, and read their weighted sum, the <strong>context</strong>:</p>
-    <div class="mj">\[ e_{tj} = v^\top \tanh(W s_{t-1} + U h_j) \quad \text{(additive; Luong's dot-product version: } e_{tj} = s_{t-1}^\top h_j\text{)} \]</div>
-    <div class="mj">\[ \alpha_{tj} = \frac{\exp(e_{tj})}{\sum_k \exp(e_{tk})} \qquad c_t = \sum_j \alpha_{tj} h_j \qquad s_t = \text{LSTM}_{\text{dec}}([y_{t-1};\, c_t],\ s_{t-1}) \]</div>
+    <div class="mj">\[ \begin{aligned} e_{tj} &amp;= v^\top \tanh(W s_{t-1} + U h_j) &amp;&amp; \text{additive (Bahdanau)} \\ e_{tj} &amp;= s_{t-1}^\top h_j &amp;&amp; \text{dot product (Luong's version)} \end{aligned} \]</div>
+    <div class="mj">\[ \begin{aligned} \alpha_{tj} &amp;= \frac{\exp(e_{tj})}{\sum_k \exp(e_{tk})} \\ c_t &amp;= \sum_j \alpha_{tj} h_j \\ s_t &amp;= \text{LSTM}_{\text{dec}}([y_{t-1};\, c_t],\ s_{t-1}) \end{aligned} \]</div>
     <div class="tbl"><table>
       <thead><tr><th>Thing</th><th>Shape</th><th>Note</th></tr></thead>
       <tbody>
@@ -396,7 +396,7 @@ y_hat   = softmax(W_out @ s + b_out)              <span class="cm"># next-word p
     <p>Each token starts as an embedding (a learned vector per token) plus a position signal. A stack of identical blocks then updates every token's vector, and each block does two things: <strong>attention moves information between tokens, and a small MLP processes it within each token.</strong></p>
 
     <h3>Self-attention: a soft lookup</h3>
-    <div class="mj">\[ Q = XW_Q,\quad K = XW_K,\quad V = XW_V \qquad\qquad \text{Attention}(Q, K, V) = \text{softmax}\!\Big(\frac{QK^\top}{\sqrt{d_k}}\Big) V \]</div>
+    <div class="mj">\[ \begin{aligned} Q &amp;= XW_Q \\ K &amp;= XW_K \\ V &amp;= XW_V \\ \text{Attention}(Q, K, V) &amp;= \text{softmax}\!\Big(\frac{QK^\top}{\sqrt{d_k}}\Big) V \end{aligned} \]</div>
     <figure>
       <div class="plate">
         <svg class="dg" viewBox="0 0 700 230" role="img" aria-label="Scaled dot-product attention. X is projected three ways into Q, K and V. Q times K transpose over root d k gives an n by n score matrix, an optional mask blocks some scores, a row-wise softmax turns them into weights, and the weights multiply V to give the output Z.">
@@ -441,11 +441,11 @@ y_hat   = softmax(W_out @ s + b_out)              <span class="cm"># next-word p
     </ul>
 
     <h3>Why divide by \(\sqrt{d_k}\)</h3>
-    <p>A dot product of two random \(d_k\)-dimensional vectors with unit-variance entries has variance \(d_k\). With \(d_k = 64\) the scores spread over tens, the softmax goes nearly one-hot, and its gradient goes to almost zero: the same saturation problem as a tanh stuck at ±1. Dividing by \(\sqrt{d_k}\) brings the variance back to about 1.</p>
+    <p>A dot product of two random \(d_k\)-dimensional vectors with independent, zero-mean, unit-variance entries has variance \(d_k\): it's a sum of \(d_k\) independent products, each with variance 1, and variances add. With \(d_k = 64\) the scores spread over tens, the softmax goes nearly one-hot, and its gradient goes to almost zero: the same saturation problem as a tanh stuck at ±1. Dividing by \(\sqrt{d_k}\), the standard deviation, brings the variance back to about 1. Dividing by \(d_k\) would overshoot, shrinking the scores toward 0 so every row would start out nearly uniform.</p>
 
     <h3>Multi-head attention</h3>
-    <div class="mj">\[ \text{head}_i = \text{Attention}\big(XW_Q^{(i)},\, XW_K^{(i)},\, XW_V^{(i)}\big) \qquad \text{MultiHead}(X) = [\text{head}_1; \dots; \text{head}_h]\, W_O \]</div>
-    <p>Instead of one attention over the full width \(d\), run \(h\) heads in parallel, each with its own \(W_Q, W_K, W_V\) of width \(d/h\), then concatenate their outputs and mix them with \(W_O\). One softmax can only focus on one pattern per token; several heads can track several (a syntactic link, a coreference, a neighbouring word) at once. It costs about the same as one full-width head.</p>
+    <div class="mj">\[ \begin{aligned} \text{head}_i &amp;= \text{Attention}\big(XW_Q^{(i)},\, XW_K^{(i)},\, XW_V^{(i)}\big) \\ \text{MultiHead}(X) &amp;= [\text{head}_1; \dots; \text{head}_h]\, W_O \end{aligned} \]</div>
+    <p>Instead of one attention over the full width \(d\), run \(h\) heads in parallel, each with its own \(W_Q, W_K, W_V\) of width \(d/h\), then concatenate their outputs and mix them with \(W_O\). One softmax can only focus on one pattern per token, since its output is a single weighted average, and averaging two different relations blurs both; several heads can track several (a syntactic link, a coreference, a neighbouring word) at once. It costs about the same as one full-width head, because \(h\) heads of width \(d/h\) add up to the same \(d \times d\) projections and the same \(n^2 d\) of score work.</p>
 
     <h3>Where word order comes from</h3>
     <p>Attention treats its input as a set: shuffle the tokens and the outputs shuffle the same way. So position has to be added.</p>
@@ -454,12 +454,11 @@ y_hat   = softmax(W_out @ s + b_out)              <span class="cm"># next-word p
       <li><strong>Learned</strong> (BERT, GPT-2): one trained vector per position. Simple, but capped at the longest length seen in training.</li>
       <li><strong>RoPE</strong> (most modern LLMs, e.g. Llama): rotate each query and key by an angle proportional to its position, so \(q_i \cdot k_j\) depends only on the offset \(i - j\). Relative position is built into the score itself.</li>
     </ul>
-    <div class="mj">\[ PE_{(pos,\,2i)} = \sin\!\big(pos / 10000^{2i/d}\big) \qquad PE_{(pos,\,2i+1)} = \cos\!\big(pos / 10000^{2i/d}\big) \]</div>
+    <div class="mj">\[ \begin{aligned} PE_{(pos,\,2i)} &amp;= \sin\!\big(pos / 10000^{2i/d}\big) \\ PE_{(pos,\,2i+1)} &amp;= \cos\!\big(pos / 10000^{2i/d}\big) \end{aligned} \]</div>
     <p>Each dimension pair is a sine wave of a different wavelength, so every position gets a unique pattern, and a fixed offset is a fixed rotation of it. That makes relative positions easy to read off.</p>
 
     <h3>The block</h3>
-    <div class="mj">\[ x \leftarrow x + \text{MultiHead}(\text{LN}(x)) \qquad x \leftarrow x + \text{FFN}(\text{LN}(x)) \]</div>
-    <div class="mj">\[ \text{FFN}(x) = W_2\,\text{GELU}(W_1 x) \]</div>
+    <div class="mj">\[ \begin{aligned} x &amp;\leftarrow x + \text{MultiHead}(\text{LN}(x)) \\ x &amp;\leftarrow x + \text{FFN}(\text{LN}(x)) \\ \text{FFN}(x) &amp;= W_2\,\text{GELU}(W_1 x) \end{aligned} \]</div>
     <figure>
       <div class="plate">
         <svg class="dg" viewBox="0 0 680 210" role="img" aria-label="A pre-LayerNorm transformer block. The residual stream runs left to right. A first branch applies LayerNorm then multi-head attention and adds the result back; a second branch applies LayerNorm then the feed-forward network and adds it back.">
@@ -489,7 +488,7 @@ y_hat   = softmax(W_out @ s + b_out)              <span class="cm"># next-word p
     <ul>
       <li><strong>The FFN</strong> is a two-layer MLP applied to each token separately, usually 4× wider than \(d\). Attention gathers; the FFN thinks. Most of a transformer's parameters, and much of its stored knowledge, live here.</li>
       <li><strong>Residual connections</strong> make each sublayer add to the stream instead of replacing it, so the gradient has a straight path through every layer. It's the same trick as the LSTM's \(c_t = c_{t-1} + \dots\), applied across depth instead of time.</li>
-      <li><strong>LayerNorm, not BatchNorm.</strong> LayerNorm normalizes each token's vector on its own, so it doesn't care about batch size, sequence length or padding, and it behaves the same in training and at inference. BatchNorm would average across a batch of padded, variable-length sequences, and breaks with a batch of one.</li>
+      <li><strong>LayerNorm, not BatchNorm.</strong> LayerNorm normalizes each token's vector on its own, so it doesn't care about batch size, sequence length or padding, and it behaves the same in training and at inference. BatchNorm would average across a batch of padded, variable-length sequences, so each token's output would depend on what else is in the batch, and the running averages it uses at inference may not match the sequences seen then.</li>
       <li><strong>Pre-LN vs post-LN.</strong> The original transformer put LayerNorm after each residual add (post-LN) and needed a learning-rate warmup to train. Putting it inside the branch (pre-LN, above) keeps the residual path clean and trains more stably, so most modern models use pre-LN.</li>
     </ul>
 
@@ -629,9 +628,18 @@ def generate(prompt, steps, temperature=1.0):
     <h3>What it costs</h3>
     <ul>
       <li><strong>Attention</strong> builds an \(n \times n\) score matrix per head: about \(n^2 d\) time and \(n^2\) memory per layer. The FFN costs about \(n d^2\). Short sequences are dominated by the FFN, long ones by attention.</li>
-      <li><strong>Training</strong> processes all positions at once. <strong>Generation</strong> is still one token at a time; the <strong>KV cache</strong> stores every past token's keys and values, so each new token costs about \(n d\) instead of recomputing everything.</li>
+      <li><strong>Training</strong> processes all positions at once. <strong>Generation</strong> is still one token at a time; the <strong>KV cache</strong> stores every past token's keys and values, so each new token's attention costs about \(n d\) per layer instead of recomputing everything (its own projections and FFN add about \(d^2\)).</li>
       <li><strong>Parameters per block:</strong> \(4d^2\) for \(W_Q, W_K, W_V, W_O\), plus \(8d^2\) for the FFN with a 4× hidden width, so about \(12 d^2\).</li>
     </ul>
+
+    <h3>Decoding: greedy, beam search, sampling</h3>
+    <p>A decoder outputs a probability for every possible next token; something still has to pick one.</p>
+    <ul>
+      <li><strong>Greedy:</strong> take the most likely token at each step. Fast, but short-sighted: the best whole sequence may start with a token that wasn't the single best first step, and greedy can't go back.</li>
+      <li><strong>Beam search:</strong> keep the \(w\) best partial sequences by total log-probability (\(w\) is the beam width). Each step, extend each by every token and keep the best \(w\) again, at about \(w\) times the cost of greedy. Log-probabilities are negative and add up, so each extra token lowers the score and the search is biased toward ending early; dividing by a length penalty such as \(t^\alpha\) corrects for that.</li>
+      <li><strong>Sampling:</strong> draw from the distribution. A temperature \(\tau\) divides the logits first (below 1 sharpens, above 1 flattens); top-\(k\) keeps only the \(k\) likeliest tokens; top-\(p\) (nucleus) keeps the smallest set whose probabilities add up to at least \(p\).</li>
+    </ul>
+    <p>Beam search suits tasks with one right answer: translation, summarization, speech recognition. For open-ended text the single most probable continuation is often bland and repetitive (Holtzman et al., 2019), so chat models sample instead.</p>
 
     <!-- 10 what-ifs -->
     <h2 id="tfwhat"><span class="pn">03</span>Transformer what-ifs</h2>
@@ -642,7 +650,7 @@ def generate(prompt, steps, temperature=1.0):
         <tr><td>Drop the \(\sqrt{d_k}\)</td><td>Scores grow with \(d_k\), the softmax saturates to near one-hot, gradients through it vanish, and training gets unstable.</td></tr>
         <tr><td>Drop positional encodings</td><td>The model sees a bag of tokens: “dog bites man” = “man bites dog”. (A causal decoder can still infer some order from how much it is allowed to see.)</td></tr>
         <tr><td>Drop residual connections</td><td>Every gradient has to pass through every sublayer, so deep stacks train badly, much like a plain deep network without skip connections.</td></tr>
-        <tr><td>BatchNorm instead of LayerNorm</td><td>Statistics get mixed across padded sequences and examples, are noisy with small batches, and break at inference with batch size 1.</td></tr>
+        <tr><td>BatchNorm instead of LayerNorm</td><td>Statistics get mixed across padded sequences and examples, so outputs depend on the rest of the batch; they're noisy with small batches; and the running averages used at inference may not match the sequences seen then. In a causal decoder, statistics over positions would also leak the future.</td></tr>
         <tr><td>Drop the causal mask in a decoder</td><td>In training each position can see the token it is supposed to predict, so the loss collapses. At generation the future isn't there, so it fails.</td></tr>
         <tr><td>One head instead of many (same width)</td><td>Each token gets one attention pattern instead of several, so it can't track several relations at once. Quality drops; cost is about the same.</td></tr>
         <tr><td>Drop the FFN</td><td>Each layer can only take weighted averages of value vectors, with no per-token computation. Capacity drops sharply.</td></tr>
@@ -698,7 +706,7 @@ def generate(prompt, steps, temperature=1.0):
       </div>
       <figcaption>BERT reads the whole sentence at once and is trained to recover hidden tokens; its <code>[CLS]</code> output feeds a classifier. GPT reads left to right under a causal mask and predicts the next token at every position, so every position is a training example. The small grids show which tokens each one may attend to.</figcaption>
     </figure>
-    <div class="mj">\[ L_{\text{BERT}} = -\sum_{i \in \mathcal{M}} \log p\big(x_i \mid x_{\setminus \mathcal{M}}\big) \qquad L_{\text{GPT}} = -\sum_t \log p(x_t \mid x_{&lt;t}), \quad p(x) = \prod_t p(x_t \mid x_{&lt;t}) \]</div>
+    <div class="mj">\[ \begin{aligned} L_{\text{BERT}} &amp;= -\sum_{i \in \mathcal{M}} \log p\big(x_i \mid x_{\setminus \mathcal{M}}\big) \\ L_{\text{GPT}} &amp;= -\sum_t \log p(x_t \mid x_{&lt;t}) \\ p(x) &amp;= \prod_t p(x_t \mid x_{&lt;t}) \end{aligned} \]</div>
     <p>Here \(\mathcal{M}\) is the set of masked positions and \(x_{\setminus \mathcal{M}}\) is everything else. BERT learns from about 15% of the tokens per sentence, while GPT learns from every one.</p>
     <h3>Sizes worth knowing</h3>
     <div class="tbl"><table>
@@ -719,7 +727,7 @@ def generate(prompt, steps, temperature=1.0):
 
     <h3>BERT: fill in the blanks (encoder-only)</h3>
     <ul>
-      <li><strong>Masked language modelling.</strong> Pick 15% of the tokens. Of those, replace 80% with <code>[MASK]</code>, 10% with a random token, and leave 10% unchanged. Predict the original token at those positions only, with cross-entropy over the vocabulary.</li>
+      <li><strong>Masked language modelling.</strong> Pick 15% of the tokens. Of those, replace 80% with <code>[MASK]</code>, 10% with a random token, and leave 10% unchanged. Predict the original token at those positions only, with cross-entropy over the vocabulary. Why 15%: fewer gives little training signal per sequence, and more leaves too little context to predict from. It's a choice rather than a tuned optimum; later work found about 40% works as well or better for large models (Wettig et al., 2023).</li>
       <li><strong>Why 80/10/10?</strong> It fixes two problems you'd get if every chosen position showed <code>[MASK]</code>:
         <ul>
           <li><em>A train/test mismatch.</em> The loss would only ever ask about <code>[MASK]</code> positions, so the model would have no reason to build careful vectors for the ordinary words it sees. But BERT is mostly used as an encoder for classification, tagging, QA and embeddings, and there the input never contains <code>[MASK]</code>: every token is a real word. (You <em>can</em> put <code>[MASK]</code> in at inference for fill-in-the-blank; that is the one exception.)</li>
@@ -830,8 +838,10 @@ for batch in corpus_batches:                      <span class="cm"># (B, n + 1) 
     <h3>LoRA</h3>
     <div class="mj">\[ W' = W + \frac{\alpha}{r} B A, \qquad B \in \mathbb{R}^{d \times r},\ A \in \mathbb{R}^{r \times k},\ r \ll \min(d, k) \]</div>
     <ul>
-      <li>Freeze \(W\) and train only the low-rank pair \(B A\), often under 1% of the parameters. \(B\) starts at 0, so training starts from the unchanged model.</li>
+      <li>Freeze \(W\) and train only the low-rank pair \(B A\), often under 1% of the parameters: \(r(d + k)\) instead of \(dk\). \(B\) starts at 0, so training starts from the unchanged model; \(A\) starts random, so \(B\)'s gradient isn't zero.</li>
+      <li>The \(\alpha / r\) factor keeps the update's size roughly steady when you change \(r\), so the learning rate needn't be retuned.</li>
       <li>It works because the weight <em>change</em> needed for a new task tends to have low intrinsic rank. After training, merge \(BA\) into \(W\): no extra inference cost.</li>
+      <li>It saves memory because frozen weights need no gradients and no optimizer state, which is most of what fine-tuning stores.</li>
       <li>QLoRA keeps the frozen base in 4-bit precision and trains LoRA on top, which fits big models on one GPU.</li>
     </ul>
 
@@ -863,57 +873,221 @@ for batch in corpus_batches:                      <span class="cm"># (B, n + 1) 
       <li>the softmax renormalizes over the valid set;</li>
       <li>no gradient flows to the masked logits.</li>
     </ul>
-    <p>It's the same mechanism as a transformer's causal and padding masks. Codon-optimization models use it so every predicted codon matches its amino acid. <strong>Apply the mask at both training and inference.</strong> Otherwise the model trains on a different distribution from the one it's used on.</p>
+    <p>It's the same mechanism as a transformer's causal and padding masks. Codon-optimization models use it so every predicted codon matches its amino acid. <strong>Apply the mask at both training and inference.</strong> Masked only in training, the invalid logits are never pushed down and can win at inference. Masked only at inference, the ranking among valid classes is unchanged, but training wasted capacity pushing impossible classes down. In code, use a large negative number or the dtype's minimum rather than a literal \(-\infty\): if every entry in a row is masked, \(-\infty - (-\infty)\) inside the softmax gives NaN.</p>
 
     <!-- 07 -->
     <h2 id="questions"><span class="pn">05</span>Interview questions</h2>
-    <p>Answer out loud first, then open the answer.</p>
+    <p>Answer out loud first, then open the answer. Each answer stands on its own: the one-line answer first, then how it works, then why.</p>
     <h3>Transformers</h3>
     <details class="qa"><summary><span class="qn">T1</span>Why did transformers replace LSTMs?</summary><div class="ans">
-      <p>Three reasons. They train in parallel across positions instead of step by step. Any two tokens are one attention step apart, so there's no long chain for gradients to vanish along. And they keep every past token instead of squeezing the past into one fixed state. The price is \(n^2\) cost in sequence length, and generation is still sequential (helped by the KV cache).</p></div></details>
+      <p><strong>They train in parallel, connect any two tokens in one step, and keep every past token instead of one compressed state. That let them scale to far more data and compute.</strong></p>
+      <ul>
+        <li><strong>Parallel training.</strong> In an RNN, \(h_t\) needs \(h_{t-1}\), so a sequence of length \(n\) takes \(n\) sequential steps and the GPU sits mostly idle. Attention computes every position at once as a few large matrix multiplies, \(\text{softmax}(QK^\top/\sqrt{d_k})\,V\). The same hardware gets through far more data, which is what made scaling possible.</li>
+        <li><strong>Short paths.</strong> Between tokens 1 and \(n\), information and gradient pass through \(n - 1\) recurrent steps in an RNN, each able to shrink them. In attention, any pair is one step apart.</li>
+        <li><strong>No bottleneck.</strong> An RNN squeezes the whole past into one fixed-size \(h\). Attention keeps every token's vector and looks things up by content when it needs them.</li>
+      </ul>
+      <p><strong>The price:</strong> attention costs \(n^2\) time and memory per layer, generation is still one token at a time, and the KV cache grows with context. <strong>RNNs still win</strong> for streaming with constant work and memory per event. State-space models such as Mamba try to get both: a fixed-size, RNN-like state with parallel training.</p></div></details>
     <details class="qa"><summary><span class="qn">T2</span>Walk me through self-attention. Why separate Q, K and V?</summary><div class="ans">
-      <p>Project each token into a query, a key and a value. Scores are \(QK^\top/\sqrt{d_k}\), a softmax per row turns them into weights, and each output is the weighted sum of values. Separate projections let “what I look for” differ from “what I advertise” (so relevance can be asymmetric), and let what gets copied differ from what was matched on.</p></div></details>
+      <p><strong>Each token asks a question (query), advertises what it holds (key) and offers content (value). Its output is the average of all values, weighted by how well its query matches each key.</strong></p>
+      <div class="mj">\[ \begin{aligned} Q &amp;= XW_Q \\ K &amp;= XW_K \\ V &amp;= XW_V \\ \text{Attention}(Q, K, V) &amp;= \text{softmax}\!\Big(\frac{QK^\top}{\sqrt{d_k}}\Big) V \end{aligned} \]</div>
+      <p>Row \(i\) of \(QK^\top\) scores every token against token \(i\); the softmax turns that row into weights that sum to 1; multiplying by \(V\) takes the weighted average. It's a soft dictionary lookup, done for all tokens at once in two matrix multiplies.</p>
+      <ul>
+        <li><strong>Why queries differ from keys.</strong> With one shared projection \(W\), the score matrix \(XWW^\top X^\top\) is symmetric: \(i\)'s interest in \(j\) would equal \(j\)'s in \(i\), but relevance is often one-way (a verb looks for its subject, not the reverse). And since a dot product is at most the product of the two lengths, a token's self-score \(\lVert x_i W \rVert^2\) is at least its score with any token whose projection is no longer, so tokens over-attend to themselves.</li>
+        <li><strong>Why values differ from keys.</strong> What a token is matched on (say, its grammatical role) needn't be what it should hand over (its meaning).</li>
+      </ul>
+      <p><strong>Likely follow-up:</strong> nothing here depends on order, so positions have to be added separately.</p></div></details>
     <details class="qa"><summary><span class="qn">T3</span>Why divide by \(\sqrt{d_k}\)?</summary><div class="ans">
-      <p>A dot product of two random \(d_k\)-dimensional vectors has variance about \(d_k\). Large scores push the softmax to near one-hot, where its gradient is almost zero. Dividing by \(\sqrt{d_k}\) keeps the scores' variance near 1, so the softmax stays in its sensitive range.</p></div></details>
+      <p><strong>To keep the scores' spread at about 1 whatever the head size, so the softmax doesn't saturate and its gradient doesn't vanish.</strong></p>
+      <p>If the entries of \(q\) and \(k\) are independent with mean 0 and variance 1 (roughly true at initialization):</p>
+      <div class="mj">\[ \begin{aligned} q \cdot k &amp;= \textstyle\sum_{j=1}^{d_k} q_j k_j \\ \text{Var}(q \cdot k) &amp;= d_k \\ \text{Var}\big(q \cdot k / \sqrt{d_k}\big) &amp;= 1 \end{aligned} \]</div>
+      <ul>
+        <li><strong>Why the variance is \(d_k\).</strong> The dot product is a sum of \(d_k\) independent terms, each with variance 1, and variances add. So the scores' standard deviation grows like \(\sqrt{d_k}\).</li>
+        <li><strong>Why big scores hurt.</strong> Softmax exaggerates gaps: with widely spread scores, one weight is near 1 and the rest near 0. The softmax's slopes are products of weights, \(a_i(1 - a_i)\) and \(a_i a_j\), which are all near zero then, so the attention weights stop learning. It's the same saturation problem as a tanh stuck at \(\pm 1\).</li>
+        <li><strong>Why \(\sqrt{d_k}\) and not \(d_k\).</strong> Dividing by the standard deviation brings the spread to 1. Dividing by \(d_k\) would shrink it toward 0, so every row would start nearly uniform.</li>
+      </ul>
+      <p><strong>Likely follow-up:</strong> training can still make attention sharp by growing the weights. The scaling only sets a sensible starting point, the same for any \(d_k\).</p></div></details>
     <details class="qa"><summary><span class="qn">T4</span>Why multi-head attention?</summary><div class="ans">
-      <p>One softmax gives each token a single attention pattern. With \(h\) heads of width \(d/h\), each head can track a different relation (syntax, coreference, nearby words), and \(W_O\) mixes the results. The cost is about the same as one full-width head.</p></div></details>
+      <p><strong>One softmax gives each token one attention pattern. Several heads let it attend to several things at once, for about the same cost.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{head}_i &amp;= \text{Attention}\big(XW_Q^{(i)}, XW_K^{(i)}, XW_V^{(i)}\big) \\ \text{MultiHead}(X) &amp;= [\text{head}_1; \dots; \text{head}_h]\, W_O \end{aligned} \]</div>
+      <ul>
+        <li><strong>Why one head isn't enough.</strong> A softmax row is one distribution over tokens, and the output is one weighted average. If a token needs both its subject and the previous word, a single head has to average them, which blurs both.</li>
+        <li><strong>How heads split the work.</strong> Each head has its own \(W_Q, W_K, W_V\) of width \(d/h\), so each learns its own notion of relevance (syntax, coreference, nearby words). \(W_O\) mixes their outputs back to width \(d\).</li>
+        <li><strong>Why the compute is the same.</strong> \(h\) heads of width \(d/h\) add up to the same \(d \times d\) projections, and their score computations add up to the same \(n^2 d\) as one full-width head. Memory isn't quite the same: each head keeps its own \(n \times n\) score matrix.</li>
+      </ul>
+      <p><strong>Likely follow-ups:</strong> many heads can be pruned after training with little loss (Michel et al., 2019), so they're partly redundant. Multi-query and grouped-query attention share keys and values across heads to shrink the KV cache.</p></div></details>
     <details class="qa"><summary><span class="qn">T5</span>How does a transformer know word order? What is RoPE?</summary><div class="ans">
-      <p>Attention is permutation-equivariant, so position must be injected: sinusoidal encodings (fixed, any length), learned position vectors (capped at the trained length), or RoPE. RoPE rotates each query and key by an angle proportional to its position, so \(q_i \cdot k_j\) depends only on the relative offset \(i - j\). Most modern LLMs use it.</p></div></details>
+      <p><strong>Mostly through a position signal that has to be added, because attention treats its input as a set. RoPE adds it by rotating queries and keys, so their dot product depends on relative position.</strong></p>
+      <ul>
+        <li><strong>Why attention ignores order.</strong> A score depends only on two tokens' contents, \(q_i \cdot k_j\), and the output is a weighted sum over all tokens. Shuffle the inputs and the outputs shuffle the same way: “dog bites man” looks like “man bites dog”.</li>
+        <li><strong>Sinusoidal</strong> (the original paper): fixed sine and cosine waves of many wavelengths, added to the embeddings. Each position gets a unique pattern and a fixed offset is a fixed rotation, so relative positions are easy to read. Any length works.</li>
+        <li><strong>Learned</strong> (BERT, GPT-2): one trained vector per position. Flexible, but there's no vector for positions past the longest trained length.</li>
+        <li><strong>RoPE</strong> (Llama and most modern LLMs): rotate each pair of query and key dimensions by an angle proportional to the token's position; \(R_i\) is that rotation for position \(i\). Rotations compose, so:</li>
+      </ul>
+      <div class="mj">\[ (R_i\, q) \cdot (R_j\, k) = q \cdot (R_{j-i}\, k) \]</div>
+      <p>The score depends only on the offset \(j - i\), so relative position sits in the score itself, not mixed into the content; each key is rotated once (so it works with a KV cache); and it stretches to longer contexts with interpolation tricks.</p>
+      <p><strong>Likely follow-up:</strong> a causal decoder with no position signal can still infer some order, from how many tokens each position is allowed to see.</p></div></details>
     <details class="qa"><summary><span class="qn">T6</span>What do the FFN, the residual connections and LayerNorm each do? Why not BatchNorm?</summary><div class="ans">
-      <p>The FFN is a per-token MLP: attention moves information between tokens, and the FFN processes it within each one (most parameters live here). Residuals give gradients a straight path through depth, like the LSTM's cell through time. LayerNorm normalizes each token on its own, so it's independent of batch size, length and padding. BatchNorm would mix statistics across padded sequences and fail with a batch of one. Pre-LN trains more stably than post-LN, which needed warmup.</p></div></details>
+      <p><strong>Attention moves information between tokens, the FFN processes it inside each token, residuals keep a straight path through depth, and LayerNorm keeps each token's scale steady. BatchNorm doesn't fit padded, variable-length sequences.</strong></p>
+      <div class="mj">\[ \begin{aligned} x &amp;\leftarrow x + \text{MultiHead}(\text{LN}(x)) \\ x &amp;\leftarrow x + \text{FFN}(\text{LN}(x)) \end{aligned} \]</div>
+      <ul>
+        <li><strong>FFN, \(W_2\,\text{GELU}(W_1 x)\):</strong> attention's output is a weighted average of value vectors, mostly linear mixing. The FFN adds non-linear computation per token, and at width \(4d\) it holds about two-thirds of a block's parameters.</li>
+        <li><strong>Residuals:</strong> with \(y = x + F(x)\), the Jacobian is \(I + \partial F / \partial x\) (\(I\) is the identity), so the gradient reaches early layers even when \(F\)'s own is small. Each layer learns a change, like the LSTM's \(c_t = c_{t-1} + \dots\), across depth.</li>
+        <li><strong>LayerNorm</strong> normalizes each token over its \(d\) features, so it doesn't depend on batch size, length or padding, and it behaves the same in training and inference.</li>
+        <li><strong>Why not BatchNorm:</strong> it averages each feature over the batch and positions, so a token's output depends on what else, and how much padding, is in its batch; small batches make that noisy; and inference uses running averages that may not match. In a causal decoder, statistics over positions would also leak the future.</li>
+      </ul>
+      <p><strong>Pre-LN vs post-LN:</strong> post-LN normalizes after each residual add, interrupting the identity path, so early training is unstable without warmup. Pre-LN keeps the path clean, so modern models use it.</p></div></details>
     <details class="qa"><summary><span class="qn">T7</span>Encoder-only vs decoder-only vs encoder–decoder: what are cross-attention and the causal mask for?</summary><div class="ans">
-      <p>Encoder-only (BERT) is bidirectional and trained to fill in masked tokens, which suits classification and embeddings. Decoder-only (GPT) uses a causal mask and is trained to predict the next token, which suits generation. Encoder–decoder (T5, the original) maps one sequence to another; its decoder's cross-attention takes queries from the decoder and keys and values from the encoder. The causal mask sets future scores to \(-\infty\), so training on all positions at once can't peek at the answer.</p></div></details>
+      <p><strong>They differ in what each token may see: an encoder sees both sides, a decoder only the past, and an encoder–decoder adds cross-attention so the output side can read the input side.</strong></p>
+      <ul>
+        <li><strong>Encoder-only (BERT):</strong> no mask, so every token sees the whole input, the best context for understanding. Pretrained to fill in masked tokens; suits classification, tagging and embeddings. It can't generate left to right, because it was never trained to predict a token from the past alone.</li>
+        <li><strong>Decoder-only (GPT, Llama):</strong> a causal mask and next-token prediction, \(p(x) = \prod_t p(x_t \mid x_{&lt;t})\). Generation is natural, every position is a training example, and input and output are one sequence, so one model handles every task. Modern LLMs use this shape.</li>
+        <li><strong>Encoder–decoder (T5, the original):</strong> a bidirectional encoder reads the input and a causal decoder writes the output. Suits mapping one sequence to another (translation, summarization).</li>
+      </ul>
+      <div class="mj">\[ \text{CrossAttn}(S, H_{\text{enc}}) = \text{softmax}\!\Big(\frac{(S W_Q)(H_{\text{enc}} W_K)^\top}{\sqrt{d_k}}\Big) H_{\text{enc}} W_V \]</div>
+      <p><strong>Cross-attention</strong> takes queries from the decoder states \(S\) and keys and values from the encoder outputs, so each output step can look up any input token: Bahdanau's attention, generalized. <strong>The causal mask</strong> sets the scores for \(j > i\) to \(-\infty\) before the softmax, so they get weight 0. Without it, training on all positions at once would let each position see the token it has to predict.</p></div></details>
     <details class="qa"><summary><span class="qn">T8</span>What does attention cost, and what is the KV cache?</summary><div class="ans">
-      <p>About \(n^2 d\) time and \(n^2\) memory per layer for the score matrix, versus \(n d^2\) for the FFN. At generation, each new token would otherwise recompute keys and values for the whole prefix; the KV cache stores them, so a new token costs about \(n d\). The cache's memory grows with length, which is what limits long contexts.</p></div></details>
+      <p><strong>Attention costs about \(n^2 d\) time and \(n^2\) memory per layer. The KV cache stores past keys and values, so each generated token costs about \(n d\) for attention per layer (plus about \(d^2\) for its own projections and FFN) instead of re-running the prefix.</strong></p>
+      <ul>
+        <li><strong>Why \(n^2\).</strong> Every token scores every token: \(QK^\top\) is \(n \times n\) per head, each entry a \(d_k\)-long dot product, which over all heads is about \(n^2 d\). Multiplying the weights by \(V\) costs the same again, and the score matrix needs \(n^2\) memory per head.</li>
+        <li><strong>The rest of the block</strong> (projections and FFN) costs about \(n d^2\), linear in \(n\). So short sequences are dominated by the FFN and long ones by attention.</li>
+        <li><strong>Why a cache works.</strong> Under a causal mask, a past token's key and value never change when new tokens arrive. So each generation step computes only the new token's \(q, k, v\), appends \(k, v\) to the cache, and attends over it.</li>
+        <li><strong>Its cost:</strong> \(2 \times n \times d\) numbers per layer per sequence, growing with context. That's what limits context length and batch size when serving.</li>
+      </ul>
+      <p><strong>Likely follow-ups:</strong> grouped-query attention shares keys and values across heads to shrink the cache; FlashAttention computes attention in tiles, so the \(n \times n\) matrix is never stored.</p></div></details>
     <details class="qa"><summary><span class="qn">T9</span>How many parameters does one transformer block have?</summary><div class="ans">
-      <p>About \(4d^2\) for \(W_Q, W_K, W_V, W_O\), plus \(8d^2\) for an FFN with hidden width \(4d\) (two \(d \times 4d\) matrices), so about \(12 d^2\), plus small LayerNorm and bias terms. Embeddings add vocabulary size × \(d\).</p></div></details>
+      <p><strong>About \(12 d^2\): \(4 d^2\) in attention and \(8 d^2\) in the FFN, plus small bias and LayerNorm terms.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{attention } (W_Q, W_K, W_V, W_O) &amp;= 4 \cdot d \cdot d = 4d^2 \\ \text{FFN } (W_1, W_2) &amp;= d \cdot 4d + 4d \cdot d = 8d^2 \\ \text{block} &amp;\approx 12 d^2 \end{aligned} \]</div>
+      <ul>
+        <li><strong>Why multi-head doesn't change it.</strong> \(h\) heads each have \(d \times (d/h)\) projections, which add up to \(d \times d\).</li>
+        <li><strong>Why the FFN is \(8d^2\).</strong> Its hidden width is \(4d\), and it has two matrices, in and out.</li>
+        <li><strong>What's small:</strong> biases and LayerNorm's \(\gamma, \beta\) are a few multiples of \(d\), negligible next to \(d^2\).</li>
+        <li><strong>Independent of \(n\):</strong> the same weights apply at every position, just as an RNN's weights are shared across time.</li>
+      </ul>
+      <p><strong>Outside the blocks:</strong> the embedding table adds vocabulary size × \(d\) (often tied to the output layer), plus learned positions if used. BERT-base: about 85M in its 12 blocks plus about 23M in embeddings, about 110M in all.</p></div></details>
+    <details class="qa"><summary><span class="qn">T10</span>Greedy decoding, beam search or sampling: when each?</summary><div class="ans">
+      <p><strong>Greedy takes the single most likely token each step, beam search keeps the \(w\) most likely partial outputs (\(w\) is the beam width), and sampling draws from the distribution. Beam suits tasks with one right answer; sampling suits open-ended text.</strong></p>
+      <div class="mj">\[ \text{score}(y_{1:t}) = \frac{1}{t^{\alpha}} \sum_{s=1}^{t} \log p(y_s \mid y_{&lt;s}, x) \]</div>
+      <p>In words: a beam is ranked by its total log-probability, divided by a length penalty.</p>
+      <ul>
+        <li><strong>Greedy</strong> is fast but short-sighted: the best whole sequence may start with a token that wasn't the single best first step, and greedy can't go back.</li>
+        <li><strong>Beam search</strong> extends each of the \(w\) kept prefixes by every token, then keeps the best \(w\) again, at about \(w\) times the cost. Log-probabilities are negative and add up, so each extra token lowers the score; without the length penalty the search is biased toward ending early.</li>
+        <li><strong>Why beam fails on open-ended text.</strong> The most probable continuation is often bland and repetitive (Holtzman et al., 2019), so chat models sample.</li>
+        <li><strong>Sampling controls:</strong> a temperature \(\tau\) divides the logits first (below 1 sharpens, above 1 flattens); top-\(k\) keeps the \(k\) likeliest tokens; top-\(p\) (nucleus) keeps the smallest set whose probabilities add up to at least \(p\).</li>
+      </ul>
+      <p><strong>Use:</strong> beam search for translation, summarization and speech recognition; sampling with a temperature and top-\(p\) for dialogue and creative text.</p></div></details>
 
     <h3>Pretrained models and training</h3>
     <details class="qa"><summary><span class="qn">P1</span>Explain BERT's pretraining. Why the 80/10/10 rule?</summary><div class="ans">
-      <p>Masked language modelling: pick 15% of tokens and predict the originals from both sides' context, with cross-entropy at those positions only. Of the chosen tokens, 80% become <code>[MASK]</code>, 10% a random token, and 10% stay as they are. Since <code>[MASK]</code> never appears at fine-tuning time, the random and unchanged cases force a useful representation for every token. The original BERT also used next-sentence prediction, which RoBERTa showed wasn't needed.</p></div></details>
+      <p><strong>Masked language modelling: hide 15% of the tokens and predict them from both sides' context. The 80/10/10 split stops the model relying on the <code>[MASK]</code> token, which never appears in downstream tasks.</strong></p>
+      <div class="mj">\[ L_{\text{MLM}} = -\frac{1}{|\mathcal M|} \sum_{i \in \mathcal M} \log p_\theta(x_i \mid \tilde x) \]</div>
+      <p>In words: \(\mathcal M\) is the set of chosen positions and \(\tilde x\) the corrupted input; the loss counts only the chosen positions.</p>
+      <ul>
+        <li><strong>Why 15%.</strong> A trade-off: fewer gives little training signal per sequence, more leaves too little context to predict from. It's a choice, not a tuned optimum; later work found about 40% works as well or better for large models (Wettig et al., 2023).</li>
+        <li><strong>Why not always <code>[MASK]</code>.</strong> The loss would only ask about <code>[MASK]</code> positions, so the model would have no reason to build good vectors for ordinary tokens, which are all it sees downstream.</li>
+        <li><strong>The random 10%:</strong> any visible token might be a planted fake, so every token must be checked against its context.</li>
+        <li><strong>The unchanged 10%:</strong> the true word is shown and still predicted, so the model learns to use what it sees, not ignore it.</li>
+        <li><strong>Together:</strong> the model can't tell which visible tokens are being tested, so it keeps a good contextual vector for all of them.</li>
+      </ul>
+      <p><strong>Likely follow-ups:</strong> RoBERTa dropped next-sentence prediction and did better with longer training and a fresh mask each epoch. MLM learns from only 15% of tokens per pass, while GPT learns from every one.</p></div></details>
     <details class="qa"><summary><span class="qn">P2</span>Frozen backbone with a linear probe, full fine-tune, or LoRA: when each? Why can a probe beat a big trained model?</summary><div class="ans">
-      <p>Use a probe when labelled data is small and the pretrained embeddings already capture the structure: few parameters, low variance, cheap. Fine-tune (with a small learning rate, maybe only the top layers) when there's more data or a domain shift. Use LoRA when memory is tight or many tasks share one base. A probe can win because the representation was learned from far more data than the labelled set; a big model trained on the small set overfits. That's ppLM-CO's result: 62K trainable parameters against 7.1M.</p></div></details>
+      <p><strong>Probe when labelled data is small and the pretrained features already fit the task; fine-tune when there's more data or a domain shift; LoRA when memory is tight or many tasks share one base. A probe can win because it has too few parameters to overfit.</strong></p>
+      <ul>
+        <li><strong>Probe:</strong> freeze the backbone and train only a linear head, \(dK + K\) parameters. Low variance, cheap, and the backbone's knowledge stays untouched. It fails when the features don't separate the classes linearly, usually under domain shift.</li>
+        <li><strong>Full fine-tune:</strong> every weight moves, at a small learning rate (about 1e-5 to 5e-5). Most capacity, but on little data it overfits and can overwrite what pretraining learned.</li>
+        <li><strong>Partial fine-tune:</strong> train the top layers and the head. Lower layers hold general features; the top ones are the most task-specific.</li>
+        <li><strong>LoRA:</strong> train small low-rank updates to frozen weights. Only those need gradients and optimizer state, which saves most of the memory, and one base serves many tasks by swapping adapters.</li>
+      </ul>
+      <p><strong>Why a probe can win:</strong> the representation was learned from far more data than the labelled set, so the head only draws a boundary. A model trained on the small set must also learn the representation, from too little data. ppLM-CO fits this: a frozen encoder with 62K trainable parameters beat a 7.1M-parameter model.</p></div></details>
     <details class="qa"><summary><span class="qn">P3</span>What is LoRA, and why does it work?</summary><div class="ans">
-      <p>Freeze \(W\) and learn a low-rank update, \(W' = W + (\alpha/r) BA\), with \(r\) small (say 8) and \(B\) starting at zero. You train under 1% of the parameters, and \(BA\) merges into \(W\) afterwards, so inference costs nothing extra. It works because the change a new task needs tends to have low intrinsic rank. QLoRA does the same on a 4-bit frozen base.</p></div></details>
+      <p><strong>LoRA freezes a pretrained weight matrix and learns a low-rank change to it, so fine-tuning often trains under 1% of the parameters and adds no inference cost.</strong></p>
+      <div class="mj">\[ W' = W + \frac{\alpha}{r} BA, \qquad B \in \mathbb{R}^{d \times r},\ A \in \mathbb{R}^{r \times k},\ r \ll \min(d, k) \]</div>
+      <p>In words: instead of a full \(d \times k\) update, learn two thin matrices whose product is the update. Trainable parameters drop from \(dk\) to \(r(d + k)\).</p>
+      <ul>
+        <li><strong>Why it works.</strong> The weight change a new task needs tends to have low intrinsic rank: a few directions carry most of it.</li>
+        <li><strong>Why \(B\) starts at 0.</strong> Then \(BA = 0\), so training starts from exactly the pretrained model. \(A\) starts random so that \(B\)'s gradient isn't zero.</li>
+        <li><strong>Why \(\alpha / r\).</strong> It keeps the update's size roughly steady when you change \(r\), so the learning rate needn't be retuned.</li>
+        <li><strong>Why it saves memory.</strong> Frozen weights need no gradients and no Adam state, which is most of fine-tuning's memory.</li>
+        <li><strong>Why no inference cost.</strong> After training, \(BA\) is merged into \(W\), leaving one matrix.</li>
+      </ul>
+      <p><strong>Likely follow-ups:</strong> QLoRA keeps the frozen base in 4-bit precision, which fits big models on one GPU. Under a large domain shift, LoRA can fall short of a full fine-tune.</p></div></details>
     <details class="qa"><summary><span class="qn">P4</span>What does a \(-\infty\) logit mask do to the probabilities and the gradients?</summary><div class="ans">
-      <p>Masked classes get \(e^{-\infty} = 0\) probability, so the softmax renormalizes over the valid set, and no gradient flows to the masked logits. It's the same mechanism as the causal and padding masks. Apply it in both training and inference; otherwise the model trains on a different distribution from the one it's used on.</p></div></details>
+      <p><strong>A masked class gets probability exactly 0, the softmax renormalizes over the valid classes, and the masked logits get no gradient.</strong></p>
+      <div class="mj">\[ \begin{aligned} p_k &amp;= 0 &amp;&amp; \text{masked } k \\ p_k &amp;= \frac{e^{z_k}}{\sum_{j \text{ valid}} e^{z_j}} &amp;&amp; \text{valid } k \\ \frac{\partial L}{\partial z_k} &amp;= p_k - y_k &amp;&amp; \text{softmax + cross-entropy} \end{aligned} \]</div>
+      <ul>
+        <li><strong>Why 0.</strong> \(e^{-\infty} = 0\), so a masked class adds nothing to the numerator or the denominator.</li>
+        <li><strong>Why no gradient.</strong> A masked class has zero probability and is never the label, so its gradient \(p_k - y_k\) is zero. The model spends nothing on learning to rule out impossible classes; all the learning goes into choosing among valid ones.</li>
+        <li><strong>Masked only in training</strong> is the dangerous case: the invalid logits were never pushed down, so at inference they can win.</li>
+        <li><strong>Masked only at inference</strong> is safe for ranking, since renormalizing over the valid set doesn't change their order, but it wastes training: the model spent capacity pushing impossible classes down, and the valid logits learned to compete against the wrong set. So mask in both.</li>
+      </ul>
+      <p><strong>In practice:</strong> use a large negative number or the dtype's minimum, not a literal \(-\infty\). A stable softmax subtracts the row's maximum, and if a whole row is masked that maximum is itself \(-\infty\), so \(-\infty - (-\infty)\) gives NaN (with the dtype's minimum the row comes out silently uniform instead). Causal and padding masks in attention work the same way.</p></div></details>
     <details class="qa"><summary><span class="qn">P5</span>Bi-LSTM or transformer for a per-token tagging task?</summary><div class="ans">
-      <p>Both see both sides. A bi-LSTM carries context through gated states (\(n\) steps from end to end, cheap per token, fine on small data). A transformer connects any two positions in one step and can start from a pretrained encoder like BERT, which usually wins when one exists, at \(n^2\) cost. Watch inference on sequences longer than any in training: learned position embeddings can't extend, while RoPE or an RNN handles length more gracefully. Either way, a CRF layer or a logit mask can enforce valid outputs.</p></div></details>
+      <p><strong>A pretrained transformer encoder, if a good one exists for the domain; otherwise a bi-LSTM is a strong, cheap baseline, especially on small data.</strong></p>
+      <ul>
+        <li><strong>Both see both sides,</strong> which tagging needs: a token's label depends on what comes before and after it.</li>
+        <li><strong>Bi-LSTM:</strong> context flows step by step through gated states, so far-apart tokens are \(n\) steps apart. Cost is linear in \(n\), and its built-in lean toward nearby context helps when labelled data is small.</li>
+        <li><strong>Transformer:</strong> any two positions are one step apart, and it can start from a pretrained encoder (BERT, or a domain one such as ProtBert for proteins). Transfer from pretraining usually decides it. The cost is \(n^2\) per layer.</li>
+        <li><strong>Length:</strong> learned position embeddings have no vectors past the longest trained length, so very long inputs need chunking; RoPE degrades more gracefully, and an RNN has no hard limit.</li>
+      </ul>
+      <p><strong>Enforcing valid outputs:</strong> a CRF layer on top scores label transitions (an “inside-person” tag can't follow “begin-location”) and decodes the best whole sequence with Viterbi (dynamic programming over label sequences). A logit mask enforces per-position rules, such as a codon having to match its amino acid.</p></div></details>
     <details class="qa"><summary><span class="qn">P6</span>Validation loss starts rising at epoch 5 while training loss keeps falling. What do you do?</summary><div class="ans">
-      <p>It's overfitting. Keep the epoch-5 checkpoint (early stopping with some patience). Then add regularization: dropout, weight decay, augmentation, a smaller model or more data. Lower the learning rate or add decay if the curves are noisy. Before all that, rule out leakage or a distribution shift between the splits, and check that the metric you care about moves the same way as the loss.</p></div></details>
+      <p><strong>It's overfitting: keep the checkpoint with the lowest validation loss (just before the rise), then regularize, after ruling out leakage, a shift between splits, and a gap between loss and metric.</strong></p>
+      <ul>
+        <li><strong>Why this pattern means overfitting.</strong> Training loss keeps falling because the model is fitting details specific to the training set; validation loss rises because those details don't carry over.</li>
+        <li><strong>Early stopping:</strong> that checkpoint generalized best. Use some patience, since validation loss is noisy.</li>
+        <li><strong>Regularize:</strong> dropout (noise stops units relying on each other), weight decay (smaller weights, smoother function), augmentation (more effective data), a smaller model (less capacity), or more data (lower variance).</li>
+        <li><strong>Learning rate:</strong> a lower one or a decay schedule turns later epochs into small refinements instead of big moves.</li>
+      </ul>
+      <p><strong>Check first:</strong></p>
+      <ul>
+        <li>leakage, or different distributions in the two splits, can produce the same shape;</li>
+        <li>the metric you care about: validation loss can rise while accuracy or AUC still improves, because the model grows overconfident on a few examples it gets wrong and cross-entropy punishes confident mistakes heavily. Stop on the metric if that's what matters.</li>
+      </ul></div></details>
     <details class="qa"><summary><span class="qn">P7</span>Your loss suddenly spikes to NaN halfway through training. Causes and fixes?</summary><div class="ans">
-      <p>Usually exploding gradients: one bad batch or a steep cliff in the loss, often worse in RNNs or with fp16 overflow. Clip the gradient norm, lower the learning rate or add warmup, check the inputs for huge or missing values, use numerically stable log-softmax, and use loss scaling for fp16. Plot the gradient norm next to the loss to confirm.</p></div></details>
+      <p><strong>Usually an exploding update: one huge gradient step throws the weights where activations overflow. Clip, lower the learning rate, and find the batch.</strong></p>
+      <ul>
+        <li><strong>How it happens.</strong> A steep cliff in the loss or a bad batch gives one huge gradient; the step lands where activations are enormous; they overflow to infinity, and \(\infty - \infty\) or \(0 \times \infty\) gives NaN, which then spreads to every weight.</li>
+        <li><strong>Usual causes:</strong> a learning rate too high, or no warmup with Adam, whose early step sizes are poorly estimated; long recurrent products; fp16 overflowing its small range; \(\log 0\) from computing softmax and log separately; NaN or extreme values in the inputs.</li>
+      </ul>
+      <p><strong>Fixes, each matching a cause:</strong></p>
+      <ul>
+        <li>clip the gradient norm, which caps the step;</li>
+        <li>lower the learning rate or add warmup;</li>
+        <li>use a fused, stable log-softmax and cross-entropy, so there's no \(\log 0\);</li>
+        <li>use loss scaling, or bf16, for mixed precision;</li>
+        <li>validate the inputs and find the offending batch.</li>
+      </ul>
+      <p><strong>To confirm:</strong> plot the gradient norm next to the loss. A spike just before the NaN points to an explosion. Restart from the last good checkpoint.</p></div></details>
     <details class="qa"><summary><span class="qn">P8</span>How would you optimize a metric that isn't differentiable?</summary><div class="ans">
-      <p>Use a smooth surrogate (soft versions of max and argmax, with a temperature), Gumbel-softmax, a straight-through estimator, or REINFORCE with the metric as the reward and a baseline to cut variance. Or keep cross-entropy and weight it. Check that the surrogate tracks the real metric; it can also add nothing when cross-entropy already captures what the metric rewards.</p></div></details>
+      <p><strong>Replace the metric with a differentiable stand-in that tracks it, or treat it as a reward and use a gradient estimator that doesn't need its derivative.</strong></p>
+      <p>Metrics built from argmax, thresholds or counts are piecewise constant in the weights, so their gradient is 0 almost everywhere. The options:</p>
+      <ul>
+        <li><strong>Smooth surrogate:</strong> replace hard choices with soft ones, such as a softmax with temperature \(\tau\) for an argmax. As \(\tau \to 0\) it approaches the real metric, but its gradients get sharper and noisier.</li>
+        <li><strong>Gumbel-softmax:</strong> a differentiable stand-in for sampling a one-hot choice.</li>
+        <li><strong>Straight-through:</strong> use the hard choice in the forward pass and treat it as the identity in the backward pass. Biased, but simple, and it often works.</li>
+        <li><strong>REINFORCE:</strong> treat the metric as a reward \(R\). It needs only reward values, so any metric works; it's unbiased but high-variance, and subtracting a baseline from \(R\) cuts the variance:
+          <div class="mj">\[ \nabla_\theta\, \mathbb{E}[R] = \mathbb{E}\big[R\, \nabla_\theta \log p_\theta(y)\big] \]</div></li>
+        <li><strong>Weighting:</strong> keep cross-entropy, and weight examples or classes the way the metric does.</li>
+      </ul>
+      <p><strong>Why it may not help:</strong> cross-entropy may already push toward what the metric rewards, and a surrogate can disagree with the real metric. Always check the real metric on validation.</p></div></details>
     <details class="qa"><summary><span class="qn">P9</span>What is catastrophic forgetting, and how do you reduce it?</summary><div class="ans">
-      <p>Training on new data overwrites what the model knew. To reduce it: a small learning rate and fewer epochs; freeze lower layers or use layer-wise learning-rate decay; adapters or LoRA; replay some old data; or EWC, which penalizes moving the weights that mattered for old tasks (weighted by Fisher information). In production, the same issue shows up as retraining under drift.</p></div></details>
+      <p><strong>Training on new data overwrites what the model knew, because nothing in the new loss asks it to keep its old abilities. The fixes keep the weights near where they were, or keep old data in the loss.</strong></p>
+      <ul>
+        <li><strong>Why it happens.</strong> Gradient descent moves the shared weights to lower the new loss only. Weights that mattered for the old task move freely, and old performance drops.</li>
+        <li><strong>Small learning rate, few epochs:</strong> stay close to the pretrained weights.</li>
+        <li><strong>Freeze lower layers, or use layer-wise learning-rate decay:</strong> lower layers hold the most general features, so protect them most.</li>
+        <li><strong>LoRA or adapters:</strong> the base weights never change, so removing the adapter gives back the old model.</li>
+        <li><strong>Replay:</strong> mix old examples back in, which puts the old loss back into the objective.</li>
+        <li><strong>EWC:</strong> penalize moving each weight in proportion to how much the old task depends on it. \(\theta_i^*\) is the weight after the old task, and \(F_i\), the Fisher information, is roughly the old loss's average squared gradient for weight \(i\): large means important.
+          <div class="mj">\[ L = L_{\text{new}} + \frac{\lambda}{2} \sum_i F_i\, (\theta_i - \theta_i^*)^2 \]</div></li>
+      </ul>
+      <p><strong>In production:</strong> retraining under drift is the same problem. Keep a slice of older data in the mix, and track performance on older segments.</p></div></details>
 
     <!-- 08 -->
     <h2 id="sheet"><span class="pn">06</span>Cheat sheet</h2>
     <div class="sheet">
       <h3>Transformer</h3>
-      <div class="mj">\[ Q = XW_Q,\ K = XW_K,\ V = XW_V \qquad \text{Attention} = \text{softmax}\!\Big(\frac{QK^\top}{\sqrt{d_k}}\Big) V \]</div>
-      <div class="mj">\[ x \leftarrow x + \text{MHA}(\text{LN}(x)) \qquad x \leftarrow x + \text{FFN}(\text{LN}(x)) \qquad \approx 12 d^2 \text{ parameters per block} \]</div>
+      <div class="mj">\[ \begin{aligned} Q &amp;= XW_Q \\ K &amp;= XW_K \\ V &amp;= XW_V \\ \text{Attention} &amp;=\text{softmax}\!\Big(\frac{QK^\top}{\sqrt{d_k}}\Big) V \end{aligned} \]</div>
+      <div class="mj">\[ \begin{aligned} x &amp;\leftarrow x + \text{MHA}(\text{LN}(x)) \\ x &amp;\leftarrow x + \text{FFN}(\text{LN}(x)) \\ \text{parameters per block} &amp;\approx 12 d^2 \end{aligned} \]</div>
       <h3>Shapes</h3>
       <div class="mj">\[ \text{Attention: } X\ n{\times}d \to Q, K, V\ n{\times}d_k \to QK^\top\ n{\times}n \to AV\ n{\times}d_k \to \text{concat} \cdot W_O\ n{\times}d \]</div>
     </div>

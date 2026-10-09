@@ -1,0 +1,1308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070707">
+<title>Classical NLP · Deepam Minda</title>
+<meta name="description" content="From text to vectors: tokenization, bag of words, TF-IDF and BM25, Naive Bayes, n-gram language models, PMI and LSA, word2vec, GloVe and fastText.">
+<meta property="og:title" content="Classical NLP">
+<meta property="og:description" content="From text to vectors: tokenization, bag of words, TF-IDF and BM25, Naive Bayes, n-gram language models, PMI and LSA, word2vec, GloVe and fastText.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem("deepam-theme"); } catch (e) {}
+  if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<link rel="stylesheet" href="../assets/design/tokens.css?v=1">
+<link rel="stylesheet" href="../assets/design/components.css?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<style>
+/* Green graph-paper theme for the recurrent-notebook content.
+   Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
+   One sans for text, one mono for labels; MathJax draws the maths. Green = the cell / notebook,
+   slate = the hidden state, orange only for gradients. */
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
+body {
+  margin: 0; color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: 50% 0;
+  font: 16.5px/1.7 var(--sans); letter-spacing: -.003em;
+  padding-inline: 20px; padding-block: 44px 88px;
+  -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 640px) { body { font-size: 16px; padding-inline: 16px; padding-block: 24px 80px; } }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+table, button { font: inherit; }
+code { font: .86em var(--mono); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; }
+
+.page { max-width: 1200px; margin: 0 auto; display: grid; gap: 52px; grid-template-columns: 220px minmax(0, 860px); justify-content: center; }
+@media (max-width: 1080px) { .page { grid-template-columns: minmax(0, 860px); gap: 0; } }
+
+/* contents */
+.toc { position: sticky; top: 28px; align-self: start; font: 13.5px/1.4 var(--sans); max-height: calc(100vh - 56px); overflow-y: auto; }
+.toc summary { display: none; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--ink-2); text-decoration: none; }
+.toc a:hover { background: var(--surface); color: var(--ink); }
+.toc a.on { color: var(--ink); background: var(--surface); box-shadow: inset 2px 0 0 var(--cell); }
+.toc .n { font: 500 11px var(--mono); color: var(--ink-3); margin-right: 8px; }
+.toc .label { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 10px 10px; }
+.toc li.part { font: 500 10.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 14px 10px 4px; }
+@media (max-width: 1080px) {
+  .toc { position: static; margin-bottom: 26px; max-height: none; }
+  .toc .label { display: none; }
+  .toc details { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  .toc summary { display: block; cursor: pointer; padding: 12px 14px; font: 500 14px var(--sans); list-style: none; }
+  .toc summary::-webkit-details-marker { display: none; }
+  .toc summary::after { content: "+"; float: right; color: var(--ink-3); }
+  .toc details[open] summary::after { content: "–"; }
+  .toc details ol { padding: 0 6px 10px; }
+}
+.jump {
+  display: none; position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+  font: 500 13px var(--sans); color: var(--ink); background: var(--surface); text-decoration: none;
+  border: 1px solid var(--rule); border-radius: 999px; padding: 9px 14px;
+}
+@media (max-width: 1080px) { .jump { display: block; } }
+
+/* article */
+article { min-width: 0; }
+header.hero { display: grid; gap: 10px; margin-bottom: 26px; }
+.kicker { font: 500 12px/1 var(--mono); color: var(--ink-3); letter-spacing: .02em; }
+h1 { margin: 0; font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.6rem); line-height: 1.1; font-weight: 600; letter-spacing: -.028em; text-wrap: balance; }
+.dek { margin: 0; font-size: 1.1rem; line-height: 1.55; color: var(--ink-2); max-width: 40em; }
+.meta { font: 12px/1.5 var(--mono); color: var(--ink-3); }
+.key { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.key span::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--c); margin-right: 6px; vertical-align: middle; }
+
+h2 { font-size: 1.36rem; line-height: 1.25; font-weight: 600; letter-spacing: -.018em; margin: 56px 0 12px; text-wrap: balance; scroll-margin-top: 16px; }
+h2 .pn { font: 500 .74em/1 var(--mono); color: var(--ink-3); margin-right: .7em; letter-spacing: 0; }
+h3 { font-size: 1.04rem; font-weight: 600; letter-spacing: -.01em; margin: 30px 0 6px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 1.25em; }
+li { margin-bottom: 5px; }
+li::marker { color: var(--ink-3); }
+strong { font-weight: 600; }
+.mj { overflow-x: auto; overflow-y: hidden; margin: 4px 0 16px; padding: 2px 0; }
+mjx-container[display="true"] { margin: 0 !important; }
+
+/* plan and summary panels */
+.tldr { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 22px 6px; margin-bottom: 14px; }
+.tldr h2 { margin: 0 0 10px; font: 500 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.tldr ol { padding-left: 1.3em; }
+.tldr li { margin-bottom: 8px; }
+.tldr p { margin: 0 0 12px; font-size: 15.5px; }
+.tldr .tbl { margin: 4px 0 12px; }
+
+/* notes: quote-style, coloured by kind */
+.note { margin: 16px 0 20px; padding: 2px 0 2px 16px; border-left: 2px solid var(--c); color: var(--ink-2); font-size: .97em; }
+.note > .nl { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); margin: 4px 0 8px; }
+.note strong { color: var(--ink); }
+.note.ask { --c: var(--cell); }
+.note.say { --c: var(--hid); }
+.note.trap { --c: var(--grad); }
+.note.lab { --c: var(--cell); }
+.note .q { font-style: italic; color: var(--ink); }
+.note ul { margin: 0 0 10px; }
+.note li { margin-bottom: 5px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 6px 0 20px; }
+table { border-collapse: collapse; width: 100%; font-size: .93em; line-height: 1.5; }
+th { text-align: left; vertical-align: bottom; font: 500 11px/1.4 var(--mono); color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; padding: 0 14px 8px 0; border-bottom: 1px solid var(--ink-3); }
+td { padding: 8px 14px 8px 0; vertical-align: top; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+td .src { display: block; font: 11.5px/1.4 var(--mono); color: var(--ink-3); margin-top: 2px; }
+
+/* gate cards */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0 20px; }
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.gc { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 4px; font-size: 15.5px; line-height: 1.6; }
+.gc h4 { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.gc h4 .tag { font: 500 11px var(--mono); color: var(--c); }
+.gc.g1 { --c: var(--cell); }
+.gc.g2 { --c: var(--ink-3); }
+.gc p { margin-bottom: 10px; }
+
+/* figures */
+figure { margin: 18px 0 24px; }
+.plate { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 10px; overflow-x: auto; }
+.plate svg { display: block; width: 100%; height: auto; min-width: 460px; max-width: 700px; margin: 0 auto; }
+@media (max-width: 500px) { .plate svg { max-width: none; } }
+figcaption { font-size: .86rem; line-height: 1.5; color: var(--ink-3); margin-top: 10px; }
+.dg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink-2); }
+.dg .v { font-family: var(--serif); font-style: italic; font-size: 19px; fill: var(--ink); }
+.dg .v .s { font-size: 12.5px; }
+.dg .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; fill: var(--ink-3); }
+.dg .gl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--gate); }
+.dg .gs { font-family: var(--serif); font-style: normal; font-size: 12px; fill: var(--ink-3); }
+.dg .cl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--ink); }
+.dg .cs { font-family: var(--sans); font-size: 12px; fill: var(--ink-2); }
+.dg .optx { font: 500 17px var(--sans); fill: var(--ink); }
+.dg .cell { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.dg .hid { stroke: var(--hid); stroke-width: 2.4; fill: none; }
+.dg .hid.thick { stroke-width: 3.6; }
+.dg .in { stroke: var(--ink-3); stroke-width: 1.5; fill: none; }
+.dg .gw { stroke: var(--gate); stroke-width: 1.6; fill: none; }
+.dg .cw { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+.dg .grad { stroke: var(--grad); fill: none; stroke-linecap: round; }
+.dg .gbox { fill: var(--gate-wash); stroke: var(--gate); stroke-width: 1.3; }
+.dg .box { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .op { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.3; }
+.dg .dot { fill: var(--ink-2); }
+.dg .cellon { fill: var(--cell-wash); stroke: var(--cell); stroke-width: 1; }
+.dg .celloff { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.dg .stream { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.mk-cell { fill: var(--cell); } .mk-hid { fill: var(--hid); } .mk-in { fill: var(--ink-3); }
+.mk-gate { fill: var(--gate); } .mk-cw { fill: var(--ink-2); } .mk-grad { fill: var(--grad); }
+
+/* questions */
+details.qa { border-bottom: 1px solid var(--rule); }
+details.qa:first-of-type { border-top: 1px solid var(--rule); }
+details.qa summary { cursor: pointer; padding: 11px 2px; font-weight: 500; font-size: 15.5px; line-height: 1.45; list-style: none; display: flex; gap: 12px; }
+details.qa summary::-webkit-details-marker { display: none; }
+details.qa summary .qn { font: 500 11.5px/1.9 var(--mono); color: var(--ink-3); flex: none; min-width: 1.9em; }
+details.qa summary::after { content: "+"; margin-left: auto; color: var(--ink-3); flex: none; }
+details.qa[open] summary::after { content: "–"; }
+details.qa .ans { padding: 0 4px 12px 32px; font-size: 15.5px; color: var(--ink-2); }
+summary:focus-visible, a:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+
+.sheet { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 6px; }
+.sheet h3 { margin: 4px 0 6px; font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: .9rem; color: var(--ink-3); }
+
+/* code blocks */
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; margin: 8px 0 20px; overflow-x: auto; font: 12.8px/1.6 var(--mono); color: var(--ink); white-space: pre; }
+pre.code code { font: inherit; background: none; border: 0; padding: 0; }
+pre.code .cm { color: var(--ink-3); }
+@media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
+
+/* public copy: colours, fonts and sizes come from the site's tokens.css; this maps the notebook's
+   token names onto them (green_theme.css's own token block is left out of public pages). */
+:root {
+  --paper: var(--void); --ink: var(--text); --ink-2: var(--soft); --ink-3: var(--muted);
+  --accent: var(--amber);
+  --cell: var(--green); --cell-wash: var(--green-wash); --hid: var(--blue); --hid-wash: var(--blue-wash);
+  --gate: var(--neutral); --gate-wash: var(--neutral-wash); --grad: var(--orange); --grad-wash: var(--orange-wash);
+  --sans: var(--font-sans); --mono: var(--font-mono);
+  --serif: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
+}
+body { padding-block-start: 0; letter-spacing: 0; }
+/* the shared header sits inside the notebook's side padding */
+.site-header { width: min(100%, 1260px); margin-bottom: 40px; }
+.site-header a:hover { text-decoration: none; }
+@media (max-width: 720px) { .site-header { width: 100%; margin-bottom: 26px; } }
+/* the site's type scale */
+h1 { font-weight: 600; font-size: var(--fs-title); line-height: 1.12; letter-spacing: -.02em; }
+h2 { font-size: var(--fs-h2); letter-spacing: -.01em; }
+h3 { font-size: var(--fs-h3); }
+.dek { font-size: 18px; }
+.toc a.on { box-shadow: inset 2px 0 0 var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline-color: var(--accent); }
+footer .site-nav { display: block; margin-top: 10px; }
+.next { margin-top: 36px; font-weight: 500; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="a-cell" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path class="mk-cell" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-hid" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto"><path class="mk-hid" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-in" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-in" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-gate" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-cw" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-cw" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-grad" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path class="mk-grad" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">study notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
+<div class="page">
+  <nav class="toc" aria-label="Contents">
+    <details id="tocd" open>
+      <summary>Contents</summary>
+      <div class="label">Contents</div>
+      <ol>
+        <li><a href="#tldr"><span class="n">00</span>In short</a></li>
+        <li><a href="#pipeline"><span class="n">01</span>The pipeline, and the notation</a></li>
+        <li><a href="#tokens"><span class="n">02</span>Text to tokens</a></li>
+        <li><a href="#bow"><span class="n">03</span>Bag of words and n-grams</a></li>
+        <li><a href="#tfidf"><span class="n">04</span>TF-IDF</a></li>
+        <li><a href="#bm25"><span class="n">05</span>BM25</a></li>
+        <li><a href="#classifiers"><span class="n">06</span>Classical text classifiers</a></li>
+        <li><a href="#lm"><span class="n">07</span>n-gram language models</a></li>
+        <li><a href="#distributional"><span class="n">08</span>Distributional semantics: PMI and LSA</a></li>
+        <li><a href="#word2vec"><span class="n">09</span>word2vec</a></li>
+        <li><a href="#glove"><span class="n">10</span>GloVe and fastText</a></li>
+        <li><a href="#using"><span class="n">11</span>Using word vectors</a></li>
+        <li><a href="#contextual"><span class="n">12</span>From static to contextual embeddings</a></li>
+        <li><a href="#code"><span class="n">13</span>Pseudocode</a></li>
+        <li><a href="#questions"><span class="n">14</span>Interview questions</a></li>
+        <li><a href="#sheet"><span class="n">15</span>Cheat sheet</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <article>
+    <header class="hero">
+      <div class="tag">Study notes · NLP</div>
+      <h1>Classical NLP</h1>
+      <p class="dek">Everything that happens before a sequence model sees a sentence: tokens and vocabularies, bag of words, TF-IDF and BM25, Naive Bayes, n-gram language models, PMI and LSA, word2vec, GloVe and fastText. What each one computes, why it's built that way, and where it stops working.</p>
+      <div class="meta">About 40 minutes, plus the questions · formulas, shapes and pseudocode, no worked numbers ·
+        <span class="key"><span style="--c: var(--hid)">sparse, count-based</span><span style="--c: var(--cell)">dense vectors</span><span style="--c: var(--grad)">noise and negatives</span></span>
+      </div>
+    </header>
+
+    <section class="tldr" id="tldr" aria-labelledby="tldr-h">
+      <h2 id="tldr-h">In short</h2>
+      <ol>
+        <li>Text becomes numbers in four steps: normalize, tokenize, map tokens to ids through a vocabulary, then turn ids into vectors. The vectors are either sparse counts (bag of words, TF-IDF) or rows of a dense \(V \times d\) embedding matrix. Subword tokenizers (BPE, WordPiece, unigram) all but remove the out-of-vocabulary problem by splitting rare words into known pieces.</li>
+        <li><strong>TF-IDF</strong> weights each count by \(\log(N/\text{df})\), the surprisal of seeing the term in a document. L2 normalization makes cosine similarity about the mix of words, not the length. <strong>BM25</strong> adds term-frequency saturation (\(k_1\)) and length normalization pivoted on the average length (\(b\)), which is why it's the default for keyword search.</li>
+        <li>On sparse features, <strong>Naive Bayes</strong> (counting, smoothing, log space) and <strong>logistic regression or a linear SVM</strong> are fast, strong, interpretable baselines. Naive Bayes is itself a linear classifier whose weights come from counts.</li>
+        <li><strong>n-gram language models</strong> estimate next-token probabilities from counts under a Markov assumption. Smoothing handles unseen n-grams; Kneser–Ney's continuation counts are the best version. Perplexity is the exponential of the per-token cross-entropy; a uniform model scores exactly \(V\).</li>
+        <li><strong>Distributional semantics:</strong> a word's meaning comes from its contexts. PMI measures how strongly a word and a context are associated; LSA compresses a weighted co-occurrence matrix with truncated SVD.</li>
+        <li><strong>word2vec</strong> predicts context words from a centre word (skip-gram) or the reverse (CBOW). Negative sampling replaces the \(V\)-way softmax with \(k + 1\) logistic regressions, and at its optimum it factorizes PMI \(- \log k\). <strong>GloVe</strong> factorizes log co-occurrence counts explicitly; <strong>fastText</strong> builds words from character n-grams, so unseen words still get vectors.</li>
+        <li>Static vectors give one vector per word type, so "bank" has a single meaning. <strong>ELMo</strong> and <strong>BERT</strong> compute a vector per token in its sentence; the static table survives as the first layer of every sequence model.</li>
+      </ol>
+    </section>
+
+    <!-- pipeline -->
+    <h2 id="pipeline"><span class="pn">01</span>The pipeline, and the notation</h2>
+    <p>A model needs numbers. Every NLP system, from a spam filter to an LLM, turns text into numbers in the same four steps. The methods in this note differ mostly in the last one.</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 720 232" role="img" aria-label="The text-to-vectors pipeline. Raw text is normalized, tokenized into T tokens and mapped to T integer ids. Then it splits: the sparse route counts ids into a 1 by V vector of tf or tf-idf weights for Naive Bayes, logistic regression or BM25; the dense route looks each id up in a V by d matrix E, giving a T by d matrix for pooling or a sequence model.">
+          <text class="lbl" x="216" y="30" text-anchor="middle">SHARED: TEXT TO IDS</text>
+          <rect class="box" x="10" y="96" width="88" height="38" rx="8"/><text x="54" y="120" text-anchor="middle">raw text</text>
+          <rect class="box" x="118" y="96" width="88" height="38" rx="8"/><text x="162" y="120" text-anchor="middle">normalize</text>
+          <rect class="box" x="226" y="96" width="88" height="38" rx="8"/><text x="270" y="120" text-anchor="middle">tokenize</text>
+          <rect class="box" x="334" y="96" width="88" height="38" rx="8"/><text x="378" y="120" text-anchor="middle">look up ids</text>
+          <path class="cw" d="M98 115 H115" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M206 115 H223" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M314 115 H331" marker-end="url(#a-cw)"/>
+          <text class="lbl" x="54" y="154" text-anchor="middle">a string</text>
+          <text class="lbl" x="162" y="154" text-anchor="middle">a string</text>
+          <text class="lbl" x="270" y="154" text-anchor="middle">T tokens</text>
+          <text class="lbl" x="378" y="154" text-anchor="middle">T ids in [0, V)</text>
+          <path class="hid" d="M422 115 H436 V62 H451" marker-end="url(#a-hid)"/>
+          <path class="hid" style="stroke:var(--cell)" d="M422 115 H436 V168 H450" marker-end="url(#a-cell)"/>
+          <text class="lbl" x="582" y="30" text-anchor="middle" style="fill:var(--hid)">SPARSE: COUNT-BASED</text>
+          <rect class="box" style="stroke:var(--hid)" x="454" y="43" width="110" height="38" rx="8"/><text x="509" y="67" text-anchor="middle">tf or tf-idf</text>
+          <path class="hid" d="M564 62 H583" marker-end="url(#a-hid)"/>
+          <rect class="box" style="stroke:var(--hid)" x="586" y="43" width="124" height="38" rx="8"/><text x="648" y="67" text-anchor="middle">1 × V, sparse</text>
+          <text class="lbl" x="582" y="100" text-anchor="middle">→ NB · logistic regression · BM25</text>
+          <text class="lbl" x="582" y="140" text-anchor="middle" style="fill:var(--cell)">DENSE: LEARNED</text>
+          <rect class="box" style="stroke:var(--cell)" x="454" y="149" width="110" height="38" rx="8"/><text x="509" y="173" text-anchor="middle">rows E[ids]</text>
+          <path class="hid" style="stroke:var(--cell)" d="M564 168 H582" marker-end="url(#a-cell)"/>
+          <rect class="box" style="stroke:var(--cell)" x="586" y="149" width="124" height="38" rx="8"/><text x="648" y="173" text-anchor="middle">T × d, dense</text>
+          <text class="lbl" x="509" y="205" text-anchor="middle">E is V × d</text>
+          <text class="lbl" x="582" y="224" text-anchor="middle">→ pooling, or a sequence model</text>
+        </svg>
+      </div>
+      <figcaption>The first three steps are shared. The sparse route treats every word as its own unrelated dimension; the dense route puts words in a shared space where similar words sit close together.</figcaption>
+    </figure>
+    <ol>
+      <li><strong>Normalize</strong> the raw string: Unicode, case, perhaps stemming.</li>
+      <li><strong>Tokenize</strong> it into units: words, characters or subwords.</li>
+      <li><strong>Map each token to an integer id</strong> through a fixed vocabulary.</li>
+      <li><strong>Turn ids into vectors.</strong> Either count them into one sparse vector of length \(V\) per document, or look each one up in a dense \(V \times d\) matrix.</li>
+    </ol>
+    <p>The dense route is what lets a model generalize from "excellent" to "superb": the two words are different columns in a bag of words, but nearby rows in an embedding matrix.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>\(N\)</td><td>Number of documents in the corpus</td></tr>
+        <tr><td>\(V\)</td><td>Vocabulary size: the number of distinct word types</td></tr>
+        <tr><td>\(D,\ \lvert D \rvert\)</td><td>A document, and its length in tokens</td></tr>
+        <tr><td>\(T,\ B\)</td><td>Sequence length in tokens; batch size</td></tr>
+        <tr><td>\(t\)</td><td>A term (a word type)</td></tr>
+        <tr><td>\(\text{tf}_{t,D}\)</td><td>How many times \(t\) occurs in \(D\)</td></tr>
+        <tr><td>\(\text{df}_t\)</td><td>How many documents contain \(t\) at least once</td></tr>
+        <tr><td>\(X\)</td><td>The document-term matrix, \(N \times V\), one row per document</td></tr>
+        <tr><td>\(d\)</td><td>Embedding size (typically 50–300 for static vectors)</td></tr>
+        <tr><td>\(w,\ c\)</td><td>A centre word and a context word (word2vec)</td></tr>
+        <tr><td>\(k\)</td><td>Negative samples per real pair</td></tr>
+        <tr><td>\(y\)</td><td>A class label</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Types and tokens.</strong> A token is one occurrence in running text; a type is a distinct word. In "the cat saw the dog", "the" is one type occurring as two tokens. A vocabulary is a set of types; lengths count tokens.</p>
+
+    <!-- tokens -->
+    <h2 id="tokens"><span class="pn">02</span>Text to tokens</h2>
+    <h3>Normalization: every step merges strings, and merging can lose meaning</h3>
+    <p>Normalization maps different surface strings to one form so their counts pool together. Fewer types means fewer parameters and fewer unseen words, at the price of throwing information away. Each step is a bet that the distinction it erases doesn't matter for the task.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Step</th><th>What it does</th><th>When it hurts</th></tr></thead>
+      <tbody>
+        <tr><td>Unicode normalization (NFC, NFKC)</td><td>Makes visually identical strings byte-identical: a precomposed "é" vs "e" plus a combining accent. NFKC also folds ligatures and full-width characters.</td><td>Almost never; skipping it is the bug (one word, two ids). Stripping accents is a separate, lossy step.</td></tr>
+        <tr><td>Lowercasing</td><td>"Apple" and "apple" share counts</td><td>Names and acronyms ("US" vs "us"); NER needs case. Cased models keep it.</td></tr>
+        <tr><td>Stemming (Porter, Snowball)</td><td>Chops suffixes by rule: "connected", "connection" → "connect"</td><td>Merges unrelated words ("universe", "university"), makes non-words, erases tense and number</td></tr>
+        <tr><td>Lemmatization</td><td>Maps to the dictionary form using a lexicon and the part of speech: "was" → "be"</td><td>Slower, needs a tagger and language resources; still erases tense and number</td></tr>
+        <tr><td>Stopword removal</td><td>Drops frequent function words ("the", "of", "not")</td><td>Negation ("not good"), questions ("who" vs "where"), phrases, authorship. Never for sequence models.</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Rule of thumb:</strong> aggressive normalization helps sparse models on small data, and recall in search. It hurts neural models with subword tokenizers, which would use the information it throws away. TF-IDF already down-weights stopwords.</p>
+
+    <h3>Words, characters or subwords</h3>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Word</th><th>Character</th><th>Subword</th></tr></thead>
+      <tbody>
+        <tr><td>Vocabulary</td><td>Huge, and still incomplete</td><td>Tiny: an alphabet, or 256 bytes</td><td>A chosen size, tens of thousands</td></tr>
+        <tr><td>Sequence length</td><td>Shortest</td><td>Several times longer</td><td>A little longer than words</td></tr>
+        <tr><td>Unknown words</td><td>Become &lt;UNK&gt;</td><td>None</td><td>Almost none: split into known pieces</td></tr>
+        <tr><td>Sharing across forms</td><td>None: "play" and "playing" are unrelated ids</td><td>Total, but each unit means little</td><td>"play" + "ing"</td></tr>
+        <tr><td>Weak spot</td><td>OOV words; languages without spaces</td><td>Long sequences; the model must learn spelling → meaning</td><td>Splits follow corpus frequency, not morphology</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Why word vocabularies never close.</strong> Word frequencies follow <strong>Zipf's law</strong>: the \(r\)-th most frequent word has frequency roughly proportional to \(1/r\). A few types cover most tokens, and a long tail of types appears once or twice. <strong>Heaps' law</strong> says the number of distinct types keeps growing with the number of tokens seen, \(n\):</p>
+    <div class="mj">\[ V(n) \propto n^{\beta}, \qquad 0 &lt; \beta &lt; 1 \]</div>
+    <p>\(\beta\) is typically around 0.4–0.6. The vocabulary grows more slowly than the corpus but never stops: new names, typos and inflections keep arriving, so a word-level model always meets words it has never seen.</p>
+
+    <h3>Building the vocabulary</h3>
+    <ol>
+      <li><strong>Count</strong> token frequencies on the training split only. The vocabulary is a learned parameter; building it on test data leaks.</li>
+      <li><strong>Cut</strong> by a minimum count, or keep the top \(V\). Zipf's law makes this cheap: dropping the tail removes many types but few tokens.</li>
+      <li><strong>Map everything else to &lt;UNK&gt;</strong>, including the rare <em>training</em> words. That's the point: the &lt;UNK&gt; vector is only trained if &lt;UNK&gt; appears in training, and this way it learns what "some rare word" looks like.</li>
+      <li><strong>Reserve ids for special tokens:</strong></li>
+    </ol>
+    <div class="tbl"><table>
+      <thead><tr><th>Token</th><th>Role</th><th>Handling</th></tr></thead>
+      <tbody>
+        <tr><td>&lt;PAD&gt;</td><td>Fills short sequences so a batch is rectangular</td><td>Masked out of the loss, attention and pooling; its embedding row is fixed at zero</td></tr>
+        <tr><td>&lt;UNK&gt;</td><td>Any out-of-vocabulary token</td><td>Every unknown word shares this one vector</td></tr>
+        <tr><td>&lt;s&gt;, &lt;/s&gt; (BOS, EOS)</td><td>Sentence start and end</td><td>A language model must predict the end, or it can't model length or stop generating</td></tr>
+        <tr><td>[CLS], [SEP], [MASK]</td><td>BERT's summary slot, segment separator and masked position</td><td>Added by the tokenizer, never by the text</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>The size trade-off.</strong> A bigger \(V\) means fewer &lt;UNK&gt;s, but more parameters (the input embedding and a language model's output layer are each \(V \times d\)) and more rare types with too few occurrences to learn good vectors.</p>
+
+    <h3>The OOV problem</h3>
+    <p>An out-of-vocabulary word at test time (a new product name, a typo, a rare inflection like "unfriendliness") becomes &lt;UNK&gt;, so all OOV words share one vector and the model loses what they carried. In jargon-heavy or noisy text, those are often the informative words. The fixes: character models, the hashing trick (<a href="#bow">section 03</a>), fastText's character n-grams (<a href="#glove">section 10</a>), and subword tokenization. Byte-level BPE removes OOV entirely; character-based WordPiece and unigram vocabularies almost entirely (a character never seen in training, such as a rare emoji, still gives [UNK]).</p>
+
+    <h3>Subword tokenization: BPE, WordPiece, unigram</h3>
+    <p>All three learn a vocabulary of pieces from corpus statistics. Frequent words stay whole, rare words split into frequent pieces, and almost any string can be encoded.</p>
+    <p><strong>BPE</strong> (byte-pair encoding; Sennrich et al., 2016; the GPT family) is bottom-up and greedy:</p>
+    <ol>
+      <li>Pre-split the corpus into words with their counts. Write each word as a sequence of characters plus an end-of-word marker. (GPT-2's byte-level version starts from the 256 byte values instead, with a marker for a leading space.)</li>
+      <li>Count every adjacent pair of symbols, weighted by the word's count.</li>
+      <li>Merge the most frequent pair everywhere into a new symbol, and record the merge.</li>
+      <li>Repeat until the vocabulary reaches the target size: the base symbols plus one new symbol per merge.</li>
+    </ol>
+    <p>To encode new text, split each word into base symbols and apply the learned merges in the order they were learned. Byte-level BPE can encode any string, so nothing is ever unknown. Pseudocode is in <a href="#code">section 13</a>.</p>
+    <p><strong>WordPiece</strong> (BERT) also merges bottom-up, but picks the pair whose merge most increases the likelihood of the training data under a unigram model of the current symbols (each symbol drawn independently with its corpus frequency), not the most frequent pair. Google never published its training code; open reimplementations score a pair as</p>
+    <div class="mj">\[ \text{score}(a, b) = \frac{\text{count}(ab)}{\text{count}(a)\, \text{count}(b)} \]</div>
+    <p>This is a PMI-like ratio (<a href="#distributional">section 08</a>): it rewards pairs whose parts rarely occur apart. Two very common symbols that are often adjacent get a high BPE count but a modest WordPiece score. (The exact likelihood gain is closer to \(\text{count}(ab)\) times the log of this ratio, so frequency still matters.) Encoding differs too: WordPiece takes the longest vocabulary piece from the start of the word, then the longest continuation piece (marked "##"), and so on; if some position matches nothing, the whole word becomes [UNK].</p>
+    <p><strong>Unigram LM</strong> (Kudo, 2018) works top-down: start from a large candidate vocabulary, score a segmentation by the product of its pieces' probabilities, and repeatedly drop the pieces whose removal costs the least likelihood. Encoding picks the most probable segmentation (Viterbi).</p>
+    <p><strong>SentencePiece</strong> is a library, not an algorithm: it treats the space as an ordinary symbol ("▁"), so it needs no language-specific pre-tokenizer and decoding is lossless. It trains unigram models (T5) or BPE (Llama 1 and 2).</p>
+    <aside class="note trap"><p class="nl">Trap</p><p>Subword splits follow frequency, not morphology: whether a rare word splits along its morpheme boundaries depends on the corpus. And languages that were rare in the tokenizer's training data split into many more pieces per word, which costs sequence length, compute and money.</p></aside>
+
+    <!-- bow -->
+    <h2 id="bow"><span class="pn">03</span>Bag of words and n-grams</h2>
+    <p>A <strong>bag of words</strong> represents a document by how often each vocabulary term occurs in it, ignoring order. Stack the documents as rows and you get the <strong>document-term matrix</strong>:</p>
+    <div class="mj">\[ X \in \mathbb{R}^{N \times V}, \qquad X_{D,t} = \text{tf}_{t,D} \]</div>
+    <p>Row \(D\) is a document's vector; column \(t\) is a term's profile across the corpus. A new document or a query is encoded with the training vocabulary, and terms outside it are dropped.</p>
+
+    <h3>Sparsity, and what it costs</h3>
+    <p>A document uses a few hundred distinct terms out of tens or hundreds of thousands, so well over 99% of \(X\) is zero. It's stored in a sparse format such as CSR: the nonzero values, their column indices, and one pointer per row marking where it starts. Memory is \(O(\text{nnz})\) instead of \(O(NV)\), and multiplying by a weight vector costs \(O(\text{nnz})\).</p>
+    <ul>
+      <li><strong>Algorithms must stay sparse.</strong> Linear models trained by SGD or coordinate descent, Naive Bayes and inverted indexes touch only the nonzeros. Anything that densifies the matrix blows up memory.</li>
+      <li><strong>Centering destroys sparsity.</strong> Subtracting each column's mean makes almost every entry nonzero. That's why text uses truncated SVD rather than PCA, and scales by maximum absolute value rather than standardizing.</li>
+      <li><strong>Far more features than examples.</strong> With \(V \gg N\), a linear model can fit the training set perfectly, so regularization isn't optional.</li>
+    </ul>
+
+    <h3>Binary or counts</h3>
+    <p>Binary features record presence, \(\mathbf{1}[\text{tf}_{t,D} > 0]\); counts record how many times. In short texts and in sentiment, the first occurrence carries most of the signal, so binary features often match or beat counts (binarized multinomial Naive Bayes is a standard sentiment baseline). In long documents, counts say how much a document is about a topic. Sublinear \(1 + \log \text{tf}\) sits between the two.</p>
+
+    <h3>n-grams</h3>
+    <p>Add contiguous pairs and triples of tokens as extra features: "not good", "New York", "credit card". They restore local word order, which is often exactly what flips the meaning.</p>
+    <ul>
+      <li><strong>The vocabulary blows up.</strong> There are up to \(V^n\) possible n-grams, and for \(n \ge 3\) the number actually observed grows almost linearly with corpus size, because most occur once. Unigrams plus bigrams, pruned by a minimum document frequency, is the usual sweet spot.</li>
+      <li><strong>Character n-grams</strong> (lengths 2–5, say, within word boundaries) are robust to typos, inflections and unseen words. They work well for short, noisy or code-mixed text and for language identification.</li>
+    </ul>
+
+    <h3>The hashing trick</h3>
+    <p>Instead of storing a vocabulary, hash each feature string straight to one of \(m\) columns, with a sign from a second hash \(\xi(t) \in \{-1, +1\}\):</p>
+    <div class="mj">\[ \phi_i(D) = \sum_{t \,:\, h(t) = i} \xi(t)\, \text{tf}_{t,D} \]</div>
+    <p>There's no vocabulary to fit, store or ship. The transform is stateless, so it parallelizes and works on streams, and a term never seen in training still lands in a column.</p>
+    <p><strong>Collisions.</strong> Terms that hash to the same column share one weight, and the model can't tell them apart. With \(n\) distinct features and \(n \ll m\), a given feature collides with some other one with probability about \(n/m\). It still works because:</p>
+    <ul>
+      <li>\(m\) is chosen large relative to the number of features that matter (sklearn's default is \(2^{20}\));</li>
+      <li>most features are rare and uninformative, so a collision usually pairs a useful feature with noise, and the shared weight is driven by the useful one;</li>
+      <li>the random sign makes collisions cancel on average, so inner products survive in expectation (Weinberger et al., 2009).</li>
+    </ul>
+    <p>Write \(x, x'\) for two documents' full, unhashed count vectors:</p>
+    <div class="mj">\[ \begin{aligned} \phi(x)^\top \phi(x') &amp;= \sum_t x_t\, x'_t \\ &amp;\quad + \sum_{\substack{t \ne t' \\ h(t) = h(t')}} \xi(t)\, \xi(t')\, x_t\, x'_{t'} \\ \mathbb{E}_{\xi}\big[\phi(x)^\top \phi(x')\big] &amp;= x^\top x' \end{aligned} \]</div>
+    <p>The first sum is the true inner product (since \(\xi^2 = 1\)); every collision term carries \(\xi(t)\,\xi(t')\), which averages to zero. The price: the mapping can't be inverted, so you can't read which word a weight belongs to.</p>
+
+    <h3>What a bag of words loses</h3>
+    <ul>
+      <li><strong>Order:</strong> "dog bites man" and "man bites dog" are the same vector.</li>
+      <li><strong>Negation and scope:</strong> "not good, just bad" and "not bad, just good" contain the same words. Bigrams catch "not good"; a classic trick prefixes every token after a negation word with NOT_ until the next punctuation mark.</li>
+      <li><strong>Similarity between words:</strong> "car" and "automobile" are different columns with a dot product of zero. A query with one never matches a document with the other: the vocabulary-mismatch problem in search.</li>
+      <li><strong>Word senses:</strong> "bank" is one column for both meanings.</li>
+    </ul>
+    <p>Static word vectors (sections <a href="#distributional">08</a>–<a href="#using">11</a>) fix word similarity; word senses need contextual models (<a href="#contextual">section 12</a>); order and negation need n-grams or a sequence model.</p>
+
+    <!-- tfidf -->
+    <h2 id="tfidf"><span class="pn">04</span>TF-IDF</h2>
+    <p>Raw counts are dominated by words that are frequent everywhere ("the", "is", "said"), which say nothing about what a document is about. TF-IDF multiplies each count by a weight that's high for terms concentrated in few documents:</p>
+    <div class="mj">\[ \begin{gathered} \text{tfidf}(t, D) = \text{tf}_{t,D} \cdot \text{idf}(t) \\ \text{idf}(t) = \log \frac{N}{\text{df}_t} \end{gathered} \]</div>
+    <p>A term in every document gets weight \(\log 1 = 0\); a term in a single document gets the maximum, \(\log N\). Then each document vector is scaled to unit length:</p>
+    <div class="mj">\[ \hat x_D = \frac{x_D}{\lVert x_D \rVert_2} \]</div>
+
+    <h3>The variants</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Part</th><th>Variant</th><th>Formula</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>tf</td><td>Raw</td><td>\(\text{tf}_{t,D}\)</td><td>Simple; linear in repetitions</td></tr>
+        <tr><td>tf</td><td>Binary</td><td>\(\mathbf{1}[\text{tf}_{t,D} > 0]\)</td><td>Short texts, sentiment</td></tr>
+        <tr><td>tf</td><td>Sublinear</td><td>\(1 + \log \text{tf}_{t,D}\) when \(\text{tf} > 0\), else 0</td><td>The tenth repeat shouldn't count like the first</td></tr>
+        <tr><td>idf</td><td>Plain</td><td>\(\log (N / \text{df}_t)\)</td><td>Undefined when \(\text{df} = 0\); zero for a term in every document</td></tr>
+        <tr><td>idf</td><td>Smoothed (sklearn's default)</td><td>\(\log \frac{1 + N}{1 + \text{df}_t} + 1\)</td><td>As if one extra document contained every term: no division by zero. The \(+1\) keeps ubiquitous terms from vanishing entirely.</td></tr>
+        <tr><td>idf</td><td>Probabilistic (BM25)</td><td>\(\log \frac{N - \text{df}_t + 0.5}{\text{df}_t + 0.5}\)</td><td>From a relevance model; negative for terms in more than half the documents</td></tr>
+        <tr><td>norm</td><td>L2</td><td>\(x / \lVert x \rVert_2\)</td><td>Removes document length; cosine becomes a dot product</td></tr>
+      </tbody>
+    </table></div>
+    <p>sklearn's <code>TfidfVectorizer</code> uses natural logs, smoothed idf and L2 normalization by default; <code>sublinear_tf=True</code> switches to \(1 + \log \text{tf}\).</p>
+
+    <h3>Why idf, and why the log</h3>
+    <p>\(\text{df}_t / N\) estimates the probability that a random document contains \(t\). Its negative log is the <strong>surprisal</strong> of that event, in the information-theory sense:</p>
+    <div class="mj">\[ \begin{gathered} \text{idf}(t) = -\log \hat P(t \in D) \\ \hat P(t \in D) = \frac{\text{df}_t}{N} \end{gathered} \]</div>
+    <p>A term that appears everywhere tells you nothing about which document you're looking at; a rare one narrows it down a lot. Three reasons for the log in particular:</p>
+    <ul>
+      <li><strong>Information adds.</strong> If terms occur independently, the surprisal of a document containing two terms is the sum of their idfs:</li>
+    </ul>
+    <div class="mj">\[ \begin{aligned} -\log \hat P(t_1, t_2 \in D) &amp;= -\log \Big( \frac{\text{df}_{t_1}}{N} \cdot \frac{\text{df}_{t_2}}{N} \Big) \\ &amp;= \text{idf}(t_1) + \text{idf}(t_2) \end{aligned} \]</div>
+    <ul>
+      <li><strong>Dampening.</strong> \(N / \text{df}\) spans many orders of magnitude (Zipf again). Without the log, a term seen in one document would outweigh a term seen in every document by a factor of \(N\); with it, weights grow slowly.</li>
+      <li><strong>It falls out of a model.</strong> The probabilistic relevance framework scores a document by the odds that it's relevant, given which query terms it contains. Each matched term adds a weight (the Robertson–Spärck Jones weight), and with no relevance judgments available that weight reduces to \(\log \frac{N - \text{df} + 0.5}{\text{df} + 0.5}\): idf, up to smoothing. That's the idf BM25 uses.</li>
+    </ul>
+
+    <h3>Cosine similarity, and why you normalize</h3>
+    <div class="mj">\[ \cos(x, y) = \frac{x^\top y}{\lVert x \rVert\, \lVert y \rVert} \]</div>
+    <p>Cosine compares directions (the mix of terms) and ignores magnitude. That's what you want: a long document has bigger counts for everything, so a raw dot product favours long documents whatever their topic. Paste a document after itself and its topic hasn't changed, but its raw vector has doubled; its normalized vector is identical.</p>
+    <p>Once vectors are L2-normalized, cosine is a plain dot product (fast on sparse matrices and inverted indexes), and Euclidean distance gives the same ranking:</p>
+    <div class="mj">\[ \begin{aligned} \lVert \hat x - \hat y \rVert^2 &amp;= \lVert \hat x \rVert^2 + \lVert \hat y \rVert^2 - 2\, \hat x^\top \hat y \\ &amp;= 2 - 2 \cos(x, y) \end{aligned} \]</div>
+    <p>TF-IDF entries are non-negative, so the cosine between two documents lies in \([0, 1]\). For classifiers, normalizing puts documents of every length on one scale, so a single regularization strength suits all of them.</p>
+
+    <h3>Pruning: min_df and max_df</h3>
+    <ul>
+      <li><strong><code>min_df</code></strong> drops terms that appear in fewer than a threshold number (or fraction) of documents: typos, IDs, one-off names. They have no statistical support yet get the <em>largest</em> idf, so a classifier can overfit to them. Because of Zipf's law, this shrinks the vocabulary drastically.</li>
+      <li><strong><code>max_df</code></strong> drops terms in more than a given fraction of documents: corpus-specific stopwords ("patient" in clinical notes) that idf would only shrink.</li>
+      <li><strong>Fit on training data only.</strong> The vocabulary and the idf weights are learned parameters. In cross-validation, the vectorizer goes inside the pipeline and is refit on each training fold.</li>
+    </ul>
+
+    <h3>Where TF-IDF stops</h3>
+    <ul>
+      <li>Raw tf grows linearly, so repeating a word inflates its weight without limit (keyword stuffing). Sublinear tf slows the growth but doesn't bound it.</li>
+      <li>L2 normalization couples every term to every other: one very frequent, unrelated term in a document shrinks the weights of all its other terms.</li>
+      <li>The weights are a fixed heuristic, not fitted to the task, and idf drifts as the corpus changes.</li>
+    </ul>
+    <p>That's on top of everything a bag of words loses (<a href="#bow">section 03</a>). BM25 fixes the first two for search.</p>
+
+    <!-- bm25 -->
+    <h2 id="bm25"><span class="pn">05</span>BM25</h2>
+    <p>BM25 (Okapi BM25, from Robertson and colleagues) scores a document \(D\) against a query \(Q\) by summing over the query's terms:</p>
+    <div class="mj">\[ \text{score}(D, Q) = \sum_{t \in Q} \text{idf}(t) \cdot \frac{\text{tf}_{t,D}\, (k_1 + 1)}{\text{tf}_{t,D} + K} \]</div>
+    <div class="mj">\[ K = k_1 \Big( 1 - b + b\, \frac{\lvert D \rvert}{\text{avgdl}} \Big) \]</div>
+    <div class="mj">\[ \text{idf}(t) = \log \Big( 1 + \frac{N - \text{df}_t + 0.5}{\text{df}_t + 0.5} \Big) \]</div>
+    <p>\(\text{avgdl}\) is the average document length in the collection. This idf is the probabilistic one with a \(+1\) inside the log (as in Lucene and Elasticsearch), so it never goes negative. Typical settings are \(k_1\) between 1.2 and 2.0 and \(b = 0.75\).</p>
+    <p>Read the fraction as a term-frequency score that saturates, and \(K\) as the length adjustment: it depends on the document only through its length relative to the average.</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 640 292" role="img" aria-label="A query term's contribution to the score as its count in the document grows. A dashed straight line for raw tf rises without limit. A grey log curve keeps rising slowly. Two BM25 curves rise quickly and flatten toward a dashed ceiling labelled k1 plus 1; the curve for a long document climbs more slowly than the one for a short document.">
+          <path class="in" d="M70 250 H604" marker-end="url(#a-in)"/>
+          <path class="in" d="M70 250 V26" marker-end="url(#a-in)"/>
+          <path d="M70 80.8 H596" style="stroke:var(--ink-3);stroke-width:1.2;stroke-dasharray:4 4;fill:none"/>
+          <text x="596" y="73" text-anchor="end" style="fill:var(--ink)">ceiling: k₁ + 1</text>
+          <path class="in" style="stroke-dasharray:6 5" d="M70 250 L333 54"/>
+          <path class="in" d="M70.0 250.0 L72.2 247.7 L74.3 245.5 L78.7 241.3 L83.0 237.5 L89.5 232.3 L96.0 227.6 L104.7 222.0 L113.3 216.9 L124.2 211.3 L135.0 206.3 L145.8 201.8 L156.7 197.6 L178.3 190.3 L200.0 183.9 L221.7 178.3 L243.3 173.2 L286.7 164.5 L330.0 157.2 L373.3 150.8 L416.7 145.2 L460.0 140.2 L503.3 135.6 L546.7 131.5 L590.0 127.7"/>
+          <path class="hid" d="M70.0 250.0 L72.2 239.4 L74.3 230.1 L78.7 214.4 L83.0 201.6 L89.5 186.5 L96.0 174.8 L104.7 162.7 L113.3 153.3 L124.2 144.2 L135.0 137.2 L145.8 131.5 L156.7 126.9 L178.3 119.8 L200.0 114.6 L221.7 110.6 L243.3 107.5 L286.7 102.8 L330.0 99.6 L373.3 97.1 L416.7 95.3 L460.0 93.8 L503.3 92.6 L546.7 91.6 L590.0 90.7"/>
+          <path class="hid" style="stroke:var(--gate)" d="M70.0 250.0 L72.2 246.1 L74.3 242.3 L78.7 235.3 L83.0 228.8 L89.5 220.1 L96.0 212.4 L104.7 203.3 L113.3 195.4 L124.2 186.9 L135.0 179.5 L145.8 173.1 L156.7 167.4 L178.3 158.0 L200.0 150.5 L221.7 144.2 L243.3 139.0 L286.7 130.8 L330.0 124.6 L373.3 119.8 L416.7 116.0 L460.0 112.8 L503.3 110.1 L546.7 107.9 L590.0 106.0"/>
+          <path class="in" style="stroke-dasharray:6 5" d="M386 182 H412"/><text class="lbl" x="420" y="186">raw tf: no limit</text>
+          <path class="in" d="M386 200 H412"/><text class="lbl" x="420" y="204">log tf: slower, no limit</text>
+          <path class="hid" d="M386 218 H412"/><text class="lbl" x="420" y="222">BM25, short document</text>
+          <path class="hid" style="stroke:var(--gate)" d="M386 236 H412"/><text class="lbl" x="420" y="240">BM25, long document</text>
+          <text class="lbl" x="337" y="280" text-anchor="middle">term frequency in the document, tf →</text>
+          <text class="lbl" x="50" y="160" text-anchor="middle" transform="rotate(-90 50 160)">contribution to the score →</text>
+        </svg>
+      </div>
+      <figcaption>Shapes only: one query term's contribution as its count grows (times its idf). Raw tf grows forever; log tf grows forever, just slower. BM25 bends toward a ceiling of \(k_1 + 1\). A long document has a larger \(K\), so it climbs more slowly toward the same ceiling. A larger \(k_1\) raises the ceiling and straightens the curve.</figcaption>
+    </figure>
+
+    <h3>\(k_1\): term-frequency saturation</h3>
+    <ul>
+      <li>The contribution rises with tf but is bounded: as \(\text{tf} \to \infty\) it approaches \((k_1 + 1)\, \text{idf}(t)\). The first occurrence adds the most; each extra one adds less.</li>
+      <li>At \(k_1 = 0\) the fraction is 1 whenever the term is present: a binary model. As \(k_1 \to \infty\) the fraction approaches \(\text{tf} / (1 - b + b\, \lvert D \rvert / \text{avgdl})\), linear in tf. So \(k_1\) slides between "presence only" and "raw counts".</li>
+      <li><strong>Why saturate:</strong> after a few occurrences you're already confident the document is about the term, and more repetitions add little evidence. The shape approximates a "2-Poisson" model in which a document either is about a term or isn't. It also caps what keyword stuffing can gain at \((k_1 + 1)\, \text{idf}(t)\) per term.</li>
+    </ul>
+    <h3>\(b\): length normalization</h3>
+    <ul>
+      <li>\(\lvert D \rvert / \text{avgdl}\) is the document's length relative to the average. With \(b = 1\), normalization is full: a document twice the average length needs twice the occurrences for the same score. With \(b = 0\), length is ignored.</li>
+      <li><strong>Why partial:</strong> a long document may be verbose (the same content, stretched: normalize) or broad (more topics, so its extra matches are legitimate: don't). \(b\) mixes the two views, pivoting on the average length: a document of exactly average length is unaffected by \(b\).</li>
+      <li>Length acts through \(K\): in a longer document the curve climbs more slowly, but the ceiling stays \(k_1 + 1\).</li>
+    </ul>
+
+    <h3>Why BM25 beats TF-IDF for search</h3>
+    <ul>
+      <li><strong>Bounded tf:</strong> one repeated term can't dominate a multi-term query, so documents matching <em>more</em> query terms win.</li>
+      <li><strong>Per-term length handling</strong>, pivoted on the average, instead of an L2 norm that depends on every other word in the document.</li>
+      <li><strong>It comes from a model.</strong> The formula approximates the log-odds of relevance in the probabilistic relevance framework, and its two knobs can be tuned per collection.</li>
+      <li><strong>It's built for scoring a query against documents:</strong> a sum over the query's terms only, which an inverted index computes quickly, with no query vector to normalize.</li>
+    </ul>
+    <p>BM25 is still lexical: no synonyms, no paraphrase. Dense retrievers handle those but can miss exact identifiers, rare names and codes, and often generalize worse to new domains. So modern retrieval, RAG included, often runs both and merges the rankings, for example with reciprocal rank fusion, \(\sum_r 1 / (\kappa + \text{rank}_r(D))\) over the rankers \(r\), with a constant \(\kappa\) (60 in the original paper). Dense retrieval at scale uses approximate nearest-neighbour indexes (HNSW, IVF with product quantization).</p>
+    <p><strong>Tuning and evaluation.</strong> Tune \(k_1\) and \(b\) (and the fusion weights) on a set of labelled queries, and measure ranking quality with nDCG@10, MRR or recall@\(k\), not accuracy.</p>
+
+    <!-- classifiers -->
+    <h2 id="classifiers"><span class="pn">06</span>Classical text classifiers</h2>
+    <h3>Multinomial Naive Bayes</h3>
+    <p><strong>The generative story.</strong> To write a document of class \(y\): pick the class with probability \(\pi_y\), then draw each of its \(\lvert D \rvert\) tokens independently from a class-specific distribution over the vocabulary, \(\theta_y = (\theta_{y,1}, \dots, \theta_{y,V})\). Under this story,</p>
+    <div class="mj">\[ P(D \mid y) = \frac{\lvert D \rvert!}{\prod_t \text{tf}_{t,D}!} \prod_{t=1}^{V} \theta_{y,t}^{\,\text{tf}_{t,D}} \]</div>
+    <p>The multinomial coefficient counts the orderings of the same bag. It doesn't depend on \(y\), so it cancels in Bayes' rule. Taking logs:</p>
+    <div class="mj">\[ \log P(y \mid D) = \log \pi_y + \sum_{t} \text{tf}_{t,D} \log \theta_{y,t} + \text{const} \]</div>
+    <p>The log posterior is the log prior plus, for every token, the log of how typical that token is of the class.</p>
+    <p><strong>Training is counting.</strong> Let \(N_{y,t}\) be the total count of term \(t\) across all class-\(y\) training documents. Maximize the class's log-likelihood \(\sum_t N_{y,t} \log \theta_{y,t}\) subject to \(\sum_t \theta_{y,t} = 1\), with a Lagrange multiplier \(\mu\):</p>
+    <div class="mj">\[ \mathcal{L}(\theta_y, \mu) = \sum_{t} N_{y,t} \log \theta_{y,t} - \mu \Big( \sum_{t} \theta_{y,t} - 1 \Big) \]</div>
+    <p>The derivative with respect to \(\theta_{y,t}\) is \(N_{y,t} / \theta_{y,t} - \mu\). Setting it to zero gives \(\theta_{y,t} = N_{y,t} / \mu\); summing that over \(t\), the constraint forces \(\mu = \sum_{t'} N_{y,t'}\). So</p>
+    <div class="mj">\[ \begin{aligned} \theta_{y,t} &amp;= \frac{N_{y,t}}{\mu} \\ &amp;= \frac{N_{y,t}}{\sum_{t'} N_{y,t'}} \end{aligned} \]</div>
+    <p>Each \(\theta_{y,t}\) is the term's share of all the class's tokens, and the prior \(\hat\pi_y\) is the class's share of training documents.</p>
+    <p><strong>Additive (Laplace) smoothing.</strong> If a term never appeared in class \(y\), then \(\hat\theta_{y,t} = 0\), its log is \(-\infty\), and one unseen word vetoes the class whatever the other words say. Add \(\alpha\) to every count:</p>
+    <div class="mj">\[ \hat\theta_{y,t} = \frac{N_{y,t} + \alpha}{\sum_{t'} N_{y,t'} + \alpha V} \]</div>
+    <p>\(\alpha = 1\) is Laplace smoothing; smaller values, tuned by cross-validation, often work better for text. The Bayesian reading: \(\hat\theta\) is the posterior mean under a symmetric Dirichlet(\(\alpha\)) prior, as if every word had been seen \(\alpha\) extra times. Too large an \(\alpha\) pushes every \(\theta_{y,t}\) toward \(1/V\), and the model falls back on the prior.</p>
+    <p><strong>Log space.</strong> A document multiplies hundreds of probabilities, each far below 1, and the product underflows to 0 in floating point. Sum logs instead. To turn the class scores \(s_y = \log \pi_y + \sum_t \text{tf}_{t,D} \log \hat\theta_{y,t}\) into probabilities, use log-sum-exp with the largest score \(m = \max_{y'} s_{y'}\) subtracted. The largest term becomes \(e^{0} = 1\), so nothing overflows and the sum can't underflow to 0:</p>
+    <div class="mj">\[ \log P(y \mid D) = s_y - m - \log \sum_{y'} e^{\,s_{y'} - m} \]</div>
+    <p><strong>It's a linear classifier.</strong> With two classes, the log-odds is</p>
+    <div class="mj">\[ \log \frac{P(1 \mid D)}{P(0 \mid D)} = \underbrace{\log \frac{\pi_1}{\pi_0}}_{w_0} + \sum_t \text{tf}_{t,D}\, \underbrace{\log \frac{\theta_{1,t}}{\theta_{0,t}}}_{w_t} \]</div>
+    <p>That's \(w^\top x + w_0\), the same form as logistic regression. The difference is where the weights come from: Naive Bayes reads each \(w_t\) off counts, independently and in closed form; logistic regression fits them all jointly to minimize log loss.</p>
+
+    <h3>Why Naive Bayes works when its assumption is wrong</h3>
+    <p>Words aren't independent given the class: "credit" and "card" travel together, so Naive Bayes counts that evidence twice. Yet it classifies well. Four reasons:</p>
+    <ol>
+      <li><strong>Classification only needs the argmax.</strong> Double counting pushes scores further in the direction they were already going. The probabilities become overconfident, but the top class often doesn't change. Under 0-1 loss, Naive Bayes can be optimal even when its probabilities are badly wrong (Domingos and Pazzani, 1997).</li>
+      <li><strong>The decision rule is linear in the counts.</strong> The wrong assumption affects how the weights are <em>estimated</em>, not which boundaries the model can draw: it's the same hypothesis class as logistic regression.</li>
+      <li><strong>Low variance.</strong> Each weight comes from smoothed counts, with no joint optimization. With few examples and many features, that bias costs less than a discriminative model's variance. Naive Bayes approaches its best error with far fewer examples, roughly logarithmic in the number of features, against linear for logistic regression (Ng and Jordan, 2002). With lots of data, logistic regression overtakes it.</li>
+      <li><strong>Dependencies often cancel.</strong> When correlated words push both classes equally, or pull in opposite directions, the distortion largely cancels in the log-odds.</li>
+    </ol>
+    <p>What does break: <strong>calibration</strong> (calibrate if the probabilities matter), and ranking, when many weak, correlated features outvote one strong one. Long documents get more extreme posteriors. Two variants worth naming: <strong>Bernoulli NB</strong> models presence and absence, so it also penalizes missing words (good for short texts); <strong>Complement NB</strong> estimates each class's weights from all the <em>other</em> classes' text, which is steadier on imbalanced data.</p>
+
+    <h3>Logistic regression and linear SVMs on TF-IDF</h3>
+    <div class="mj">\[ \min_{w,\, w_0}\ \sum_{i=1}^{N} \ell\big(y_i,\ w^\top \hat x_i + w_0\big) + \lambda \lVert w \rVert_2^2 \]</div>
+    <p>\(\hat x_i\) is the L2-normalized TF-IDF vector of unigrams and bigrams. \(\ell\) is log loss for logistic regression, which gives probabilities, or the hinge loss \(\max(0,\ 1 - y\,(w^\top \hat x + w_0))\) with \(y \in \{-1, +1\}\) for a linear SVM, which gives a margin (calibrate it, with Platt scaling for example, if you need probabilities). Multi-class runs one-vs-rest or a softmax.</p>
+    <p><strong>Why it's the baseline to beat:</strong></p>
+    <ul>
+      <li>In a sparse space with \(V \gg N\), text classes are usually close to linearly separable, and most labels hinge on a set of indicative words and phrases (Joachims, 1998).</li>
+      <li>It's convex (one global optimum, no seeds or schedules), trains in seconds on a CPU, and is interpretable: the largest positive and negative weights are the n-grams that drive each class, which is also how you spot leakage and label noise.</li>
+      <li>The knobs that matter: \(C\) (sklearn's inverse regularization strength), the n-gram range, <code>min_df</code>, sublinear tf, and class weights for imbalance. To select features, use L1 regularization, or rank them by \(\chi^2\) or mutual information with the label.</li>
+      <li>Kernel SVMs rarely beat linear ones on text: the space is already high-dimensional and nearly separable, and kernels cost \(O(N^2)\). Multinomial Naive Bayes also runs fine on TF-IDF features, treating them as fractional counts.</li>
+    </ul>
+    <p><strong>When it beats a fine-tuned transformer:</strong></p>
+    <ul>
+      <li>the label really is lexical: spam, topic routing, product categories from titles, keyword-defined classes;</li>
+      <li>the text is unlike the pretraining data (codes, IDs, log lines, chemical names, heavy transliteration), so subword tokenizers shatter the informative tokens;</li>
+      <li>documents are much longer than the transformer's context and would be truncated, while TF-IDF sees every word;</li>
+      <li>latency, cost or hardware is tight, or the model must be audited, retrained often or explained term by term;</li>
+      <li>there are plenty of labels for a lexical task, so pretraining's head start stops mattering.</li>
+    </ul>
+    <p>Transformers win where meaning depends on composition: negation, sarcasm, paraphrase, sentence pairs (entailment, question answering), tasks close to pretraining with few labels, and cross-lingual transfer. Build the linear baseline first either way; it tells you what the expensive model is worth.</p>
+
+    <h3>NB-SVM</h3>
+    <p>Wang and Manning (2012) combined the two: use Naive Bayes's log-count ratios to scale the features, then train a discriminative linear model on them. With binarized feature vectors \(f_i\) and smoothing \(\alpha\):</p>
+    <div class="mj">\[ \begin{aligned} p &amp;= \alpha + \textstyle\sum_{i : y_i = 1} f_i \\ q &amp;= \alpha + \textstyle\sum_{i : y_i = 0} f_i \\ r &amp;= \log \dfrac{p / \lVert p \rVert_1}{q / \lVert q \rVert_1} \end{aligned} \]</div>
+    <p>Train a linear SVM (or logistic regression) on \(r \odot f_i\): \(r\) tells it which words discriminate, and the SVM learns how to combine them. A long-standing strong sentiment baseline; the same paper found Naive Bayes better on short snippets and SVMs on longer documents.</p>
+
+    <!-- lm -->
+    <h2 id="lm"><span class="pn">07</span>n-gram language models</h2>
+    <p>A language model assigns a probability to a sequence of tokens. The chain rule makes that exact, as a product of next-token predictions:</p>
+    <div class="mj">\[ P(w_1, \dots, w_T) = \prod_{i=1}^{T} P(w_i \mid w_1, \dots, w_{i-1}) \]</div>
+    <p>A full history is too long to estimate from counts, so an n-gram model makes the <strong>Markov assumption</strong>: only the last \(n - 1\) tokens matter.</p>
+    <div class="mj">\[ P(w_i \mid w_{1:i-1}) \approx P(w_i \mid w_{i-n+1:i-1}) \]</div>
+    <p>Here \(w_{a:b}\) means the tokens from position \(a\) to position \(b\).</p>
+    <p>The maximum-likelihood estimate is a ratio of counts, where \(C(\cdot)\) is how often a sequence occurs in training:</p>
+    <div class="mj">\[ P_{\text{MLE}}(w_i \mid w_{i-n+1:i-1}) = \frac{C(w_{i-n+1:i})}{C(w_{i-n+1:i-1})} \]</div>
+    <p>Sentences are padded with \(n - 1\) start symbols &lt;s&gt; and one end symbol &lt;/s&gt;. The end symbol matters: without it the model never decides to stop, and the probabilities of all sentences of all lengths don't sum to 1.</p>
+
+    <h3>Why smoothing is needed</h3>
+    <p>Most perfectly good n-grams never occur in any training corpus: there are \(V^n\) possible ones, and Zipf's long tail. MLE gives every unseen n-gram probability 0, so any test sentence containing one gets probability 0 and infinite perplexity; an unseen context gives \(0/0\). MLE puts all the mass on what it has seen. Smoothing moves some of it to what it hasn't.</p>
+    <p><strong>Add-\(k\)</strong> (Laplace when \(k = 1\)):</p>
+    <div class="mj">\[ P_{\text{add-}k}(w \mid h) = \frac{C(h\, w) + k}{C(h) + k V} \]</div>
+    <p>Fine for Naive Bayes, bad for language models: with a large \(V\), a context seen only a few times hands most of its mass to the many words never seen after it.</p>
+    <p><strong>Interpolation and backoff</strong> lean on lower-order estimates, which are less sparse. Interpolation always mixes the orders, with weights \(\lambda_j\) that sum to 1 and are tuned on held-out data:</p>
+    <div class="mj">\[ \begin{aligned} P(w \mid u, v) = {} &amp; \lambda_3\, P_{\text{MLE}}(w \mid u, v) \\ &amp; + \lambda_2\, P_{\text{MLE}}(w \mid v) + \lambda_1\, P_{\text{MLE}}(w) \end{aligned} \]</div>
+    <p>Backoff (Katz) uses the highest order with a nonzero count and drops to a lower order only when it's zero. To stay a proper distribution, it must discount the seen counts and spread exactly the freed mass over the backed-off words.</p>
+
+    <h3>Kneser–Ney</h3>
+    <p><strong>Absolute discounting.</strong> Bigrams seen \(c\) times in a training set turn up about \(c - 0.75\) times in an equally large held-out set (for \(c \ge 2\)). So subtract a fixed discount \(\delta \approx 0.75\) from every seen count and give the freed mass to a lower-order distribution. For bigrams, interpolated Kneser–Ney is</p>
+    <div class="mj">\[ \begin{aligned} P_{\text{KN}}(w_i \mid w_{i-1}) &amp;= \frac{\max\big( C(w_{i-1} w_i) - \delta,\ 0 \big)}{C(w_{i-1})} \\ &amp;\quad + \lambda(w_{i-1})\, P_{\text{cont}}(w_i) \end{aligned} \]</div>
+    <div class="mj">\[ \lambda(w_{i-1}) = \frac{\delta}{C(w_{i-1})}\, \big\lvert \{ w : C(w_{i-1} w) > 0 \} \big\rvert \]</div>
+    <p>Here \(C(w_{i-1})\) counts \(w_{i-1}\) as the first word of a bigram, \(\sum_w C(w_{i-1} w)\). \(\lambda\) is exactly the mass the discount removed: \(\delta\) from each distinct word seen after \(w_{i-1}\). So the distribution still sums to 1.</p>
+    <p><strong>The continuation count, Kneser–Ney's real idea.</strong> The lower-order term matters most when the bigram is unseen. So it shouldn't answer "how frequent is \(w\)?" but "how likely is \(w\) after a context it hasn't been seen with?". Measure that by how many distinct words precede \(w\):</p>
+    <div class="mj">\[ P_{\text{cont}}(w) = \frac{\big\lvert \{ v : C(v\, w) > 0 \} \big\rvert}{\big\lvert \{ (v', w') : C(v'\, w') > 0 \} \big\rvert} \]</div>
+    <p>The classic illustration: "Francisco" is frequent but almost always follows "San", so its continuation probability is tiny. "glasses" follows many different words, so it's a good guess after "reading" even if "reading glasses" never occurred in training. A plain unigram backoff would prefer "Francisco".</p>
+    <p>For longer n-grams the recursion repeats, with continuation counts at every lower order and raw counts only at the highest. <strong>Modified Kneser–Ney</strong> (Chen and Goodman) uses three discounts (for counts of 1, 2, and 3 or more) and was the best n-gram smoother before neural language models.</p>
+
+    <h3>Perplexity</h3>
+    <p>Evaluate a language model by the probability it gives held-out text, normalized per token:</p>
+    <div class="mj">\[ \begin{aligned} \text{PP}(w_{1:T}) &amp;= P(w_1, \dots, w_T)^{-1/T} \\ &amp;= \exp\Big( -\frac{1}{T} \sum_{i=1}^{T} \log P(w_i \mid w_{&lt; i}) \Big) \end{aligned} \]</div>
+    <p>The exponent is the average negative log-likelihood per token: the <strong>cross-entropy</strong> \(H\) between the true distribution (represented by the test text) and the model. So perplexity is \(e^{H}\) with \(H\) in nats, or \(2^{H}\) with \(H\) in bits, and minimizing the usual language-model training loss minimizes log-perplexity.</p>
+    <p><strong>How to read it:</strong> the model is as uncertain, on average, as if it were choosing uniformly among PP equally likely tokens at every step (a weighted average branching factor). A uniform model, which gives every token probability \(1/V\), makes that exact:</p>
+    <div class="mj">\[ \begin{aligned} \text{PP} &amp;= \Big( \big( \tfrac{1}{V} \big)^{T} \Big)^{-1/T} \\ &amp;= V \end{aligned} \]</div>
+    <ul>
+      <li>Lower is better, and a model that always gives the right token probability 1 scores 1. No model beats the language's own entropy rate: cross-entropy is never below the true entropy.</li>
+      <li><strong>Only compare like with like.</strong> Perplexity depends on the vocabulary and the tokenization. Mapping more words to &lt;UNK&gt; or shrinking the vocabulary lowers it artificially, and perplexity per subword isn't comparable with perplexity per word. Bits per character or per byte is tokenizer-independent.</li>
+      <li>Count &lt;/s&gt; in \(T\) (the model predicts it) but not &lt;s&gt; (it's given).</li>
+      <li>Lower perplexity doesn't guarantee a better downstream system; it's a proxy.</li>
+    </ul>
+    <p><strong>Where n-gram models stop.</strong> The context is short and fixed. Counts for "the cat sat" say nothing about "the dog sat", because words share nothing. Storage grows with the corpus. Bengio et al.'s neural language model (2003) replaced counts with learned word vectors fed to a network, so similar words share statistical strength. That idea, cut down to its cheapest form, is word2vec.</p>
+
+    <!-- distributional -->
+    <h2 id="distributional"><span class="pn">08</span>Distributional semantics: PMI and LSA</h2>
+    <p>The <strong>distributional hypothesis</strong> (Harris, 1954; Firth, 1957): words that occur in similar contexts have similar meanings. In Firth's phrase, "you shall know a word by the company it keeps". Every dense-vector method in this note is a way of compressing context statistics.</p>
+
+    <h3>Co-occurrence matrices</h3>
+    <p>Slide a window of \(\pm L\) tokens over the corpus and count how often each context word \(c\) appears near each word \(w\). That gives a \(V \times V\) matrix of counts \(\#(w, c)\). The choice of context decides what kind of similarity you get:</p>
+    <ul>
+      <li><strong>Small windows</strong> (a couple of words) find words with the same role that can replace each other: similarity in the strict sense ("walking" and "running").</li>
+      <li><strong>Large windows or whole documents</strong> find topical relatedness ("walking" and "shoes"). Whole documents as contexts give the term-document matrix, \(X^\top\).</li>
+    </ul>
+    <p>Raw counts are dominated by frequent words, since everything co-occurs with "the", so they need reweighting.</p>
+
+    <h3>PMI and PPMI</h3>
+    <p><strong>Pointwise mutual information</strong> compares how often \(w\) and \(c\) co-occur with how often they would if they were independent:</p>
+    <div class="mj">\[ \begin{aligned} \text{PMI}(w, c) &amp;= \log \frac{P(w, c)}{P(w)\, P(c)} \\ &amp;= \log \frac{\#(w, c) \cdot \lvert \mathcal{P} \rvert}{\#(w) \cdot \#(c)} \end{aligned} \]</div>
+    <p>\(\lvert \mathcal{P} \rvert\) is the total number of (word, context) pairs, and \(\#(w)\), \(\#(c)\) are the marginal counts. Positive PMI means the two are associated, zero means independent, negative means they avoid each other.</p>
+    <ul>
+      <li><strong>PPMI</strong> is \(\max(\text{PMI}, 0)\). Negative PMI needs enormous corpora to estimate, because it's about pairs that rarely happen, and unseen pairs have PMI of \(-\infty\) (the log of 0). Clipping at zero fixes both and keeps the matrix sparse.</li>
+      <li><strong>PMI is biased toward rare words:</strong> a context seen once, right next to \(w\), gets a huge PMI with it. The fix is to smooth the context distribution, \(P_\alpha(c) = \#(c)^{\alpha} / \sum_{c'} \#(c')^{\alpha}\) with \(\alpha = 0.75\), which raises rare contexts' probability and so lowers their PMI. It's the same \(3/4\) as word2vec's noise distribution, and not by accident (<a href="#word2vec">section 09</a>).</li>
+    </ul>
+
+    <h3>LSA: truncated SVD</h3>
+    <p><strong>Latent semantic analysis</strong> (Deerwester et al., 1990) takes a weighted term-document matrix \(A\) (the TF-IDF matrix transposed, \(V \times N\); or a PPMI word-context matrix) and keeps only its top \(r\) singular directions:</p>
+    <div class="mj">\[ A \approx U_r\, \Sigma_r\, Q_r^\top \]</div>
+    <div class="tbl"><table>
+      <thead><tr><th>Matrix</th><th>Shape</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>\(A\)</td><td>\(V \times N\)</td><td>Weighted counts: terms × documents</td></tr>
+        <tr><td>\(U_r\)</td><td>\(V \times r\)</td><td>Each column is a latent "concept", a direction in term space. Row \(t\) of \(U_r \Sigma_r\) is term \(t\)'s vector.</td></tr>
+        <tr><td>\(\Sigma_r\)</td><td>\(r \times r\)</td><td>Singular values: how much of \(A\) each concept explains</td></tr>
+        <tr><td>\(Q_r\)</td><td>\(N \times r\)</td><td>Row \(D\) of \(Q_r \Sigma_r\) is document \(D\)'s vector. (Usually written \(V\); renamed because \(V\) is the vocabulary size here.)</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Best rank-\(r\) approximation:</strong> by the Eckart–Young theorem, no rank-\(r\) matrix is closer to \(A\) in squared error.</li>
+      <li><strong>What it buys:</strong> terms that occur in the same documents, or with the same neighbours, get nearby vectors even if they never co-occur directly. "car" and "automobile" rarely share a document but share "engine" and "drive", so they land close together. Synonymy is handled, and noise is discarded with the dropped directions.</li>
+      <li><strong>Folding in a new document or query:</strong> project its TF-IDF vector \(a\) (length \(V\)) to \(U_r^\top a\). For a training document this gives exactly its row of \(Q_r \Sigma_r\), because \(U_r^\top U_r = I\), so new and old documents land in the same space. (sklearn's <code>TruncatedSVD</code> works on the \(N \times V\) orientation and does the same.)</li>
+      <li><strong>Truncated SVD, not PCA:</strong> PCA centers the columns first, which makes the sparse matrix dense. Truncated SVD (randomized or Lanczos) works on the sparse matrix directly.</li>
+      <li><strong>Limits:</strong> one vector per word blends all its senses; it's linear and still a bag of words; new vocabulary needs a refit.</li>
+    </ul>
+    <p>With PPMI and word2vec's own tricks (context smoothing, subsampling), SVD vectors are competitive with word2vec's (Levy, Goldberg and Dagan, 2015).</p>
+
+    <h3>LSA, NMF and LDA</h3>
+    <p>All three find "topics" in a term-document matrix. They differ in what a topic is allowed to be.</p>
+    <ul>
+      <li><strong>LSA:</strong> orthogonal directions with positive and negative weights. The best squared-error fit, but hard to name.</li>
+      <li><strong>NMF</strong> (non-negative matrix factorization) fits \(A \approx F G\) with every entry of \(F\) and \(G\) non-negative. A topic can only add words, never subtract them, so each topic is a nameable list of top words and each document a positive mix of topics.</li>
+      <li><strong>LDA</strong> (latent Dirichlet allocation) is generative: each document draws a topic mixture from a Dirichlet prior; each token picks a topic from that mixture, then a word from the topic's word distribution. Fitted by Gibbs sampling or variational inference, it gives probabilities: topic shares per document, word probabilities per topic.</li>
+    </ul>
+    <p>Use LSA for retrieval features and similarity, NMF for quick interpretable topics, and LDA when you want a probabilistic model of topic mixtures. All three struggle on very short texts, where clustering sentence embeddings often works better.</p>
+
+    <!-- word2vec -->
+    <h2 id="word2vec"><span class="pn">09</span>word2vec</h2>
+    <p>word2vec (Mikolov et al., 2013) turns the distributional hypothesis into a prediction task: from a word, predict its neighbours. There's no hidden non-linearity. The model is two embedding tables and dot products, which is why it scales to billions of tokens.</p>
+
+    <h3>Setup</h3>
+    <p>Slide over the corpus. At position \(t\), the centre word is \(w_t\) and its context is the words within \(L\) positions: \(w_{t+j}\) for \(-L \le j \le L,\ j \ne 0\). Every word has two vectors:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Matrix</th><th>Shape</th><th>Row \(w\) is</th></tr></thead>
+      <tbody>
+        <tr><td>\(W_{\text{in}}\)</td><td>\(V \times d\)</td><td>\(v_w\): the word as a centre (input) word</td></tr>
+        <tr><td>\(W_{\text{out}}\)</td><td>\(V \times d\)</td><td>\(u_w\): the word as a context (output) word</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Skip-gram and CBOW</h3>
+    <p><strong>Skip-gram</strong> predicts each context word from the centre word. Its loss over a corpus of \(T\) tokens, and the softmax that defines each prediction:</p>
+    <div class="mj">\[ J_{\text{SG}} = -\frac{1}{T} \sum_{t=1}^{T} \sum_{\substack{-L \le j \le L \\ j \ne 0}} \log P(w_{t+j} \mid w_t) \]</div>
+    <div class="mj">\[ P(c \mid w) = \frac{\exp(u_c^\top v_w)}{\sum_{c'=1}^{V} \exp(u_{c'}^\top v_w)} \]</div>
+    <p>A word's vector is pushed toward the output vectors of the words around it, so two words with the same neighbours are pushed toward the same place.</p>
+    <p><strong>CBOW</strong> (continuous bag of words) does the reverse: average the context's input vectors and predict the centre word from the average.</p>
+    <div class="mj">\[ \bar v_t = \frac{1}{2L} \sum_{\substack{-L \le j \le L \\ j \ne 0}} v_{w_{t+j}} \]</div>
+    <div class="mj">\[ P(w_t \mid \text{context}) = \frac{\exp(u_{w_t}^\top \bar v_t)}{\sum_{w'=1}^{V} \exp(u_{w'}^\top \bar v_t)} \]</div>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Skip-gram</th><th>CBOW</th></tr></thead>
+      <tbody>
+        <tr><td>Predicts</td><td>Each context word, from the centre</td><td>The centre, from the averaged context</td></tr>
+        <tr><td>Predictions per position</td><td>Up to \(2L\)</td><td>One</td></tr>
+        <tr><td>Speed</td><td>Slower</td><td>Several times faster</td></tr>
+        <tr><td>Rare words</td><td>Better</td><td>Worse</td></tr>
+        <tr><td>Frequent words</td><td>Good</td><td>Slightly better</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Why skip-gram is better for rare words.</strong> Every occurrence of a rare word produces up to \(2L\) training examples in which its own vector is the <em>only</em> input, so it gets a full, undiluted gradient from each neighbour. In CBOW the rare word is one of \(2L\) inputs averaged together, so its signal is blurred with its neighbours', and as a prediction target it appears only as often as it occurs. Averaging smooths over noise, which suits frequent words and makes CBOW faster.</p>
+    <p>Two implementation details: the window size is sampled from 1 to \(L\) at each position, so near neighbours count more, and the learning rate decays linearly to near zero.</p>
+
+    <h3>Why the full softmax is too expensive</h3>
+    <p>For one (centre, context) pair, the loss and its gradient with respect to the centre vector are</p>
+    <div class="mj">\[ \ell = -u_c^\top v_w + \log \sum_{c'=1}^{V} \exp(u_{c'}^\top v_w) \]</div>
+    <div class="mj">\[ \begin{aligned} \frac{\partial \ell}{\partial v_w} &amp;= -u_c + \sum_{c'=1}^{V} P(c' \mid w)\, u_{c'} \\ &amp;= \mathbb{E}_{c' \sim P(\cdot \mid w)}\big[ u_{c'} \big] - u_c \end{aligned} \]</div>
+    <p>Pull \(v_w\) toward the true context's vector and away from the model's average guess. That's correct, but both the normalizer and the expectation sum over all \(V\) output vectors: \(O(Vd)\) per pair, with every output vector touched by every update. With hundreds of thousands of words and billions of pairs, that's infeasible. word2vec's two fixes are negative sampling and hierarchical softmax.</p>
+    <p>A third, <strong>sampled softmax</strong>, keeps the softmax but normalizes over the true word plus a sample of others, subtracting \(\log Q(c)\) (the log of each word's sampling probability) from its logit to correct for how often it's drawn. It approximates the real softmax gradient, and it's the standard trick in two-tower retrieval and recommendation models.</p>
+
+    <h3>Negative sampling</h3>
+    <p>Replace "which of \(V\) words is the context?" with a yes/no question: "is this (word, context) pair real, or noise?". Model the probability that a pair is real as \(\sigma(u_c^\top v_w)\). For each real pair, draw \(k\) noise words \(c_1, \dots, c_k\) from a noise distribution \(P_n\), and minimize</p>
+    <div class="mj">\[ \ell_{\text{NEG}} = -\log \sigma(u_c^\top v_w) - \sum_{i=1}^{k} \log \sigma(-u_{c_i}^\top v_w) \]</div>
+    <p>The first term says the real pair should score high; the second says each noise pair should score low (recall \(\sigma(-s) = 1 - \sigma(s)\)). Cost per pair: \(O((k + 1)\, d)\) instead of \(O(Vd)\). The paper suggests \(k\) of 5–20 for small corpora and 2–5 for large ones.</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 700 290" role="img" aria-label="Skip-gram with negative sampling for one pair. A one-hot vector for the centre word w selects row w of the input matrix W in, which is V by d, giving the vector v w of length d. That vector is dotted with k plus 1 rows of the output matrix W out, also V by d: the real context row, whose sigmoid score is pushed toward 1, and k noise rows drawn in proportion to count to the 0.75, whose scores are pushed toward 0.">
+          <text class="lbl" x="350" y="22" text-anchor="middle">SKIP-GRAM WITH NEGATIVE SAMPLING: ONE (w, c) PAIR</text>
+          <rect class="celloff" x="24" y="56" width="14" height="182"/>
+          <rect class="cellon" style="fill:var(--cell-wash);stroke:var(--cell)" x="24" y="112" width="14" height="12"/>
+          <path class="cw" d="M40 118 H62" marker-end="url(#a-cw)"/>
+          <text class="v" x="116" y="46" text-anchor="middle">W<tspan class="s" dy="4">in</tspan></text>
+          <rect class="box" x="66" y="56" width="100" height="182"/>
+          <rect style="fill:var(--cell-wash);stroke:var(--cell);stroke-width:1.5" x="66" y="112" width="100" height="12"/>
+          <path class="hid" style="stroke:var(--cell)" d="M168 118 H209" marker-end="url(#a-cell)"/>
+          <text class="lbl" x="189" y="106" text-anchor="middle">row w</text>
+          <text class="v" x="250" y="100" text-anchor="middle">v<tspan class="s" dy="4">w</tspan></text>
+          <rect class="cellon" style="fill:var(--cell-wash);stroke:var(--cell)" x="214" y="112" width="12" height="12"/><rect class="cellon" style="fill:var(--cell-wash);stroke:var(--cell)" x="226" y="112" width="12" height="12"/><rect class="cellon" style="fill:var(--cell-wash);stroke:var(--cell)" x="238" y="112" width="12" height="12"/><rect class="cellon" style="fill:var(--cell-wash);stroke:var(--cell)" x="250" y="112" width="12" height="12"/><rect class="cellon" style="fill:var(--cell-wash);stroke:var(--cell)" x="262" y="112" width="12" height="12"/><rect class="cellon" style="fill:var(--cell-wash);stroke:var(--cell)" x="274" y="112" width="12" height="12"/>
+          <path class="hid" style="stroke:var(--cell)" d="M288 118 H366" marker-end="url(#a-cell)"/>
+          <text class="lbl" x="327" y="142" text-anchor="middle">dot with</text>
+          <text class="lbl" x="327" y="156" text-anchor="middle">k + 1 rows</text>
+          <text class="v" x="427" y="46" text-anchor="middle">W<tspan class="s" dy="4">out</tspan></text>
+          <rect class="box" x="372" y="56" width="110" height="182"/>
+          <rect style="fill:var(--gate-wash);stroke:var(--gate);stroke-width:1.5" x="372" y="72" width="110" height="12"/>
+          <rect style="fill:var(--grad-wash);stroke:var(--grad);stroke-width:1.5" x="372" y="128" width="110" height="12"/>
+          <rect style="fill:var(--grad-wash);stroke:var(--grad);stroke-width:1.5" x="372" y="164" width="110" height="12"/>
+          <rect style="fill:var(--grad-wash);stroke:var(--grad);stroke-width:1.5" x="372" y="208" width="110" height="12"/>
+          <path class="gw" d="M484 78 H510" marker-end="url(#a-gate)"/>
+          <path class="cw" style="stroke:var(--grad)" d="M484 134 H510"/>
+          <path class="cw" style="stroke:var(--grad)" d="M484 170 H510"/>
+          <path class="cw" style="stroke:var(--grad)" d="M484 214 H510"/>
+          <text x="516" y="83" style="fill:var(--gate)">σ(u · v) → 1</text>
+          <text class="lbl" x="516" y="99">real context c</text>
+          <text x="516" y="139" style="fill:var(--grad)">σ(u · v) → 0</text>
+          <text x="516" y="175" style="fill:var(--grad)">σ(u · v) → 0</text>
+          <text x="516" y="219" style="fill:var(--grad)">σ(u · v) → 0</text>
+          <text class="lbl" x="516" y="236">k negatives ∝ count^0.75</text>
+          <text class="lbl" x="31" y="258" text-anchor="middle">one-hot</text>
+          <text class="lbl" x="116" y="258" text-anchor="middle">V × d, kept</text>
+          <text class="lbl" x="250" y="258" text-anchor="middle">length d</text>
+          <text class="lbl" x="427" y="258" text-anchor="middle">V × d</text>
+          <text class="lbl" x="350" y="282" text-anchor="middle">only 1 input row and k + 1 output rows are updated per pair</text>
+        </svg>
+      </div>
+      <figcaption>One training pair. The one-hot centre word selects a row of \(W_{\text{in}}\) (a lookup, not a multiplication). That row is dotted with the real context's output vector and with \(k\) noise words' output vectors; each score goes through a sigmoid and is trained like logistic regression, toward 1 for the real pair and 0 for the noise.</figcaption>
+    </figure>
+    <p><strong>The gradients.</strong> Write \(s_0 = u_c^\top v_w\) for the real pair and \(s_i = u_{c_i}^\top v_w\) for the negatives. The derivative of \(-\log \sigma(s)\) is \(\sigma(s) - 1\), and the derivative of \(-\log \sigma(-s)\) is \(\sigma(s)\), so</p>
+    <div class="mj">\[ \begin{aligned} \frac{\partial \ell}{\partial u_c} &amp;= \big( \sigma(s_0) - 1 \big)\, v_w \\ \frac{\partial \ell}{\partial u_{c_i}} &amp;= \sigma(s_i)\, v_w \\ \frac{\partial \ell}{\partial v_w} &amp;= \big( \sigma(s_0) - 1 \big)\, u_c + \sum_{i=1}^{k} \sigma(s_i)\, u_{c_i} \end{aligned} \]</div>
+    <p>Every case is "prediction minus label", \(\sigma(s) - y\), times the other vector: the logistic-regression gradient, with label 1 for the real pair and 0 for each negative.</p>
+    <ul>
+      <li>The real pair is pulled together with strength \(1 - \sigma(s_0)\): large while the model doesn't yet believe the pair, near zero once it does. The update switches itself off.</li>
+      <li>Each negative is pushed away with strength \(\sigma(s_i)\): only negatives the model wrongly finds plausible get a real push.</li>
+      <li>Only one input row and \(k + 1\) output rows change per pair: sparse, cheap updates.</li>
+    </ul>
+    <p><strong>Why it works.</strong></p>
+    <ol>
+      <li><strong>It's a simplified noise-contrastive estimation.</strong> NCE (Gutmann and Hyvärinen, 2010) also trains a classifier to tell data from noise, but it tells the classifier how likely each noise word was to be drawn, by using \(s - \log(k\, P_n(c))\) as the logit. Then the best score is the true log-probability \(\log P(c \mid w)\). Negative sampling drops that correction, so its scores are only association strengths, not probabilities. word2vec never needed the probabilities, only the vectors.</li>
+      <li><strong>It has a clean optimum.</strong> Given enough dimensions, the objective is minimized when \(u_c^\top v_w = \text{PMI}(w, c) - \log k\) (Levy and Goldberg, 2014; derived below). The vectors encode a well-defined association statistic.</li>
+      <li><strong>Its negatives are informative.</strong> Sampled by frequency, flattened by a 3/4 power (next section), they're mostly words that look plausible next to anything. Pushing those away teaches more than rejecting random rare words would.</li>
+    </ol>
+
+    <h3>The noise distribution, and why the 3/4</h3>
+    <div class="mj">\[ P_n(c) = \frac{\#(c)^{3/4}}{\sum_{c'} \#(c')^{3/4}} \]</div>
+    <p>The unigram distribution raised to the \(3/4\) power and renormalized. Compared with the plain unigram probability \(P(c)\),</p>
+    <div class="mj">\[ \frac{P_n(c)}{P(c)} \propto \#(c)^{-1/4} \]</div>
+    <p>which falls with frequency: rare words are sampled relatively more often, frequent words relatively less.</p>
+    <ul>
+      <li><strong>Power 1 (unigram):</strong> about half the negatives would come from the hundred or so most frequent words, mostly function words. Updates concentrate there, and rare words' output vectors are hardly ever pushed.</li>
+      <li><strong>Power 0 (uniform):</strong> almost every negative would be a rare word that seldom appears as anyone's context, so the model mostly learns to reject words it would never have predicted anyway. The frequent words, the real confusers, would almost never be negatives.</li>
+      <li><strong>3/4</strong> sits between the two. It was chosen empirically: it beat both extremes in the original experiments. The later explanation (Levy, Goldberg and Dagan, 2015) is that it smooths the context distribution inside the implicit PMI, which cuts PMI's bias toward rare contexts. The same 0.75 also helps count-based PPMI.</li>
+    </ul>
+
+    <h3>Hierarchical softmax</h3>
+    <p>word2vec's other fix keeps a properly normalized distribution. Put the \(V\) words at the leaves of a binary tree; word2vec uses a Huffman tree, so frequent words have short paths. Each of the \(V - 1\) inner nodes \(n\) has its own vector \(u_n\). A word's probability is the probability of walking from the root to its leaf, one left-or-right decision per node:</p>
+    <div class="mj">\[ P(c \mid w) = \prod_{n \in \text{path}(c)} \sigma\big( \pm\, u_n^\top v_w \big) \]</div>
+    <p>The sign is \(+\) where the path turns one way and \(-\) where it turns the other. Because \(\sigma(x) + \sigma(-x) = 1\), each node splits its probability between its two children, so the leaves sum to 1 automatically. Cost: \(O(d \log V)\) per pair, and less for frequent words.</p>
+    <p>There are no per-word output vectors, only inner-node vectors. The original authors' notes say it tends to work better for infrequent words, and negative sampling for frequent words and low-dimensional vectors; negative sampling became the default.</p>
+
+    <h3>Subsampling frequent words</h3>
+    <p>Before forming windows, discard each occurrence of word \(w\) with probability</p>
+    <div class="mj">\[ P_{\text{discard}}(w) = 1 - \sqrt{\frac{\tau}{f(w)}} \]</div>
+    <p>where \(f(w)\) is the word's share of all tokens and \(\tau\) is a small threshold (the paper suggests about \(10^{-5}\); common implementations default to \(10^{-3}\) with a slightly different formula). Words rarer than \(\tau\) are never discarded; the most frequent words lose most of their occurrences.</p>
+    <ul>
+      <li>Frequent words co-occur with everything, so their extra occurrences teach little and their vectors settle early; most of their updates are wasted.</li>
+      <li>Dropping them before windowing brings more content words inside each window, and the paper reports faster training and better rare-word vectors.</li>
+    </ul>
+
+    <h3>Two matrices: which one do you keep?</h3>
+    <ul>
+      <li><strong>Why two:</strong> with one shared matrix, every word's score with itself, \(\lVert v_w \rVert^2\), is non-negative, so the model leans toward predicting each word in its own context. Yet words rarely appear next to themselves: the target (shifted PMI, below) has very negative entries on its diagonal. One matrix can only fit \(W W^\top\), which is positive semidefinite with a non-negative diagonal; two matrices remove that constraint.</li>
+      <li><strong>What you keep:</strong> conventionally \(W_{\text{in}}\). Adding the two, \(v_w + u_w\), often helps a little (GloVe does this by default). With hierarchical softmax only \(W_{\text{in}}\) exists.</li>
+      <li>Input-input similarity finds words used the same way ("Yale", "Harvard"); input-output similarity finds words that appear together ("Yale", "faculty").</li>
+    </ul>
+    <p>One SGNS training step, with shapes, is in <a href="#code">section 13</a>.</p>
+
+    <h3>In practice: the knobs</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Setting</th><th>Typical</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td>Vector size \(d\)</td><td>100–300</td><td>Bigger needs more data; returns flatten quickly</td></tr>
+        <tr><td>Window \(L\)</td><td>2–10</td><td>Small: syntactic, substitutable neighbours. Large: topical relatedness</td></tr>
+        <tr><td>min_count</td><td>5 or so</td><td>Drops words too rare to learn; shrinks \(V\)</td></tr>
+        <tr><td>Negatives \(k\)</td><td>5–20 (2–5 on big data)</td><td>More negatives make each step slower; they help most on small corpora</td></tr>
+        <tr><td>Subsampling \(\tau\)</td><td>\(10^{-3}\) to \(10^{-5}\)</td><td>Lower discards more frequent words</td></tr>
+        <tr><td>Epochs</td><td>5 or more</td><td>Small corpora need more passes</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Phrases.</strong> word2vec's tooling first joins frequent collocations into single tokens ("New_York") when \((\text{count}(ab) - \delta) / (\text{count}(a)\, \text{count}(b))\) clears a threshold, where the discount \(\delta\) stops rare pairs from qualifying. It's the same PMI-like ratio as WordPiece's.</p>
+
+    <h3>What SGNS actually learns: shifted PMI</h3>
+    <p>Sum the negative-sampling objective over the whole corpus, with unigram noise \(P_n(c) = \#(c) / \lvert \mathcal{P} \rvert\). Here \(\#(w) = \sum_c \#(w, c)\) is the number of pairs with \(w\) as the centre. The pair \((w, c)\) appears \(\#(w, c)\) times as a positive, and each of \(w\)'s pairs draws \(k\) negatives, so \(c\) is drawn as a negative for \(w\) about \(k\, \#(w)\, P_n(c)\) times. If \(d\) is large enough that each dot product \(x = u_c^\top v_w\) can be set freely, the objective splits into one term per pair. It's the negative of the loss, so it's maximized:</p>
+    <div class="mj">\[ \begin{aligned} \ell(x) &amp;= \#(w, c) \log \sigma(x) \\ &amp;\quad + k\, \#(w)\, \frac{\#(c)}{\lvert \mathcal{P} \rvert} \log \sigma(-x) \end{aligned} \]</div>
+    <p>Set the derivative to zero, using \(\frac{d}{dx} \log \sigma(x) = \sigma(-x)\), \(\frac{d}{dx} \log \sigma(-x) = -\sigma(x)\) and \(\sigma(x) / \sigma(-x) = e^{x}\):</p>
+    <div class="mj">\[ \begin{aligned} \#(w, c)\, \sigma(-x) &amp;= k\, \#(w)\, \frac{\#(c)}{\lvert \mathcal{P} \rvert}\, \sigma(x) \\ e^{x} &amp;= \frac{\#(w, c)\, \lvert \mathcal{P} \rvert}{k\, \#(w)\, \#(c)} \\ x &amp;= \log \frac{\#(w, c)\, \lvert \mathcal{P} \rvert}{\#(w)\, \#(c)} - \log k \\ &amp;= \text{PMI}(w, c) - \log k \end{aligned} \]</div>
+    <p>So SGNS implicitly factorizes the <strong>shifted PMI matrix</strong>: \(W_{\text{in}} W_{\text{out}}^\top \approx M\), with \(M_{wc} = \text{PMI}(w, c) - \log k\), a \(V \times V\) matrix approximated at rank \(d\).</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 640 222" role="img" aria-label="Matrix factorization view. A V by V word-context matrix M is approximated by the tall V by d matrix W in times the wide d by V matrix W out transposed. One cell of M, at word w and context c, equals row w of W in dotted with column c of W out transposed, that is v w dot u c.">
+          <text class="v" x="115" y="30" text-anchor="middle">M</text>
+          <rect class="box" x="40" y="40" width="150" height="150"/>
+          <rect style="fill:var(--gate-wash);stroke:var(--gate);stroke-width:1.5" x="136" y="88" width="12" height="12"/>
+          <text class="lbl" x="115" y="210" text-anchor="middle">V × V: words × contexts</text>
+          <text class="optx" x="215" y="121" text-anchor="middle">≈</text>
+          <text class="v" x="260" y="30" text-anchor="middle">W<tspan class="s" dy="4">in</tspan></text>
+          <rect class="box" x="240" y="40" width="40" height="150"/>
+          <rect style="fill:var(--cell-wash);stroke:var(--cell);stroke-width:1.5" x="240" y="88" width="40" height="12"/>
+          <text class="lbl" x="260" y="210" text-anchor="middle">V × d</text>
+          <text class="optx" x="303" y="121" text-anchor="middle">×</text>
+          <text class="v" x="400" y="84" text-anchor="middle">W<tspan class="s" dy="4">out</tspan><tspan dy="-10" style="font-size:12px">T</tspan></text>
+          <rect class="box" x="325" y="95" width="150" height="40"/>
+          <rect style="fill:var(--cell-wash);stroke:var(--cell);stroke-width:1.5" x="421" y="95" width="12" height="40"/>
+          <text class="lbl" x="400" y="155" text-anchor="middle">d × V</text>
+          <text class="lbl" x="560" y="104" text-anchor="middle">cell (w, c)</text>
+          <text class="lbl" x="560" y="120" text-anchor="middle">= row w · column c</text>
+          <text class="v" x="560" y="146" text-anchor="middle" style="font-size:16px">v<tspan class="s" dy="4">w</tspan><tspan dy="-4"> · u</tspan><tspan class="s" dy="4">c</tspan></text>
+        </svg>
+      </div>
+      <figcaption>One picture for the whole family. LSA: \(M\) is a PPMI matrix (or the \(V \times N\) TF-IDF matrix, with documents as the contexts), factorized optimally in squared error by truncated SVD. SGNS: \(M\) is PMI \(- \log k\), factorized implicitly by SGD, with frequent pairs weighted more. GloVe: \(M\) is log co-occurrence counts with learned biases, fitted by weighted least squares.</figcaption>
+    </figure>
+    <ul>
+      <li>With \(3/4\)-smoothed noise, the PMI uses the smoothed context distribution.</li>
+      <li>Unlike SVD, the fit is weighted: frequent pairs count for more, and unseen pairs (PMI of \(-\infty\)) are just pushed down, never matched exactly.</li>
+      <li>The practical lesson (Levy, Goldberg and Dagan, 2015): much of word2vec's edge came from its hyperparameters (subsampling, dynamic windows, smoothed negatives). Ported to count-based methods such as SVD of shifted PPMI, they close most of the gap. word2vec and LSA are one family: low-rank factorizations of a word-context association matrix.</li>
+    </ul>
+
+    <h3>Analogies: why vector arithmetic works, and when it doesn't</h3>
+    <p>"\(a\) is to \(a^*\) as \(b\) is to ?" is answered by the word whose vector is closest to \(v_{a^*} - v_a + v_b\), excluding the three query words (3CosAdd):</p>
+    <div class="mj">\[ b^* = \arg\max_{x \notin \{a,\, a^*,\, b\}} \cos\big( v_x,\ v_{a^*} - v_a + v_b \big) \]</div>
+    <p>The famous case is king − man + woman ≈ queen.</p>
+    <p><strong>Why it works.</strong> Suppose dot products approximate PMI, \(v_w^\top u_c \approx \text{PMI}(w, c)\) up to constants. Then the difference of two word vectors measures the log-ratio of their context probabilities, because \(P(c)\) cancels:</p>
+    <div class="mj">\[ (v_{\text{king}} - v_{\text{queen}})^\top u_c \approx \log \frac{P(c \mid \text{king})}{P(c \mid \text{queen})} \]</div>
+    <p>For most contexts, the king/queen ratio matches the man/woman ratio: both pairs differ mainly on gendered contexts ("he", "she", "her", "hers") and are about equal everywhere else. If the log-ratios match for every context, and the context vectors span the space, the difference vectors match: \(v_{\text{king}} - v_{\text{queen}} \approx v_{\text{man}} - v_{\text{woman}}\). A relation shows up as a consistent offset when it changes the context distribution the same way for every pair (Arora et al., 2016; Allen and Hospedales, 2019). GloVe's ratio argument is the same idea.</p>
+    <p><strong>When it fails:</strong></p>
+    <ul>
+      <li>Excluding the query words does much of the work. Without the exclusion the nearest vector is usually \(b\) itself, so reported accuracies overstate the geometry (Linzen, 2016).</li>
+      <li>Relations that aren't one consistent offset fail: one-to-many relations (a country and its cities), lexical relations like hypernymy, and rare words with noisy vectors.</li>
+      <li>Antonyms share contexts ("hot" and "cold" both go with "water" and "weather"), so they often sit close together. Distributional similarity isn't synonymy.</li>
+    </ul>
+
+    <!-- glove -->
+    <h2 id="glove"><span class="pn">10</span>GloVe and fastText</h2>
+    <h3>GloVe: factorize log counts directly</h3>
+    <p>GloVe (Pennington, Socher and Manning, 2014) starts from the same observation as the analogy argument: meaning lives in <em>ratios</em> of co-occurrence probabilities. A context like "solid" is much likelier near "ice" than near "steam", and "gas" the reverse; "water" is likely near both and "fashion" near neither, so their ratios are close to 1. So it asks for vectors whose dot products reproduce log co-occurrence counts, which turns ratios into differences:</p>
+    <div class="mj">\[ w_i^\top \tilde w_j + b_i + \tilde b_j \approx \log X_{ij} \]</div>
+    <p>\(X_{ij}\) is how often word \(j\) appears in word \(i\)'s context window, counted once over the corpus with each occurrence weighted by 1/distance. \(w\) and \(\tilde w\) are word and context vectors. The biases absorb each word's overall frequency: \(\log P(j \mid i) = \log X_{ij} - \log X_i\), and \(\log X_i\) goes into \(b_i\). The objective is weighted least squares over the nonzero cells:</p>
+    <div class="mj">\[ J = \sum_{i, j \,:\, X_{ij} > 0} f(X_{ij}) \big( w_i^\top \tilde w_j + b_i + \tilde b_j - \log X_{ij} \big)^2 \]</div>
+    <div class="mj">\[ f(x) = \begin{cases} (x / x_{\max})^{\alpha} &amp; x &lt; x_{\max} \\ 1 &amp; \text{otherwise} \end{cases} \]</div>
+    <p>with \(x_{\max} = 100\) and \(\alpha = 3/4\) in the paper. What the weighting does:</p>
+    <ul>
+      <li>\(f(0) = 0\): empty cells, where \(\log 0\) is undefined, drop out. Training touches only the nonzeros, so it scales with the number of observed pairs, not \(V^2\).</li>
+      <li>Rare co-occurrences are noisy, so they get small weights (the rising part).</li>
+      <li>The cap at 1 stops very frequent pairs ("of the") from dominating the loss.</li>
+      <li>\(\alpha = 3/4\) was again found empirically, like word2vec's noise exponent.</li>
+    </ul>
+    <p>Training is AdaGrad over the nonzero cells. \(w\) and \(\tilde w\) play symmetric roles, so the released vectors are \(w + \tilde w\).</p>
+    <p><strong>GloVe vs word2vec.</strong> Both factorize a log co-occurrence statistic. GloVe does it explicitly on global counts, with learned biases absorbing the \(\log P(w)\) and \(\log P(c)\) terms that PMI subtracts. SGNS does it implicitly, streaming over local windows. GloVe builds a large co-occurrence matrix up front and then trains fast; word2vec needs no matrix and works on a stream. In Levy, Goldberg and Dagan's controlled comparison (2015), SGNS matched or beat GloVe once the hyperparameters were matched.</p>
+
+    <h3>fastText: words as bags of character n-grams</h3>
+    <p>fastText (Bojanowski et al., 2017) is skip-gram with negative sampling where a word's input vector is built from its pieces. Add boundary symbols, take every character n-gram of length 3 to 6, and add the whole word as one more unit. "where" contributes the 3-grams &lt;wh, whe, her, ere, re&gt;, the longer n-grams, and &lt;where&gt; itself. The word's vector is the sum of its units' vectors (the library averages them instead), and its score with a context word follows:</p>
+    <div class="mj">\[ v_w = \sum_{g \in \mathcal{G}_w} z_g, \qquad s(w, c) = \sum_{g \in \mathcal{G}_w} z_g^\top u_c \]</div>
+    <p>where \(\mathcal{G}_w\) is the word's set of n-grams and \(z_g\) is one n-gram's vector.</p>
+    <ul>
+      <li><strong>Unseen words get vectors:</strong> their n-grams were seen inside other words, so summing them gives a sensible vector for typos, inflections, compounds and new coinages. word2vec and GloVe have no vector at all for a word they didn't train on.</li>
+      <li><strong>Rare words improve,</strong> because they share n-grams with frequent ones. Morphologically rich languages (Finnish, Turkish, German compounds) benefit most.</li>
+      <li><strong>Memory is bounded by hashing:</strong> n-grams are hashed into a fixed number of buckets (about 2 million), the hashing trick again, with collisions tolerated.</li>
+      <li><strong>Costs:</strong> bigger and slower than word2vec, and spelling isn't meaning ("universe" and "university" share many n-grams).</li>
+    </ul>
+    <p>The same library also ships a fast text classifier: average the embeddings of the words and word bigrams, then one linear softmax layer. It trains in minutes and is a good baseline next to TF-IDF with logistic regression.</p>
+
+    <h3>Which one, when</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Method</th><th>Reach for it when</th></tr></thead>
+      <tbody>
+        <tr><td>PPMI + SVD (LSA)</td><td>Small corpus; you want something quick and deterministic; document similarity</td></tr>
+        <tr><td>word2vec (SGNS)</td><td>A large corpus to stream; training your own domain vectors</td></tr>
+        <tr><td>GloVe</td><td>Strong pretrained general-English vectors; memory for the count matrix</td></tr>
+        <tr><td>fastText</td><td>Typos, slang, rich morphology, code-mixed text, many unseen words at inference</td></tr>
+        <tr><td>Contextual (ELMo, BERT)</td><td>Word sense and sentence context matter, and the compute budget allows it</td></tr>
+      </tbody>
+    </table></div>
+
+    <!-- using -->
+    <h2 id="using"><span class="pn">11</span>Using word vectors</h2>
+    <h3>The embedding layer is a lookup</h3>
+    <p>Multiplying a one-hot vector by the embedding matrix selects one row:</p>
+    <div class="mj">\[ e_i^\top E = E[i, :], \qquad e_i \in \{0, 1\}^{V}, \quad E \in \mathbb{R}^{V \times d} \]</div>
+    <p>So an embedding layer is a bias-free linear layer on one-hot inputs, implemented as indexing: \(O(d)\) per token instead of \(O(Vd)\). A batch of ids of shape \(B \times T\) becomes a tensor of shape \(B \times T \times d\).</p>
+    <ul>
+      <li><strong>Sparse gradients:</strong> only the rows of words in the batch get a nonzero gradient. Rare words are updated rarely, which is one reason pretrained initialization helps them.</li>
+      <li><strong>The padding row</strong> is pinned to zero and excluded from updates.</li>
+      <li><strong>Weight tying:</strong> a language model's output layer is also \(V \times d\). Sharing it with the input embedding (Press and Wolf, 2017) saves parameters and usually helps; word2vec keeps the two separate.</li>
+    </ul>
+
+    <h3>From word vectors to a sentence vector</h3>
+    <ul>
+      <li><strong>Average:</strong> \(s = \frac{1}{\lvert S \rvert} \sum_{w \in S} v_w\). It loses order and is dominated by frequent words, but it's a surprisingly strong baseline, especially with a classifier or a small network on top.</li>
+      <li><strong>TF-IDF-weighted average:</strong> weight each word by its TF-IDF score and divide by the total weight, so function words count for little.</li>
+      <li><strong>SIF</strong> (smooth inverse frequency; Arora, Liang and Ma, 2017): weight each word by \(a / (a + p(w))\), with \(p(w)\) its corpus frequency and \(a\) a small constant. Then remove the component along \(u\), the first singular vector of the matrix of all sentence vectors (no centering):</li>
+    </ul>
+    <div class="mj">\[ s = \frac{1}{\lvert S \rvert} \sum_{w \in S} \frac{a}{a + p(w)}\, v_w, \qquad s \leftarrow s - u u^\top s \]</div>
+    <p>The weight is an idf-like discount for frequent words. The removed direction is shared by almost every sentence (it tracks frequency and syntax rather than content), so subtracting it sharpens similarities. Contextual sentence encoders have replaced these methods, but they remain the baseline for unsupervised similarity.</p>
+    <p><strong>doc2vec</strong> (paragraph vectors) learns a vector per document alongside the word vectors: PV-DM adds a document vector to the context when predicting a word, and PV-DBOW predicts the document's words from its vector alone, like skip-gram. A new document needs a few gradient steps at inference to get its vector.</p>
+
+    <h3>Pretrained vectors in a neural model: freeze or fine-tune?</h3>
+    <p>Initialize an LSTM's or CNN's embedding layer with pretrained rows for every word in your vocabulary, small random vectors on the same scale for the rest, and zeros for the padding row. Then decide whether the layer trains:</p>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Frozen</th><th>Fine-tuned</th></tr></thead>
+      <tbody>
+        <tr><td>Trainable parameters</td><td>Few: no \(V \times d\) block</td><td>Many</td></tr>
+        <tr><td>Small labelled data</td><td>Safer: the embeddings can't overfit</td><td>Risky</td></tr>
+        <tr><td>Words absent from the labelled data</td><td>Keep their place relative to seen words, so synonyms seen only in pretraining still work</td><td>Seen words move and unseen ones don't, so the space drifts out of alignment</td></tr>
+        <tr><td>Task-specific meaning</td><td>Can't adapt</td><td>Adapts: sentiment can pull apart "good" and "bad", which distributional vectors place close together</td></tr>
+      </tbody>
+    </table></div>
+    <p>A common middle path: freeze for the first epochs, then unfreeze with a lower learning rate, or keep a frozen and a trainable copy side by side (Kim's 2014 sentence CNN). Either way, match the pretrained vectors' preprocessing: casing, tokenization, phrase joining.</p>
+
+    <h3>Evaluating embeddings</h3>
+    <ul>
+      <li><strong>Intrinsic:</strong> word similarity (Spearman correlation between cosines and human ratings, e.g. SimLex-999) and analogy accuracy. Fast and cheap, but they correlate only loosely with downstream results, and many datasets mix up similarity ("cup", "mug") with relatedness ("cup", "coffee").</li>
+      <li><strong>Extrinsic:</strong> plug the vectors into the task you care about (NER, sentiment, retrieval) and measure that. The real test, but slower, and confounded with the rest of the model.</li>
+    </ul>
+
+    <h3>Bias in embeddings</h3>
+    <p>Vectors learn whatever associations the corpus contains, stereotypes included: gender directions (\(v_{\text{he}} - v_{\text{she}}\)) line up with occupations (Bolukbasi et al., 2016), and tests like WEAT measure such associations (Caliskan et al., 2017). Downstream, that becomes biased ranking, screening or coreference.</p>
+    <ul>
+      <li><strong>Hard debiasing:</strong> find a bias direction \(g\) (the top principal component of differences like he − she), remove it from words that should be neutral, \(v \leftarrow v - (v^\top g)\, g\), and renormalize.</li>
+      <li><strong>Its limit:</strong> the bias stays recoverable from the geometry (neighbours still cluster by the removed attribute), so debiasing hides more than it removes (Gonen and Goldberg, 2019). Measure bias in the downstream task, not just in the vectors.</li>
+    </ul>
+
+    <!-- contextual -->
+    <h2 id="contextual"><span class="pn">12</span>From static to contextual embeddings</h2>
+    <p>Every method so far gives <strong>one vector per word type</strong>. "bank" gets a single vector for the river and the money senses, roughly a frequency-weighted blend of the two, so in a sentence about rivers it still carries finance. The same vector has to serve every syntactic role, and it can't see negation or anything else in the sentence.</p>
+    <p>One vector per sense needs the number of senses in advance and a way to choose the sense in context, which is the original problem again. The real fix is to compute a word's vector from its sentence.</p>
+
+    <h3>ELMo: features from bidirectional language models</h3>
+    <p>ELMo (Peters et al., 2018) trains a forward and a backward LSTM language model on a large corpus. Tokens enter through a character CNN (so nothing is out of vocabulary), then two biLSTM layers. A token's representation is a task-learned mix of all the layers:</p>
+    <div class="mj">\[ \begin{gathered} \text{ELMo}_k = \gamma \sum_{j=0}^{2} s_j\, h_{k,j} \\ h_{k,j} = \big[ \overrightarrow{h}_{k,j};\ \overleftarrow{h}_{k,j} \big] \end{gathered} \]</div>
+    <p>\(h_{k,0}\) is token \(k\)'s character-CNN embedding, \(s_j\) are softmax-normalized layer weights and \(\gamma\) a scale, all learned per task. Lower layers carried more syntax (part of speech), higher layers more meaning (word sense). The vectors were concatenated with static embeddings as inputs to task models and improved results on six benchmark tasks.</p>
+    <p>Its bidirectionality is shallow: the two directions are separate models, joined only at the end.</p>
+
+    <h3>BERT: fine-tune the whole encoder</h3>
+    <p>BERT (Devlin et al., 2019) runs a transformer encoder over WordPiece tokens, pretrained to fill in masked tokens using both sides at every layer. Instead of extracting features, you fine-tune the whole model on the task. That pattern, pretrain once and fine-tune everywhere, replaced static vectors as the default starting point.</p>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Static (word2vec, GloVe, fastText)</th><th>Contextual (ELMo, BERT)</th></tr></thead>
+      <tbody>
+        <tr><td>One vector per</td><td>Word type</td><td>Token, in its sentence</td></tr>
+        <tr><td>Polysemy</td><td>One blended vector</td><td>A different vector per use</td></tr>
+        <tr><td>Cost to use</td><td>A table lookup</td><td>A forward pass through a deep network</td></tr>
+        <tr><td>Unseen words</td><td>No vector (fastText: n-grams)</td><td>Almost none: characters or subwords</td></tr>
+        <tr><td>Still useful for</td><td>Cheap features, small data, exploring a corpus, initialization</td><td>Almost everything else</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Where the sequence models take over</h3>
+    <p>Static embeddings didn't disappear; they became the first layer. An LSTM or a transformer starts with the lookup from <a href="#using">section 11</a>, ids to a \(B \times T \times d\) tensor of context-free vectors, and its layers mix in context, so the output for "bank" depends on its neighbours. How they do that is the subject of the sequence-models and transformers notes.</p>
+
+    <!-- code -->
+    <h2 id="code"><span class="pn">13</span>Pseudocode</h2>
+    <p>NumPy-style, with shapes in the comments. Write each one from memory once.</p>
+
+    <h3>TF-IDF from a count matrix</h3>
+    <pre class="code"><code><span class="cm"># C_train: (N, V) sparse counts, one row per training document</span>
+N   = C_train.shape[0]
+df  = asarray((C_train &gt; 0).sum(axis=0)).ravel()   <span class="cm"># (V,) documents containing each term</span>
+idf = log((1 + N) / (1 + df)) + 1          <span class="cm"># (V,) smoothed idf, fitted on train only</span>
+
+def tfidf(C, sublinear=False):             <span class="cm"># C: (M, V), same vocabulary as training</span>
+    X = C.astype(float).copy()
+    if sublinear:
+        X.data = 1 + log(X.data)           <span class="cm"># transform the nonzeros only: stays sparse</span>
+    X = X.multiply(idf)                    <span class="cm"># scale column t by idf[t]: (M, V)</span>
+    norms = sqrt(X.multiply(X).sum(axis=1))      <span class="cm"># (M, 1)</span>
+    return X.multiply(1 / maximum(norms, 1e-12)) <span class="cm"># unit L2 norm per row</span>
+
+X_train = tfidf(C_train)
+X_test  = tfidf(C_test)                    <span class="cm"># reuse df and idf: never refit on test</span>
+S = X_test @ X_train.T                     <span class="cm"># (M, N) cosine similarities</span></code></pre>
+
+    <h3>Multinomial Naive Bayes, in log space</h3>
+    <pre class="code"><code>def train_mnb(C, y, n_cls, alpha=1.0):     <span class="cm"># C: (N, V) counts; y: (N,) in 0..n_cls-1</span>
+    V = C.shape[1]
+    log_prior, log_theta = zeros(n_cls), zeros((n_cls, V))
+    for c in range(n_cls):
+        Nc = C[y == c].sum(axis=0)         <span class="cm"># (V,) total count of each term in class c</span>
+        log_theta[c] = log(Nc + alpha) - log(Nc.sum() + alpha * V)
+        log_prior[c] = log(mean(y == c))
+    return log_prior, log_theta            <span class="cm"># (n_cls,), (n_cls, V)</span>
+
+def predict_mnb(C_new, log_prior, log_theta):    <span class="cm"># C_new: (M, V)</span>
+    S = C_new @ log_theta.T + log_prior    <span class="cm"># (M, n_cls) joint log-likelihoods: sums, no products</span>
+    m = S.max(axis=1, keepdims=True)
+    log_Z = m + log(exp(S - m).sum(axis=1, keepdims=True))   <span class="cm"># log-sum-exp</span>
+    return S.argmax(axis=1), exp(S - log_Z)  <span class="cm"># labels (M,), probabilities (M, n_cls)</span></code></pre>
+
+    <h3>One skip-gram negative-sampling step</h3>
+    <pre class="code"><code><span class="cm"># W_in: (V, d) small random init; W_out: (V, d), often zeros at the start</span>
+<span class="cm"># noise: a big array of word ids, each repeated in proportion to count ** 0.75</span>
+
+def sgns_step(w, c, k, lr):
+    neg = noise[randint(0, len(noise), size=k)]  <span class="cm"># (k,) negative ids (word2vec skips any equal to c)</span>
+    ids = concat([[c], neg])               <span class="cm"># (k+1,) row 0 is the real context</span>
+    v = W_in[w]                            <span class="cm"># (d,) a view: safe, gradients come first</span>
+    U = W_out[ids]                         <span class="cm"># (k+1, d) a copy of those rows</span>
+    s = U @ v                              <span class="cm"># (k+1,) scores</span>
+    label = concat([[1], zeros(k)])        <span class="cm"># (k+1,)</span>
+    g = sigmoid(s) - label                 <span class="cm"># (k+1,) dloss/dscore: prediction minus label</span>
+    loss = -log(sigmoid(s[0])) - log(sigmoid(-s[1:])).sum()
+    grad_v = g @ U                         <span class="cm"># (d,) uses U from before the update</span>
+    grad_U = outer(g, v)                   <span class="cm"># (k+1, d)</span>
+    add.at(W_out, ids, -lr * grad_U)       <span class="cm"># add.at: a repeated id accumulates</span>
+    W_in[w] -= lr * grad_v
+    return loss
+
+for sentence in corpus:                    <span class="cm"># sentence: a list of ids</span>
+    kept = [i for i in sentence if random() &gt; p_discard[i]]  <span class="cm"># subsample frequent words</span>
+    for pos, w in enumerate(kept):
+        L = randint(1, window + 1)         <span class="cm"># dynamic window: near words count more</span>
+        for c in kept[max(0, pos - L) : pos] + kept[pos + 1 : pos + L + 1]:
+            sgns_step(w, c, k, lr)
+    lr = decay(lr)                         <span class="cm"># linear decay toward zero</span>
+
+<span class="cm"># Batched over B pairs: v (B, d), U (B, k+1, d),</span>
+<span class="cm"># s = einsum("bkd,bd-&gt;bk", U, v) is (B, k+1); the same gradients row by row.</span></code></pre>
+
+    <h3>BPE: learning merges, then encoding</h3>
+    <pre class="code"><code>def train_bpe(word_counts, num_merges):    <span class="cm"># word_counts: {word: corpus frequency}</span>
+    words = {tuple(w) + ("&lt;/w&gt;",): n for w, n in word_counts.items()}
+    merges = []
+    for _ in range(num_merges):
+        pairs = Counter()
+        for symbols, n in words.items():
+            for a, b in zip(symbols, symbols[1:]):
+                pairs[(a, b)] += n         <span class="cm"># weighted by how often the word occurs</span>
+        if not pairs:
+            break
+        best = max(pairs, key=pairs.get)   <span class="cm"># BPE: the most frequent pair</span>
+        <span class="cm"># WordPiece-style: max of pairs[(a, b)] / (count[a] * count[b]), where count[x]</span>
+        <span class="cm"># is symbol x's frequency, recounted after each merge (and "##" marks pieces, not &lt;/w&gt;)</span>
+        merges.append(best)
+        words = {merge_pair(s, best): n for s, n in words.items()}
+    return merges                          <span class="cm"># vocabulary = base symbols + one per merge</span>
+
+def merge_pair(symbols, pair):             <span class="cm"># replace every adjacent (a, b) with "ab"</span>
+    out, i = [], 0
+    while i &lt; len(symbols):
+        if i + 1 &lt; len(symbols) and (symbols[i], symbols[i + 1]) == pair:
+            out.append(symbols[i] + symbols[i + 1]); i += 2
+        else:
+            out.append(symbols[i]); i += 1
+    return tuple(out)
+
+def encode_bpe(word, merges):
+    rank = {pair: r for r, pair in enumerate(merges)}   <span class="cm"># earlier merge = higher priority</span>
+    symbols = tuple(word) + ("&lt;/w&gt;",)
+    while len(symbols) &gt; 1:
+        best = min(zip(symbols, symbols[1:]), key=lambda p: rank.get(p, inf))
+        if best not in rank:
+            break                          <span class="cm"># no learned merge applies</span>
+        symbols = merge_pair(symbols, best)
+    return symbols
+
+def encode_wordpiece(word, vocab):         <span class="cm"># BERT: greedy longest match first</span>
+    pieces, start = [], 0
+    while start &lt; len(word):
+        end = len(word)
+        while end &gt; start:
+            piece = word[start:end] if start == 0 else "##" + word[start:end]
+            if piece in vocab:
+                break
+            end -= 1
+        if end == start:
+            return ["[UNK]"]               <span class="cm"># some position matched nothing</span>
+        pieces.append(piece)
+        start = end
+    return pieces</code></pre>
+
+    <!-- questions -->
+    <h2 id="questions"><span class="pn">14</span>Interview questions</h2>
+    <p>Answer out loud first, then open the answer. Each one links back to its section.</p>
+
+    <details class="qa"><summary><span class="qn">1</span>Walk through turning raw text into model input. When does normalization hurt?</summary><div class="ans">
+      <p>Normalize, tokenize, build a vocabulary on the training split with a frequency cut-off and special tokens (&lt;UNK&gt;, &lt;PAD&gt;, start and end), map tokens to ids, then vectorize: sparse counts or TF-IDF for linear models, or an embedding lookup (\(B \times T\) ids to \(B \times T \times d\)) with padding masked for neural ones. Lowercasing hurts names and acronyms, stemming merges unrelated words and erases tense and number, and stopword removal destroys negation. Neural models with subword tokenizers need almost none of it. (<a href="#tokens">02</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">2</span>Why subword tokenization? How do BPE and WordPiece differ?</summary><div class="ans">
+      <p>Word vocabularies never close (Zipf, Heaps), and characters make sequences long; subwords keep frequent words whole and split rare ones into known pieces. BPE merges the most frequent adjacent pair and encodes by replaying its merges in order. WordPiece merges the pair that most raises the training likelihood (scored as \(\text{count}(ab) / (\text{count}(a)\, \text{count}(b))\) in open versions, a PMI-like ratio) and encodes greedily, longest match first, with "##" pieces. (<a href="#tokens">02</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">3</span>What is the hashing trick, and why don't collisions ruin it?</summary><div class="ans">
+      <p>Hash each feature to one of \(m\) columns, with a random sign from a second hash: no vocabulary, stateless, streamable. Collisions are rare when \(m\) is large relative to the useful features, usually pair a useful feature with noise, and cancel on average thanks to the sign, so inner products are unbiased. The cost: you can't map a weight back to a word. (<a href="#bow">03</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">4</span>Why the log in idf?</summary><div class="ans">
+      <p>\(-\log(\text{df}/N)\) is the surprisal of a document containing the term. The log makes information add across independent terms, compresses a ratio \(N/\text{df}\) that spans orders of magnitude, and falls out of the probabilistic relevance model (the Robertson–Spärck Jones weight). A term in every document gets 0 with plain idf and 1 with sklearn's smoothed idf. (<a href="#tfidf">04</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">5</span>Why L2-normalize TF-IDF vectors and compare them with cosine?</summary><div class="ans">
+      <p>Length inflates every count, so a raw dot product favours long documents. Normalizing keeps only the mix of terms; cosine becomes a dot product, and Euclidean distance between unit vectors, \(\sqrt{2 - 2\cos}\), ranks the same way. (<a href="#tfidf">04</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">6</span>TF-IDF vs BM25: what do \(k_1\) and \(b\) do?</summary><div class="ans">
+      <p>BM25's tf part, \(\text{tf}\,(k_1 + 1) / (\text{tf} + K)\), saturates at \(k_1 + 1\): \(k_1 = 0\) counts presence only, and \(k_1 \to \infty\) is linear in tf. \(K\) carries length normalization pivoted on the average length, with \(b\) running from none (0) to full (1). So repetition can't dominate, documents matching more query terms win, and both knobs are tuned per collection. Neither method handles synonyms, hence hybrid search with dense retrieval. (<a href="#bm25">05</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">7</span>Derive multinomial Naive Bayes. Why smoothing, and why log space?</summary><div class="ans">
+      <p>Draw the class from its prior, then each token independently from \(\theta_y\); the multinomial coefficient cancels, leaving \(\log P(y \mid D) = \log \pi_y + \sum_t \text{tf}_{t,D} \log \theta_{y,t} + \text{const}\). The Lagrangian gives each \(\theta_{y,t}\) as the term's share of the class's tokens. Adding \(\alpha\) to every count (the posterior mean under a Dirichlet prior) stops one unseen word from zeroing a class. Summing logs avoids underflow; log-sum-exp normalizes. The result is linear in the counts. (<a href="#classifiers">06</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">8</span>Why does Naive Bayes work with a wrong independence assumption?</summary><div class="ans">
+      <p>Classification needs only the argmax, which double counting usually leaves intact while making the probabilities overconfident. The boundary is linear in the counts either way. Its closed-form, low-variance estimates win on small data, and correlations often cancel across classes. Calibration breaks, and with lots of data logistic regression wins. (<a href="#classifiers">06</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">9</span>When would TF-IDF with logistic regression beat BERT?</summary><div class="ans">
+      <p>When the label is lexical; when the text is far from pretraining data (codes, IDs, logs); when documents are longer than BERT's context; when latency, cost or auditability is tight; and when a lexical task has plenty of labels. BERT wins on compositional meaning (negation, paraphrase) and sentence pairs. (<a href="#classifiers">06</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">10</span>Why do n-gram language models need smoothing? What's Kneser–Ney's key idea?</summary><div class="ans">
+      <p>Most n-grams never occur in training, so MLE gives test sentences probability 0. Kneser–Ney subtracts about 0.75 from every seen count and gives that mass to a lower order built from <strong>continuation counts</strong>, the number of distinct words preceding \(w\), because the lower order is consulted for new contexts. "Francisco" is frequent but follows almost only "San". (<a href="#lm">07</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">11</span>Define perplexity. How does it relate to cross-entropy? What does a uniform model score?</summary><div class="ans">
+      <div class="mj">\[ \begin{aligned} \text{PP} &amp;= P(w_{1:T})^{-1/T} \\ &amp;= \exp\Big( -\frac{1}{T} \sum_{i} \log P(w_i \mid w_{&lt; i}) \Big) \end{aligned} \]</div>
+      <p>The exponent is the per-token cross-entropy \(H\), so PP is \(e^{H}\) in nats or \(2^{H}\) in bits: the effective number of equally likely choices per step. A uniform model over \(V\) tokens scores exactly \(V\). Compare only with the same tokenization and test set. (<a href="#lm">07</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">12</span>Skip-gram or CBOW for rare words, and why?</summary><div class="ans">
+      <p>Skip-gram. Each occurrence of a rare word yields up to \(2L\) examples with its own vector as the only input, so it gets a full gradient each time. CBOW averages it with its neighbours and makes one prediction per position, which blurs its signal. CBOW is faster and slightly better on frequent words. (<a href="#word2vec">09</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">13</span>Why is the full softmax over the vocabulary expensive, and what replaces it?</summary><div class="ans">
+      <p>Its normalizer and its gradient touch all \(V\) output vectors: \(O(Vd)\) per pair. Negative sampling turns it into \(k + 1\) logistic regressions, \(O((k + 1)\, d)\), without normalized probabilities. Hierarchical softmax walks a Huffman tree, \(O(d \log V)\), and stays normalized. Sampled softmax normalizes over a corrected sample. (<a href="#word2vec">09</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">14</span>Write the negative-sampling loss and its gradients. Why does it work?</summary><div class="ans">
+      <p>With \(s_0 = u_c^\top v_w\) for the real pair and \(s_i = u_{c_i}^\top v_w\) for \(k\) noise words:</p>
+      <div class="mj">\[ \begin{aligned} \ell &amp;= -\log \sigma(s_0) - \textstyle\sum_{i} \log \sigma(-s_i) \\ \partial \ell / \partial u_c &amp;= (\sigma(s_0) - 1)\, v_w \\ \partial \ell / \partial u_{c_i} &amp;= \sigma(s_i)\, v_w \\ \partial \ell / \partial v_w &amp;= (\sigma(s_0) - 1)\, u_c + \textstyle\sum_i \sigma(s_i)\, u_{c_i} \end{aligned} \]</div>
+      <p>Each is "prediction minus label" times the other vector. It works because it's logistic regression between data and noise (NCE without the normalizing correction, so association scores instead of probabilities), its optimum is \(u_c^\top v_w = \text{PMI} - \log k\), and each update fades once its pair is classified correctly. (<a href="#word2vec">09</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">15</span>Why raise the unigram distribution to the 3/4 power for negatives?</summary><div class="ans">
+      <p>It won empirically. It flattens the distribution, \(P_n(c) / P(c) \propto \#(c)^{-1/4}\): unigram negatives would be dominated by function words, uniform ones by rare words that never confuse the model. It also smooths the context distribution inside the implicit PMI, cutting PMI's bias toward rare words. (<a href="#word2vec">09</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">16</span>Why does word2vec keep two embedding matrices, and which do you use?</summary><div class="ans">
+      <p>One shared matrix could only fit \(W W^\top\), which is positive semidefinite with a non-negative diagonal, but words rarely appear in their own context (their PMI with themselves is very negative). You keep \(W_{\text{in}}\), or the sum \(v + u\). (<a href="#word2vec">09</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">17</span>What does word2vec implicitly factorize, and how does that relate to LSA and GloVe?</summary><div class="ans">
+      <p>With enough dimensions, SGNS's optimum is \(u_c^\top v_w = \text{PMI}(w, c) - \log k\): a weighted rank-\(d\) factorization of shifted PMI. LSA is the same family, an unweighted truncated SVD of a PPMI or TF-IDF matrix; GloVe fits log co-occurrence counts explicitly, with biases. With matched hyperparameters, count-based SVD comes close to SGNS. (<a href="#word2vec">09</a>, <a href="#glove">10</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">18</span>How does word2vec handle out-of-vocabulary words, and how does fastText?</summary><div class="ans">
+      <p>word2vec (like GloVe) has no vector for a word it didn't train on: drop it, map it to &lt;UNK&gt; or retrain. fastText builds each word from its character 3–6-grams, so an unseen word gets the sum of n-gram vectors learned from other words, which handles typos, inflections and compounds. (<a href="#glove">10</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">19</span>Is word2vec deep learning?</summary><div class="ans">
+      <p>No. It's a shallow log-bilinear model, a lookup and a dot product with no hidden non-linearity, trained by SGD; at its optimum it implicitly does a weighted factorization of shifted PMI. Its link to deep learning is the idea it popularized: pretrained dense vectors as a model's first layer, which ELMo and BERT scaled up. (<a href="#word2vec">09</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">20</span>Why do word analogies work with vector arithmetic, and when do they fail?</summary><div class="ans">
+      <p>If dot products approximate PMI, a difference vector encodes log-ratios of context probabilities. When a relation such as gender shifts the contexts the same way for every pair, the offsets match. Analogies fail for one-to-many relations, rare words and antonyms (which share contexts), and reported accuracies lean on excluding the query words. (<a href="#word2vec">09</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">21</span>Pretrained embeddings in an LSTM classifier: freeze or fine-tune?</summary><div class="ans">
+      <p>Freeze with little labelled data or when many test-time words never appear in the labels: the space stays consistent, so unseen synonyms still work. Fine-tune with more data or when the task needs meanings the distributional space blurs ("good" vs "bad" for sentiment), ideally after a few frozen epochs and at a lower learning rate. (<a href="#using">11</a>)</p></div></details>
+
+    <details class="qa"><summary><span class="qn">22</span>What's the core limitation of static embeddings, and how did ELMo and BERT fix it?</summary><div class="ans">
+      <p>One vector per word type blends every sense ("bank") and ignores the sentence. ELMo computes per-token vectors from bidirectional LSTM language models and uses them as features; BERT pretrains a transformer encoder by masked-token prediction and fine-tunes it end to end. Static vectors survive as their input layer. (<a href="#contextual">12</a>)</p></div></details>
+
+    <!-- sheet -->
+    <h2 id="sheet"><span class="pn">15</span>Cheat sheet</h2>
+    <div class="sheet">
+      <h3>Tokens and vocabulary</h3>
+      <div class="mj">\[ \begin{gathered} \text{Heaps: } V(n) \propto n^{\beta} \\ \text{BPE: merge } \arg\max_{(a,b)} \text{count}(a, b) \\ \text{WordPiece: merge } \arg\max_{(a,b)} \frac{\text{count}(ab)}{\text{count}(a)\, \text{count}(b)} \end{gathered} \]</div>
+      <h3>Bag of words, hashing, TF-IDF</h3>
+      <div class="mj">\[ \begin{gathered} X \in \mathbb{R}^{N \times V} \\ \mathbb{E}_\xi\big[ \phi(x)^\top \phi(x') \big] = x^\top x' \\ \text{tfidf} = \text{tf} \cdot \log \frac{N}{\text{df}} \\ \text{sklearn idf} = \log \frac{1 + N}{1 + \text{df}} + 1 \\ \hat x = \frac{x}{\lVert x \rVert_2} \qquad \lVert \hat x - \hat y \rVert^2 = 2 - 2 \cos \end{gathered} \]</div>
+      <h3>BM25</h3>
+      <div class="mj">\[ \begin{gathered} \sum_{t \in Q} \text{idf}(t)\, \frac{\text{tf}\, (k_1 + 1)}{\text{tf} + K} \\ K = k_1 \big( 1 - b + b\, \lvert D \rvert / \text{avgdl} \big) \\ \text{idf} = \log \Big( 1 + \frac{N - \text{df} + 0.5}{\text{df} + 0.5} \Big) \end{gathered} \]</div>
+      <h3>Naive Bayes</h3>
+      <div class="mj">\[ \begin{gathered} \hat\theta_{y,t} = \frac{N_{y,t} + \alpha}{\sum_{t'} N_{y,t'} + \alpha V} \\ \log P(y \mid D) = \log \pi_y + \sum_t \text{tf}_{t,D} \log \hat\theta_{y,t} + \text{const} \end{gathered} \]</div>
+      <h3>n-gram language models</h3>
+      <div class="mj">\[ \begin{gathered} P_{\text{KN}}(w \mid v) = \frac{\max(C(v w) - \delta, 0)}{C(v)} \\ \qquad + \lambda(v)\, P_{\text{cont}}(w) \\ P_{\text{cont}}(w) \propto \lvert \{ v : C(v w) > 0 \} \rvert \\ \text{PP} = \exp\Big( -\frac{1}{T} \sum_i \log P(w_i \mid w_{&lt; i}) \Big) \\ \text{uniform model: PP} = V \end{gathered} \]</div>
+      <h3>PMI and LSA</h3>
+      <div class="mj">\[ \begin{gathered} \text{PMI}(w, c) = \log \frac{P(w, c)}{P(w)\, P(c)} \\ \text{PPMI} = \max(\text{PMI}, 0) \\ A_{V \times N} \approx U_r \Sigma_r Q_r^\top \qquad \text{fold in: } U_r^\top a \end{gathered} \]</div>
+      <h3>word2vec</h3>
+      <div class="mj">\[ \begin{gathered} P(c \mid w) = \frac{e^{u_c^\top v_w}}{\sum_{c'} e^{u_{c'}^\top v_w}} \\ \ell_{\text{NEG}} = -\log \sigma(s_0) - \sum_{i=1}^{k} \log \sigma(-s_i) \\ P_n(c) \propto \#(c)^{3/4} \\ P_{\text{discard}}(w) = 1 - \sqrt{\tau / f(w)} \\ \text{optimum: } u_c^\top v_w = \text{PMI}(w, c) - \log k \end{gathered} \]</div>
+      <h3>GloVe, fastText, SIF</h3>
+      <div class="mj">\[ \begin{gathered} J = \sum_{X_{ij} > 0} f(X_{ij}) \big( w_i^\top \tilde w_j + b_i + \tilde b_j - \log X_{ij} \big)^2 \\ f(x) = \min\big( 1, (x / x_{\max})^{3/4} \big) \\ v_w = \sum_{g \in \mathcal{G}_w} z_g \\ s = \frac{1}{\lvert S \rvert} \sum_{w \in S} \frac{a}{a + p(w)}\, v_w \end{gathered} \]</div>
+    </div>
+
+    <footer>Sources: Mikolov et al. 2013 (word2vec, two papers); Levy and Goldberg 2014 (implicit factorization); Levy, Goldberg and Dagan 2015; Pennington et al. 2014 (GloVe); Bojanowski et al. 2017 (fastText); Sennrich et al. 2016 (BPE); Kudo 2018 (unigram LM); Robertson and Zaragoza 2009 (BM25); Chen and Goodman 1998 (smoothing); Wang and Manning 2012 (NB-SVM); Arora et al. 2017 (SIF); Peters et al. 2018 (ELMo); Devlin et al. 2019 (BERT).<span class="site-nav"><a href="./">More study notes</a> · <a href="../">Deepam Minda</a></span></footer>
+
+  </article>
+</div>
+<a class="jump" href="#tldr">Contents ↑</a>
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+  svg: { fontCache: "global" },
+  options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script>
+(function () {
+  var d = document.getElementById("tocd");
+  var wide = window.matchMedia("(min-width: 1081px)");
+  function sync() { d.open = wide.matches; }
+  sync();
+  if (wide.addEventListener) wide.addEventListener("change", sync);
+  var jump = document.querySelector(".jump");
+  jump.addEventListener("click", function () { if (!wide.matches) d.open = true; });
+  d.addEventListener("click", function (e) {
+    if (!wide.matches && e.target.closest("a")) d.open = false;
+  });
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+  function spy() {
+    var y = window.scrollY + 120, cur = 0;
+    targets.forEach(function (t, i) { if (t && t.getBoundingClientRect().top + window.scrollY <= y) cur = i; });
+    links.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
+  }
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+})();
+</script>
+
+<script>
+(function () {
+  var root = document.documentElement, b = document.getElementById("theme-toggle");
+  function cur() { return root.getAttribute("data-theme") === "light" ? "light" : "dark"; }
+  function label() { b.setAttribute("aria-label", "Switch to " + (cur() === "dark" ? "light" : "dark") + " mode"); }
+  b.addEventListener("click", function () {
+    var n = cur() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", n);
+    try { localStorage.setItem("deepam-theme", n); } catch (e) {}
+    label();
+  });
+  label();
+})();
+</script>
+</body>
+</html>

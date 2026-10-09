@@ -284,7 +284,7 @@ footer .site-nav { display: block; margin-top: 10px; }
 
     <!-- 01 -->
     <h2 id="rnn"><span class="pn">01</span>The plain RNN’s problem</h2>
-    <div class="mj">\[ h_t = \tanh(W_x x_t + W_h h_{t-1} + b), \qquad \hat y_t = \text{softmax}(W_y h_t + b_y) \]</div>
+    <div class="mj">\[ \begin{aligned} h_t &amp;= \tanh(W_x x_t + W_h h_{t-1} + b) \\ \hat y_t &amp;= \text{softmax}(W_y h_t + b_y) \end{aligned} \]</div>
     <h3>Shapes</h3>
     <p>Notation for the whole page: \(d\) = input size (e.g. the embedding size), \(H\) = hidden size, \(K\) = number of classes (or the vocabulary size \(V\)), \(T\) = sequence length, \(B\) = batch size.</p>
     <div class="tbl"><table>
@@ -301,7 +301,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <tr><td>Weight gradient share \(\delta a_t\, x_t^\top\)</td><td>\((H \times 1)(1 \times d) = H \times d\)</td><td>Same shape as \(W_x\) ✓</td></tr>
       </tbody>
     </table></div>
-    <p><strong>In code</strong> everything gets a leading batch dimension, and rows are examples, so a step is \(h_t = \tanh(x_t W_x^\top + h_{t-1} W_h^\top + b)\) with \(x_t\) of shape \(B \times d\) and \(h_t\) of shape \(B \times H\). PyTorch's <code>nn.RNN(d, H, batch_first=True)</code> takes \(B \times T \times d\) and returns all states as \(B \times T \times H\), plus the last one as \(\text{layers} \times B \times H\). Parameters: \(H(d + H) + H\) for the cell, plus \(KH + K\) for the head.</p>
+    <p><strong>In code</strong> everything gets a leading batch dimension, and rows are examples, so a step is \(h_t = \tanh(x_t W_x^\top + h_{t-1} W_h^\top + b)\) with \(x_t\) of shape \(B \times d\) and \(h_t\) of shape \(B \times H\). PyTorch's <code>nn.RNN(d, H, batch_first=True)</code> takes \(B \times T \times d\) and returns all states as \(B \times T \times H\), plus the last one as \(\text{layers} \times B \times H\). Parameters: \(H(d + H) + H\) for the cell, plus \(KH + K\) for the head. PyTorch stores two bias vectors, \(b_{ih}\) and \(b_{hh}\), so it reports \(H(d + H) + 2H\) for the cell; only their sum matters (more on this under the LSTM). None of it depends on \(T\), because the same weights run at every step.</p>
     <h3 id="tokens">Where \(x_t\) comes from: tokens to vectors</h3>
     <p>For text, \(x_t\) is a learned embedding, exactly as in a transformer. The text is split into tokens, each token is an id in a vocabulary of size \(V\), and the id picks one row of an embedding table \(E\):</p>
     <div class="mj">\[ \begin{aligned} X &amp;= E[\text{ids}] \\ h_t &amp;= \text{RNN}(x_t,\ h_{t-1}) \\ z_t &amp;= W_y h_t + b_y \end{aligned} \]</div>
@@ -324,6 +324,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li><strong>Weight tying.</strong> A language model's output layer \(W_y\) (\(V \times H\)) can share weights with \(E\) when \(H = d\), or with a projection in between (Press &amp; Wolf, 2017): fewer parameters and usually lower perplexity. GPT and BERT do the same.</li>
       <li><strong>Cost.</strong> \(V \cdot d\) is often the largest block of parameters in a small word-level model, another reason to tie weights or use subwords.</li>
       <li><strong>Padding.</strong> Batches pad every sequence to one length with a pad id. <code>padding_idx</code> keeps that row at zero, and packing (<code>pack_padded_sequence</code>) stops the RNN stepping through the padding.</li>
+      <li><strong>Before all this:</strong> how text becomes tokens, bag of words, TF-IDF, n-gram models, word2vec and GloVe are covered in depth in the <a href="https://deepamminda.vercel.app/notes/classical-nlp.html">Classical NLP</a> note.</li>
       <li><strong>Not text?</strong> For time series or sensor data there's no vocabulary: \(x_t\) is the feature vector itself, or a linear projection of it. Only categorical features (a store id, the day of the week) get embedding tables, concatenated with the numeric ones.</li>
     </ul>
     <h3>In code</h3>
@@ -369,7 +370,7 @@ logits = W_y @ h + b_y                <span class="cm"># many-to-one head: (K,)<
       <li><strong>Vanishing gradients.</strong> The gradient from step \(T\) back to step \(k\) is a product of one factor per step in between:</li>
     </ul>
     <div class="mj">\[ \frac{\partial h_T}{\partial h_k} = \prod_{t=k+1}^{T} \text{diag}\!\left(1 - h_t^2\right) W_h \]</div>
-    <p>If each factor shrinks things, the product shrinks exponentially with distance. If one stretches, it can explode. That's the same product as the forgetting, read backwards: <strong>the state forgets step \(k\), and the gradient can't teach it to remember.</strong> Clipping by norm tames explosions but can't fix vanishing. That needs a different update rule.</p>
+    <p>How much one factor can stretch a vector is at most the tanh slope (never above 1, and near 0 when a unit saturates) times the largest stretch of \(W_h\) (its largest singular value). If that's below 1, the product shrinks like a number below 1 raised to the power \(T - k\): exponentially with distance. If \(W_h\) stretches some direction by more than 1, it can explode instead. A weight's gradient is a sum of one share per step, so the shares from distant steps are exponentially smaller than the nearby ones, and the network learns only short-range patterns. That's the same product as the forgetting, read backwards: <strong>the state forgets step \(k\), and the gradient can't teach it to remember.</strong> Clipping by norm tames explosions but can't fix vanishing. That needs a different update rule.</p>
 
     <!-- 02 -->
     <h2 id="gates"><span class="pn">02</span>What a gate is</h2>
@@ -454,7 +455,7 @@ logits = W_y @ h + b_y                <span class="cm"># many-to-one head: (K,)<
         <tr><td>output</td><td>\(o_t = \sigma(W_o u_t + b_o)\)</td><td>What should I show right now?</td></tr>
       </tbody>
     </table></div>
-    <div class="mj">\[ c_t = f_t \odot c_{t-1} + i_t \odot g_t \qquad\qquad h_t = o_t \odot \tanh(c_t) \]</div>
+    <div class="mj">\[ \begin{aligned} c_t &amp;= f_t \odot c_{t-1} + i_t \odot g_t \\ h_t &amp;= o_t \odot \tanh(c_t) \end{aligned} \]</div>
     <p><strong>Out:</strong> \(c_t\) goes only to the next step. \(h_t\) goes to the prediction <em>and</em> to the next step, inside \(u_{t+1}\). Both start at zero. And \(c_{t-1}\) has no separate equation: it is this same update, one step earlier.</p>
 
     <h3>Shapes</h3>
@@ -466,12 +467,13 @@ logits = W_y @ h + b_y                <span class="cm"># many-to-one head: (K,)<
         <tr><td>\(b_f, b_i, b_g, b_o\)</td><td>\(H\) each</td><td></td></tr>
         <tr><td>\(f_t, i_t, g_t, o_t\)</td><td>\(H\)</td><td>One dial (or draft value) per slot</td></tr>
         <tr><td>\(c_t,\ h_t\)</td><td>\(H\)</td><td>Same size, so \(\odot\) works slot by slot</td></tr>
-        <tr><td>PyTorch <code>weight_ih_l0</code> / <code>weight_hh_l0</code></td><td>\(4H \times d\) / \(4H \times H\)</td><td>The same stacked matrix, split by input; order i, f, g, o</td></tr>
+        <tr><td>PyTorch <code>weight_ih_l0</code> / <code>weight_hh_l0</code></td><td>\(4H \times d\) / \(4H \times H\)</td><td>The same stacked matrix, split by input; order i, f, g, o. From layer 2 up, \(d\) becomes \(H\) (\(2H\) if bidirectional)</td></tr>
+        <tr><td>PyTorch <code>bias_ih_l0</code> / <code>bias_hh_l0</code></td><td>\(4H\) / \(4H\)</td><td>Two bias vectors; only their sum matters (see below)</td></tr>
         <tr><td><code>nn.LSTM</code> output, \((h_n, c_n)\)</td><td>\(B \times T \times H\), \((\text{layers} \times B \times H)\) each</td><td>Bidirectional: output \(B \times T \times 2H\)</td></tr>
       </tbody>
     </table></div>
-    <div class="mj">\[ \#\text{params} = 4\,\big[H(H + d) + H\big] \]</div>
-    <p>For \(d = 100\) and \(H = 128\) that is \(4 \times (128 \times 228 + 128) = 117{,}248\).</p>
+    <div class="mj">\[ \begin{aligned} \#\text{params, textbook} &amp;= 4\,\big[H(H + d) + H\big] \\ \#\text{params, PyTorch} &amp;= 4\,\big[H(H + d) + 2H\big] \end{aligned} \]</div>
+    <p>For \(d = 100\) and \(H = 128\) the textbook count is \(4 \times (128 \times 228 + 128) = 117{,}248\); PyTorch reports \(4H\) more, for its second bias vector (explained under “Parameters” below).</p>
 
     <h3>One LSTM step, in code</h3>
     <pre class="code"><code>def lstm_step(x, h, c):               <span class="cm"># x: (d,)  h, c: (H,)</span>
@@ -488,7 +490,7 @@ h, c = zeros(H), zeros(H)
 for t in range(T):
     h, c = lstm_step(x[t], h, c)</code></pre>
 
-    <aside class="note lab"><p class="nl">What counts as a block</p><p>A <strong>block</strong> is anything computed from \([h_{t-1}, x_t]\) through its own weight matrix: \(\sigma\) or \(\tanh\) of \(W u_t + b\). The LSTM has four: \(f\), \(i\), \(g\) and \(o\). The inputs and states \(x\), \(h\) and \(c\) have no weights of their own; \(c_t\) and \(h_t\) are just multiplied and added together from the blocks. Each block holds \(H(H + d) + H\) numbers, which is where the parameter count comes from. (The GRU has three: \(z\), \(r\) and its draft \(\tilde h\).)</p></aside>
+    <aside class="note lab"><p class="nl">What counts as a block</p><p>A <strong>block</strong> is anything computed from \([h_{t-1}, x_t]\) through its own weight matrix: \(\sigma\) or \(\tanh\) of \(W u_t + b\). The LSTM has four: \(f\), \(i\), \(g\) and \(o\). The inputs and states \(x\), \(h\) and \(c\) have no weights of their own; \(c_t\) and \(h_t\) are just multiplied and added together from the blocks. Each block holds \(H(H + d) + H\) numbers (PyTorch stores one more \(H\) of bias), which is where the parameter count comes from. (The GRU has three: \(z\), \(r\) and its draft \(\tilde h\).)</p></aside>
 
     <h3 id="head">From \(h_t\) to a prediction</h3>
     <p>The cell only produces the hidden state. To predict anything, put an ordinary <strong>output layer</strong>, the “head”, on top. It is not part of the cell:</p>
@@ -538,21 +540,26 @@ for t in range(T):
       </tbody>
     </table></div>
 
-    <p><strong>Parameters:</strong> four blocks, each an \(H \times (H + d)\) matrix plus \(H\) biases, so \(4\,[H(H+d) + H]\). In code they're one \(4H \times (H+d)\) matrix multiply, split into quarters (PyTorch orders them i, f, g, o, and keeps two bias vectors per block).</p>
+    <p><strong>Parameters:</strong> four blocks, each an \(H \times (H + d)\) matrix plus \(H\) biases, so \(4\,[H(H+d) + H]\). In code they're one \(4H \times (H+d)\) matrix multiply, split into quarters (PyTorch orders them i, f, g, o).</p>
+    <ul>
+      <li><strong>PyTorch's second bias.</strong> <code>nn.LSTM</code> keeps two bias vectors per block: \(b_{ih}\) on the input projection and \(b_{hh}\) on the hidden projection, so each pre-activation is \(W_{ih} x_t + b_{ih} + W_{hh} h_{t-1} + b_{hh}\). They're always added together, so only \(b_{ih} + b_{hh}\) matters and one of them is redundant. It's there because cuDNN's formulation puts a bias on each of its two matrix multiplies, and PyTorch matches it so the fast kernel can run the same weights. Hence PyTorch's \(4\,[H(H+d) + 2H]\).</li>
+      <li><strong>Not tied to \(T\).</strong> The same weights run at every step, so the count is the same for any sequence length.</li>
+      <li><strong>Per layer.</strong> In a stack, layer 2 reads layer 1's \(h\), so its input size is \(H\) instead of \(d\) (\(2H\) if bidirectional). A bidirectional layer has two independent sets of weights, one per direction, so it doubles the count.</li>
+    </ul>
 
     <!-- 04 -->
     <h2 id="gru"><span class="pn">04</span>The GRU</h2>
     <p>The gated recurrent unit (Cho et al., 2014) is a simpler LSTM. It merges the notebook and the output into <strong>one state \(h\)</strong> and uses two gates instead of three.</p>
-    <div class="mj">\[ z_t = \sigma(W_z [h_{t-1}, x_t] + b_z) \qquad r_t = \sigma(W_r [h_{t-1}, x_t] + b_r) \]</div>
-    <div class="mj">\[ \tilde h_t = \tanh\big(W_n [\, r_t \odot h_{t-1},\; x_t \,] + b_n\big) \qquad h_t = (1 - z_t) \odot h_{t-1} + z_t \odot \tilde h_t \]</div>
+    <div class="mj">\[ \begin{aligned} z_t &amp;= \sigma(W_z [h_{t-1}, x_t] + b_z) \\ r_t &amp;= \sigma(W_r [h_{t-1}, x_t] + b_r) \\ \tilde h_t &amp;= \tanh\big(W_n [\, r_t \odot h_{t-1},\; x_t \,] + b_n\big) \\ h_t &amp;= (1 - z_t) \odot h_{t-1} + z_t \odot \tilde h_t \end{aligned} \]</div>
     <div class="tbl"><table>
       <thead><tr><th>Thing</th><th>Shape</th><th>Note</th></tr></thead>
       <tbody>
         <tr><td>\(W_z, W_r, W_n\)</td><td>\(H \times (H + d)\) each</td><td>Stacked in code as \(3H \times (H + d)\); PyTorch order r, z, n</td></tr>
         <tr><td>\(z_t, r_t, \tilde h_t, h_t\)</td><td>\(H\)</td><td>Everything is one \(H\)-vector per step</td></tr>
-        <tr><td>Parameters</td><td>\(3[H(H + d) + H]\)</td><td>25% fewer than an LSTM of the same size</td></tr>
+        <tr><td>Parameters</td><td>\(3[H(H + d) + H]\); PyTorch \(3[H(H + d) + 2H]\)</td><td>25% fewer than an LSTM of the same size: 3 blocks instead of 4</td></tr>
       </tbody>
     </table></div>
+    <p>PyTorch's GRU also keeps two bias vectors per block, but here the pair isn't fully redundant. Its draft is \(\tanh(W_{in} x_t + b_{in} + r_t \odot (W_{hn} h_{t-1} + b_{hn}))\), so \(b_{hn}\) is scaled by the reset gate while \(b_{in}\) isn't. Only the \(r\) and \(z\) bias pairs collapse into one.</p>
     <h3>One GRU step, in code</h3>
     <pre class="code"><code>def gru_step(x, h):                   <span class="cm"># z = how much to write</span>
     z = sigmoid(W_z @ concat([h, x]) + b_z)
@@ -661,7 +668,7 @@ for t in range(T):
     <ul>
       <li><strong>The second term is the highway.</strong> Going back one step along the cell multiplies the gradient by \(f\), and only \(f\): no weight matrix and no tanh slope. With \(f \approx 1\), it arrives almost whole. With \(f = 1\), the update is \(c_t = c_{t-1} + i_t \odot g_t\), a residual connection through time (the 1997 paper's “constant error carousel”).</li>
       <li><strong>The gates learn from side branches.</strong> Three come from \(\delta c_t\), the output gate from \(\delta h_t\):<div class="mj">\[ \begin{aligned} \delta f_t &amp;= \delta c_t \odot c_{t-1} \\ \delta i_t &amp;= \delta c_t \odot g_t \\ \delta g_t &amp;= \delta c_t \odot i_t \\ \delta o_t &amp;= \delta h_t \odot \tanh(c_t) \end{aligned} \]</div>Each is multiplied by its activation's slope, then feeds its weight's gradient and, through those weights, \(\delta h_{t-1}\). These side paths do go through matrices, so they can still explode, which is why LSTMs are still clipped.</li>
-      <li><strong>Memory and gradient fade together.</strong> Unrolled, the cell is a sum of every past write, faded by the forget gates since: \(c_t = \sum_k \big(\prod_{j>k} f_j\big) \odot i_k \odot g_k\). The gradient back to each write is that same product, so the cell keeps a fact exactly as long as it can learn from it. Start the forget bias at 1, so \(f \approx 0.73\). At 0, \(f \approx 0.5\) halves memory and gradient every step, like a plain RNN.</li>
+      <li><strong>Memory and gradient fade together.</strong> Unrolled, the cell is a sum of every past write, faded by the forget gates since: \(c_t = \sum_k \big(\prod_{j>k} f_j\big) \odot i_k \odot g_k\). The gradient back to each write is that same product, so the cell keeps a fact exactly as long as it can learn from it. Start the forget bias at 1, so \(f \approx 0.73\). At 0, \(f \approx 0.5\) halves memory and gradient every step, like a plain RNN. Not 10, though: there \(f\) sits a hair below 1, where the sigmoid is flat, so the side branch that trains the gate carries almost no gradient and the gate can barely learn to forget.</li>
     </ul>
 
     <h3>GRU: the blend is the highway</h3>
@@ -733,6 +740,15 @@ clip_by_norm([dW_x, dW_h, db], max_norm=5.0)
     <p>That's the whole fix in one line: <strong>replace a fixed matrix times a slope with a learned dial.</strong> Attention goes one step further and removes the walk altogether, because every token connects to every other in one step (see <a href="./transformers.html#bridge">Transformers</a>).</p>
     <aside class="note trap"><p class="nl">Trap</p><p><em>“The forget gate is a sigmoid, whose slope is at most 0.25. Doesn't the gradient vanish through it?”</em> No. Along the cell, the gradient is multiplied by the gate's <strong>value</strong> \(f\), not its slope. The slope only appears on the side branch that trains the gate's own weights.</p></aside>
 
+    <h3>In practice: clipping and truncated BPTT</h3>
+    <ul>
+      <li><strong>Clip by norm, not by value.</strong> Clipping by norm rescales the whole gradient when its length passes a threshold \(\tau\), so the direction stays the same and only the step shrinks. Clipping by value caps each component on its own, which tilts the direction toward the small components. An exploding gradient usually comes from a steep cliff in the loss: its direction is still useful, it's just far too long (Pascanu et al., 2013). Neither version helps a vanishing gradient, since both only shrink.</li>
+    </ul>
+    <div class="mj">\[ \begin{aligned} \text{by norm:}\quad g &amp;\leftarrow g \cdot \min\!\big(1,\ \tau / \lVert g \rVert\big) \\ \text{by value:}\quad g_j &amp;\leftarrow \max(-\tau, \min(\tau, g_j)) \end{aligned} \]</div>
+    <ul>
+      <li><strong>Truncated BPTT.</strong> Full BPTT stores every step's activations, so memory grows with the sequence length, and a stream that never ends can't be backpropagated at all. Instead, process it in chunks of \(k\) steps: carry the state forward from chunk to chunk, but detach it at each boundary (both \(h\) and \(c\) in an LSTM), so gradients stop there. The price is that the gradient can't teach dependencies longer than \(k\) steps, so pick \(k\) at least as long as the ones you care about.</li>
+    </ul>
+
     <!-- 05 -->
     <h2 id="research"><span class="pn">06</span>What the research found</h2>
     <p>Most of this comes from two big ablation studies: Greff et al. (2015, “LSTM: A Search Space Odyssey”, 8 variants on speech, handwriting and music) and Jozefowicz et al. (2015, over 10,000 architectures searched).</p>
@@ -744,7 +760,7 @@ clip_by_norm([dW_x, dW_h, db], max_norm=5.0)
         <tr><td>Remove the tanh on the cell output</td><td>Also a large drop: \(h\) becomes unbounded. <span class="src">Greff 2015</span></td></tr>
         <tr><td>Remove the input gate, the output gate or the candidate's tanh</td><td>Worse on speech and handwriting, no effect on music. <span class="src">Greff 2015</span></td></tr>
         <tr><td>Remove the peepholes</td><td>No significant change. <span class="src">Greff 2015</span></td></tr>
-        <tr><td>Couple the gates, i = 1 − f</td><td>No significant change on benchmarks <span class="src">Greff 2015</span>, but the cell can no longer count <span class="src">Weiss et al., 2018</span></td></tr>
+        <tr><td>Couple the gates, i = 1 − f</td><td>No significant change on benchmarks <span class="src">Greff 2015</span>, but the cell can no longer count (shown for the GRU, whose gates are tied the same way) <span class="src">Weiss et al., 2018</span></td></tr>
         <tr><td>Forget bias 0 → 1</td><td>Closes the gap between the LSTM and the GRU. <span class="src">Jozefowicz 2015</span></td></tr>
         <tr><td>Rank the gates by importance</td><td>Forget gate crucial, input gate important, output gate the least important. <span class="src">Jozefowicz 2015</span></td></tr>
         <tr><td>GRU vs LSTM</td><td>Comparable, and both far better than a tanh RNN <span class="src">Chung 2014</span>. The GRU won on most tasks except language modelling <span class="src">Jozefowicz 2015</span>.</td></tr>
@@ -772,14 +788,25 @@ clip_by_norm([dW_x, dW_h, db], max_norm=5.0)
         <tr><td>Use when</td><td>very short context, teaching</td><td>long dependencies, counting, lots of data; the safe default</td><td>less data, shorter sequences, tight latency; a fast baseline</td></tr>
       </tbody>
     </table></div>
-    <p>In practice, try both gated cells: the gap between them is usually smaller than the effect of features and tuning. Against <strong>transformers</strong>, RNNs lose because they run step by step (no parallel training across time), squeeze the past into a fixed-size state, and need \(n\) steps to connect token 1 to token \(n\). Attention keeps every past state and connects any two in one step, at a cost that grows as \(n^2\). <strong>RNNs still win</strong> for streaming with constant work per event: per-transaction scoring, or on-device.</p>
+    <p>Why each recommendation:</p>
+    <ul>
+      <li><strong>GRU for tight latency and memory:</strong> 3 weight blocks instead of 4, so 25% fewer parameters and 25% fewer multiplies per step.</li>
+      <li><strong>GRU for less data:</strong> fewer parameters leave less room to overfit. The effect is modest, so confirm it on validation.</li>
+      <li><strong>GRU for shorter sequences:</strong> there's no separate cell, so retention rests on the update gate alone, and that same gate also decides writing. Keeping a slot means not writing to it, and every write erases part of what's stored, so over many writes old facts erode; short sequences rarely hit that limit. There's also no output gate to protect a hidden memory, so a fact can't be hidden without being erased, though ablations rate the output gate as the least important, so that costs less.</li>
+      <li><strong>LSTM for long dependencies and counting:</strong> separate forget and input gates can keep and add at once, so a slot can hold a fact or a running count for a long time while other slots are rewritten.</li>
+      <li><strong>LSTM with lots of data:</strong> at the same hidden size, its fourth block is extra capacity, which pays off once there's enough data to fit it.</li>
+      <li><strong>LSTM as the safe default:</strong> it's the best-studied cell with a known training recipe (forget bias 1, clipping), and Greff et al. found no variant that reliably beat it.</li>
+      <li><strong>Plain RNN only for very short context:</strong> its memory and its gradient fade exponentially with distance.</li>
+    </ul>
+    <p><strong>What the comparisons found:</strong> no consistent winner. Chung et al. (2014) found the two gated cells comparable; Jozefowicz et al. (2015) found the GRU ahead on most tasks except language modelling, until a forget bias of 1 closed the gap; Greff et al. (2015) found the learning rate was the most important hyperparameter, while most variants changed little. So in practice, try both: the gap between them is usually smaller than the effect of features and tuning.</p>
+    <p>Against <strong>transformers</strong>, RNNs lose because they run step by step (no parallel training across time), squeeze the past into a fixed-size state, and need \(n\) steps to connect token 1 to token \(n\). Attention keeps every past state and connects any two in one step, at a cost that grows as \(n^2\). <strong>RNNs still win</strong> for streaming with constant work per event, such as per-transaction scoring or on-device models, because a new event only updates a fixed-size state, while a transformer has to attend over every past event and its cache keeps growing.</p>
 
     <!-- bilstm -->
     <h2 id="bilstm"><span class="pn">08</span>Bidirectional, stacked and in practice</h2>
 
     <h3>Bidirectional LSTMs</h3>
     <p>Run two LSTMs over the sequence: one left to right, one right to left. At each position, join their states, so every position sees its whole context:</p>
-    <div class="mj">\[ \overrightarrow{h}_t = \text{LSTM}(x_t, \overrightarrow{h}_{t-1}) \qquad \overleftarrow{h}_t = \text{LSTM}(x_t, \overleftarrow{h}_{t+1}) \qquad h_t = [\overrightarrow{h}_t ;\, \overleftarrow{h}_t] \]</div>
+    <div class="mj">\[ \begin{aligned} \overrightarrow{h}_t &amp;= \text{LSTM}(x_t, \overrightarrow{h}_{t-1}) \\ \overleftarrow{h}_t &amp;= \text{LSTM}(x_t, \overleftarrow{h}_{t+1}) \\ h_t &amp;= [\overrightarrow{h}_t ;\, \overleftarrow{h}_t] \end{aligned} \]</div>
     <ul>
       <li><strong>Built for tagging and for labelling finished sequences.</strong> Examples: named-entity tags, part-of-speech tags, or one codon per amino acid. A stacked bi-LSTM is a common baseline for exactly that. Each output sees both sides of its position.</li>
       <li><strong>Costs:</strong> twice the parameters and compute, and the output size doubles to \(2H\).</li>
@@ -790,7 +817,7 @@ clip_by_norm([dW_x, dW_h, db], max_norm=5.0)
 
     <h3>Stacking</h3>
     <ul>
-      <li>Layer 2 reads layer 1's sequence of \(h\)'s as its inputs. Two to four layers is typical; more rarely helps.</li>
+      <li>Layer 2 reads layer 1's sequence of \(h\)'s as its inputs. Two to four layers is typical; more rarely helps, because each layer adds another set of weights and another non-linear step between input and output at every time step, so deep stacks get harder to train and the gains flatten out.</li>
       <li>Put <strong>dropout between layers</strong>, not on the step-to-step connection. Fresh noise on \(h_{t-1} \to h_t\) at every step corrupts the memory. If you want it there, use the same mask at every step (“variational” dropout).</li>
       <li>Residual connections between layers help deep stacks; Google's 2016 translation system used 8 LSTM layers with residuals.</li>
     </ul>
@@ -806,79 +833,266 @@ clip_by_norm([dW_x, dW_h, db], max_norm=5.0)
       </tbody>
     </table></div>
     <ul>
-      <li><strong>Teacher forcing:</strong> while training a generator, feed it the true previous token, not its own guess. It's faster and more stable, but at inference it meets its own mistakes for the first time (“exposure bias”).</li>
+      <li><strong>Teacher forcing:</strong> while training a generator, feed it the true previous token, not its own guess. It converges faster and more stably, because each step learns from a correct prefix and one early mistake can't derail the rest. But at inference it meets its own mistakes for the first time (“exposure bias”): one wrong token puts it in a state it never trained on, and errors compound. Scheduled sampling (Bengio et al., 2015) gradually feeds the model its own predictions during training; beam search at inference softens an early slip.</li>
       <li><strong>Variable lengths:</strong> pad to the longest, then mask or pack (<code>pack_padded_sequence</code>) and read each sequence's <em>true</em> last state. Without that, padding steps keep changing the state.</li>
-      <li><strong>Checklist:</strong> forget bias 1, clipping by norm (1–5), Adam with a tuned learning rate, standardized inputs, truncated BPTT for long streams (detach both \(h\) and \(c\)).</li>
+      <li><strong>Checklist, with the reason for each:</strong>
+        <ul>
+          <li>forget bias 1, so the cell starts out remembering;</li>
+          <li>clipping by norm (1–5), since the weight paths can still explode;</li>
+          <li>Adam with a tuned learning rate, the setting that matters most;</li>
+          <li>standardized inputs, so the gates don't start saturated;</li>
+          <li>truncated BPTT for long streams, so memory stays bounded (detach both \(h\) and \(c\)).</li>
+        </ul></li>
     </ul>
 
     <!-- 07 -->
     <h2 id="questions"><span class="pn">09</span>Interview questions</h2>
-    <p>Answer out loud first, then open the answer.</p>
+    <p>Answer out loud first, then open the answer. Each answer stands on its own: the one-line answer first, then how it works, then why.</p>
     <h3>Recurrent networks</h3>
 
     <details class="qa"><summary><span class="qn">1</span>Why do plain RNNs struggle with long sequences?</summary><div class="ans">
-      <p>One vector is both the memory and the output, and every step all of it goes through \(W_h\) and a tanh. Old information fades, and the gradient back to old steps is a product of one Jacobian, \(\text{diag}(1 - h^2) W_h\), per step. Below 1 per step it vanishes exponentially, above 1 it can explode. Forgetting and vanishing are the same product read in two directions. Clipping fixes explosions only.</p></div></details>
+      <p><strong>The same matrix and squash are applied to the whole memory at every step, so old information, and the gradient that could teach the network to keep it, shrink (or blow up) exponentially with distance.</strong></p>
+      <p>All of \(h\) is rewritten every step, and going back from step \(T\) to step \(k\) multiplies one Jacobian per step in between (the matrix of how each slot of a state depends on each slot of the one before):</p>
+      <div class="mj">\[ \begin{aligned} h_t &amp;= \tanh(W_x x_t + W_h h_{t-1} + b) \\ \frac{\partial h_T}{\partial h_k} &amp;= \prod_{t=k+1}^{T} \text{diag}(1 - h_t^2)\, W_h \end{aligned} \]</div>
+      <ul>
+        <li><strong>Why it vanishes.</strong> One factor can stretch a vector by at most the tanh slope (never above 1, near 0 when a unit saturates) times the largest stretch of \(W_h\) (its largest singular value). If that's below 1, the product shrinks like a number below 1 raised to the power \(T - k\).</li>
+        <li><strong>Why it can explode.</strong> If \(W_h\) stretches some direction by more than 1 and the units aren't saturated, the same power can grow instead.</li>
+        <li><strong>Why that stops learning.</strong> A weight's gradient is a sum of one share per step, and shares from distant steps are exponentially smaller, so only short-range patterns get learned.</li>
+        <li><strong>Why forgetting is the same thing.</strong> Information from step \(k\) reaches step \(T\) through the same chain, so it fades the same way.</li>
+      </ul>
+      <p><strong>Fixes:</strong> clipping shrinks an exploding gradient but can't enlarge a vanishing one; that needs gates (LSTM, GRU) or attention.</p></div></details>
 
     <details class="qa"><summary><span class="qn">2</span>Walk me through an LSTM step. What does each gate do?</summary><div class="ans">
-      <p>Stack \(h_{t-1}\) and \(x_t\). The forget gate chooses what to keep from \(c_{t-1}\), the candidate \(g\) is the draft of new content, the input gate chooses how much of the draft to write, and the output gate chooses what to show:</p><div class="mj">\[ \begin{aligned} c_t &amp;= f \odot c_{t-1} + i \odot g \\ h_t &amp;= o \odot \tanh(c_t) \end{aligned} \]</div><p>The gates are sigmoids because they're per-slot fractions. The candidate is tanh because a write must go up or down.</p></div></details>
+      <p><strong>Each step erases part of the cell, writes a gated draft into it, and reads a filtered view of it out as \(h\).</strong></p>
+      <p>Stack \(u_t = [h_{t-1}, x_t]\) and compute four blocks, each with its own weights, then update the cell and the output:</p>
+      <div class="mj">\[ \begin{aligned} f_t &amp;= \sigma(W_f u_t + b_f) \\ i_t &amp;= \sigma(W_i u_t + b_i) \\ g_t &amp;= \tanh(W_g u_t + b_g) \\ o_t &amp;= \sigma(W_o u_t + b_o) \\ c_t &amp;= f_t \odot c_{t-1} + i_t \odot g_t \\ h_t &amp;= o_t \odot \tanh(c_t) \end{aligned} \]</div>
+      <ul>
+        <li><strong>Forget \(f\):</strong> which old notes to keep, slot by slot.</li>
+        <li><strong>Candidate \(g\):</strong> the draft of new content, exactly a plain RNN update.</li>
+        <li><strong>Input \(i\):</strong> how much of the draft to write. It's separate from \(g\) because what an input says and whether it's worth recording are different questions.</li>
+        <li><strong>Output \(o\):</strong> which notes to show now, to the prediction and to the next step's gates.</li>
+      </ul>
+      <p><strong>Why these activations.</strong> The gates are sigmoids because each is a per-slot fraction in \((0, 1)\). The draft is tanh because a write must push a slot up or down. The tanh on \(c\) keeps \(h\) bounded, since \(c\) is a sum of writes and can grow. All four read \([h_{t-1}, x_t]\) because whether to keep or write depends on both what just arrived and the context so far.</p>
+      <p><strong>Likely follow-up:</strong> “Why does this help the gradient?” One step back along \(c\) multiplies only by \(f_t\), with no weight matrix, so where \(f \approx 1\) the gradient survives.</p></div></details>
 
     <details class="qa"><summary><span class="qn">3</span>Cell state vs hidden state: why keep both?</summary><div class="ans">
-      <p>\(c\) is long-term storage: unbounded, only scaled and added to, never read directly from outside. \(h = o \odot \tanh(c)\) is the bounded readout used by the output and the next step's gates. Two states mean the cell can hide a fact without forgetting it. The GRU, with one state, can't.</p></div></details>
+      <p><strong>\(c\) is the memory and \(h\) is what the cell shows. Keeping them apart lets the LSTM hide a fact without forgetting it, keeps the gates' inputs bounded, and leaves a weight-free gradient path.</strong></p>
+      <div class="mj">\[ \begin{aligned} c_t &amp;= f_t \odot c_{t-1} + i_t \odot g_t \\ h_t &amp;= o_t \odot \tanh(c_t) \end{aligned} \]</div>
+      <ul>
+        <li><strong>Hide without forgetting.</strong> \(o_t\) can zero a slot in \(h\), so neither the prediction nor the next gates see it, while \(c\) keeps it for later. With one state, as in the GRU, hiding a fact means overwriting it.</li>
+        <li><strong>Bounded inputs for the gates.</strong> \(c\) is a running sum of writes, so it's unbounded; fed raw into the next step's sigmoids, it would saturate them. \(h\) lies in \((-1, 1)\).</li>
+        <li><strong>A clean gradient path.</strong> \(c\) is only multiplied by \(f\) and added to, so the gradient along it meets no weight matrix. \(h\) goes through all four weight blocks at the next step.</li>
+      </ul>
+      <p><strong>How much it matters:</strong> in ablations the output gate is the least important gate (Jozefowicz 2015), and the GRU does without the split at little cost. Letting the gates read \(c\) directly (peepholes) gave no consistent gain.</p></div></details>
 
     <details class="qa"><summary><span class="qn">4</span>How does the LSTM fix vanishing gradients? Can it still vanish or explode?</summary><div class="ans">
-      <p>Along the cell, \(\partial c_t/\partial c_{t-1} = \text{diag}(f_t)\): no weight matrix, no tanh slope. With \(f\) near 1 the gradient survives many steps (the constant error carousel, a residual connection through time). It can still vanish over very long gaps, since it's a product of \(f\)'s. The paths through \(h\) go through weights and can explode, so clip.</p></div></details>
+      <p><strong>It adds a memory path whose per-step gradient multiplier is a learned gate value, \(f_t\), instead of a weight matrix times a tanh slope.</strong></p>
+      <p>On the direct path along the cell, one step back is just:</p>
+      <div class="mj">\[ \frac{\partial c_t}{\partial c_{t-1}} = \text{diag}(f_t) \]</div>
+      <ul>
+        <li><strong>Why that helps.</strong> No \(W_h\) and no tanh slope sit on this path. Where the network learns \(f \approx 1\), the gradient arrives almost whole: a residual connection through time, the 1997 paper's “constant error carousel”.</li>
+        <li><strong>Why it's controllable.</strong> \(f\) is recomputed every step from the data, per slot, so a slot can hold for a long stretch and then reset. A fixed \(W_h\) can't do that.</li>
+        <li><strong>It can still vanish.</strong> Over a gap of \(T - k\) steps the factor is a product of \(f\)'s. Below 1 it still decays, just far more slowly and under the model's control.</li>
+        <li><strong>It can still explode.</strong> \(h_{t-1}\) feeds every gate and the draft through weight matrices. Those side paths behave like an RNN's, so LSTMs are still clipped.</li>
+      </ul>
+      <p><strong>Likely follow-up:</strong> “The sigmoid's slope is at most 0.25, so doesn't the gradient vanish through \(f\)?” No. Along the cell it's multiplied by the gate's <em>value</em>; the slope only appears on the side branch that trains the gate's own weights.</p></div></details>
 
     <details class="qa"><summary><span class="qn">5</span>Why initialize the forget-gate bias to 1? Why not 10?</summary><div class="ans">
-      <p>At initialization gates sit near σ(bias). A bias of 0 gives \(f \approx 0.5\), halving memory and gradient every step. A bias of 1 gives \(f \approx 0.73\), so the cell starts out remembering. At 10, the sigmoid is flat, so the gate can barely learn to forget. Jozefowicz et al. found this one change closes the LSTM–GRU gap. Keras does it by default; PyTorch doesn't.</p></div></details>
+      <p><strong>At 1 the cell starts out remembering, so long-range gradients exist from the start; at 10 the gate is saturated and can't learn to forget.</strong></p>
+      <p>At initialization the weights are small, so \(f \approx \sigma(b_f)\), and the cell path multiplies both memory and gradient by \(f\) every step.</p>
+      <ul>
+        <li><strong>Bias 0:</strong> \(f \approx 0.5\), so memory and gradient halve every step, much like a plain RNN. Long-range dependencies send almost no gradient back, so the model never discovers it should keep them.</li>
+        <li><strong>Bias 1:</strong> \(f \approx 0.73\). The cell leans toward keeping, gradients reach further back, and the gate is still in the sigmoid's responsive range, so it can learn to move either way.</li>
+        <li><strong>Bias 10:</strong> \(f\) is a hair below 1, where the sigmoid is flat. Its slope is almost zero, so the gradient into the gate's weights vanishes and it can barely learn to forget. The cell then piles up writes until \(\tanh(c)\) saturates.</li>
+      </ul>
+      <p><strong>Evidence:</strong> Jozefowicz et al. (2015) found this one change closes the LSTM–GRU gap.</p>
+      <p><strong>In practice:</strong> Keras does it by default; PyTorch doesn't. PyTorch's forget slice is <code>[H:2H]</code> (order i, f, g, o). \(b_{ih}\) and \(b_{hh}\) are added together, so set it in one of them only; both would give an effective bias of 2.</p></div></details>
 
     <details class="qa"><summary><span class="qn">6</span>Why separate forget and input gates instead of i = 1 − f?</summary><div class="ans">
-      <p>Separate gates allow four moves: keep, replace, accumulate (keep <em>and</em> write) and wipe (erase without writing). Tied gates make the update a weighted average, so every write erases the same fraction, the state can't exceed the draft so it can't count, and every write cuts the gradient by \(1 - i\). The other side: coupled gates (CIFG, and the GRU) do about as well on most benchmarks.</p></div></details>
+      <p><strong>Separate gates let a slot keep and write at the same time, which is what lets an LSTM accumulate and count. Tied gates force every write to erase.</strong></p>
+      <p>With separate gates each slot has four moves: keep (\(f = 1, i = 0\)), replace (\(0, 1\)), accumulate (\(1, 1\)) and wipe (\(0, 0\)). Tie them and the update becomes a weighted average of old and new:</p>
+      <div class="mj">\[ c_t = f_t \odot c_{t-1} + (1 - f_t) \odot g_t \]</div>
+      <ul>
+        <li><strong>Every write erases.</strong> Writing a fraction \(1 - f\) of the draft costs exactly that fraction of the old memory, so remembering and writing compete.</li>
+        <li><strong>It can't count.</strong> An average of values in \((-1, 1)\) stays in \((-1, 1)\), so the cell can't grow with the number of events. Weiss et al. (2018) showed the LSTM can count and the GRU, whose gates are tied, can't.</li>
+        <li><strong>The gradient pays too.</strong> The cell path's multiplier is \(f = 1 - i\), so each strong write also cuts the gradient flowing back past it.</li>
+      </ul>
+      <p><strong>The other side:</strong> coupled gates (CIFG in Greff 2015, and the GRU) do about as well on standard benchmarks, which rarely need counting. Separate gates matter when the task accumulates evidence over time, such as counting events in a session.</p></div></details>
 
     <details class="qa"><summary><span class="qn">7</span>Write the GRU and compare it with the LSTM.</summary><div class="ans">
-      <div class="mj">\[ \begin{aligned} z &amp;= \sigma(W_z[h_{t-1}, x_t]) \\ r &amp;= \sigma(W_r[h_{t-1}, x_t]) \\ \tilde h &amp;= \tanh(W_n[r \odot h_{t-1}, x_t]) \\ h_t &amp;= (1-z) \odot h_{t-1} + z \odot \tilde h \end{aligned} \]</div><p>One state instead of two. The update gate is the LSTM's forget and input tied (\(f = 1 - z\), \(i = z\)). There's no output gate, and \(r\) controls how much past the draft sees. Three blocks instead of four. Mention that PyTorch's \(z\) means “keep”.</p></div></details>
+      <p><strong>The GRU merges the cell and the output into one state, ties forget and input into one update gate, and drops the output gate: three blocks instead of four.</strong></p>
+      <div class="mj">\[ \begin{aligned} z_t &amp;= \sigma(W_z[h_{t-1}, x_t] + b_z) \\ r_t &amp;= \sigma(W_r[h_{t-1}, x_t] + b_r) \\ \tilde h_t &amp;= \tanh(W_n[r_t \odot h_{t-1}, x_t] + b_n) \\ h_t &amp;= (1 - z_t) \odot h_{t-1} + z_t \odot \tilde h_t \end{aligned} \]</div>
+      <p>In words: \(z\) slides the state between its old value and the draft, and \(r\) decides how much of the past the draft is built from.</p>
+      <ul>
+        <li><strong>Tied gates:</strong> \(z\) plays the LSTM's input gate, and \(1 - z\) its forget gate. Every write erases the same fraction, and the state stays within the draft's range, so it can't count.</li>
+        <li><strong>No output gate:</strong> the whole state is always shown, so it can't hide a fact without overwriting it.</li>
+        <li><strong>Gradient:</strong> one step back along the blend multiplies by \(1 - z_t\), the GRU's version of the LSTM's \(f_t\).</li>
+        <li><strong>Cost:</strong> 3 weight blocks instead of 4, so 25% fewer parameters and multiplies per step.</li>
+      </ul>
+      <p><strong>Convention trap:</strong> the original paper and PyTorch write \(h_t = z \odot h_{t-1} + (1 - z) \odot \tilde h_t\), so their \(z\) means “keep”, and PyTorch applies \(r\) after the hidden matrix multiply. Say which one you're using.</p></div></details>
 
     <details class="qa"><summary><span class="qn">8</span>What does the reset gate do that the update gate doesn't?</summary><div class="ans">
-      <p>The update gate decides how much of the state to replace. The reset gate decides what the replacement is built from: with \(r \approx 0\) the draft ignores the past, a fresh start. Without \(r\), every draft would mix in the whole past, so the GRU couldn't cleanly start over at a sentence or session boundary.</p></div></details>
+      <p><strong>The update gate decides how much of the state to replace; the reset gate decides what the replacement is built from.</strong></p>
+      <div class="mj">\[ \begin{aligned} \tilde h_t &amp;= \tanh(W_n[r_t \odot h_{t-1}, x_t] + b_n) \\ h_t &amp;= (1 - z_t) \odot h_{t-1} + z_t \odot \tilde h_t \end{aligned} \]</div>
+      <ul>
+        <li><strong>\(r \approx 0\):</strong> the draft ignores the past and is built from \(x_t\) alone, a fresh start (a new sentence, a new session). Then \(z\) decides whether to write it over the old state.</li>
+        <li><strong>\(r \approx 1\):</strong> the draft is a plain RNN update from the whole past.</li>
+        <li><strong>Why \(z\) alone isn't enough.</strong> Without \(r\), every draft is computed from the entire old state, so \(z\) could only blend the old state with something that already contains it. There'd be no way to build new content that isn't coloured by irrelevant history.</li>
+        <li><strong>Why \(r\) doesn't erase.</strong> It only filters the draft's input. Nothing leaves the state until \(z\) writes the draft over it.</li>
+      </ul>
+      <p><strong>Evidence:</strong> Cho et al. (2014) saw units that track short-range patterns lean on \(r\), and long-range ones on \(z\). The minimal gated unit (Zhou et al., 2016) uses one gate for both jobs and does about as well on several tasks, so a <em>separate</em> reset gate helps but isn't essential.</p></div></details>
 
     <details class="qa"><summary><span class="qn">9</span>Which LSTM gate matters most? What happens if you remove each one?</summary><div class="ans">
-      <p>Forget gate: removing it causes the biggest drop on every task, because the cell can't reset. Output tanh: removing it also hurts badly, since \(h\) becomes unbounded. Input gate, output gate, candidate tanh: removing them hurts on some tasks. Peepholes and coupling make no significant difference (Greff 2015). Jozefowicz ranks them forget, then input, then output.</p></div></details>
+      <p><strong>The forget gate matters most and the output gate least.</strong> Each removal hurts in proportion to the job it leaves undone (Greff 2015; Jozefowicz 2015 ranks forget, then input, then output):</p>
+      <ul>
+        <li><strong>Forget gate:</strong> the biggest drop, on every task. The cell can only add, so it can't reset at boundaries, it grows on long streams, and \(\tanh(c)\) saturates. That's why it was added in 2000.</li>
+        <li><strong>Tanh on the cell output:</strong> also a large drop. \(h = o \odot c\) becomes unbounded, so the next step's gates saturate and activations can blow up.</li>
+        <li><strong>Input gate:</strong> every draft is added in full on top of what's stored, so routine inputs keep corrupting stored facts. Worse on speech and handwriting.</li>
+        <li><strong>Output gate:</strong> the whole cell is always shown, as in a GRU, so stored facts disturb every step. Also worse on speech and handwriting, though Jozefowicz ranks it the least important gate.</li>
+        <li><strong>Candidate's tanh:</strong> writes become unbounded too. It hurt on some tasks.</li>
+        <li><strong>Peepholes, or coupling \(i = 1 - f\):</strong> no significant change on benchmarks.</li>
+      </ul>
+      <p><strong>Why the forget gate ranks first:</strong> it sets both how long memory lasts and how far the gradient reaches, the two things a plain RNN lacks. Greff also found the learning rate was the most important hyperparameter, while most variants changed little.</p></div></details>
 
     <details class="qa"><summary><span class="qn">10</span>Hypothetical: swap the sigmoid gates for ReLU, tanh, or hard 0/1 switches?</summary><div class="ans">
-      <p>ReLU: a gate above 1 amplifies the memory every step, so it explodes. Tanh: a negative gate flips the memory's sign, so it's no longer “how much to keep”. Hard 0/1: the slope is 0 almost everywhere, so no gradient reaches the gate's weights and they never learn when to open. Sigmoid is the one that is a smooth fraction.</p></div></details>
+      <p><strong>Each one breaks something a gate needs: a value between 0 and 1, the meaning “how much”, or a gradient.</strong></p>
+      <ul>
+        <li><strong>ReLU:</strong> unbounded above, so a forget value above 1 multiplies the memory by more than 1 every step, and \(c\) and its gradient explode. Below zero it outputs exactly 0 with zero slope, so a gate that closes can get stuck closed.</li>
+        <li><strong>Tanh:</strong> range \((-1, 1)\). A negative gate flips a slot's sign every step, so the memory oscillates and “how much to keep” loses its meaning. Rescaled to \((1 + \tanh)/2\), it's just a sigmoid again.</li>
+        <li><strong>Hard 0/1:</strong> a step function's slope is 0 almost everywhere, so no gradient reaches the gate's weights and they never learn when to open. Workarounds exist (a straight-through estimator, or a piecewise-linear “hard sigmoid” with a slope in the middle), but they approximate the smooth gate.</li>
+      </ul>
+      <p><strong>Why the sigmoid fits:</strong> it's bounded in \((0, 1)\), so it reads as a fraction; it's smooth with a non-zero slope everywhere, so training can move it; and it starts mid-range, with room to open or close.</p></div></details>
 
     <details class="qa"><summary><span class="qn">11</span>Hypothetical: what if f = 1 and i = 1 at every step?</summary><div class="ans">
-      <p>The cell adds every draft forever: \(c\) grows without limit, \(\tanh(c)\) sticks near ±1, and \(h\) stops responding. The tanh slope then starves the gradient on its way into the cell. That's why the original LSTM needed the forget gate on long streams.</p></div></details>
+      <p><strong>The cell becomes a pure running sum of drafts: it never forgets, grows without limit, and saturates its own readout.</strong></p>
+      <div class="mj">\[ \begin{aligned} c_t &amp;= c_{t-1} + g_t \\ &amp;= \sum_{k \le t} g_k \end{aligned} \]</div>
+      <ul>
+        <li><strong>Why it grows.</strong> Nothing ever scales \(c\) back, so it's a sum of \(t\) drafts, and its size can keep growing with the length of the stream.</li>
+        <li><strong>Why \(h\) stops responding.</strong> \(h = o \odot \tanh(c)\), and once \(|c|\) is large, \(\tanh(c)\) is stuck near \(\pm 1\). New inputs barely change the output.</li>
+        <li><strong>Why learning stalls.</strong> The gradient from each output into the cell carries the factor \(1 - \tanh^2(c_t)\), near zero when saturated. The cell path itself multiplies by exactly 1, a perfect carousel, but almost nothing gets onto it.</li>
+        <li><strong>Why it can't reset.</strong> With \(f = 1\), facts from a previous sentence or session stay forever and pollute the next.</li>
+      </ul>
+      <p><strong>History:</strong> this is close to the original 1997 LSTM, which had no forget gate. Gers et al. (2000) added one because the cell failed on long continuous streams in exactly this way.</p></div></details>
 
     <details class="qa"><summary><span class="qn">12</span>Parameter count for an LSTM and a GRU?</summary><div class="ans">
-      <p>One block is \(H(H + d) + H\). An LSTM has 4 blocks and a GRU 3, so the GRU has 25% fewer. PyTorch adds another \(H\) per block for its second bias vector. The count doesn't depend on sequence length, because the weights are shared across time.</p></div></details>
+      <p><strong>Count weight blocks: an LSTM has 4, a GRU 3 (so 25% fewer), a plain RNN 1. PyTorch stores one extra bias vector per block.</strong></p>
+      <p>One block maps the \(H + d\) numbers of \([h_{t-1}, x_t]\) to \(H\) outputs: \(H(d + H)\) weights plus \(H\) biases. So:</p>
+      <div class="mj">\[ \begin{aligned} \text{LSTM, textbook} &amp;= 4\,[H(d + H) + H] \\ \text{LSTM, PyTorch} &amp;= 4\,[H(d + H) + 2H] \\ \text{GRU, textbook} &amp;= 3\,[H(d + H) + H] \\ \text{GRU, PyTorch} &amp;= 3\,[H(d + H) + 2H] \end{aligned} \]</div>
+      <ul>
+        <li><strong>PyTorch's second bias.</strong> <code>nn.LSTM</code> and <code>nn.GRU</code> keep \(b_{ih}\) on the input projection and \(b_{hh}\) on the hidden one. In an LSTM each pre-activation is \(W_{ih}x_t + b_{ih} + W_{hh}h_{t-1} + b_{hh}\), so only the sum \(b_{ih} + b_{hh}\) matters: the second vector is redundant, kept to match cuDNN's formulation.</li>
+        <li><strong>The GRU is not fully redundant.</strong> Its candidate is \(\tanh(W_{in}x_t + b_{in} + r_t \odot (W_{hn}h_{t-1} + b_{hn}))\), so \(b_{hn}\) sits inside the reset gate's product while \(b_{in}\) doesn't. Only the \(r\) and \(z\) pairs collapse to one.</li>
+        <li><strong>Independent of \(T\):</strong> the same weights run at every step.</li>
+        <li><strong>Per layer:</strong> in a stack, layer 2 reads layer 1's states, so its input size is \(H\), or \(2H\) if bidirectional. A bidirectional layer has two sets of weights, so it doubles the count.</li>
+      </ul>
+      <p>A plain RNN is one block, \(H(d + H) + H\) (PyTorch adds \(H\)). An output head over \(K\) classes adds \(KH + K\), and an embedding table for a vocabulary of \(V\) tokens adds \(Vd\).</p></div></details>
 
     <details class="qa"><summary><span class="qn">13</span>LSTM or GRU, and why did transformers replace both?</summary><div class="ans">
-      <p>GRU for less data, shorter sequences or tight latency. LSTM for long dependencies, counting, or plenty of data; try both. Transformers train in parallel across positions, connect any two tokens in one step, and keep every past token instead of one fixed state, at \(n^2\) cost. RNNs still suit streaming with constant memory per event.</p></div></details>
+      <p><strong>Neither wins consistently, so try both. Lean GRU for small data, shorter sequences or tight latency; lean LSTM for long dependencies, counting, or plenty of data.</strong></p>
+      <ul>
+        <li><strong>GRU is cheaper per step.</strong> 3 weight blocks instead of 4, so 25% fewer parameters and multiplies: lower latency and memory.</li>
+        <li><strong>GRU can suit small data.</strong> Fewer parameters leave less room to overfit, though the effect is modest.</li>
+        <li><strong>GRU is weaker over long spans.</strong> With no separate cell, retention rests on the update gate alone, and that gate also decides writing: keeping a slot means not writing to it, and every write erases part of it, so old facts erode. And with no output gate to protect a hidden memory, it can't hide a fact without erasing it (ablations rate this as minor).</li>
+        <li><strong>LSTM can hold and count.</strong> Separate forget and input gates keep and add at once, so a slot holds a fact or a count while others are rewritten.</li>
+        <li><strong>Evidence:</strong> Chung et al. (2014) found them comparable; Jozefowicz et al. (2015) found the GRU ahead except on language modelling, until a forget bias of 1 closed the gap; Greff et al. (2015) found no variant reliably beat the standard LSTM.</li>
+      </ul>
+      <p><strong>Why transformers replaced both:</strong> attention trains all positions in parallel, links any two tokens in one step and keeps every past token, at \(n^2\) cost. RNNs still suit streaming, with constant work per event.</p></div></details>
 
     <details class="qa"><summary><span class="qn">14</span>Is the LSTM's \(h_t\) the prediction? How do you get an output?</summary><div class="ans">
-      <p>No. \(h_t\) is the hidden state; a separate output layer reads it, \(\hat y_t = \text{softmax}(W_y h_t + b_y)\), and that layer isn't part of the cell. Many-to-many applies the same \(W_y\) at every step; many-to-one applies it once, to \(h_T\) or to a pooled summary of all the \(h_t\). In PyTorch you put an <code>nn.Linear</code> on top of <code>nn.LSTM</code>'s outputs.</p></div></details>
+      <p><strong>No. \(h_t\) is the hidden state; a separate output layer, the head, turns it into a prediction.</strong></p>
+      <div class="mj">\[ \hat y_t = \text{softmax}(W_y h_t + b_y), \qquad W_y \text{ is } K \times H \]</div>
+      <ul>
+        <li><strong>Why a separate head.</strong> \(h_t\) holds \(H\) numbers in \((-1, 1)\) chosen to be useful memory, not \(K\) probabilities that sum to 1. The head maps the state to the task's outputs, so the same cell serves any task by changing only the head.</li>
+        <li><strong>Many-to-many</strong> (tag every token, flag every payment): apply the same head at every step and add up the per-step losses.</li>
+        <li><strong>Many-to-one</strong> (one label per message): apply it once, to \(h_T\) or to a pool of all the \(h_t\). Pooling (mean, max or attention weights) helps on long inputs, because \(h_T\) is dominated by the most recent steps.</li>
+        <li><strong>Activation by task:</strong> softmax for one of \(K\) classes, sigmoid for yes/no or multi-label, none for regression.</li>
+      </ul>
+      <p><strong>In PyTorch:</strong> <code>nn.LSTM</code> returns every \(h_t\) (\(B \times T \times H\)) plus the final \((h_T, c_T)\); you add <code>nn.Linear(H, K)</code>. With padded batches, read each sequence's true last state, not the padding's.</p></div></details>
 
     <details class="qa"><summary><span class="qn">15</span>Why does the GRU's reset gate act on \(h_{t-1}\) inside the draft, when the LSTM's input gate multiplies the draft's output?</summary><div class="ans">
-      <p>Different jobs. \(z\) already decides how much to write, the LSTM's \(i\) job, so a reset gate on the output would be a second volume knob. On the input, \(r\) decides what the draft is built from: \(r \approx 0\) means start fresh from the input alone. That stands in for the LSTM's output gate, whose filtered \(h\) is what an LSTM draft reads. It acts before the matrix multiply so the past and the input stay separable.</p></div></details>
+      <p><strong>Because the GRU's update gate already does the input gate's job, so \(r\) gets a different one: choosing what the draft is computed from.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{LSTM write} &amp;= i_t \odot g_t \\ \text{GRU draft} &amp;= \tanh(W_n[r_t \odot h_{t-1}, x_t] + b_n) \end{aligned} \]</div>
+      <ul>
+        <li><strong>Not a second volume knob.</strong> “How much to write” is \(z\), in \(h_t = (1 - z_t) \odot h_{t-1} + z_t \odot \tilde h_t\). An \(r\) on the draft's output would duplicate it.</li>
+        <li><strong>A stand-in for the output gate, for the draft only.</strong> An LSTM's draft reads \(h_{t-1} = o \odot \tanh(c_{t-1})\), memory already filtered by \(o\). A GRU's \(h\) is the raw memory, so without \(r\) every draft would be built from all of the past, relevant or not.</li>
+        <li><strong>Why before the matrix multiply.</strong> Once \(W_n\) mixes \(h_{t-1}\) and \(x_t\), their contributions can't be pulled apart. Filtering \(h_{t-1}\) first drops the past slot by slot while keeping the input.</li>
+      </ul>
+      <p><strong>PyTorch's variant</strong> computes \(\tanh(W_{in}x_t + b_{in} + r_t \odot (W_{hn}h_{t-1} + b_{hn}))\): \(r\) acts after the hidden multiply but still apart from the input's. It's faster, because \(W_{hn}h_{t-1}\) can run in the same multiply as the other gates' hidden projections, and the accuracy difference is usually small.</p></div></details>
 
     <details class="qa"><summary><span class="qn">16</span>Compare how the gradient flows back through time in an RNN, an LSTM and a GRU.</summary><div class="ans">
-      <p>On the memory path, one step back multiplies the gradient by \(\text{diag}(1 - h_t^2) W_h\) in an RNN: a fixed matrix and a slope, so the product vanishes or explodes. In an LSTM it's \(f_t\) along the cell, since \(\delta c_t\) gets \(\delta c_{t+1} \odot f_{t+1}\). In a GRU it's \(1 - z_t\) along the blend. Gate values near 1 give a near-identity highway. The gates' own gradients branch off and pass through weights, so clipping is still needed.</p></div></details>
+      <p><strong>On the memory path, one step back multiplies the gradient by a fixed matrix and a slope in an RNN, but only by a learned gate value in an LSTM (\(f_t\)) or a GRU (\(1 - z_t\)).</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{RNN:}\quad \delta h_{t-1} &amp;= W_h^\top\big[\delta h_t \odot (1 - h_t^2)\big] + \dots \\ \text{LSTM:}\quad \delta c_{t-1} &amp;= \delta c_t \odot f_t + \dots \\ \text{GRU:}\quad \delta h_{t-1} &amp;= \delta h_t \odot (1 - z_t) + \dots \end{aligned} \]</div>
+      <p>Here \(\delta x\) means the gradient of the loss with respect to \(x\). The “\(\dots\)” are the other routes: the step's own output and, in the gated cells, the paths through the gates and the draft.</p>
+      <ul>
+        <li><strong>RNN:</strong> the same \(W_h\) and a tanh slope at every step, so over many steps the product vanishes or explodes exponentially, and nothing in the model can stop it.</li>
+        <li><strong>LSTM and GRU:</strong> no weight matrix and no slope on the direct path. The multiplier is per slot and per step, and the network can hold it near 1 where memory is needed: a near-identity highway, like a residual connection through time.</li>
+        <li><strong>What still goes through weights:</strong> the gates and the draft read \(h_{t-1}\) through matrices, so those side paths can still explode. Clip by norm.</li>
+        <li><strong>GRU detail:</strong> when it writes (\(z \approx 1\)), the direct path is cut, and the gradient has to go back through the draft, which behaves like an RNN step.</li>
+      </ul>
+      <p><strong>Likely follow-up:</strong> attention removes the walk altogether, since any two tokens are one step apart.</p></div></details>
+
+    <details class="qa"><summary><span class="qn">17</span>What is truncated backprop through time, and what does it cost you?</summary><div class="ans">
+      <p><strong>Backpropagate through only the last \(k\) steps of a long sequence, while still carrying the state forward through all of it.</strong></p>
+      <p>Split the stream into chunks of \(k\) steps. Run each chunk forward from the previous chunk's final state, backprop and update within the chunk, then <em>detach</em> the state: keep its values, but cut the graph, so the next chunk's gradients stop at the boundary.</p>
+      <pre class="code"><code>h, c = zeros(H), zeros(H)
+for chunk, target in chunks(stream, k):
+    h, c = h.detach(), c.detach()       <span class="cm"># keep values, cut the graph</span>
+    out, (h, c) = lstm(chunk, (h, c))   <span class="cm"># forward k steps</span>
+    loss(head(out), target).backward(); clip(); step()</code></pre>
+      <ul>
+        <li><strong>Why truncate.</strong> Full BPTT stores every step's activations, so memory grows with sequence length, and you get one update per whole sequence. A stream that never ends can't be backpropagated at all.</li>
+        <li><strong>Why detach.</strong> Without it the graph would chain back through every earlier chunk, and memory would grow just as before. In an LSTM, detach both \(h\) and \(c\).</li>
+        <li><strong>The cost.</strong> The gradient can't teach dependencies longer than \(k\) steps. The state still carries information further, but only what was stored for shorter-range reasons. Pick \(k\) at least as long as the dependencies you care about.</li>
+      </ul></div></details>
+
+    <details class="qa"><summary><span class="qn">18</span>Gradient clipping: by norm or by value? Why?</summary><div class="ans">
+      <p><strong>By norm: it shrinks an oversized gradient without changing its direction, while clipping by value changes the direction.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{by norm:}\quad g &amp;\leftarrow g \cdot \min\!\big(1,\ \tau / \lVert g \rVert\big) \\ \text{by value:}\quad g_j &amp;\leftarrow \max(-\tau, \min(\tau, g_j)) \end{aligned} \]</div>
+      <ul>
+        <li><strong>By norm</strong> looks at the whole gradient vector, usually the global norm over all parameters. If it's longer than \(\tau\), it's scaled down to length \(\tau\). Every component shrinks by the same factor, so the step points the same way, just shorter.</li>
+        <li><strong>By value</strong> caps each component separately. Big components are cut and small ones aren't, so the direction tilts toward the small ones.</li>
+        <li><strong>Why direction matters.</strong> An exploding gradient in an RNN usually comes from a steep cliff in the loss surface. Its direction is still informative, it's just far too long, and a full step would throw the weights off the cliff (Pascanu et al., 2013).</li>
+        <li><strong>What clipping can't do:</strong> it only shrinks, so it does nothing for vanishing gradients.</li>
+      </ul>
+      <p><strong>Choosing \(\tau\):</strong> log the gradient norm and set \(\tau\) a little above its typical value, so only spikes get clipped. Common choices are 1–5 for RNNs and 1.0 for transformers.</p></div></details>
+
+    <details class="qa"><summary><span class="qn">19</span>What is teacher forcing, and what is exposure bias?</summary><div class="ans">
+      <p><strong>Teacher forcing trains a sequence generator on the true previous token instead of its own guess. Exposure bias is the mismatch this creates at inference, when the model has to condition on its own outputs.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{training:}\quad s_t &amp;= \text{LSTM}_{\text{dec}}(y_{t-1},\ s_{t-1}) \\ \text{inference:}\quad s_t &amp;= \text{LSTM}_{\text{dec}}(\hat y_{t-1},\ s_{t-1}) \end{aligned} \]</div>
+      <p>In words: \(s_t\) is the decoder's state; in training its input is the true previous token \(y_{t-1}\), at inference the model's own guess \(\hat y_{t-1}\).</p>
+      <ul>
+        <li><strong>Why teacher forcing.</strong> Each step's loss is computed on a correct prefix, so one early mistake doesn't derail the rest, and gradients stay stable. In a transformer it's also what makes training parallel: every input is known, so all positions run at once under a causal mask.</li>
+        <li><strong>Why exposure bias hurts.</strong> The model never saw its own errors in training. One wrong token at inference puts it in a state it never learned from, the next guess is worse, and errors compound over long outputs.</li>
+        <li><strong>Fixes:</strong> scheduled sampling (Bengio et al., 2015) gradually swaps true inputs for the model's own predictions during training; sequence-level training scores whole generated outputs with a metric (via REINFORCE); and beam search at inference reduces the damage of one early slip.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> scheduled sampling breaks a transformer's parallel training, so large language models mostly accept the bias and lean on scale and decoding instead.</p></div></details>
+
+    <details class="qa"><summary><span class="qn">20</span>When can't you use a bidirectional LSTM?</summary><div class="ans">
+      <p><strong>Whenever the prediction at step \(t\) has to be made before the future arrives: generation, forecasting, and live per-event scoring.</strong></p>
+      <div class="mj">\[ h_t = [\overrightarrow{h}_t ;\, \overleftarrow{h}_t], \qquad \overleftarrow{h}_t \text{ has read } x_t, \dots, x_T \]</div>
+      <ul>
+        <li><strong>Why it leaks.</strong> The backward pass starts at the end of the sequence, so \(\overleftarrow{h}_t\) already contains everything after \(t\). For a fraud score per payment, that means using payments that hadn't happened yet: offline metrics look great, and production can't supply the future.</li>
+        <li><strong>Why it can't generate.</strong> Producing token \(t+1\) needs a state that depends only on tokens up to \(t\). The backward half would need the very tokens it's trying to produce.</li>
+        <li><strong>Where it shines:</strong> labelling a finished sequence, such as tagging, named entities, one codon per amino acid, or one label for a whole message. Every position benefits from both sides.</li>
+        <li><strong>Costs:</strong> twice the parameters and compute, an output of size \(2H\), and no output until the whole sequence has arrived.</li>
+      </ul>
+      <p><strong>Many-to-one with a bi-LSTM:</strong> join the forward pass's last state with the backward pass's first state, since each has read the whole sequence, or pool over all positions.</p></div></details>
 
     <!-- 08 -->
     <h2 id="sheet"><span class="pn">10</span>Cheat sheet</h2>
     <div class="sheet">
       <h3>RNN</h3>
-      <div class="mj">\[ h_t = \tanh(W_x x_t + W_h h_{t-1} + b) \qquad \frac{\partial h_T}{\partial h_k} = \prod \text{diag}(1 - h_t^2) W_h \]</div>
+      <div class="mj">\[ \begin{aligned} h_t &amp;= \tanh(W_x x_t + W_h h_{t-1} + b) \\ \frac{\partial h_T}{\partial h_k} &amp;= \prod \text{diag}(1 - h_t^2) W_h \end{aligned} \]</div>
       <h3>LSTM, with \(u_t = [h_{t-1}, x_t]\)</h3>
-      <div class="mj">\[ f, i, o = \sigma(W_{f,i,o}\, u_t + b) \qquad g = \tanh(W_g u_t + b_g) \]</div>
-      <div class="mj">\[ c_t = f \odot c_{t-1} + i \odot g \qquad h_t = o \odot \tanh(c_t) \qquad \frac{\partial c_t}{\partial c_{t-1}} = \text{diag}(f_t) \]</div>
+      <div class="mj">\[ \begin{aligned} f, i, o &amp;= \sigma(W_{f,i,o}\, u_t + b) \\ g &amp;= \tanh(W_g u_t + b_g) \end{aligned} \]</div>
+      <div class="mj">\[ \begin{aligned} c_t &amp;= f \odot c_{t-1} + i \odot g \\ h_t &amp;= o \odot \tanh(c_t) \\ \frac{\partial c_t}{\partial c_{t-1}} &amp;= \text{diag}(f_t) \end{aligned} \]</div>
       <h3>GRU (z = write)</h3>
-      <div class="mj">\[ z, r = \sigma(W_{z,r} [h_{t-1}, x_t] + b) \qquad \tilde h_t = \tanh(W_n [r \odot h_{t-1}, x_t] + b_n) \]</div>
+      <div class="mj">\[ \begin{aligned} z, r &amp;= \sigma(W_{z,r} [h_{t-1}, x_t] + b) \\ \tilde h_t &amp;= \tanh(W_n [r \odot h_{t-1}, x_t] + b_n) \end{aligned} \]</div>
       <div class="mj">\[ h_t = (1 - z) \odot h_{t-1} + z \odot \tilde h_t \]</div>
       <h3>Shapes</h3>
       <div class="mj">\[ \text{RNN: } W_x\ H{\times}d,\ W_h\ H{\times}H \qquad \text{LSTM: } 4H{\times}(H{+}d) \qquad \text{GRU: } 3H{\times}(H{+}d) \]</div>
       <h3>Parameters</h3>
       <div class="mj">\[ \text{one block} = H(H+d) + H \qquad \text{RNN } 1,\ \text{GRU } 3,\ \text{LSTM } 4 \text{ blocks} \]</div>
+      <div class="mj">\[ \text{PyTorch: one block} = H(H+d) + 2H \quad \text{(two bias vectors; count per layer and per direction)} \]</div>
       <h3>Gradient, one step back along the memory</h3>
       <div class="mj">\[ \text{RNN: } \text{diag}(1 - h_t^2)\,W_h \qquad \text{LSTM: } f_t \qquad \text{GRU: } 1 - z_t \]</div>
     </div>
