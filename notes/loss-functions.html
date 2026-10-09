@@ -285,6 +285,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <h2 id="mle"><span class="pn">01</span>Where losses come from</h2>
     <p>A model doesn't just output a number. Implicitly it outputs the parameters of a distribution over the target. Choose that distribution's family, and the loss follows: it's minus the log of the probability the model gives to what actually happened.</p>
     <div class="mj">\[ \begin{aligned} \hat\theta &amp;= \arg\max_\theta \prod_{i=1}^{N} p(y_i \mid x_i; \theta) \\ &amp;= \arg\min_\theta \sum_{i=1}^{N} -\log p(y_i \mid x_i; \theta) \end{aligned} \]</div>
+    <p><strong>Where the product comes from:</strong> the examples are assumed independent given their inputs, and drawn from the same distribution (i.i.d.). The probability of the whole dataset then factorizes into one term per example. Correlated examples (repeated measurements of one user, neighbouring time steps) break this, and the summed loss then over-counts how much evidence you have.</p>
     <p><strong>Why the log:</strong> it's monotonic, so the best \(\theta\) doesn't move. It turns a product of many small numbers (which underflows) into a sum of per-example terms, which is what mini-batch SGD needs. And for exponential-family distributions it cancels the \(\exp\), leaving a term linear in the natural parameter (the mean for a Gaussian, the logit for a Bernoulli or categorical) minus a convex log-normalizer: a square, a softplus or a log-sum-exp.</p>
 
     <h3>Gaussian noise gives MSE</h3>
@@ -303,6 +304,60 @@ footer .site-nav { display: block; margin-top: 10px; }
     <div class="mj">\[ -\log p(y \mid x) = -\big[y\log p + (1 - y)\log(1 - p)\big] \]</div>
     <p>For \(K\) classes with a one-hot \(y\) and true class \(c\), the categorical likelihood is \(\prod_k p_k^{y_k}\), so</p>
     <div class="mj">\[ \begin{aligned} -\log p(y \mid x) &amp;= -\sum_{k=1}^{K} y_k \log p_k \\ &amp;= -\log p_c \end{aligned} \]</div>
+
+    <h3 id="glm">The same recipe, from classic models to networks</h3>
+    <p>Every classic model is “pick a distribution for \(y \mid x\), connect its mean to \(w^\top x\) through a link, minimize the negative log-likelihood”. These are the generalized linear models; a neural net keeps the same output layer and loss, and replaces \(w^\top x\) with a learned \(f(x)\).</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Assumed \(y \mid x\)</th><th>Mean from \(w^\top x\)</th><th>Loss (NLL)</th><th>Model</th></tr></thead>
+      <tbody>
+        <tr><td>Gaussian, fixed \(\sigma\)</td><td>identity</td><td>MSE</td><td>Linear regression</td></tr>
+        <tr><td>Laplace</td><td>identity (the median)</td><td>MAE</td><td>Least absolute deviations</td></tr>
+        <tr><td>Bernoulli</td><td>sigmoid</td><td>BCE</td><td>Logistic regression</td></tr>
+        <tr><td>Categorical</td><td>softmax</td><td>Cross-entropy</td><td>Multinomial logistic regression; neural classifiers</td></tr>
+        <tr><td>Poisson</td><td>\(\exp\) (log link)</td><td>Poisson NLL, \(\mu - y\log\mu\)</td><td>Poisson regression for counts</td></tr>
+        <tr><td>Gamma</td><td>\(\exp\)</td><td>Gamma deviance</td><td>Positive, skewed amounts</td></tr>
+      </tbody>
+    </table></div>
+    <p>For logistic regression, \(p_i = \sigma(w^\top x_i)\) and the Bernoulli negative log-likelihood is the BCE, \(\sum_i -y_i\log p_i - (1 - y_i)\log(1 - p_i)\), with gradient \(X^\top(p - y)\). Unlike linear regression there's no closed form, because \(p\) is a non-linear function of \(w\). But the loss is convex, so gradient descent or Newton's method (IRLS) finds the one optimum. If the classes are perfectly separable the likelihood keeps rising as \(\lVert w\rVert \to \infty\), and only regularization gives a finite answer.</p>
+
+    <h3 id="dl-mle">Training a neural network is maximum likelihood</h3>
+    <p>A network's last layer outputs the parameters of a distribution over the target, the loss is that distribution's negative log-likelihood, and SGD minimizes its average over mini-batches. So “which loss?” is really “which distribution?”, and the output activation is the link that keeps those parameters valid (a probability in \([0, 1]\), a positive variance).</p>
+    <div class="mj">\[ \begin{aligned} \theta^\star &amp;= \arg\min_\theta\ \frac{1}{N}\sum_{i=1}^{N} -\log p_\theta(y_i \mid x_i) \\ &amp;\approx \arg\min_\theta\ \mathbb E_{(x, y) \sim p_{\text{data}}}\big[-\log p_\theta(y \mid x)\big] \\ &amp;= \arg\min_\theta\ \mathbb E_{x}\Big[\mathrm{KL}\big(p_{\text{data}}(\cdot \mid x)\ \Vert\ p_\theta(\cdot \mid x)\big)\Big] \end{aligned} \]</div>
+    <p>In words: the average NLL estimates the cross-entropy between the data and the model, which is the data's own entropy (fixed) plus the KL from data to model. So MLE pulls the model's distribution towards the data's. A mini-batch average is an unbiased estimate of the same expectation, which is why SGD on mini-batches optimizes the right thing.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Head</th><th>Distribution assumed</th><th>Loss</th></tr></thead>
+      <tbody>
+        <tr><td>Linear output</td><td>Gaussian, mean \(f(x)\), fixed \(\sigma\)</td><td>MSE</td></tr>
+        <tr><td>Linear \(\mu\) and softplus \(\sigma^2\)</td><td>Gaussian with a learned, per-input variance</td><td>Gaussian NLL</td></tr>
+        <tr><td>Softmax weights, means, variances</td><td>A mixture of Gaussians (several plausible answers)</td><td>Mixture-density NLL</td></tr>
+        <tr><td>Sigmoid per output</td><td>Independent Bernoullis (binary, multi-label)</td><td>BCE</td></tr>
+        <tr><td>Softmax</td><td>Categorical (one of \(K\))</td><td>Cross-entropy</td></tr>
+        <tr><td>Softmax at every position</td><td>Autoregressive, \(p(x) = \prod_t p(x_t \mid x_{&lt;t})\)</td><td>Token-level cross-entropy (GPT); perplexity is \(\exp\) of its mean</td></tr>
+        <tr><td>Softmax at masked positions</td><td>\(p(\text{masked} \mid \text{rest})\), a pseudo-likelihood</td><td>Cross-entropy on masked tokens (BERT)</td></tr>
+        <tr><td>Exponential output</td><td>Poisson (counts)</td><td>Poisson NLL</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>What the assumptions mean for a network:</strong></p>
+    <ul>
+      <li><strong>Independent examples.</strong> The loss is a sum over examples, and shuffled mini-batches rely on it. Near-duplicates or many rows per user over-weight what they share.</li>
+      <li><strong>Independent outputs given the input.</strong> Per-pixel MSE treats every pixel as its own Gaussian, so the optimum is the per-pixel average of all plausible images, which is a blur whenever the answer is uncertain (future frames, super-resolution). Multi-label BCE likewise ignores how labels co-occur. The fixes model the joint distribution: an autoregressive factorization (how language models avoid this), a mixture, or a non-likelihood loss (perceptual, adversarial).</li>
+      <li><strong>Fixed variance.</strong> MSE assumes the same noise everywhere. Predicting \(\sigma^2(x)\) as a second output lets the network say “unsure here” and down-weight those examples (see “What the assumptions mean in practice” below).</li>
+      <li><strong>The prior.</strong> Weight decay makes training MAP rather than MLE: a Gaussian prior on the weights (see “Regularization is a prior” below). The full objective is a negative log posterior.</li>
+    </ul>
+    <p><strong>Not everything in deep learning is maximum likelihood:</strong></p>
+    <ul>
+      <li><strong>Exact likelihood:</strong> autoregressive models and normalizing flows. <strong>A bound on it:</strong> VAEs maximize the ELBO, a lower bound on \(\log p(x)\), and diffusion models train a weighted version of a similar bound.</li>
+      <li><strong>No likelihood at all:</strong> GANs. The generator minimizes a divergence that a discriminator estimates (Jensen–Shannon for the original GAN), so it can produce sharp samples but gives no \(p(x)\).</li>
+      <li><strong>Margin and ranking objectives:</strong> hinge, triplet and contrastive losses. InfoNCE sits in between: it is the categorical NLL of picking the positive out of the candidates, and a lower bound on mutual information.</li>
+      <li><strong>Reward, not likelihood:</strong> RL fine-tuning (REINFORCE, PPO) maximizes expected reward. Supervised fine-tuning of an LLM, by contrast, is plain MLE on the demonstrations.</li>
+    </ul>
+    <p><strong>Where MLE shows its limits in deep nets:</strong> the NLL keeps rewarding larger logits on training data, so big networks become overconfident (label smoothing and temperature scaling, section 08); it memorizes noisy labels (also section 08); and forward KL is mode-covering, so a language model spreads some probability onto poor continuations, which is one reason decoding uses top-\(k\) or top-\(p\) truncation.</p>
+    <aside class="note say"><p class="nl">Where the central limit theorem fits</p>
+      <p>The CLT doesn't derive any loss; maximum likelihood under an assumed distribution does. The CLT does two other jobs:</p>
+      <ul>
+        <li><strong>It motivates Gaussian noise.</strong> If a target's noise is the sum of many small, independent effects, the CLT says that sum is roughly Gaussian, which is the case for MSE. (The Gaussian is also the maximum-entropy distribution for a given mean and variance: the least-committal choice.)</li>
+        <li><strong>It describes mini-batch gradients.</strong> A mini-batch gradient is an average of \(B\) per-example gradients, so by the CLT it is roughly Gaussian around the full-data gradient, with covariance shrinking as \(1/B\). That is the “gradient noise” behind the linear learning-rate scaling rule and arguments about SGD finding flat minima.</li>
+      </ul></aside>
 
     <h3>What the optimum predicts</h3>
     <p>With a flexible enough model, the loss is minimized separately at each \(x\): pick the prediction \(\hat y\) that minimizes the expected loss over \(y \mid x\). For log loss, write \(\pi = P(y = 1 \mid x)\) and let \(q\) be the predicted probability.</p>
@@ -1218,6 +1273,41 @@ loss = cross_entropy(S, labels)               <span class="cm"># 2B - 2 negative
       <p>Sum makes the gradient, and so SGD's effective learning rate, grow with batch size; mean keeps it independent of \(B\). Adam is mostly insensitive to the loss scale, apart from \(\epsilon\) and L2 terms. With gradient accumulation, divide by the number of micro-batches. For sequences, mask padding with <code>ignore_index</code> and divide by the number of real tokens, never by all positions. Per-token averaging weights long sequences more; per-sequence averaging weights each sequence equally. With accumulation, divide by the total tokens across all micro-batches. (<a href="#practice">12</a>)</p></div></details>
     <details class="qa"><summary><span class="qn">20</span>How do you weight the losses in a multi-task model?</summary><div class="ans">
       <p>Task losses differ in units, scale and gradient size, so fixed equal weights let one task dominate. Simple baselines normalize each loss by its initial value or a running mean. Uncertainty weighting learns \(s_k = \log\sigma_k^2\) per task and minimizes \(\sum_k \big(\tfrac12 e^{-s_k}L_k + \tfrac12 s_k\big)\), giving each task a weight of about \(1/L_k\). GradNorm balances the tasks' gradient norms on the shared layers; PCGrad projects away conflicting gradient components. (<a href="#practice">12</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">21</span>How does training a neural network relate to maximum likelihood? What is the network assuming about the data?</summary><div class="ans">
+      <p><strong>Minimizing the usual losses is maximum-likelihood estimation: the network outputs a distribution's parameters, and the loss is that distribution's negative log-likelihood.</strong></p>
+      <p>Assuming i.i.d. examples, the dataset's likelihood is a product over examples, and its negative log is a sum, which mini-batch SGD can estimate:</p>
+      <div class="mj">\[ \begin{aligned} \hat\theta &amp;= \arg\max_\theta \prod_i p_\theta(y_i \mid x_i) \\ &amp;= \arg\min_\theta \sum_i -\log p_\theta(y_i \mid x_i) \end{aligned} \]</div>
+      <p>The head fixes the distribution, and the distribution fixes the loss:</p>
+      <ul>
+        <li>linear output → Gaussian with fixed variance → MSE (predicts the mean);</li>
+        <li>sigmoid → Bernoulli → BCE;</li>
+        <li>softmax → categorical → cross-entropy;</li>
+        <li>softmax at every position → autoregressive language model → token-level cross-entropy.</li>
+      </ul>
+      <p><strong>The assumptions:</strong></p>
+      <ul>
+        <li>Independent examples.</li>
+        <li>Outputs independent given the input: per-pixel MSE blurs uncertain images for this reason.</li>
+        <li>For MSE, constant noise.</li>
+      </ul>
+      <p>Weight decay adds a Gaussian prior, which turns MLE into MAP.</p>
+      <p><strong>Follow-ups:</strong></p>
+      <ul>
+        <li><em>Is every deep-learning loss MLE?</em> No. VAEs and diffusion models maximize a bound on the likelihood, GANs use none, and triplet, hinge and contrastive losses are margin objectives.</li>
+        <li><em>Why are big networks overconfident?</em> The NLL keeps rewarding larger logits on training data.</li>
+        <li><em>What does the CLT have to do with it?</em> It motivates Gaussian noise, and it makes mini-batch gradients roughly Gaussian with variance shrinking as \(1/B\).</li>
+      </ul>
+      <p>(<a href="#dl-mle">01</a>)</p></div></details>
+    <details class="qa"><summary><span class="qn">22</span>Where do cross-entropy and the other losses come from? How do you pick a loss for a new target?</summary><div class="ans">
+      <p><strong>Each loss is the negative log-likelihood of an assumed distribution for \(y \mid x\); pick the distribution that matches how the target is generated, and the loss follows.</strong></p>
+      <ul>
+        <li><strong>Binary label:</strong> a Bernoulli with \(p = \sigma(z)\) gives BCE, \(-y\log p - (1-y)\log(1-p)\). That is logistic regression.</li>
+        <li><strong>One of \(K\) classes:</strong> a categorical with \(p = \text{softmax}(z)\) gives cross-entropy, \(-\log p_{y}\).</li>
+        <li><strong>Real value, symmetric noise:</strong> Gaussian gives MSE (predicts the mean); Laplace gives MAE (predicts the median), more robust to outliers.</li>
+        <li><strong>Counts:</strong> Poisson with a log link, loss \(\mu - y\log\mu\); predictions stay positive and the variance grows with the mean.</li>
+        <li><strong>Positive, skewed amounts</strong> (spend, claim size): Gamma or Tweedie with a log link.</li>
+      </ul>
+      <p><strong>Why this matters:</strong> the distribution decides what the optimum predicts (mean, median, probability), how hard outliers pull, and whether predictions respect the target's range. A mismatched loss still trains, but it estimates the wrong quantity, for example a mean when the business needs a quantile. Regularization fits the same frame: a Gaussian prior on the weights adds L2, a Laplace prior adds L1. (<a href="#glm">01</a>)</p></div></details>
 
     <!-- sheet -->
     <h2 id="sheet"><span class="pn">16</span>Cheat sheet</h2>
