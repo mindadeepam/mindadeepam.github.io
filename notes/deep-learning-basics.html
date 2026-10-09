@@ -246,7 +246,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <li><a href="#activations"><span class="n">05</span>Activations</a></li>
         <li><a href="#losses"><span class="n">06</span>Losses</a></li>
         <li><a href="#init"><span class="n">07</span>Vanishing, exploding and initialization</a></li>
-        <li><a href="#norm"><span class="n">08</span>BatchNorm and LayerNorm</a></li>
+        <li><a href="#norm"><span class="n">08</span>Normalization</a></li>
         <li><a href="#reg"><span class="n">09</span>Regularization</a></li>
         <li><a href="#residual"><span class="n">10</span>Residual connections</a></li>
         <li><a href="#addcat"><span class="n">11</span>Adding vs concatenating vectors</a></li>
@@ -488,7 +488,29 @@ w -= lr * (m_hat / (sqrt(v_hat) + eps) + wd * w)   <span class="cm"># AdamW: dec
     </ul>
 
     <!-- norm -->
-    <h2 id="norm"><span class="pn">08</span>BatchNorm and LayerNorm</h2>
+    <h2 id="norm"><span class="pn">08</span>Normalization: inputs, BatchNorm, LayerNorm</h2>
+    <h3 id="standardize">Standardizing the inputs</h3>
+    <p>Standardization rescales each input feature \(j\) to mean 0 and variance 1, using statistics from the training set only:</p>
+    <div class="mj">\[ \tilde x_j = \frac{x_j - \mu_j}{\sigma_j} \]</div>
+    <p>Fit \(\mu_j, \sigma_j\) on the training data and apply the same numbers to validation, test and production. Computing them on all the data leaks information from the test set.</p>
+    <p><strong>Why it helps gradient descent.</strong> For a linear model with MSE, each weight's gradient scales with its feature, and the loss's curvature is set by the features' scales:</p>
+    <div class="mj">\[ \begin{aligned} \frac{\partial L}{\partial w_j} &amp;= \frac{1}{N}\sum_{i} (\hat y_i - y_i)\, x_{ij} \\ H &amp;= \nabla^2 L = \frac{1}{N} X^\top X \end{aligned} \]</div>
+    <ul>
+      <li><strong>A badly shaped bowl.</strong> A feature measured in thousands next to one measured in fractions makes the loss surface a long, thin valley: very steep along one weight, nearly flat along another. One learning rate can't suit both. Small enough not to overshoot the steep direction means crawling along the flat one, and the path zig-zags across the valley. Standardizing makes \(X^\top X\) closer to a correlation matrix and the bowl rounder, so one learning rate works for every direction. (Formally, it lowers the Hessian's condition number, the ratio of its largest to smallest curvature, which sets how many steps gradient descent needs.)</li>
+      <li><strong>A double mismatch per weight.</strong> A large-scale feature gets a large gradient but needs only a small weight, and a small-scale feature the reverse. Adam's per-weight scaling softens this, but it can't fix correlated or off-centre features.</li>
+      <li><strong>Centring matters too.</strong> If a feature is always positive, every gradient on a neuron's incoming weights shares the sign of \(\hat y - y\), so they all move up or down together and the path zig-zags. It's the same argument that makes zero-centred activations preferable.</li>
+      <li><strong>Initialization and activations assume it.</strong> Xavier and He initialization are derived for inputs with unit variance. Large raw inputs push the first layer's pre-activations far out, saturating tanh or sigmoid from the very first step.</li>
+    </ul>
+    <p><strong>Why it matters beyond gradient descent.</strong></p>
+    <ul>
+      <li><strong>Regularization.</strong> L1 and L2 penalize every weight equally, which is only fair when features share a scale. Otherwise a small-scale feature needs a large weight and gets penalized more for the same effect.</li>
+      <li><strong>Distances.</strong> k-NN, k-means, RBF-kernel SVMs and PCA all use distances or variances, which the largest-scale feature dominates. Unscaled PCA mostly finds “the feature with the biggest units”.</li>
+    </ul>
+    <p><strong>When it doesn't matter.</strong> Tree models (decision trees, random forests, gradient boosting) split on thresholds, which no monotonic rescaling changes. Unregularized least squares gives the same predictions either way; only the coefficients rescale.</p>
+    <p><strong>Variants.</strong> Min-max scaling to \([0, 1]\) suits bounded inputs such as pixels, but one outlier squashes everything else. Robust scaling (median and interquartile range) resists outliers. Take a log first for heavily skewed features (incomes, counts). Images are usually divided by 255, then standardized per channel. Categorical features get embeddings or one-hot encodings instead.</p>
+    <p><strong>BatchNorm and LayerNorm are the same idea inside the network.</strong> Each layer's input is the previous layer's output, and its scale drifts as the earlier weights change, so normalization layers standardize the activations as well, with a learned scale and shift added back.</p>
+
+    <h3>BatchNorm and LayerNorm</h3>
     <div class="mj">\[ \begin{aligned} \hat x &amp;= \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}} \\ y &amp;= \gamma\, \hat x + \beta \end{aligned} \]</div>
     <figure>
       <div class="plate">
@@ -869,7 +891,8 @@ for o in range(C_out):
         <li><strong>Why decay at all:</strong> smaller weights give a smoother function that changes less when the input changes a little, which tends to generalize better.</li>
       </ul>
       <p><strong>Follow-up:</strong> biases and normalization gains are usually left out of weight decay; there are few of them, they don't drive overfitting, and decaying the gains just fights the normalization.</p>
-          <p>The two update steps side by side: <a href="#adamw">Adam + L2 vs AdamW</a>.</p>
+          <p><strong>In one line, for an interview:</strong> “L2 regularization adds \(\tfrac{\lambda}{2}\lVert\theta\rVert^2\) to the loss, whose gradient is \(\lambda\theta\). Under SGD that's identical to weight decay. Under Adam the \(\lambda\theta\) gets rescaled per weight, so AdamW applies the decay directly to the weights instead. AdamW is weight decay, not L2.”</p>
+      <p>The two update steps side by side: <a href="#adamw">Adam + L2 vs AdamW</a>.</p>
     </div></details>
     <details class="qa"><summary><span class="qn">13</span>Adam vs SGD with momentum. Why does Adam need bias correction?</summary><div class="ans">
       <p><strong>Momentum smooths the gradient's direction; Adam also gives every weight its own step size by dividing by the root of its recent squared gradients. Bias correction undoes the fact that Adam's running averages start at zero.</strong></p>
@@ -983,6 +1006,17 @@ for o in range(C_out):
       <p>In words: the chain rule is linear, so scaling the loss scales every gradient by \(S\), lifting them into range, and dividing back gives exactly the true gradient. If a gradient overflows, the step is skipped and \(S\) lowered.</p>
       <p><strong>bf16</strong> keeps fp32's exponent range with fewer precision bits, so it underflows no more than fp32 and needs no loss scaling. That's why it's the default on recent GPUs and TPUs.</p>
     </div></details>
+    <details class="qa"><summary><span class="qn">23</span>Why do we standardize input features? When doesn't it matter?</summary><div class="ans">
+      <p><strong>Standardizing puts every feature on the same scale (mean 0, variance 1) so that one learning rate, one penalty and one distance treat all features alike.</strong></p>
+      <div class="mj">\[ \begin{aligned} \tilde x_j &amp;= \frac{x_j - \mu_j}{\sigma_j} \\ \frac{\partial L}{\partial w_j} &amp;\propto \sum_i (\hat y_i - y_i)\, x_{ij} \end{aligned} \]</div>
+      <ul>
+        <li><strong>Gradient descent:</strong> a weight's gradient scales with its feature, and the loss's curvature with the features' scales (\(H = X^\top X/N\) for a linear model). Mixed scales give a long, thin valley where no single learning rate works. Standardizing rounds the bowl, so training is faster and more stable.</li>
+        <li><strong>Centring:</strong> an always-positive input makes all of a neuron's weight gradients share a sign, so the updates zig-zag.</li>
+        <li><strong>Initialization:</strong> Xavier and He assume unit-variance inputs; raw large inputs saturate the first layer.</li>
+        <li><strong>Regularization and distances:</strong> L1/L2 penalties, k-NN, k-means, SVMs and PCA are all scale-dependent, so the largest-unit feature would dominate.</li>
+      </ul>
+      <p><strong>When it doesn't matter:</strong> tree models, since splits are unchanged by any monotonic rescaling, and unregularized least squares, which gives the same predictions with rescaled coefficients.</p>
+      <p><strong>Follow-ups:</strong> fit the mean and standard deviation on the training set only (otherwise the test set leaks into training); use robust scaling or a log transform for outliers and skew. BatchNorm and LayerNorm apply the same idea to hidden activations. (<a href="#standardize">08</a>)</p></div></details>
 
     <!-- sheet -->
     <h2 id="sheet"><span class="pn">17</span>Cheat sheet</h2>
