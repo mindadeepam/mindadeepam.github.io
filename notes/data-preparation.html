@@ -1,0 +1,1362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070707">
+<title>Data preparation and feature engineering · Deepam Minda</title>
+<meta name="description" content="Tabular data, end to end: cleaning, leakage-safe splits, missing values and imputation, outliers, categorical encodings, scaling, collinearity, feature selection and imbalance.">
+<meta property="og:title" content="Data preparation and feature engineering">
+<meta property="og:description" content="Tabular data, end to end: cleaning, leakage-safe splits, missing values and imputation, outliers, categorical encodings, scaling, collinearity, feature selection and imbalance.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem("deepam-theme"); } catch (e) {}
+  if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<link rel="stylesheet" href="../assets/design/tokens.css?v=1">
+<link rel="stylesheet" href="../assets/design/components.css?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<style>
+/* Green graph-paper theme for the recurrent-notebook content.
+   Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
+   One sans for text, one mono for labels; MathJax draws the maths. Green = the cell / notebook,
+   slate = the hidden state, orange only for gradients. */
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
+body {
+  margin: 0; color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: 50% 0;
+  font: 16.5px/1.7 var(--sans); letter-spacing: -.003em;
+  padding-inline: 20px; padding-block: 44px 88px;
+  -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 640px) { body { font-size: 16px; padding-inline: 16px; padding-block: 24px 80px; } }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+table, button { font: inherit; }
+code { font: .86em var(--mono); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; }
+
+.page { max-width: 1200px; margin: 0 auto; display: grid; gap: 52px; grid-template-columns: 220px minmax(0, 860px); justify-content: center; }
+@media (max-width: 1080px) { .page { grid-template-columns: minmax(0, 860px); gap: 0; } }
+
+/* contents */
+.toc { position: sticky; top: 28px; align-self: start; font: 13.5px/1.4 var(--sans); max-height: calc(100vh - 56px); overflow-y: auto; }
+.toc summary { display: none; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--ink-2); text-decoration: none; }
+.toc a:hover { background: var(--surface); color: var(--ink); }
+.toc a.on { color: var(--ink); background: var(--surface); box-shadow: inset 2px 0 0 var(--cell); }
+.toc .n { font: 500 11px var(--mono); color: var(--ink-3); margin-right: 8px; }
+.toc .label { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 10px 10px; }
+.toc li.part { font: 500 10.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 14px 10px 4px; }
+@media (max-width: 1080px) {
+  .toc { position: static; margin-bottom: 26px; max-height: none; }
+  .toc .label { display: none; }
+  .toc details { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  .toc summary { display: block; cursor: pointer; padding: 12px 14px; font: 500 14px var(--sans); list-style: none; }
+  .toc summary::-webkit-details-marker { display: none; }
+  .toc summary::after { content: "+"; float: right; color: var(--ink-3); }
+  .toc details[open] summary::after { content: "–"; }
+  .toc details ol { padding: 0 6px 10px; }
+}
+.jump {
+  display: none; position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+  font: 500 13px var(--sans); color: var(--ink); background: var(--surface); text-decoration: none;
+  border: 1px solid var(--rule); border-radius: 999px; padding: 9px 14px;
+}
+@media (max-width: 1080px) { .jump { display: block; } }
+
+/* article */
+article { min-width: 0; }
+header.hero { display: grid; gap: 10px; margin-bottom: 26px; }
+.kicker { font: 500 12px/1 var(--mono); color: var(--ink-3); letter-spacing: .02em; }
+h1 { margin: 0; font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.6rem); line-height: 1.1; font-weight: 600; letter-spacing: -.028em; text-wrap: balance; }
+.dek { margin: 0; font-size: 1.1rem; line-height: 1.55; color: var(--ink-2); max-width: 40em; }
+.meta { font: 12px/1.5 var(--mono); color: var(--ink-3); }
+.key { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.key span::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--c); margin-right: 6px; vertical-align: middle; }
+
+h2 { font-size: 1.36rem; line-height: 1.25; font-weight: 600; letter-spacing: -.018em; margin: 56px 0 12px; text-wrap: balance; scroll-margin-top: 16px; }
+h2 .pn { font: 500 .74em/1 var(--mono); color: var(--ink-3); margin-right: .7em; letter-spacing: 0; }
+h3 { font-size: 1.04rem; font-weight: 600; letter-spacing: -.01em; margin: 30px 0 6px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 1.25em; }
+li { margin-bottom: 5px; }
+li::marker { color: var(--ink-3); }
+strong { font-weight: 600; }
+.mj { overflow-x: auto; overflow-y: hidden; margin: 4px 0 16px; padding: 2px 0; }
+mjx-container[display="true"] { margin: 0 !important; }
+
+/* plan and summary panels */
+.tldr { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 22px 6px; margin-bottom: 14px; }
+.tldr h2 { margin: 0 0 10px; font: 500 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.tldr ol { padding-left: 1.3em; }
+.tldr li { margin-bottom: 8px; }
+.tldr p { margin: 0 0 12px; font-size: 15.5px; }
+.tldr .tbl { margin: 4px 0 12px; }
+
+/* notes: quote-style, coloured by kind */
+.note { margin: 16px 0 20px; padding: 2px 0 2px 16px; border-left: 2px solid var(--c); color: var(--ink-2); font-size: .97em; }
+.note > .nl { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); margin: 4px 0 8px; }
+.note strong { color: var(--ink); }
+.note.ask { --c: var(--cell); }
+.note.say { --c: var(--hid); }
+.note.trap { --c: var(--grad); }
+.note.lab { --c: var(--cell); }
+.note .q { font-style: italic; color: var(--ink); }
+.note ul { margin: 0 0 10px; }
+.note li { margin-bottom: 5px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 6px 0 20px; }
+table { border-collapse: collapse; width: 100%; font-size: .93em; line-height: 1.5; }
+th { text-align: left; vertical-align: bottom; font: 500 11px/1.4 var(--mono); color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; padding: 0 14px 8px 0; border-bottom: 1px solid var(--ink-3); }
+td { padding: 8px 14px 8px 0; vertical-align: top; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+td .src { display: block; font: 11.5px/1.4 var(--mono); color: var(--ink-3); margin-top: 2px; }
+
+/* gate cards */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0 20px; }
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.gc { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 4px; font-size: 15.5px; line-height: 1.6; }
+.gc h4 { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.gc h4 .tag { font: 500 11px var(--mono); color: var(--c); }
+.gc.g1 { --c: var(--cell); }
+.gc.g2 { --c: var(--ink-3); }
+.gc p { margin-bottom: 10px; }
+
+/* figures */
+figure { margin: 18px 0 24px; }
+.plate { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 10px; overflow-x: auto; }
+.plate svg { display: block; width: 100%; height: auto; min-width: 460px; max-width: 700px; margin: 0 auto; }
+@media (max-width: 500px) { .plate svg { max-width: none; } }
+figcaption { font-size: .86rem; line-height: 1.5; color: var(--ink-3); margin-top: 10px; }
+.dg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink-2); }
+.dg .v { font-family: var(--serif); font-style: italic; font-size: 19px; fill: var(--ink); }
+.dg .v .s { font-size: 12.5px; }
+.dg .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; fill: var(--ink-3); }
+.dg .gl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--gate); }
+.dg .gs { font-family: var(--serif); font-style: normal; font-size: 12px; fill: var(--ink-3); }
+.dg .cl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--ink); }
+.dg .cs { font-family: var(--sans); font-size: 12px; fill: var(--ink-2); }
+.dg .optx { font: 500 17px var(--sans); fill: var(--ink); }
+.dg .cell { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.dg .hid { stroke: var(--hid); stroke-width: 2.4; fill: none; }
+.dg .hid.thick { stroke-width: 3.6; }
+.dg .in { stroke: var(--ink-3); stroke-width: 1.5; fill: none; }
+.dg .gw { stroke: var(--gate); stroke-width: 1.6; fill: none; }
+.dg .cw { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+.dg .grad { stroke: var(--grad); fill: none; stroke-linecap: round; }
+.dg .gbox { fill: var(--gate-wash); stroke: var(--gate); stroke-width: 1.3; }
+.dg .box { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .op { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.3; }
+.dg .dot { fill: var(--ink-2); }
+.dg .cellon { fill: var(--cell-wash); stroke: var(--cell); stroke-width: 1; }
+.dg .celloff { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.dg .stream { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.mk-cell { fill: var(--cell); } .mk-hid { fill: var(--hid); } .mk-in { fill: var(--ink-3); }
+.mk-gate { fill: var(--gate); } .mk-cw { fill: var(--ink-2); } .mk-grad { fill: var(--grad); }
+
+/* questions */
+details.qa { border-bottom: 1px solid var(--rule); }
+details.qa:first-of-type { border-top: 1px solid var(--rule); }
+details.qa summary { cursor: pointer; padding: 11px 2px; font-weight: 500; font-size: 15.5px; line-height: 1.45; list-style: none; display: flex; gap: 12px; }
+details.qa summary::-webkit-details-marker { display: none; }
+details.qa summary .qn { font: 500 11.5px/1.9 var(--mono); color: var(--ink-3); flex: none; min-width: 1.9em; }
+details.qa summary::after { content: "+"; margin-left: auto; color: var(--ink-3); flex: none; }
+details.qa[open] summary::after { content: "–"; }
+details.qa .ans { padding: 0 4px 12px 32px; font-size: 15.5px; color: var(--ink-2); }
+summary:focus-visible, a:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+
+.sheet { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 6px; }
+.sheet h3 { margin: 4px 0 6px; font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: .9rem; color: var(--ink-3); }
+
+/* code blocks */
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; margin: 8px 0 20px; overflow-x: auto; font: 12.8px/1.6 var(--mono); color: var(--ink); white-space: pre; }
+pre.code code { font: inherit; background: none; border: 0; padding: 0; }
+pre.code .cm { color: var(--ink-3); }
+@media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
+
+/* public copy: colours, fonts and sizes come from the site's tokens.css; this maps the notebook's
+   token names onto them (green_theme.css's own token block is left out of public pages). */
+:root {
+  --paper: var(--void); --ink: var(--text); --ink-2: var(--soft); --ink-3: var(--muted);
+  --accent: var(--amber);
+  --cell: var(--green); --cell-wash: var(--green-wash); --hid: var(--blue); --hid-wash: var(--blue-wash);
+  --gate: var(--neutral); --gate-wash: var(--neutral-wash); --grad: var(--orange); --grad-wash: var(--orange-wash);
+  --sans: var(--font-sans); --mono: var(--font-mono);
+  --serif: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
+}
+body { padding-block-start: 0; letter-spacing: 0; }
+/* the shared header sits inside the notebook's side padding */
+.site-header { width: min(100%, 1260px); margin-bottom: 40px; }
+.site-header a:hover { text-decoration: none; }
+@media (max-width: 720px) { .site-header { width: 100%; margin-bottom: 26px; } }
+/* the site's type scale */
+h1 { font-weight: 600; font-size: var(--fs-title); line-height: 1.12; letter-spacing: -.02em; }
+h2 { font-size: var(--fs-h2); letter-spacing: -.01em; }
+h3 { font-size: var(--fs-h3); }
+.dek { font-size: 18px; }
+.toc a.on { box-shadow: inset 2px 0 0 var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline-color: var(--accent); }
+footer .site-nav { display: block; margin-top: 10px; }
+.next { margin-top: 36px; font-weight: 500; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="a-cell" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path class="mk-cell" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-hid" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto"><path class="mk-hid" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-in" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-in" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-gate" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-cw" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-cw" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-grad" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path class="mk-grad" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">study notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
+<div class="page">
+  <nav class="toc" aria-label="Contents">
+    <details id="tocd" open>
+      <summary>Contents</summary>
+      <div class="label">Contents</div>
+      <ol>
+        <li><a href="#tldr"><span class="n">00</span>In short</a></li>
+        <li><a href="#eda"><span class="n">01</span>The first look</a></li>
+        <li><a href="#cleaning"><span class="n">02</span>Cleaning</a></li>
+        <li><a href="#split"><span class="n">03</span>Split first: honest splits and leakage</a></li>
+        <li><a href="#missing"><span class="n">04</span>Missing values</a></li>
+        <li><a href="#outliers"><span class="n">05</span>Outliers</a></li>
+        <li><a href="#encoding"><span class="n">06</span>Encoding categorical features</a></li>
+        <li><a href="#scaling"><span class="n">07</span>Scaling and transforms</a></li>
+        <li><a href="#collinearity"><span class="n">08</span>Collinearity</a></li>
+        <li><a href="#features"><span class="n">09</span>Feature engineering</a></li>
+        <li><a href="#selection"><span class="n">10</span>Feature selection</a></li>
+        <li><a href="#imbalance"><span class="n">11</span>Class imbalance at the data level</a></li>
+        <li><a href="#fit"><span class="n">12</span>Overfitting and underfitting</a></li>
+        <li><a href="#code"><span class="n">13</span>Pseudocode</a></li>
+        <li><a href="#questions"><span class="n">14</span>Interview questions</a></li>
+        <li><a href="#sheet"><span class="n">15</span>Cheat sheet</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <article>
+    <header class="hero">
+      <div class="tag">Study notes · Data</div>
+      <h1>Data preparation and feature engineering</h1>
+      <p class="dek">What to do to a tabular dataset before a model sees it, and why each step exists: the first look, cleaning, honest splits, missing values, outliers, encoding categories, scaling, collinearity, building and selecting features, class imbalance, and telling overfitting from underfitting.</p>
+      <div class="meta">About 45 minutes · mechanisms, trade-offs, pseudocode and 25 questions</div>
+    </header>
+
+    <section class="tldr" id="tldr" aria-labelledby="tldr-h">
+      <h2 id="tldr-h">In short</h2>
+      <ol>
+        <li><strong>One rule runs through everything.</strong> Anything that learns a number from the data (a median, a category's average target, a scaler's mean, a list of selected features) is fitted on the training rows only, inside each cross-validation fold. Fixes that learn nothing, such as correcting a type or a typo, can run before the split.</li>
+        <li><strong>Before filling a blank, ask why it's blank:</strong> by pure chance (MCAR), because of other things you can see (MAR), or because of the missing value itself (MNAR). Blanks often carry signal, so keep it with a missing-indicator column or an explicit “Missing” category. Filling with the mode or median and leaving no trace is safe only when the blanks are random and few.</li>
+        <li><strong>Encoding follows the model and the number of levels.</strong> One-hot for a few levels; out-of-fold, smoothed target encoding or count encoding for many; native categorical support in boosting libraries; embeddings in neural nets. Target encoding leaks because each row's own label sits inside its category's average.</li>
+        <li><strong>Outliers: first decide whether a value is an error or a genuine extreme.</strong> Errors are fixed, or turned into missing values. Genuine extremes are capped or transformed, or handled by a robust loss or a tree. In fraud, the extremes are the signal.</li>
+        <li><strong>Scaling matters for anything built on distances, penalties or gradient descent;</strong> trees ignore monotone transforms. Collinearity makes coefficients unstable but usually leaves predictions fine, and it splits a tree's feature importance between correlated features.</li>
+        <li><strong>Split the way the model will meet new data:</strong> by time for forecasting and credit, by group when new customers arrive, stratified when a class is rare. For imbalance, move the threshold first, reweight second, resample last.</li>
+      </ol>
+    </section>
+
+    <!-- eda -->
+    <h2 id="eda"><span class="pn">01</span>The first look</h2>
+    <p>The first look is a checklist, not free browsing. Each check answers one question: what could make a model wrong, or make it look better than it is? Write the answers down; most of them decide a later step.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Check</th><th>What you're looking for</th><th>Why it matters</th></tr></thead>
+      <tbody>
+        <tr><td><strong>What is one row?</strong></td><td>The unit of prediction: an application, a customer-month, a transaction. Types and shape.</td><td>It fixes how to split (rows of one customer belong together) and how to aggregate features.</td></tr>
+        <tr><td><strong>The target</strong></td><td>Its distribution or base rate, how it's defined, when it becomes known, and how it moves over time.</td><td>It sets the metric, the need to stratify, and the prediction time, which decides what counts as leakage.</td></tr>
+        <tr><td><strong>Missingness map</strong></td><td>Share missing per column, columns missing together, missing rates over time, target rate when missing vs present.</td><td>It decides the imputation strategy, and shows whether blanks are a signal or a pipeline bug.</td></tr>
+        <tr><td><strong>Duplicates</strong></td><td>Exact copies, and the same entity or event appearing twice.</td><td>Copies on both sides of a split inflate scores.</td></tr>
+        <tr><td><strong>Cardinality</strong></td><td>Number of levels per categorical column, rare levels, ID-like columns.</td><td>It picks the encoding; a column with one value per row is an ID, not a feature.</td></tr>
+        <tr><td><strong>Distributions and skew</strong></td><td>Long tails, spikes at 0 or −1 or 9999 (sentinels), impossible values, constant columns.</td><td>It decides transforms, outlier handling and scaling.</td></tr>
+        <tr><td><strong>Time ordering</strong></td><td>A timestamp, whether feature distributions drift by month, when columns were added.</td><td>It decides a time-based split and which aggregates are legal.</td></tr>
+        <tr><td><strong>Leakage suspects</strong></td><td>Columns recorded after the prediction time (“closed date”, “collections calls”), a single feature that predicts the target almost perfectly.</td><td>They make offline scores great and production poor.</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Where to look.</strong> Hygiene checks (types, duplicates, missing shares) are fine on all the data, since they learn nothing the model uses. Exploration that shapes modelling choices, such as which features look predictive or where to cap a tail, uses the training portion only; choosing features because they fit the test rows is a quiet leak.</p>
+    <p><strong>Adversarial validation</strong> is a fast check that training and test data look alike. Label training rows 0 and test (or recent) rows 1 and train a classifier to tell them apart. An AUC near 0.5 means they look alike; a high AUC means they differ, and its top features show where: drift, a changed definition, or an ID that encodes time.</p>
+
+    <!-- cleaning -->
+    <h2 id="cleaning"><span class="pn">02</span>Cleaning</h2>
+    <p>Cleaning makes each value mean what it claims to mean. Most cleaning steps are row-by-row rules that learn nothing from the data, which is why they can safely run before the split.</p>
+
+    <h3>Duplicates</h3>
+    <ul>
+      <li><strong>What:</strong> exact copies (a replayed batch, a join that fanned one row out into several) and near-copies (the same customer re-applying, a retried payment).</li>
+      <li><strong>Why it matters:</strong> copies get extra weight, and a copy in training with its twin in validation means the model is graded on rows it memorized.</li>
+      <li><strong>What to do:</strong> first ask whether the repeat is real; two identical purchases can both be genuine. Remove artefacts; keep genuine repeats but split by entity. Check the row count after every join, since a many-to-many join multiplies rows silently.</li>
+    </ul>
+
+    <h3>Inconsistent categories</h3>
+    <ul>
+      <li><strong>What:</strong> one real level written several ways: case, stray spaces, typos, synonyms (“Self-employed”, “Business owner”).</li>
+      <li><strong>Why it matters:</strong> one level splits into several rare ones with noisy averages, and a new spelling at serving time becomes an unseen category.</li>
+      <li><strong>What to do:</strong> trim, lower-case and normalize Unicode, then map with an explicit table. Fuzzy matching finds candidates, but a person approves the merges: “Mumbai” and “Mumba” are one place, “Austria” and “Australia” are not.</li>
+    </ul>
+
+    <h3>Wrong types, impossible values and units</h3>
+    <ul>
+      <li><strong>Wrong types:</strong> numbers stored as text (“1,200”, “12k”), mixed date formats, booleans as “Y”, “yes” and 1. And the reverse: IDs and postcodes stored as numbers, so a model treats one postcode as “bigger” than another.</li>
+      <li><strong>Sentinels:</strong> −1, 0 or 9999 meaning “unknown”. An income of 0 that means “not provided” is a blank pretending to be a value, and a linear model reads it as very low income. Convert sentinels to proper blanks.</li>
+      <li><strong>Impossible values</strong> (an age of 230, a negative quantity, an end before a start) are errors, not outliers. Set them to missing rather than deleting the row.</li>
+      <li><strong>Unit mismatches</strong> (rupees vs thousands, 35 vs 0.35, grams vs kilograms) show up as clusters a factor of 10, 100 or 1,000 apart. Split the distribution by source or by date to find them.</li>
+    </ul>
+
+    <h3>Label noise</h3>
+    <ul>
+      <li><strong>What:</strong> wrong targets: annotators disagree, a definition changed (default at 30 days past due, later 90), or a label isn't mature yet (a loan disbursed last month can't have defaulted, so it's “good” too early).</li>
+      <li><strong>Why it matters:</strong> random noise caps the accuracy you can reach and blurs probabilities; systematic noise, like immature labels, teaches something false.</li>
+      <li><strong>Detect:</strong> rows whose out-of-fold probability strongly disagrees with their label (the idea behind confident learning), the highest-loss rows, annotator disagreement; then review a sample by hand.</li>
+      <li><strong>Treat:</strong> relabel or drop clear errors, set a maturity window for outcomes, and prefer training that doesn't chase every point (label smoothing, early stopping). Keep the test labels cleanest of all, or every model comparison is noisy.</li>
+    </ul>
+
+    <!-- split -->
+    <h2 id="split"><span class="pn">03</span>Split first: honest splits and leakage</h2>
+    <p>Every later step asks the same question: was this fitted on data the model will legitimately have? So the split comes before any step that learns from the data.</p>
+
+    <h3>Train, validation, test</h3>
+    <ul>
+      <li><strong>Training set:</strong> fits the model's parameters and every preprocessing statistic.</li>
+      <li><strong>Validation set (or cross-validation folds):</strong> chooses hyperparameters, features, thresholds and the preprocessing recipe.</li>
+      <li><strong>Test set:</strong> touched once, at the end. Every look followed by a change turns it into a validation set, and the estimate becomes optimistic.</li>
+    </ul>
+    <p><strong>The rule for preprocessing:</strong> a step that learns a number (a median, a mean and standard deviation, a category's average target, a vocabulary, a list of selected features) is <em>fitted</em> on training rows and <em>applied</em> unchanged to validation, test and production rows. Steps that learn nothing, like parsing a date, can run anywhere.</p>
+
+    <h3>Choosing the split</h3>
+    <p>The split must imitate how the model will meet new data. Ask: at prediction time, what's new?</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Situation</th><th>Split</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Independent rows, classification</td><td>Stratified k-fold</td><td>Each fold keeps the class ratio. With 2% positives, a random fold can get very few, and its score is noise.</td></tr>
+        <tr><td>Many rows per customer, store or device; new ones at deployment</td><td>Group k-fold</td><td>All rows of one group stay together, so the model can't score well by recognizing the customer.</td></tr>
+        <tr><td>Data ordered in time; predicting forward (credit, demand, fraud)</td><td>Time-based: expanding or rolling window, plus a final out-of-time test</td><td>Train on the past, test on the future, as in production. Random splits leak trends and future regimes backwards.</td></tr>
+        <tr><td>Labels that cover a horizon (default within 12 months)</td><td>Time-based with a gap</td><td>The last training rows' outcomes are only observed during the validation period; the gap drops them.</td></tr>
+      </tbody>
+    </table></div>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 600 214" role="img" aria-label="Expanding-window time series cross-validation. Four folds; in each, training covers all earlier periods, then one period is left as a gap, then the next period is validation. Each fold's training window is longer than the last.">
+          <rect class="cellon" x="96" y="14" width="16" height="12"/><text x="118" y="25">train</text>
+          <rect class="celloff" x="172" y="14" width="16" height="12" style="stroke:var(--ink-3);stroke-dasharray:3 2"/><text x="194" y="25">gap</text>
+          <rect x="236" y="14" width="16" height="12" style="fill:var(--grad-wash);stroke:var(--grad);stroke-width:1"/><text x="258" y="25">validate</text>
+          <text class="lbl" x="84" y="64" text-anchor="end">fold 1</text>
+          <text class="lbl" x="84" y="100" text-anchor="end">fold 2</text>
+          <text class="lbl" x="84" y="136" text-anchor="end">fold 3</text>
+          <text class="lbl" x="84" y="172" text-anchor="end">fold 4</text>
+          <g>
+            <rect class="cellon" x="96" y="48" width="38" height="24"/><rect class="cellon" x="136" y="48" width="38" height="24"/><rect class="cellon" x="176" y="48" width="38" height="24"/><rect class="cellon" x="216" y="48" width="38" height="24"/><rect class="celloff" x="256" y="48" width="38" height="24" style="stroke:var(--ink-3);stroke-dasharray:3 2"/><rect x="296" y="48" width="38" height="24" style="fill:var(--grad-wash);stroke:var(--grad);stroke-width:1"/><rect class="celloff" x="336" y="48" width="38" height="24"/><rect class="celloff" x="376" y="48" width="38" height="24"/><rect class="celloff" x="416" y="48" width="38" height="24"/><rect class="celloff" x="456" y="48" width="38" height="24"/><rect class="celloff" x="496" y="48" width="38" height="24"/><rect class="celloff" x="536" y="48" width="38" height="24"/>
+            <rect class="cellon" x="96" y="84" width="38" height="24"/><rect class="cellon" x="136" y="84" width="38" height="24"/><rect class="cellon" x="176" y="84" width="38" height="24"/><rect class="cellon" x="216" y="84" width="38" height="24"/><rect class="cellon" x="256" y="84" width="38" height="24"/><rect class="cellon" x="296" y="84" width="38" height="24"/><rect class="celloff" x="336" y="84" width="38" height="24" style="stroke:var(--ink-3);stroke-dasharray:3 2"/><rect x="376" y="84" width="38" height="24" style="fill:var(--grad-wash);stroke:var(--grad);stroke-width:1"/><rect class="celloff" x="416" y="84" width="38" height="24"/><rect class="celloff" x="456" y="84" width="38" height="24"/><rect class="celloff" x="496" y="84" width="38" height="24"/><rect class="celloff" x="536" y="84" width="38" height="24"/>
+            <rect class="cellon" x="96" y="120" width="38" height="24"/><rect class="cellon" x="136" y="120" width="38" height="24"/><rect class="cellon" x="176" y="120" width="38" height="24"/><rect class="cellon" x="216" y="120" width="38" height="24"/><rect class="cellon" x="256" y="120" width="38" height="24"/><rect class="cellon" x="296" y="120" width="38" height="24"/><rect class="cellon" x="336" y="120" width="38" height="24"/><rect class="cellon" x="376" y="120" width="38" height="24"/><rect class="celloff" x="416" y="120" width="38" height="24" style="stroke:var(--ink-3);stroke-dasharray:3 2"/><rect x="456" y="120" width="38" height="24" style="fill:var(--grad-wash);stroke:var(--grad);stroke-width:1"/><rect class="celloff" x="496" y="120" width="38" height="24"/><rect class="celloff" x="536" y="120" width="38" height="24"/>
+            <rect class="cellon" x="96" y="156" width="38" height="24"/><rect class="cellon" x="136" y="156" width="38" height="24"/><rect class="cellon" x="176" y="156" width="38" height="24"/><rect class="cellon" x="216" y="156" width="38" height="24"/><rect class="cellon" x="256" y="156" width="38" height="24"/><rect class="cellon" x="296" y="156" width="38" height="24"/><rect class="cellon" x="336" y="156" width="38" height="24"/><rect class="cellon" x="376" y="156" width="38" height="24"/><rect class="cellon" x="416" y="156" width="38" height="24"/><rect class="cellon" x="456" y="156" width="38" height="24"/><rect class="celloff" x="496" y="156" width="38" height="24" style="stroke:var(--ink-3);stroke-dasharray:3 2"/><rect x="536" y="156" width="38" height="24" style="fill:var(--grad-wash);stroke:var(--grad);stroke-width:1"/>
+          </g>
+          <path class="in" d="M96 200 H572" marker-end="url(#a-in)"/>
+          <text class="lbl" x="335" y="212" text-anchor="middle">time →  each block is one month</text>
+        </svg>
+      </div>
+      <figcaption>Expanding-window validation. Each fold trains on everything before a cut-off, skips a gap as long as the label horizon (here, one month), and validates on the next period. The folds' scores show whether performance holds as time moves on.</figcaption>
+    </figure>
+
+    <h3 id="leak-types">Leakage, in four kinds</h3>
+    <p><strong>Leakage</strong> is any information available in training or validation that won't be available when the model makes a real prediction. It's the most common reason for “great offline, poor in production”.</p>
+    <ol>
+      <li><strong>Target leakage:</strong> a feature recorded after the label, or caused by it: “number of collections calls” when predicting default, “chargeback filed” when predicting fraud. The test, per feature: is this value known, with this exact content, at the moment of prediction?</li>
+      <li><strong>Train–test contamination:</strong> the same row, a near-copy or the same customer on both sides of the split. Oversampling or SMOTE before the split does this too.</li>
+      <li><strong>Preprocessing fitted on all the data:</strong> a scaler, imputer, encoder, PCA or feature selection fitted before splitting. Scaling leaks a little; target encoding and feature selection leak a lot, because they use the labels.</li>
+      <li><strong>Temporal leakage:</strong> random splits of time-ordered data, a customer's lifetime average that includes later rows, or today's value of a slowly changing table joined instead of its value at prediction time.</li>
+    </ol>
+    <p><strong>How it shows up:</strong> a score too good for the problem; one feature dominating importance, or predicting the target almost perfectly alone; a random split scoring far above a time-based or grouped one.</p>
+
+    <h3 id="pipelines">Pipelines are the fix</h3>
+    <p>A <code>Pipeline</code> chains preprocessing and the model into one object, and a <code>ColumnTransformer</code> applies different preprocessing to different columns. Hand the whole pipeline to cross-validation and every step is refitted on each training fold, so the validation fold never touches any statistic. The same fitted object then runs in production, which removes train–serve skew (two codebases computing a feature slightly differently). A full example is in section <a href="#code">13</a>.</p>
+    <aside class="note trap"><p class="nl">Trap</p><p>“Scaling has no labels, so scaling everything before cross-validation is fine.” The effect is small for scaling, but the same order of steps with target encoding, feature selection or SMOTE inflates the score a lot. Put every fitted step inside the pipeline.</p></aside>
+
+    <!-- missing -->
+    <h2 id="missing"><span class="pn">04</span>Missing values</h2>
+    <p>Filling a blank is the last step, not the first. Three questions come before any method:</p>
+    <ol>
+      <li><strong>Why is it missing?</strong> The mechanism decides which methods are unbiased.</li>
+      <li><strong>Does missingness itself predict the target?</strong> If it does, it's a feature, and filling it in without a trace throws that feature away.</li>
+      <li><strong>Will it be missing in production in the same way?</strong> The model must meet blanks at serving time exactly as it met them in training.</li>
+    </ol>
+
+    <h3 id="mechanisms">Why values go missing: MCAR, MAR, MNAR</h3>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 660 222" role="img" aria-label="Three missingness mechanisms. MCAR: whether a value is blank depends on pure chance. MAR: it depends on other observed columns. MNAR: it depends on the missing value itself, which you never see.">
+          <path d="M220 34 V212 M440 34 V212" style="stroke:var(--rule);stroke-width:1;fill:none"/>
+          <text x="110" y="22" text-anchor="middle" style="fill:var(--ink);font-weight:600">MCAR</text>
+          <text x="330" y="22" text-anchor="middle" style="fill:var(--ink);font-weight:600">MAR</text>
+          <text x="550" y="22" text-anchor="middle" style="fill:var(--ink);font-weight:600">MNAR</text>
+          <rect class="box" x="12" y="40" width="92" height="40" rx="8"/><text x="58" y="64" text-anchor="middle" style="font-size:12px">other columns</text>
+          <rect class="box" x="116" y="40" width="92" height="40" rx="8" style="stroke-dasharray:5 4"/><text x="162" y="64" text-anchor="middle" style="font-size:12px">the value</text>
+          <rect class="gbox" x="64" y="136" width="92" height="40" rx="8"/><text x="110" y="160" text-anchor="middle">blank?</text>
+          <text class="lbl" x="110" y="108" text-anchor="middle">pure chance</text>
+          <path class="cw" d="M110 114 V132" marker-end="url(#a-cw)"/>
+          <rect class="box" x="232" y="40" width="92" height="40" rx="8"/><text x="278" y="64" text-anchor="middle" style="font-size:12px">other columns</text>
+          <rect class="box" x="336" y="40" width="92" height="40" rx="8" style="stroke-dasharray:5 4"/><text x="382" y="64" text-anchor="middle" style="font-size:12px">the value</text>
+          <rect class="gbox" x="284" y="136" width="92" height="40" rx="8"/><text x="330" y="160" text-anchor="middle">blank?</text>
+          <path class="cw" d="M278 80 L314 132" marker-end="url(#a-cw)"/>
+          <rect class="box" x="452" y="40" width="92" height="40" rx="8"/><text x="498" y="64" text-anchor="middle" style="font-size:12px">other columns</text>
+          <rect class="box" x="556" y="40" width="92" height="40" rx="8" style="stroke-dasharray:5 4"/><text x="602" y="64" text-anchor="middle" style="font-size:12px">the value</text>
+          <rect class="gbox" x="504" y="136" width="92" height="40" rx="8"/><text x="550" y="160" text-anchor="middle">blank?</text>
+          <path class="cw" d="M602 80 L566 132" marker-end="url(#a-cw)"/>
+          <text class="lbl" x="110" y="204" text-anchor="middle">depends on nothing</text>
+          <text class="lbl" x="330" y="204" text-anchor="middle">depends on what you see</text>
+          <text class="lbl" x="550" y="204" text-anchor="middle">depends on the hidden value</text>
+        </svg>
+      </div>
+      <figcaption>What decides whether a value is blank. The dashed box is the value itself, which you never see when it's blank. Only in MNAR does the blank depend on it.</figcaption>
+    </figure>
+    <div class="tbl"><table>
+      <thead><tr><th>Mechanism</th><th>Example</th><th>What it implies</th></tr></thead>
+      <tbody>
+        <tr><td><strong>MCAR</strong>, missing completely at random</td><td>A sensor drops readings at random; a batch of forms was lost in a migration.</td><td>The complete rows are a random sample, so dropping rows adds no bias; it only loses data. A mean fill keeps the mean right but still shrinks the spread and the correlations.</td></tr>
+        <tr><td><strong>MAR</strong>, missing at random given what's observed</td><td>Income is blank more often for self-employed applicants, and employment type is recorded. Within each employment type, blanks are random.</td><td>Dropping rows under-represents the self-employed, so it's biased. Imputing income <em>from</em> employment type and the other columns can remove that bias.</td></tr>
+        <tr><td><strong>MNAR</strong>, missing not at random</td><td>Applicants with low incomes leave the field blank <em>because</em> the income is low.</td><td>Imputing from other columns stays biased: even rows that match on every observed column differ in the hidden value. The information sits in the fact of the blank, so keep it as a feature.</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>A fourth case, structural blanks:</strong> “months since last loan” for someone who has never had a loan. Nothing is unknown here; the value is undefined. Imputing a typical value would invent a loan. Use a domain rule instead: a “none” category, or a sentinel plus an indicator.</p>
+    <p><strong>Why the names matter in practice.</strong> For a prediction model, the key question is whether blanks at serving time are produced the same way as in training. If they are, the blank can be used as a feature whatever the mechanism, even MNAR. For inference (estimating a coefficient, an effect, a population average) the mechanism decides whether the estimate is biased, and MNAR needs assumptions the data can't check.</p>
+
+    <h3 id="diagnose">Diagnosing the mechanism</h3>
+    <ol>
+      <li><strong>Compare rows with and without the value.</strong> Look at the other columns' distributions and at the target rate in each group. If the groups differ, the data isn't MCAR.</li>
+      <li><strong>Predict the blank.</strong> Train a classifier on the other columns to predict “is this value missing?”, scored out-of-fold. An AUC near 0.5 is consistent with MCAR. A clearly higher AUC means it isn't MCAR: the blanks depend on observed columns (MAR, or MNAR if the value itself matters too), and the classifier's top features say which. An AUC near 0.5 can't rule out MNAR. Little's MCAR test is the formal version of this check, for means.</li>
+      <li><strong>Check whether the blank predicts the target.</strong> If rows with a blank default at twice the rate of the rest, the blank is a predictor, however it arose.</li>
+      <li><strong>MAR vs MNAR can't be settled from the data.</strong> The difference is about values you never observe. Use domain knowledge (why would someone skip this field?), a follow-up sample where the true values are obtained, or an outside source that has them for some rows.</li>
+    </ol>
+
+    <h3 id="indicator">Missingness as a signal: the indicator column</h3>
+    <p>A <strong>missing indicator</strong> is a 0/1 column that records whether the original value was blank, added next to the filled-in column. The model can then give blanks their own effect, and it knows which values are real and which were filled in.</p>
+    <p><strong>In a linear model it frees the blank rows' prediction.</strong> Fill blanks with any constant \(c\), giving the filled column \(\tilde x\) (\(x\) where observed, \(c\) where blank), and add the indicator \(I\):</p>
+    <div class="mj">\[ \begin{aligned} \hat y &amp;= \beta_0 + \beta\, \tilde x + \theta I \\ \text{observed rows:}\quad \hat y &amp;= \beta_0 + \beta x \\ \text{blank rows:}\quad \hat y &amp;= \beta_0 + \beta c + \theta \end{aligned} \]</div>
+    <p>In words: the blank rows get their own intercept through \(\theta\), so the slope \(\beta\) is pinned only by real \(x\) values, and without regularization the choice of \(c\) doesn't change the fit at all. Without the indicator, blank rows are forced onto the line at \(x = c\), and if blanks behave unlike a typical value, they drag \(\beta\) around.</p>
+    <p><strong>Add one when:</strong></p>
+    <ul>
+      <li>the target rate differs between blank and non-blank rows, or MNAR is plausible;</li>
+      <li>you fill with a simple value for a linear model or a neural net;</li>
+      <li>the share missing isn't trivial (an indicator that's almost always 0 carries little).</li>
+    </ul>
+    <p><strong>Skip it, or think twice, when:</strong></p>
+    <ul>
+      <li>a boosting library handles blanks natively: it already learns where blanks go at each split;</li>
+      <li>the collection process will change. If the income field becomes mandatory, a model that learned “blank means risky” has a feature that no longer fires;</li>
+      <li>many columns go blank together (one source failed). Use one indicator per source or pattern, not one per column.</li>
+    </ul>
+    <p><strong>Trade-off:</strong> the model now depends on how the data was collected, which is often a strong signal and always a fragile one. Monitor missing rates in production: a pipeline bug that blanks a field changes scores without any error.</p>
+
+    <h3 id="numeric-impute">Numeric options</h3>
+    <p><strong>Mean or median.</strong> Replace each blank with the training mean or median. It's fast, simple and stable. The median is the usual choice for skewed columns such as income, where a few huge values pull the mean. What it distorts, with a share \(r\) missing completely at random and filled with the mean (\(\tilde x\) is the filled column, \(z\) any other column):</p>
+    <div class="mj">\[ \begin{aligned} \operatorname{Var}(\tilde x) &amp;\approx (1 - r)\, \operatorname{Var}(x) \\ \operatorname{Corr}(\tilde x, z) &amp;\approx \sqrt{1 - r}\; \operatorname{Corr}(x, z) \end{aligned} \]</div>
+    <p>In words: every filled value sits exactly at the centre, so it adds nothing to the spread and nothing to any co-movement with other columns. The variance shrinks, every correlation weakens, and the histogram grows a spike at the mean.</p>
+    <p>Under MAR it's also biased: filling a self-employed applicant's income with the overall median ignores what employment type says. In a model with several correlated features, the other features absorb the missing part of \(x\), which biases their coefficients. With an indicator, much of the damage to <em>prediction</em> goes away; the damage to inference doesn't.</p>
+    <p><strong>A constant, plus an indicator.</strong> Fill with a fixed value. For trees, an out-of-range value such as −999 puts every blank at one end, so one split can separate them: a crude version of native handling. For linear models, an out-of-range constant without an indicator is harmful: it acts as an extreme point with high leverage and tilts the slope. With an indicator the constant doesn't matter, but only without regularization and before scaling: a −999 fill inflates a later scaler's \(\sigma\) and squeezes the real values together. For linear models and neural nets, fill with the median and let the indicator carry the signal.</p>
+    <p><strong>kNN imputation.</strong> For a row with a blank, find the \(k\) most similar training rows, measured on the columns both have, and average their values (a majority vote for categories).</p>
+    <ul>
+      <li><strong>Why:</strong> it fills from rows that look alike, so it respects local structure and relationships without assuming a model.</li>
+      <li><strong>Costs:</strong> features must be scaled first, or the largest-unit column decides who's “similar”. Every imputation searches the training set, so it's slow on big data and the training rows must be kept for serving. Distances get less meaningful as the number of columns grows.</li>
+      <li><strong>When:</strong> small-to-medium data with a few informative numeric columns. Not for big data, many columns, or mostly categorical data.</li>
+    </ul>
+    <p><strong>Model-based (regression) imputation.</strong> Train a model to predict the column from the others, on rows where it's observed, and predict the blanks.</p>
+    <ul>
+      <li><strong>Why:</strong> under MAR it uses exactly the information that explains the blanks, so it removes the bias that mean filling leaves.</li>
+      <li><strong>The catch:</strong> predictions sit on the regression surface with no noise, so imputed values are too regular and correlations come out <em>too strong</em>. Adding a random draw of the model's residual (stochastic regression imputation) fixes the spread.</li>
+      <li><strong>When:</strong> under MAR, when the column matters to a linear model or to inference.</li>
+      <li><strong>Never use the target as an input in a prediction pipeline:</strong> the target isn't known when a new row arrives. (In multiple imputation for inference, the reverse holds: the outcome <em>should</em> be in the imputation model, or the imputed values weaken its relationships.)</li>
+    </ul>
+    <p><strong>Iterative imputation (MICE).</strong> Model-based imputation for many columns at once, when several have blanks:</p>
+    <ol>
+      <li>Fill every blank with a simple value (the median).</li>
+      <li>For each column with blanks in turn, fit a model predicting it from all the other columns, on the rows where it's observed, and replace its blanks with the predictions.</li>
+      <li>Cycle through the columns several times, until the imputed values stop changing much.</li>
+    </ol>
+    <p>MICE (multiple imputation by chained equations) is the version that adds random draws at step 2 and repeats the whole process to produce several completed datasets (see <a href="#multiple">multiple imputation</a>). sklearn's <code>IterativeImputer</code> returns one completed dataset per run (run it several times with <code>sample_posterior=True</code> for multiple imputation); with random forests as the per-column model it's close to missForest. <strong>Trade-offs:</strong> it uses the joint structure of all columns and handles blanks in many columns at once, but it's slow, it assumes MAR, it can overfit, convergence isn't guaranteed, and a single deterministic run understates uncertainty.</p>
+    <p><strong>Time series: forward fill and interpolation.</strong> Forward fill carries the last observed value forward; it uses only the past, so it's safe for live prediction. Add “time since last real observation”, because a value carried forward for a month isn't as trustworthy as yesterday's. Linear interpolation between neighbours uses the <em>next</em> value, which doesn't exist yet at prediction time: fine for cleaning a historical chart, a leak in a forecasting feature.</p>
+    <p><strong>Domain rules.</strong> Often the best imputer is knowing the data. A blank “number of previous defaults” for a bureau record that exists means 0; a blank “spouse income” for a single applicant means “not applicable”; a blank discount means no discount. Encode these explicitly, before any statistical method.</p>
+
+    <h3 id="cat-impute">Categorical options</h3>
+    <p><strong>An explicit “Missing” category: usually the best default.</strong> Treat the blank as its own level.</p>
+    <ul>
+      <li><strong>Why:</strong> it keeps the signal if there is one, assumes nothing about the mechanism, and works with every encoder (one-hot gives it a column, target encoding gives it its own rate, a tree can split it off).</li>
+      <li><strong>Costs:</strong> one more level. If blanks are very rare it's a rare category with a noisy estimate (group it or smooth it). If training had no blanks but production does, “Missing” is an unseen category, so plan for it.</li>
+    </ul>
+    <p><strong>Mode (most frequent value): acceptable only in a narrow case.</strong></p>
+    <ul>
+      <li><strong>When it's fine:</strong> the blanks are MCAR, so the blank rows are a random sample and the most common level is the best single guess; the share is small (a few percent), so the distortion is negligible; and the blank doesn't predict the target. Quick baselines and linear models where you'd rather not add a level fit this case.</li>
+      <li><strong>What goes wrong otherwise:</strong> filled rows join the mode category, so it becomes a mixture of two populations. Its target rate, its encoding and its coefficient all drift towards the blanks' behaviour, so the biggest category's own signal gets corrupted. If the blanks were informative (MAR or MNAR), that information is erased. And if no level dominates, the mode is a poor guess: it's right only as often as its share.</li>
+    </ul>
+    <p><strong>A classifier-based imputer.</strong> Under MAR, predict the missing category from the other columns (employment type from income, age and region), trained on rows where it's observed and fitted on training data only. It's better than the mode when the other columns really predict the category. Costs: a model to maintain, and its hard guesses look more certain than they are; passing the predicted probabilities instead of one label keeps the uncertainty. Add an indicator if the blank itself predicts the target.</p>
+    <p><strong>kNN.</strong> The majority category among the most similar training rows. The same trade-offs as for numbers: needs scaling, slow on big data.</p>
+
+    <h3 id="native">Models that handle blanks themselves</h3>
+    <p><strong>XGBoost: a learned default direction.</strong> At each candidate split, the rows with a blank in that feature are tried on both sides. The split gain is computed twice, with the blanks' gradient sums \(G_{\text{miss}}, H_{\text{miss}}\) added to the left child, then to the right:</p>
+    <div class="mj">\[ \begin{aligned} \text{Gain} &amp;= \tfrac12\Big[\frac{G_L^2}{H_L + \lambda} + \frac{G_R^2}{H_R + \lambda} \\ &amp;\qquad - \frac{(G_L + G_R)^2}{H_L + H_R + \lambda}\Big] - \gamma \end{aligned} \]</div>
+    <div class="mj">\[ \begin{aligned} \text{blanks left:}\quad G_L &amp;\leftarrow G_L + G_{\text{miss}} \\ H_L &amp;\leftarrow H_L + H_{\text{miss}} \\ \text{blanks right:}\quad G_R &amp;\leftarrow G_R + G_{\text{miss}} \\ H_R &amp;\leftarrow H_R + H_{\text{miss}} \end{aligned} \]</div>
+    <p>In words: \(G\) and \(H\) are the sums of the loss's first and second derivatives over the rows in a child, \(\lambda\) is the L2 penalty on leaf values, and \(\gamma\) the minimum gain a split must clear. The direction with the higher gain becomes that node's default, so blanks are routed wherever they look most like the data. Only the non-missing values are sorted and scanned, which also makes this fast on sparse data. Each node learns its own direction, so a blank can mean “risky” at one node and “safe” at another.</p>
+    <ul>
+      <li><strong>LightGBM</strong> does the same by default (and can be told to treat zeros as missing).</li>
+      <li><strong>CatBoost</strong> treats a numeric blank as smaller than every value by default (“Min”), so a split can always put the blanks on one side. Categorical columns need blanks turned into an explicit string such as “Missing”, which becomes its own level.</li>
+      <li><strong>sklearn:</strong> <code>HistGradientBoosting</code> learns the direction like XGBoost; plain decision trees (version 1.3 on) and random forests (1.4 on) accept <code>NaN</code> too.</li>
+      <li><strong>Not handled natively:</strong> linear and logistic regression, SVMs, kNN, most neural nets. They need imputation.</li>
+    </ul>
+    <p><strong>Should you impute before boosting?</strong> Usually not: the learned direction is at least as good as a single fill value, and it keeps the signal. The trap: if a feature had <em>no</em> blanks in training, there was nothing to learn from, so a blank at serving goes to an arbitrary or majority side (sklearn sends it to the child with more rows). A pipeline bug that blanks a field can silently make risky rows look safe. Monitor missing rates.</p>
+
+    <h3 id="drop">Dropping rows or columns</h3>
+    <ul>
+      <li><strong>Dropping rows</strong> is acceptable when the blanks are MCAR, few, and you have data to spare. It's biased under MAR and MNAR, since the rows you keep are no longer representative. And it doesn't solve the production problem: the deployed model will still meet blanks, so you need a strategy for them anyway.</li>
+      <li><strong>Dropping a column</strong> is reasonable when it's mostly blank <em>and</em> neither its values nor its blankness predict the target. Check first: a column that's 95% blank whose presence predicts default should become an indicator, not be deleted.</li>
+      <li><strong>Rows with a missing target</strong> can't be used for supervised training. But check why they're missing: in credit, only approved applicants have outcomes, so the training data is a selected sample (the reject-inference problem).</li>
+    </ul>
+
+    <h3 id="impute-leak">Fit imputers on the training fold only</h3>
+    <p>Imputers learn numbers (medians, the kNN pool, per-column models), so they sit in the pipeline: refitted on each training fold, and frozen from the training fit in production. Fitting one on all rows leaks a little for a median, more for an iterative imputer, which learns relationships between columns, and seriously for anything that uses the target.</p>
+
+    <h3 id="multiple">Multiple imputation, for inference</h3>
+    <p>A single imputation treats filled values as if they were observed. Coefficients may be fine, but their standard errors are too small, because the uncertainty about what the blanks really were has been ignored. When you need inference (confidence intervals, p-values, effect sizes), use <strong>multiple imputation</strong>:</p>
+    <ol>
+      <li>Create \(M\) completed datasets, each with its own random draws for the blanks (MICE with noise). \(M\) of 5 to 20 is common; use more when the share missing is large.</li>
+      <li>Fit the same model on each.</li>
+      <li>Pool the results with <strong>Rubin's rules</strong>:</li>
+    </ol>
+    <div class="mj">\[ \begin{aligned} \bar Q &amp;= \frac{1}{M} \sum_{m=1}^{M} \hat Q_m \\ \bar W &amp;= \frac{1}{M} \sum_{m=1}^{M} W_m \\ B &amp;= \frac{1}{M - 1} \sum_{m=1}^{M} \big(\hat Q_m - \bar Q\big)^2 \\ T &amp;= \bar W + \Big(1 + \frac{1}{M}\Big) B \end{aligned} \]</div>
+    <p>In words: \(\hat Q_m\) is the estimate from dataset \(m\) and \(W_m\) its squared standard error. The pooled estimate \(\bar Q\) is their average. The total variance \(T\) adds the usual sampling variance \(\bar W\) to the disagreement between imputations \(B\), which is the uncertainty single imputation throws away. For pure prediction, multiple imputation rarely pays off; averaging predictions over the \(M\) datasets is at most a mild ensemble.</p>
+
+    <h3 id="choose-impute">Choosing a method</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Situation</th><th>Method</th></tr></thead>
+      <tbody>
+        <tr><td>Few blanks, MCAR, blank doesn't predict the target</td><td>Median (numeric) or mode (categorical); dropping rows is fine if data is plentiful</td></tr>
+        <tr><td>The blank predicts the target, or MNAR is plausible</td><td>Keep the signal: indicator plus a simple fill, or a “Missing” category, or native handling</td></tr>
+        <tr><td>MAR, the feature matters, other columns predict it</td><td>Model-based or iterative imputation, plus an indicator if blanks are informative</td></tr>
+        <tr><td>Gradient boosting (XGBoost, LightGBM, CatBoost)</td><td>Leave blanks as <code>NaN</code>; monitor missing rates</td></tr>
+        <tr><td>Linear model, SVM, kNN, neural net</td><td>Median plus indicator by default; model-based if MAR and important</td></tr>
+        <tr><td>Structural (“not applicable”)</td><td>Domain rule: 0, a “none” level, or a sentinel plus an indicator</td></tr>
+        <tr><td>Time series, live prediction</td><td>Forward fill from the past, plus time since the last real value</td></tr>
+        <tr><td>Inference: coefficients, intervals</td><td>Multiple imputation (MICE), pooled with Rubin's rules</td></tr>
+        <tr><td>Column mostly blank, blank not predictive</td><td>Drop the column</td></tr>
+      </tbody>
+    </table></div>
+
+    <!-- outliers -->
+    <h2 id="outliers"><span class="pn">05</span>Outliers</h2>
+    <p>Two things share the name. An <strong>error</strong> is a wrong value (an age of 230, an amount in the wrong unit); a <strong>genuine extreme</strong> is right but rare (a very large legitimate payment). They need opposite treatment, so first tell them apart: check domain limits, the source, and whether the rest of the row agrees.</p>
+
+    <h3>Detecting them</h3>
+    <p><strong>z-score.</strong> Flag values more than about 3 standard deviations from the mean:</p>
+    <div class="mj">\[ z_i = \frac{x_i - \bar x}{s} \]</div>
+    <p>In words: how many standard deviations a value is from the average. It assumes a roughly normal shape, and it suffers from <strong>masking</strong>: the outliers inflate \(s\) and drag \(\bar x\) towards themselves, which shrinks their own z-scores. In a sample of \(n\) points no z-score can exceed \((n-1)/\sqrt n\), so with ten or fewer points a z above 3 is impossible, however wild the value.</p>
+    <p><strong>Robust z-score, with the MAD.</strong> Replace the mean with the median \(\tilde x\) and the standard deviation with the median absolute deviation:</p>
+    <div class="mj">\[ \begin{aligned} \text{MAD} &amp;= \operatorname{median}_i \big\lvert x_i - \tilde x \big\rvert \\ z_i^{\text{robust}} &amp;= \frac{0.6745\,(x_i - \tilde x)}{\text{MAD}} \end{aligned} \]</div>
+    <p>In words: the median and the MAD barely move when a few values are extreme, so the outliers can't hide themselves. The 0.6745 makes the score comparable to an ordinary z for normal data (the standard deviation is about 1.4826 MAD). A common flag is \(\lvert z^{\text{robust}} \rvert &gt; 3.5\).</p>
+    <p><strong>IQR fences (Tukey).</strong></p>
+    <div class="mj">\[ \begin{aligned} \text{IQR} &amp;= Q_3 - Q_1 \\ \text{lower fence} &amp;= Q_1 - 1.5\,\text{IQR} \\ \text{upper fence} &amp;= Q_3 + 1.5\,\text{IQR} \end{aligned} \]</div>
+    <p>In words: the middle half of the data sets the scale, and anything more than one and a half middle-halves beyond it is flagged (3 IQR for “far out”). Quartiles are robust and assume no distribution, but on a right-skewed column such as income the fences flag a large part of the perfectly real long tail. Take the log first, then fence.</p>
+    <p><strong>Multivariate methods,</strong> for points that are normal on every column but odd in combination (a large amount at 3 a.m. from a new device):</p>
+    <ul>
+      <li><strong>Isolation forest:</strong> random trees with random splits. An outlier sits in a sparse region, so it's isolated in few splits; the score is the average path length. Fast and scalable; its expected-outlier-share setting fixes the threshold, and it struggles when anomalies form dense clusters of their own.</li>
+      <li><strong>Local outlier factor (LOF):</strong> compares a point's density with its neighbours', so it finds points that are odd <em>for their region</em>. Slow on big data and sensitive to the number of neighbours.</li>
+      <li><strong>Residual-based:</strong> rows with large standardized residuals from a model. In linear regression also check leverage (an unusual \(x\)) and Cook's distance (how much the fit moves without the row).</li>
+      <li><strong>Domain rules:</strong> limits no statistic needs to find, such as non-negative quantities and dates not in the future.</li>
+    </ul>
+
+    <h3>What outliers do to statistics and models</h3>
+    <ul>
+      <li><strong>Mean, standard deviation, scaling:</strong> one extreme value shifts the mean and inflates the standard deviation more, so standardization squeezes every normal value into a narrow band. Min-max is worse: one extreme sets the range.</li>
+      <li><strong>Linear models with squared loss:</strong> a row's loss grows with its squared residual, so its pull on the fit grows with the residual, without limit. One far point can tilt the line, and a high-leverage point can rotate it. Distance methods (k-means, kNN) get pulled too.</li>
+      <li><strong>Trees, extreme inputs:</strong> robust. Splits use only the order of values, so an extreme \(x\) just lands at one end.</li>
+      <li><strong>Trees, extreme targets:</strong> not robust. With squared error, a leaf is a mean that one extreme target pulls, and in boosting the largest residuals dominate the gradients. Use a Huber or absolute-error loss.</li>
+    </ul>
+
+    <h3>Treating them</h3>
+    <ul>
+      <li><strong>Errors: fix or remove.</strong> Correct from the source if you can; otherwise set the value to missing and let the missing-value strategy handle it, rather than dropping the row.</li>
+      <li><strong>Cap (winsorize).</strong> Clip to percentiles learned on training data, such as the 1st and 99th. The row stays with limited influence, but you lose <em>how</em> extreme it was; add a “was capped” flag if many rows hit the cap.</li>
+      <li><strong>Transform.</strong> A log, Box-Cox or Yeo-Johnson transform pulls in a long tail without deleting anything (section <a href="#scaling">07</a>).</li>
+      <li><strong>Use a robust loss or model.</strong> Huber loss is squared for small residuals and linear for large ones, so a far point pulls with constant force instead of growing force:</li>
+    </ul>
+    <div class="mj">\[ L_\delta(r) = \begin{cases} \tfrac12 r^2 &amp; \lvert r \rvert \le \delta \\ \delta \big(\lvert r \rvert - \tfrac12 \delta\big) &amp; \lvert r \rvert &gt; \delta \end{cases} \]</div>
+    <p>In words: \(r\) is the residual and \(\delta\) the point where the loss switches from squared to linear. Absolute error (which predicts the median) and quantile losses are more robust still.</p>
+    <ul>
+      <li><strong>Keep them when they are the signal.</strong> In fraud, anomaly detection or large insurance claims, the extremes are what the model exists to find; removing them removes the positives. And production will contain extremes anyway, so the model must behave sensibly on them.</li>
+    </ul>
+    <aside class="note trap"><p class="nl">Trap</p><p>Removing outliers from the test set. It makes the score look better while the model meets the same extremes in production. Decide the outlier rule on training data, then apply it identically everywhere, including at serving time.</p></aside>
+
+    <!-- encoding -->
+    <h2 id="encoding"><span class="pn">06</span>Encoding categorical features</h2>
+    <p>Most models need numbers. An encoding decides what a model can learn from a category: whether it sees an order, how many parameters the category costs, and whether the labels were used to build it. The right choice depends on the model and on the <strong>cardinality</strong> (the number of levels).</p>
+
+    <h3 id="onehot">One-hot encoding</h3>
+    <p>One 0/1 column per level. No order is invented, and each level gets its own coefficient.</p>
+    <ul>
+      <li><strong>The dummy-variable trap.</strong> With an intercept, the \(K\) one-hot columns always sum to 1, which is exactly the intercept column. The columns are perfectly collinear, \(X^\top X\) can't be inverted, and an unregularized linear model has no unique solution. Drop one level (the reference); each remaining coefficient then means “difference from the reference level”.</li>
+      <li><strong>With regularization, keep all \(K\).</strong> The penalty picks a unique solution and treats every level symmetrically, whereas dropping one makes the result depend on which level you dropped. Trees and neural nets don't need a level dropped either.</li>
+      <li><strong>High cardinality hurts.</strong> Thousands of sparse columns; rare levels get noisy coefficients; memory grows. A tree can only peel off one level per split, so a high-cardinality feature's signal is spread thin across many weak columns and needs many splits to use.</li>
+      <li><strong>Best for:</strong> a handful to a few dozen levels, in linear models and neural nets.</li>
+    </ul>
+
+    <h3 id="ordinal">Ordinal (label) encoding</h3>
+    <p>One integer per level.</p>
+    <ul>
+      <li><strong>Truly ordered levels</strong> (education, small/medium/large, credit grades A to E): in a linear model, one slope then covers all levels, which assumes the steps between neighbours are equal. One-hot is the flexible alternative, at the cost of more parameters.</li>
+      <li><strong>Unordered levels in a linear model: wrong.</strong> The model treats code 7 as seven times code 1, and the result depends on whatever order (often alphabetical) produced the codes.</li>
+      <li><strong>Unordered levels in a tree: workable.</strong> A tree can cut the integer line several times, so it can still separate levels. But each cut splits a contiguous range of codes, so grouping risky levels that happen to sit far apart in the code order costs many splits. Ordering the codes by target rate fixes that, which is where target encoding comes in.</li>
+      <li>(sklearn's <code>LabelEncoder</code> is meant for the target; use <code>OrdinalEncoder</code> for features.)</li>
+    </ul>
+
+    <h3 id="target-enc">Target (mean) encoding</h3>
+    <p>Replace each level with the average target of the training rows in that level: the default rate of a postcode, the average basket value of a merchant category. For a multi-class target, use one column per class (the class's share in that level).</p>
+    <p><strong>Why it works.</strong> It turns any number of levels into one numeric column ordered by risk. For a yes/no target, sorting the levels by their rate and trying each cut in that order is guaranteed to find the best split of the levels into two groups (Breiman's result), so one split in a tree does what one-hot needs dozens for. LightGBM's native categorical splits use the same idea, sorting levels by their gradient statistics. For a linear model, it turns a nominal column into one monotone feature.</p>
+    <p><strong>Smoothing.</strong> A level seen 3 times has an average that is mostly noise. Shrink it towards the overall mean \(\bar y\):</p>
+    <div class="mj">\[ \begin{aligned} \text{enc}(c) &amp;= \frac{n_c\, \bar y_c + m\, \bar y}{n_c + m} \\ &amp;= \lambda_c\, \bar y_c + (1 - \lambda_c)\, \bar y \\ \lambda_c &amp;= \frac{n_c}{n_c + m} \end{aligned} \]</div>
+    <p>In words: \(n_c\) is the level's row count, \(\bar y_c\) its average target, and \(m\) the <strong>prior weight</strong>: the overall mean counts as \(m\) extra rows. A big level keeps essentially its own average; a tiny one is pulled to the overall mean; a level never seen gets exactly \(\bar y\). Tune \(m\) by cross-validation, or set it from the data: the noisier the target within a level, the larger \(m\) should be (the empirical-Bayes idea). sklearn's <code>TargetEncoder</code> by default sets \(m\) per level to the level's target variance divided by the overall target variance.</p>
+    <p id="te-leak"><strong>Why it leaks.</strong> Computed on the same rows the model trains on, each row's own label is inside its level's average. For a level with one row, the encoding <em>is</em> the label. For a level with 10 rows, a positive row raises its own encoding by a tenth.</p>
+    <p>The model learns “high encoding means positive”, which holds in training because of the row's own label and fails on new rows. Even a category with no real relationship to the target shows a strong training signal, and the effect is largest for small levels. Smoothing reduces it but doesn't remove it.</p>
+    <p><strong>The fix: out-of-fold encoding.</strong> Split the training rows into \(K\) folds. Encode each fold's rows using averages computed from the other \(K - 1\) folds, so no row's label touches its own encoding. Train the model on these out-of-fold encodings. For validation, test and production rows, use averages from all the training rows.</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 600 252" role="img" aria-label="Out-of-fold target encoding with five folds. In each of five rounds, one fold is encoded using category averages from the other four folds. Finally, test rows are encoded with averages from all training rows.">
+          <rect class="cellon" x="96" y="12" width="16" height="12"/><text x="118" y="23">averages computed from these rows</text>
+          <rect x="356" y="12" width="16" height="12" style="fill:var(--grad-wash);stroke:var(--grad);stroke-width:1"/><text x="378" y="23">rows being encoded</text>
+          <text class="lbl" x="134" y="58" text-anchor="middle">fold 1</text><text class="lbl" x="214" y="58" text-anchor="middle">fold 2</text><text class="lbl" x="294" y="58" text-anchor="middle">fold 3</text><text class="lbl" x="374" y="58" text-anchor="middle">fold 4</text><text class="lbl" x="454" y="58" text-anchor="middle">fold 5</text>
+          <text class="lbl" x="86" y="81" text-anchor="end">split 1</text>
+          <rect x="96" y="66" width="76" height="22" style="fill:var(--grad-wash);stroke:var(--grad);stroke-width:1"/><rect class="cellon" x="176" y="66" width="76" height="22"/><rect class="cellon" x="256" y="66" width="76" height="22"/><rect class="cellon" x="336" y="66" width="76" height="22"/><rect class="cellon" x="416" y="66" width="76" height="22"/>
+          <text class="lbl" x="86" y="109" text-anchor="end">split 2</text>
+          <rect class="cellon" x="96" y="94" width="76" height="22"/><rect x="176" y="94" width="76" height="22" style="fill:var(--grad-wash);stroke:var(--grad);stroke-width:1"/><rect class="cellon" x="256" y="94" width="76" height="22"/><rect class="cellon" x="336" y="94" width="76" height="22"/><rect class="cellon" x="416" y="94" width="76" height="22"/>
+          <text class="lbl" x="86" y="137" text-anchor="end">split 3</text>
+          <rect class="cellon" x="96" y="122" width="76" height="22"/><rect class="cellon" x="176" y="122" width="76" height="22"/><rect x="256" y="122" width="76" height="22" style="fill:var(--grad-wash);stroke:var(--grad);stroke-width:1"/><rect class="cellon" x="336" y="122" width="76" height="22"/><rect class="cellon" x="416" y="122" width="76" height="22"/>
+          <text class="lbl" x="86" y="165" text-anchor="end">split 4</text>
+          <rect class="cellon" x="96" y="150" width="76" height="22"/><rect class="cellon" x="176" y="150" width="76" height="22"/><rect class="cellon" x="256" y="150" width="76" height="22"/><rect x="336" y="150" width="76" height="22" style="fill:var(--grad-wash);stroke:var(--grad);stroke-width:1"/><rect class="cellon" x="416" y="150" width="76" height="22"/>
+          <text class="lbl" x="86" y="193" text-anchor="end">split 5</text>
+          <rect class="cellon" x="96" y="178" width="76" height="22"/><rect class="cellon" x="176" y="178" width="76" height="22"/><rect class="cellon" x="256" y="178" width="76" height="22"/><rect class="cellon" x="336" y="178" width="76" height="22"/><rect x="416" y="178" width="76" height="22" style="fill:var(--grad-wash);stroke:var(--grad);stroke-width:1"/>
+          <path d="M92 214 H588" style="stroke:var(--rule);stroke-width:1;fill:none"/>
+          <text class="lbl" x="86" y="241" text-anchor="end">final</text>
+          <rect class="cellon" x="96" y="226" width="76" height="22"/><rect class="cellon" x="176" y="226" width="76" height="22"/><rect class="cellon" x="256" y="226" width="76" height="22"/><rect class="cellon" x="336" y="226" width="76" height="22"/><rect class="cellon" x="416" y="226" width="76" height="22"/>
+          <rect x="512" y="226" width="76" height="22" style="fill:var(--grad-wash);stroke:var(--grad);stroke-width:1"/><text class="lbl" x="550" y="241" text-anchor="middle">test</text>
+        </svg>
+      </div>
+      <figcaption>Out-of-fold target encoding. Each training row is encoded from averages that never include its own label. Test and production rows use averages from all the training rows.</figcaption>
+    </figure>
+    <ul>
+      <li><strong>Leave-one-out encoding is a trap.</strong> Excluding only the row itself sounds safe:
+        <div class="mj">\[ \text{enc}_{-i} = \frac{S_c - y_i}{n_c - 1} \]</div>
+        Here \(S_c\) is the level's sum of targets. Within one level \(S_c\) and \(n_c\) are the same for every row, so the encoding is a decreasing function of \(y_i\): every positive gets a slightly lower value than every negative in its level. A deep enough tree can read the label level by level. Out-of-fold encoding doesn't have this problem: rows of a level in the same fold share one value, computed without any of their labels. (A faint fold-level trace remains; smoothing and enough rows per fold make it negligible.)</li>
+      <li><strong>It must sit inside cross-validation.</strong> If you compute the out-of-fold encodings on all the data and then run cross-validation, the validation fold's labels have already shaped the training rows' encodings. The encoder goes in the pipeline, so it's refitted on each training fold. sklearn's <code>TargetEncoder</code> does the out-of-fold part itself: <code>fit_transform</code> cross-fits, while <code>transform</code> on new rows uses the full training averages. Calling <code>fit</code> and then <code>transform</code> on the training rows yourself skips the cross-fitting and leaks.</li>
+      <li><strong>Time-ordered data:</strong> encode each row from rows strictly earlier in time (an expanding average), the way the value would have been computed live.</li>
+      <li><strong>CatBoost's ordered target statistics</strong> do the same job differently. Shuffle the training rows into a random order and encode each row from the rows <em>before</em> it, with a prior counted as \(a\) extra rows:
+        <div class="mj">\[ \text{enc}_i = \frac{S_{\text{before}} + a \cdot \text{prior}}{n_{\text{before}} + a} \]</div>
+        Here \(S_{\text{before}}\) and \(n_{\text{before}}\) are the sum of targets and the row count of the same level among the rows earlier in the order. A row's label never enters its own encoding, and no rows are wasted. The first rows of each level get noisy encodings, so CatBoost uses several random orders. Its “ordered boosting” applies the same before-only idea to the gradients.</li>
+    </ul>
+    <p><strong>Trade-offs.</strong> Target encoding is compact and handles any cardinality. Its costs: the leakage risk above; noise for rare levels; drift, since a level's rate changes over time; one encoding per target (and per class); and one number per level, so any interaction between the level and other features has to be learned elsewhere.</p>
+
+    <h3 id="freq-enc">Frequency and count encoding</h3>
+    <div class="mj">\[ \text{freq}(c) = \frac{n_c}{n} \]</div>
+    <p>In words: replace each level with how often it appears in the training data (its count, or its share).</p>
+    <ul>
+      <li><strong>Why it works:</strong> popularity is often predictive. A merchant seen millions of times is an established business; a device model seen twice is unusual, which matters in fraud.</li>
+      <li><strong>Why it's safe:</strong> it never uses the target, so there's no target leakage, and it's one column whatever the cardinality.</li>
+      <li><strong>When:</strong> high-cardinality features in tree models, usually next to a target encoding (how common versus how risky); unsupervised and anomaly models, which have no target.</li>
+      <li><strong>Trade-offs:</strong> levels with equal counts become identical. Counts depend on data volume and window, so use shares or a fixed trailing window (“transactions at this merchant in the last 30 days”), computed the same way at serving. An unseen level gets 0, which is usually meaningful.</li>
+    </ul>
+
+    <h3 id="hash-emb">Hashing, binary encoding and embeddings</h3>
+    <p><strong>Hashing.</strong> Map each level to one of \(B\) columns with a hash function, \(j = h(c) \bmod B\), and set that column to 1.</p>
+    <ul>
+      <li><strong>Why:</strong> no vocabulary to store, a fixed number of columns, and new levels are handled automatically. It suits huge or open-ended vocabularies (URLs, user agents, crossed features) in sparse linear models and streaming systems.</li>
+      <li><strong>Cost: collisions.</strong> Unrelated levels share a column, so their effects blur together. The chance that a given level shares its bucket with at least one of the other \(K - 1\) levels is</li>
+    </ul>
+    <div class="mj">\[ 1 - \Big(1 - \frac{1}{B}\Big)^{K - 1} \approx 1 - e^{-K/B} \]</div>
+    <p>In words: to keep collisions rare you need many more buckets than levels. Hashing also can't be inverted, so it's the wrong tool when you need to interpret levels, or when the vocabulary is small enough to store.</p>
+    <p><strong>Binary encoding</strong> writes each level's integer code in binary, one column per bit (about \(\log_2 K\) columns). Compact, but each bit groups unrelated levels, so it's mostly a memory trick.</p>
+    <p><strong>Learned embeddings.</strong> In a neural net, each level gets a dense vector trained with the task, so levels that behave alike end up close and rare levels borrow strength from similar ones; the vectors can be reused as tree features. A common size heuristic is about \(\min(50, K/2)\). Map levels below a count threshold to a shared “rare” index, which unseen levels then use. Not for small data or non-neural models, unless the vectors are pre-trained.</p>
+
+    <h3 id="rare">Rare and unseen categories</h3>
+    <ul>
+      <li><strong>Group rare levels.</strong> Merge levels with fewer than some number of training rows into “Other”. It cuts noise and columns, and it gives unseen levels a natural home. The threshold is a hyperparameter, and it's learned from training data, so it belongs in the pipeline.</li>
+      <li><strong>Plan for unseen levels at serving time,</strong> encoder by encoder: one-hot gives an all-zero row or the “Other” column; target encoding the prior; count encoding 0; embeddings the shared “unknown” index; hashing some bucket. Decide on purpose and test it: a silent mismatch between training and serving codes is a classic production bug.</li>
+      <li><strong>Monitor the share of unseen levels.</strong> A jump means the data changed: a new product, a renamed category, a broken upstream mapping.</li>
+    </ul>
+
+    <h3 id="enc-table">Which encoding for which model</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Encoding</th><th>Linear models</th><th>Tree ensembles</th><th>Neural nets</th></tr></thead>
+      <tbody>
+        <tr><td><strong>One-hot</strong></td><td>The default for few levels (drop one if there's no penalty)</td><td>Fine for few levels; spreads many levels thin</td><td>Fine for few levels</td></tr>
+        <tr><td><strong>Ordinal</strong></td><td>Only for truly ordered levels; assumes equal steps</td><td>Works even unordered, but wastes splits</td><td>Only for truly ordered levels</td></tr>
+        <tr><td><strong>Target (out-of-fold, smoothed)</strong></td><td>Good for many levels: one monotone column</td><td>Very good for many levels</td><td>Possible; embeddings usually better</td></tr>
+        <tr><td><strong>Count / frequency</strong></td><td>Weak alone: assumes the effect is linear in popularity</td><td>Good, as a complement</td><td>Useful extra input</td></tr>
+        <tr><td><strong>Hashing</strong></td><td>Good for huge or open-ended sets of levels</td><td>Rarely the best choice</td><td>As the index into an embedding table</td></tr>
+        <tr><td><strong>Embedding</strong></td><td>Only as pre-trained vectors</td><td>Learned vectors as features</td><td>The default for many levels</td></tr>
+        <tr><td><strong>Native categorical</strong></td><td>Not available</td><td>LightGBM, CatBoost, XGBoost, sklearn's histogram boosting</td><td>Not available</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Why the columns differ.</strong> A linear model gives each input column one slope, so the encoding must make the relationship linear: one-hot gives each level its own slope, target encoding makes the column monotone in risk. A tree only needs the levels to be separable by a few thresholds, so any encoding that puts similar levels next to each other works. A neural net can learn its own representation, so an embedding lets it learn which levels are alike.</p>
+
+    <!-- scaling -->
+    <h2 id="scaling"><span class="pn">07</span>Scaling and transforms</h2>
+    <h3>Three scalers</h3>
+    <div class="mj">\[ \begin{aligned} \text{standardize:}\quad \tilde x &amp;= \frac{x - \mu}{\sigma} \\ \text{min-max:}\quad \tilde x &amp;= \frac{x - x_{\min}}{x_{\max} - x_{\min}} \\ \text{robust:}\quad \tilde x &amp;= \frac{x - \operatorname{median}}{\text{IQR}} \end{aligned} \]</div>
+    <div class="tbl"><table>
+      <thead><tr><th>Scaler</th><th>Use it when</th><th>Weak spot</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Standardization</strong><br>mean 0, sd 1</td><td>The default for penalized linear models, SVMs, kNN, PCA, neural nets</td><td>Outliers inflate \(\sigma\) and squeeze the normal values together</td></tr>
+        <tr><td><strong>Min-max</strong><br>range \([0, 1]\)</td><td>Naturally bounded features (pixels, percentages), or models that need bounded inputs</td><td>One outlier sets the range; new values can fall outside \([0, 1]\)</td></tr>
+        <tr><td><strong>Robust</strong><br>median 0, IQR 1</td><td>Columns with outliers you want to keep</td><td>Outliers stay extreme; they just stop setting the scale</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>A vocabulary trap:</strong> “normalization” means min-max scaling to some people, and rescaling each <em>row</em> to unit length (sklearn's <code>Normalizer</code>) to others, so say which.</p>
+
+    <h3>Transforms for skewed columns</h3>
+    <p>Incomes, amounts, counts and durations are usually right-skewed: most values are small and a few are huge. A transform pulls the tail in.</p>
+    <ul>
+      <li><strong>Log</strong> (or \(\log(1 + x)\) when zeros occur): turns multiplicative effects into additive ones (“10% more income” becomes a fixed step), reduces the leverage of the tail, and often makes a relationship more linear. \(\log x\) needs \(x &gt; 0\); \(\log(1 + x)\) allows zeros.</li>
+      <li><strong>Box-Cox</strong> picks the power that makes the result as close to normal as possible, by maximum likelihood. It requires \(x &gt; 0\):</li>
+    </ul>
+    <div class="mj">\[ x^{(\lambda)} = \begin{cases} \dfrac{x^{\lambda} - 1}{\lambda} &amp; \lambda \ne 0 \\ \log x &amp; \lambda = 0 \end{cases} \]</div>
+    <p>In words: \(\lambda = 1\) only shifts the values, \(\lambda = 0.5\) is a rescaled square root, and \(\lambda = 0\) is the log. The \(-1\) and \(/\lambda\) make the family join smoothly at \(\lambda = 0\).</p>
+    <ul>
+      <li><strong>Yeo-Johnson</strong> extends the same idea to zero and negative values (profits, balance changes).</li>
+      <li><strong>Quantile transform</strong> maps each value to its rank, then to a uniform or normal shape. The most robust (outliers become merely the top ranks), but it bends linear relationships, distorts distances, and clips values beyond the training range.</li>
+    </ul>
+    <p><strong>When transforms matter:</strong> for linear models, distance-based methods and neural nets. Trees ignore any monotone transform, since a threshold on \(\log x\) is a threshold on \(x\). Box-Cox's \(\lambda\) and the quantiles are learned, so fit them on training rows.</p>
+    <p><strong>Transforming the target</strong> is different: a model trained on \(\log y\) predicts roughly the median of \(y\), not the mean, so exponentiated predictions underestimate totals unless corrected (Duan's smearing: multiply them by the average of the exponentiated training residuals).</p>
+
+    <h3>Which models need scaling, and why</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Model</th><th>Scale?</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Neural nets, anything trained by gradient descent</td><td>Yes</td><td>Mixed scales make a long, thin loss valley, so no single learning rate suits every direction.</td></tr>
+        <tr><td>Ridge, lasso, penalized logistic regression</td><td>Yes</td><td>The penalty treats all coefficients alike, so a feature with a small numeric range, which needs a large coefficient, is punished more for the same effect.</td></tr>
+        <tr><td>kNN, k-means, SVM with an RBF kernel</td><td>Yes</td><td>Distances are dominated by the feature with the largest units.</td></tr>
+        <tr><td>PCA</td><td>Yes</td><td>The largest-variance directions would just be the largest-unit columns.</td></tr>
+        <tr><td>Unregularized linear regression</td><td>Not for predictions</td><td>Predictions don't change; coefficients rescale to match.</td></tr>
+        <tr><td>Decision trees, random forests, gradient boosting</td><td>No</td><td>A split is a threshold on one feature; any monotone rescaling gives the same partition.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3 id="fit-train">Fit on the training data only</h3>
+    <p>The scaler's \(\mu\) and \(\sigma\) (or min and max, or quantiles) are learned on training rows and frozen, the rule from section <a href="#split">03</a>. At serving time there's often one row and nothing to compute statistics from. Re-fitting on test rows also hides shift: re-centring test incomes that run higher makes them look normal.</p>
+
+    <!-- collinearity -->
+    <h2 id="collinearity"><span class="pn">08</span>Collinearity</h2>
+    <p><strong>Collinearity</strong> (multicollinearity) means some features are nearly linear combinations of others: floor area and number of rooms; income and an income-derived credit limit. A total next to its parts, or all one-hot dummies next to an intercept, is <em>perfect</em> collinearity.</p>
+    <h3>Why it hurts linear models</h3>
+    <p>When two features move together, the data can't tell which one deserves the credit. The loss surface becomes a long, flat valley along “more weight on one, less on the other”, and the fitted coefficients can slide along it. For ordinary least squares:</p>
+    <div class="mj">\[ \begin{aligned} \operatorname{Var}(\hat\beta_j) &amp;= \frac{\sigma^2}{\sum_i (x_{ij} - \bar x_j)^2} \cdot \text{VIF}_j \\ \text{VIF}_j &amp;= \frac{1}{1 - R_j^2} \end{aligned} \]</div>
+    <p>In words: \(\sigma^2\) is the noise variance, and the first factor is the variance \(\hat\beta_j\) would have if \(x_j\) were uncorrelated with the rest. \(R_j^2\) is how well the <em>other</em> features predict feature \(j\). Only the part of \(x_j\) the others can't predict helps pin down \(\beta_j\). The variance inflation factor (VIF) says how many times larger the coefficient's variance is than if \(x_j\) were uncorrelated with the rest; its square root is how many times wider the standard error is.</p>
+    <ul>
+      <li><strong>Unstable coefficients:</strong> large standard errors, big changes when a few rows change, and signs that can flip against domain sense.</li>
+      <li><strong>Misleading tests:</strong> each feature can look insignificant alone while the pair is clearly significant together (an F-test on both shows it).</li>
+      <li><strong>Interpretation breaks:</strong> “the effect of \(x_1\) holding \(x_2\) fixed” describes something the data never shows.</li>
+      <li><strong>Predictions are usually fine</strong> while the correlation holds, because they depend on the combined effect, which the data pins down well. A new row that breaks the pattern asks about the one direction the data never covered, and its prediction swings.</li>
+    </ul>
+    <h3>Detecting it</h3>
+    <ul>
+      <li><strong>Correlation matrix:</strong> quick but pairwise only; it misses a column that is the sum of three others.</li>
+      <li><strong>VIF</strong> per feature (regress it on all the others): above 5 is worth a look, above 10 is serious.</li>
+      <li><strong>Condition number</strong> of the standardized feature matrix (largest over smallest singular value): above about 30 is strong collinearity. Eigenvectors of the correlation matrix with near-zero eigenvalues show which columns are involved.</li>
+    </ul>
+    <h3>Remedies</h3>
+    <ul>
+      <li><strong>Do nothing</strong> if you only need predictions and the relationship is stable.</li>
+      <li><strong>Drop one</strong> of a redundant pair, or <strong>combine</strong> them (a sum, ratio or domain index).</li>
+      <li><strong>PCA:</strong> uncorrelated components, at the cost of interpretability.</li>
+      <li><strong>Ridge:</strong> the penalty curves the flat valley, so the coefficients stop sliding and the twins share the weight. Lasso keeps one twin somewhat arbitrarily (unstable selection); elastic net keeps the group.</li>
+      <li><strong>More varied data</strong> is the only fix that makes the separate effects estimable.</li>
+    </ul>
+    <h3>Trees and feature importance</h3>
+    <p>Trees predict fine with correlated features, but their <strong>importance is split</strong>. Whichever twin wins a split takes its credit, so impurity importance divides the credit arbitrarily and each twin looks weaker than the signal is. Permutation importance underestimates both, because with one twin shuffled the model still has the other (and the shuffled rows are unrealistic). Random forests, which sample features per split, spread credit evenly; boosting tends to lean on one twin. Measure correlated features as a group: permute them together, or drop the group and refit.</p>
+
+    <!-- features -->
+    <h2 id="features"><span class="pn">09</span>Feature engineering</h2>
+    <p>Feature engineering hands a model a quantity it would struggle to build itself. The test of a good feature: is it known at prediction time, does it have a reason to predict the target, and would it be computed the same way in production?</p>
+
+    <h3>Dates and times</h3>
+    <ul>
+      <li><strong>Components and durations:</strong> hour, day of week, month, weekend, holiday, days to or from an event (payday, a festival, the month end); and durations up to the prediction time, such as account age or days since the last purchase, which carry far more than raw dates.</li>
+      <li><strong>Don't use a raw timestamp as a feature:</strong> the model learns the trend in the training period and can't extrapolate it to future dates.</li>
+      <li><strong>Cyclical encoding</strong> for features that wrap around:</li>
+    </ul>
+    <div class="mj">\[ \begin{aligned} h_{\sin} &amp;= \sin(2\pi h / 24) \\ h_{\cos} &amp;= \cos(2\pi h / 24) \end{aligned} \]</div>
+    <p>In words: the hour \(h\) becomes a point on a circle, so 23:00 and 00:00 are neighbours instead of 23 apart. Both coordinates are needed, because the sine alone gives the same value to two different hours (3:00 and 9:00 share a sine and differ only in the cosine). This matters for linear models, neural nets and distances; a tree can isolate a late-night window from the raw hour with two splits, so it gains less.</p>
+
+    <h3>Group aggregates</h3>
+    <p>Statistics of an entity's history: a customer's average transaction amount, a merchant's number of distinct customers, a device's count of accounts. Often the strongest features, especially as deviations: this amount divided by the customer's usual amount.</p>
+    <p><strong>Their leakage risks:</strong></p>
+    <ul>
+      <li><strong>The current row's label:</strong> “the merchant's fraud rate” over rows that include this transaction is unprotected target encoding. Compute it out-of-fold or from earlier rows only.</li>
+      <li><strong>Future rows:</strong> a customer's average over the whole dataset includes later transactions. Compute every aggregate as of the prediction time (a point-in-time or “as-of” join).</li>
+      <li><strong>Pooling train and test:</strong> lets test rows shape training features.</li>
+      <li><strong>Small groups:</strong> an average over two rows is noise; smooth it towards the overall average and add the count as a feature.</li>
+    </ul>
+
+    <h3>Ratios, interactions and binning</h3>
+    <ul>
+      <li><strong>Ratios</strong> such as debt-to-income or loan-to-value. A tree approximates a ratio only with a staircase of many splits, and a linear model can't form it from the raw columns (only from logs, as \(\log a - \log b\)). Define the zero-denominator case, with an indicator.</li>
+      <li><strong>Interactions</strong> (products, crossed categories): a linear model sees one only if you add it; trees find them by nesting splits, but an explicit one helps shallow trees. Let domain knowledge pick them, since all pairwise products explode the feature count.</li>
+      <li><strong>Binning</strong> (equal-width or quantile): gives a linear model a step-shaped, non-linear effect and limits outliers' influence; credit scorecards replace each bin by its weight of evidence (the log of the bin's share of good outcomes over its share of bad ones). Costs: variation within a bin is lost and edges create jumps (splines are the smooth alternative). Fit edges on training rows. Trees don't need binning.</li>
+    </ul>
+
+    <h3 id="lags">Time series: lags and rolling windows, with no future</h3>
+    <p>Lags (yesterday's value, last week's value), rolling means and standard deviations, expanding averages, differences and exponentially weighted averages. The rule: a feature for time \(t\) may use only what was known at time \(t\). If a source arrives two days late, the shortest usable lag is two days. The classic bug is a rolling window that includes the current row, whose target is exactly what you're predicting:</p>
+    <pre class="code"><code>df = df.sort_values("date")
+g = df.groupby("store")["sales"]
+df["lag_7"] = g.shift(7)
+<span class="cm"># shift first, so the window ends yesterday</span>
+df["mean_28"] = g.transform(
+    lambda s: s.shift(1).rolling(28).mean())</code></pre>
+    <p>Centred windows (which average the past and the future around a point) are fine for smoothing a chart and always a leak in a feature.</p>
+
+    <h3>Basic text features</h3>
+    <p>Cheap signals (length, word count, share of capitals or digits, keyword flags); TF-IDF with a vocabulary fitted on training text, into a sparse linear model, as a strong baseline; character n-grams for messy short strings such as merchant names; sentence embeddings from a pretrained model as dense features. Watch for text written after the event, such as resolution notes, which often contains the label.</p>
+
+    <!-- selection -->
+    <h2 id="selection"><span class="pn">10</span>Feature selection</h2>
+    <p><strong>Why select at all:</strong> with many weak features and few rows, extra features add variance; fewer features are cheaper to compute, monitor and keep correct; and there's less surface for leakage. With gradient boosting and plenty of data the accuracy gain is often small, so start by removing junk (IDs, leaky columns, constants) and keep the rest.</p>
+    <ul>
+      <li><strong>Filters</strong> score each feature on its own: correlation with the target, mutual information, a chi-squared or ANOVA F test, a variance threshold. Mutual information measures how much knowing \(X\) reduces the uncertainty about \(Y\), with \(H\) the entropy (uncertainty):
+        <div class="mj">\[ I(X; Y) = H(Y) - H(Y \mid X) \]</div>
+        It's 0 only when they're independent, so it catches non-linear relationships that correlation misses. Filters are fast, but they judge one feature at a time: they miss features that work only together, and keep two copies of one signal.</li>
+      <li><strong>Wrappers</strong> search subsets with the model itself: recursive feature elimination (RFE) fits, drops the weakest features, refits and repeats. They see combinations, but they're expensive and overfit the selection score unless nested inside cross-validation.</li>
+      <li><strong>Embedded methods</strong> select while training:
+        <ul>
+          <li><strong>L1 (lasso)</strong> sets weak coefficients exactly to 0. With correlated features it keeps one more or less at random, so repeat it on bootstrap samples and keep features chosen consistently (stability selection).</li>
+          <li><strong>Tree impurity importance</strong> is free, but it's computed on training data and favours continuous and high-cardinality features, which offer more split points to fit noise with. A random ID column can rank highly.</li>
+          <li><strong>Permutation importance</strong> shuffles one feature in <em>validation</em> data and measures the drop in score. It works for any model without that bias, but correlated features hide each other's importance.</li>
+        </ul>
+      </li>
+    </ul>
+    <p id="select-cv"><strong>The pitfall: select inside cross-validation, not before it.</strong> Take thousands of pure-noise features and random labels, keep the few most correlated with the labels on all the rows, then cross-validate a model on them: the accuracy comes out well above chance. The selection step saw the validation labels and picked features that happen to fit them.</p>
+    <p>Selection is part of the training procedure, so it goes in the pipeline and is redone on each training fold, and the final estimate comes from data the selection never saw.</p>
+
+    <!-- imbalance -->
+    <h2 id="imbalance"><span class="pn">11</span>Class imbalance at the data level</h2>
+    <p><strong>First ask whether it's a problem.</strong> With a proper loss (log loss) and a few hundred positives, a model ranks well despite imbalance; what changes is where the threshold belongs and which metric to read. So: threshold first, then weights, then resampling.</p>
+    <ul>
+      <li><strong>Move the threshold.</strong> With calibrated probabilities, choose it from the costs of the two mistakes, or from capacity (flag the top \(N\) a review team can handle). Flag when \(p &gt; t^*\):
+        <div class="mj">\[ t^* = \frac{C_{FP}}{C_{FP} + C_{FN}} \]</div>
+        In words: with \(C_{FP}\) the cost of a false alarm and \(C_{FN}\) the cost of a miss, the threshold is the false alarm's share of the total cost. When a miss costs far more, the threshold is low.</li>
+      <li><strong>Class weights.</strong> Count each positive \(w\) times in the loss. It works with every model and discards nothing. But the model now believes positives are \(w\) times more likely in odds terms, so probabilities are inflated; at threshold 0.5 it decides about the same as the unweighted model at threshold \(1/(1 + w)\).</li>
+      <li><strong>Undersample the majority.</strong> Keep a fraction \(q\) of negatives. Training gets much cheaper, at the cost of discarded information. Undo the probability inflation with the prior correction:
+        <div class="mj">\[ \operatorname{logit} p = \operatorname{logit} p_s + \log q \]</div>
+        In words: \(p_s\) is the model's probability on the resampled data; adding \(\log q\) to its log-odds restores the real base rate. For class weights, use \(q = 1/w\).</li>
+      <li><strong>Oversample the minority</strong> by duplicating positives: the same effect as weights, but duplicates are easy to memorize, especially for trees.</li>
+      <li><strong>SMOTE</strong> creates synthetic positives on the line between a positive and one of its positive nearest neighbours:
+        <div class="mj">\[ \begin{aligned} x_{\text{new}} &amp;= x_i + u\,(x_{\text{nn}} - x_i) \\ u &amp;\sim \text{Uniform}(0, 1) \end{aligned} \]</div>
+        Apply it only to training folds, after the split (imbalanced-learn's pipeline does this); before the split, synthetic near-copies of validation rows leak into training. Its points can be unrealistic (half-way values of integer or categorical columns, points between two separate fraud patterns), it amplifies label noise, it distorts probabilities, and with gradient boosting it rarely beats weights or a good threshold.</li>
+    </ul>
+    <p><strong>The right metrics:</strong> not accuracy (flagging nobody scores 98% at 2% positives). Use PR-AUC (its random baseline is the positive rate), precision and recall at the operating threshold, or money saved; ROC-AUC ignores the base rate and can look excellent while precision is poor. Add log loss or a calibration plot when probabilities matter. <strong>Never resample the validation or test sets:</strong> they must reflect the real base rate.</p>
+
+    <!-- fit -->
+    <h2 id="fit"><span class="pn">12</span>Overfitting and underfitting</h2>
+    <p>Expected squared error on a new point splits into three parts:</p>
+    <div class="mj">\[ \begin{aligned} \mathbb E\big[(y - \hat f(x))^2\big] &amp;= \text{bias}^2 + \text{variance} + \sigma^2 \\ \text{bias} &amp;= \mathbb E[\hat f(x)] - f(x) \\ \text{variance} &amp;= \operatorname{Var}\big(\hat f(x)\big) \end{aligned} \]</div>
+    <p>In words: <strong>bias</strong> is how far the average model (over many training sets) is from the truth, so a model too simple for the pattern has high bias. <strong>Variance</strong> is how much the model changes from one training set to another, so a model flexible enough to fit noise has high variance. The noise can't be removed by any model.</p>
+    <ul>
+      <li><strong>Learning curve</strong> (both scores against training-set size): curves that meet low mean underfitting, and more data won't help; a gap that narrows as data grows means overfitting, and more data will.</li>
+      <li><strong>Validation curve</strong> (both scores against one complexity setting, such as tree depth): pick the validation peak, or the simplest setting near it.</li>
+    </ul>
+    <div class="tbl"><table>
+      <thead><tr><th>What you see</th><th>Diagnosis</th><th>Fixes</th></tr></thead>
+      <tbody>
+        <tr><td>Training and validation both poor, small gap</td><td>Underfitting (high bias)</td><td>Better features (ratios, aggregates, interactions); more capacity; less regularization; train longer; check for label noise</td></tr>
+        <tr><td>Training good, validation much worse</td><td>Overfitting (high variance)</td><td>More data; fewer or cleaner features; group rare levels and smooth encodings; stronger regularization; shallower trees, early stopping; bagging</td></tr>
+        <tr><td>Validation good, test or production much worse</td><td>Leakage, a shift, or overfitting the validation set through many tuning rounds</td><td>Audit features for post-prediction information; time or group split; adversarial validation; a fresh holdout and fewer tuning rounds</td></tr>
+        <tr><td>Fold scores vary a lot</td><td>Small or mixed data</td><td>Repeated or grouped cross-validation; simpler model; report the spread, not just the mean</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>A gap isn't always overfitting.</strong> If a feature leaks only in training rows, or the validation period differs from the training period, the gap comes from the data, not the model's flexibility, and regularization won't close it.</p>
+
+    <!-- code -->
+    <h2 id="code"><span class="pn">13</span>Pseudocode</h2>
+    <p>Python-flavoured. The first block is real sklearn; the others are outlines to write out from memory.</p>
+
+    <h3>A leakage-safe preprocessing pipeline</h3>
+    <pre class="code"><code>num  = ["income", "age", "amount"]
+low  = ["employment_type", "channel"]   <span class="cm"># few levels</span>
+high = ["merchant_id"]                  <span class="cm"># many levels</span>
+
+pre = ColumnTransformer([
+    ("num", make_pipeline(
+        SimpleImputer(strategy="median",
+                      add_indicator=True), <span class="cm"># fill + flag</span>
+        StandardScaler()), num),
+    ("low", make_pipeline(
+        SimpleImputer(strategy="constant",
+                      fill_value="Missing"),
+        OneHotEncoder(
+            handle_unknown="infrequent_if_exist",
+            min_frequency=50)), low),  <span class="cm"># rare → 1 col</span>
+    ("high", TargetEncoder(), high),       <span class="cm"># cross-fitted</span>
+])
+model = make_pipeline(pre,
+                      LogisticRegression(max_iter=1000))
+
+<span class="cm"># rows sorted by time; every step is refitted</span>
+<span class="cm"># on each training fold (gap is counted in rows)</span>
+cv = TimeSeriesSplit(n_splits=5, gap=1000)
+scores = cross_val_score(model, X_train, y_train,
+                         cv=cv, scoring="average_precision")
+
+model.fit(X_train, y_train)    <span class="cm"># final fit: train only</span>
+p = model.predict_proba(X_test)[:, 1]  <span class="cm"># test: one look</span></code></pre>
+    <p>Why each choice: the median resists skew and the indicator keeps the blank's signal; “Missing” is a real level; rare levels share one column, where unseen levels also go (all zeros if no level was rare). <code>TargetEncoder</code> cross-fits the training rows because the pipeline calls its <code>fit_transform</code>; calling <code>fit</code> then <code>transform</code> yourself would leak. Its internal folds are shuffled, not past-only, so for strict point-in-time encodings use an expanding mean instead. Use <code>GroupKFold</code> when customers repeat.</p>
+
+    <h3>Out-of-fold target encoding</h3>
+    <pre class="code"><code>def target_encode_oof(cat, y, n_folds=5, m=20):
+    enc = empty(len(y))
+    for fit_idx, enc_idx in KFold(n_folds, shuffle=True):
+        prior = mean(y[fit_idx])
+        s, n = sum_and_count_by_level(cat[fit_idx],
+                                      y[fit_idx])
+        for i in enc_idx:          <span class="cm"># own label never used</span>
+            c = cat[i]             <span class="cm"># unseen here: s = n = 0</span>
+            enc[i] = (s.get(c, 0) + m * prior) \
+                     / (n.get(c, 0) + m)
+    <span class="cm"># for validation, test and production rows</span>
+    prior = mean(y)
+    s, n = sum_and_count_by_level(cat, y)
+    table = {c: (s[c] + m * prior) / (n[c] + m)
+             for c in s}
+    return enc, table, prior   <span class="cm"># new: table.get(c, prior)</span></code></pre>
+    <p>Run it inside each cross-validation training fold, never on all the data. For time-ordered data, replace the folds with an expanding past-only average; for grouped data, fold by group.</p>
+
+    <h3>Iterative imputation, in outline</h3>
+    <pre class="code"><code>def iterative_impute_fit(X, rounds=10, tol=1e-3):
+    miss = isnan(X)                    <span class="cm"># remember the blanks</span>
+    med = nanmedian(X, axis=0)
+    Xf = where(miss, med, X)           <span class="cm"># 1. simple start</span>
+    cols = columns with blanks, fewest blanks first
+    for r in range(rounds):
+        old = Xf[miss].copy()
+        for j in cols:          <span class="cm"># 2. a model per column</span>
+            obs, gap = ~miss[:, j], miss[:, j]
+            rest = every column except j   <span class="cm"># never y</span>
+            mdl[j] = Regressor().fit(Xf[obs][:, rest],
+                                     Xf[obs, j])
+            Xf[gap, j] = mdl[j].predict(Xf[gap][:, rest])
+            <span class="cm"># MICE: add a random residual draw here,</span>
+            <span class="cm"># and repeat everything M times</span>
+        if mean_abs(Xf[miss] - old) &lt; tol:   <span class="cm"># 3. settled</span>
+            break
+    return Xf, med, mdl   <span class="cm"># reuse med and mdl on new rows</span></code></pre>
+    <p>New rows start from the training medians and pass through the stored per-column models in the same order. Nothing is refitted on them.</p>
+
+    <h3>Diagnosing missingness</h3>
+    <pre class="code"><code><span class="cm"># 1. does the blank depend on other columns?</span>
+blank = df["income"].isna().astype(int)
+others = encoded columns except income and target
+auc = cross_val_score(HistGradientBoostingClassifier(),
+                      others, blank, cv=5,
+                      scoring="roc_auc").mean()
+<span class="cm"># about 0.5: consistent with MCAR; well above: not MCAR</span>
+
+<span class="cm"># 2. does the blank predict the target?</span>
+<span class="cm"># rates differ: keep the signal</span>
+df.groupby(blank)["target"].mean()</code></pre>
+
+    <!-- questions -->
+    <h2 id="questions"><span class="pn">14</span>Interview questions</h2>
+    <p>Answer out loud first, then open the answer. Each answer stands on its own: the short answer, the mechanism, the why, then the trade-off or the likely follow-up.</p>
+
+    <details class="qa"><summary><span class="qn">1</span>You get a new tabular dataset. What do you do before modelling?</summary><div class="ans">
+      <p><strong>Pin down what a row and the target are, run a checklist for anything that would make the model wrong or falsely good, clean what's broken, and split before fitting anything that learns from the data.</strong></p>
+      <ul>
+        <li><strong>The grain and the target:</strong> what one row is (an application, a customer-month); how the target is defined, its base rate, and when it becomes known. That moment is the prediction time, and anything recorded after it is leakage.</li>
+        <li><strong>The checklist:</strong> missing share per column, columns that go blank together, blank rates over time, and the target rate when blank; duplicates and repeated entities; cardinality and ID-like columns; distributions, skew, sentinel values (−1, 9999), impossible values; drift by month; columns that look recorded after the prediction time, or that predict the target almost perfectly alone.</li>
+        <li><strong>Cleaning:</strong> remove artefact duplicates, merge category spellings, fix types and units, turn sentinels and impossible values into proper blanks, check that labels are mature.</li>
+        <li><strong>Then split</strong> the way deployment works (by time, by group, stratified), and put every step that learns a number (imputer, encoder, scaler, selection) in a pipeline fitted on training folds.</li>
+      </ul>
+      <p><strong>Why:</strong> each check feeds a later decision: the split, the imputation, the encoding, the transforms, the metric. <strong>Follow-up:</strong> adversarial validation (a classifier trained to tell training rows from test rows) checks whether the two look alike; a high AUC means drift or a time-encoding column. (<a href="#eda">01</a>, <a href="#cleaning">02</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">2</span>What is data leakage? Give examples.</summary><div class="ans">
+      <p><strong>Leakage is information in training or evaluation that won't be available at prediction time. The model learns a shortcut, offline scores look great, and production disappoints.</strong></p>
+      <ul>
+        <li><strong>Target leakage:</strong> a feature recorded after the label or caused by it. “Number of collections calls” when predicting default; “chargeback filed” when predicting fraud; resolution notes in a ticket-escalation model.</li>
+        <li><strong>Train–test contamination:</strong> duplicates or the same customer on both sides of the split; oversampling or SMOTE before splitting, so copies of one row land in both.</li>
+        <li><strong>Preprocessing fitted on all the data:</strong> a scaler, imputer, target encoder or feature-selection step fitted before the split or outside cross-validation. Small for scaling; large for target encoding and selection, which use the labels.</li>
+        <li><strong>Temporal leakage:</strong> a random split of time-ordered data; a customer's lifetime average that includes later transactions; joining today's value of a slowly changing table instead of its value at the prediction time.</li>
+      </ul>
+      <p><strong>How to spot it:</strong> a score too good for the problem; one feature dominating importance; a single feature that predicts almost perfectly; a random split scoring far above a time-based one. <strong>The fixes:</strong> for every feature, ask when it becomes known; build features point-in-time; split the way deployment works; and keep every fitted step in a pipeline. (<a href="#leak-types">03</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">3</span>Why fit the scaler on the training data only?</summary><div class="ans">
+      <p><strong>The scaler's mean and standard deviation are learned parameters. Fitted on test rows, they carry test information into training, and in production you couldn't compute them anyway.</strong></p>
+      <p><strong>The mechanism:</strong> fit \(\mu\) and \(\sigma\) on the training rows, then apply \((x - \mu)/\sigma\) with those same numbers to validation, test and live rows. In cross-validation, the scaler sits inside the pipeline so it's refitted on each training fold.</p>
+      <ul>
+        <li><strong>Evaluate what you deploy.</strong> In production the scaler is frozen from training, and it often sees one row at a time. An evaluation that re-fits on the test set measures a procedure you can't run.</li>
+        <li><strong>Leakage.</strong> For scaling it's small. The habit is what matters: the same order of steps with a target encoder or feature selection inflates the score a lot.</li>
+        <li><strong>It hides shift.</strong> If test incomes run higher, re-centring the test set on its own mean makes them look normal, and the evaluation misses the drift production will have.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> “production drifts, should the scaler refit on live data?” Not on its own: the model's weights were learned for the training scaling. Monitor drift and retrain scaler and model together. (<a href="#fit-train">07</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">4</span>How do you split time-series data?</summary><div class="ans">
+      <p><strong>Train on the past and validate on the future, with a gap the length of the label horizon, and keep a final out-of-time test period. Never shuffle.</strong></p>
+      <ul>
+        <li><strong>Folds:</strong> an expanding window (all history up to a cut-off) or a rolling one (the most recent stretch only, when old data is stale), each followed by a gap, then the next period for validation.</li>
+        <li><strong>The gap:</strong> if the label is “default within 12 months”, the last training rows' labels overlap the validation period; the gap removes the overlap. It should also cover reporting delays.</li>
+        <li><strong>Features:</strong> lags and rolling windows must end before the prediction time. Shift before rolling, or the window includes the row being predicted.</li>
+      </ul>
+      <p><strong>Why a random split fails:</strong> future trends and regimes leak backwards; neighbouring time points are near-duplicates, so validation becomes interpolation rather than forecasting; and it doesn't match deployment, where you always predict forward. <strong>Trade-offs:</strong> early folds have little training data, and a rolling window throws away old data (good under drift, less data otherwise). With repeated entities, also keep each entity's rows together. (<a href="#split">03</a>, <a href="#lags">09</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">5</span>MCAR vs MAR vs MNAR, and why it matters.</summary><div class="ans">
+      <p><strong>They say what makes a value missing: nothing at all (MCAR), other columns you can see (MAR), or the missing value itself (MNAR). The mechanism decides which handling is unbiased.</strong></p>
+      <ul>
+        <li><strong>MCAR</strong> (missing completely at random): a sensor drops readings at random. The complete rows are a random sample, so dropping rows adds no bias, it only loses data; a mean fill keeps the mean right but shrinks the variance and the correlations.</li>
+        <li><strong>MAR</strong> (missing at random, given observed data): income is blank more often for self-employed applicants, and employment type is recorded. Dropping rows under-represents the self-employed; imputing income from employment type and other columns removes the bias.</li>
+        <li><strong>MNAR</strong> (missing not at random): low earners skip the income field <em>because</em> it's low. Imputing from other columns stays biased, since even look-alike rows differ in the hidden value; the blank itself carries the information, so keep it as a feature (an indicator or a “Missing” level).</li>
+      </ul>
+      <p><strong>Diagnosing:</strong> compare rows with and without the value (other columns' distributions, target rate); train a classifier to predict the blank from the other columns (AUC near 0.5 is consistent with MCAR). MAR vs MNAR can't be settled from the data, since it's about values you never see; it needs domain knowledge or a sample where the true values are obtained.</p>
+      <p><strong>Follow-up:</strong> for a prediction model, what matters most is that blanks arise the same way at serving; then the blank can be a feature even under MNAR. For inference (coefficients, effects), MNAR needs assumptions the data can't check, so you'd run a sensitivity analysis: redo the estimate assuming the missing values are, say, 10–20% lower than imputed, and check that the conclusion survives. (<a href="#mechanisms">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">6</span>How do you impute a categorical feature? When is mode imputation acceptable?</summary><div class="ans">
+      <p><strong>Default to an explicit “Missing” category. Use the mode only when values are missing completely at random, the share is small, and the blank doesn't predict the target.</strong></p>
+      <p><strong>First check</strong> why it's missing, and whether the target rate differs between blank and non-blank rows. Then:</p>
+      <ul>
+        <li><strong>“Missing” as its own level:</strong> keeps any signal, assumes nothing about the mechanism, and works with every encoder (one-hot gives it a column, target encoding its own rate, a tree can split it off).</li>
+        <li><strong>Mode:</strong> under MCAR the blank rows are a random sample, so the most common level is the best single guess, and with a few percent filled the distortion is negligible. Fine for baselines, or for a linear model where you'd rather not add a level.</li>
+        <li><strong>A classifier imputer</strong> under MAR: predict the category from the other columns (employment type from income, age, region), trained where it's observed, on training rows only. Passing its probabilities keeps the uncertainty. A kNN majority vote is the local version.</li>
+        <li><strong>Native handling:</strong> sklearn's HistGradientBoosting treats a categorical blank as its own category; LightGBM sends it, like any level not listed in a split, to the “other” side; CatBoost needs it turned into a string such as “Missing” first.</li>
+      </ul>
+      <p><strong>Why mode fails outside that case:</strong> the filled rows join the most common level, which becomes a mixture of two populations, so its target rate, encoding and coefficient drift towards the blanks' behaviour. Any signal in the blank is erased, and if no level dominates, the mode is right only as often as its share.</p>
+      <p><strong>Trade-off:</strong> “Missing” adds a level, which may be rare (smooth or group it) and is unseen at serving if training had no blanks. Whatever you choose is fitted on training folds and applied identically at serving. (<a href="#cat-impute">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">7</span>When would you add a missing indicator?</summary><div class="ans">
+      <p><strong>When missingness might carry information (the target rate differs for blank rows, or MNAR is plausible), especially when you fill blanks with a simple value for a linear model or a neural net.</strong></p>
+      <p><strong>The mechanism:</strong> fill with a constant \(c\), giving the filled column \(\tilde x\) (\(x\) where observed, \(c\) where blank), and add a 0/1 column \(I\) that is 1 where the value was blank. In a linear model:</p>
+      <div class="mj">\[ \begin{aligned} \hat y &amp;= \beta_0 + \beta\, \tilde x + \theta I \\ \text{observed rows:}\quad \hat y &amp;= \beta_0 + \beta x \\ \text{blank rows:}\quad \hat y &amp;= \beta_0 + \beta c + \theta \end{aligned} \]</div>
+      <p>In words: the blank rows get their own intercept through \(\theta\), so the slope is pinned only by real values, and without regularization (and before any scaling) the fill value \(c\) doesn't matter. Without \(I\), blank rows are forced onto the line at \(x = c\) and bend the slope.</p>
+      <p><strong>Why:</strong> under MNAR the blank is the information; the indicator also tells the model which values are real. <strong>When to skip it:</strong> boosting libraries already learn where blanks go at each split; a tiny missing share gives an almost-constant column; if the collection process will change (the field becomes mandatory), the learned “blank means risky” effect goes stale; and when many columns go blank together, use one indicator per source, not per column.</p>
+      <p><strong>Trade-off:</strong> the model now depends on how data is collected, so monitor missing rates: a pipeline bug that blanks a field shifts scores without an error. (<a href="#indicator">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">8</span>What does mean or median imputation do to the data?</summary><div class="ans">
+      <p><strong>It keeps the centre but shrinks the spread, weakens every correlation, and puts a spike at the fill value. Under MAR it's biased, and it erases any signal in the blank.</strong></p>
+      <p>With a share \(r\) missing completely at random and filled with the mean, for the filled column \(\tilde x\) and any other column \(z\):</p>
+      <div class="mj">\[ \begin{aligned} \operatorname{Var}(\tilde x) &amp;\approx (1 - r)\, \operatorname{Var}(x) \\ \operatorname{Corr}(\tilde x, z) &amp;\approx \sqrt{1 - r}\; \operatorname{Corr}(x, z) \end{aligned} \]</div>
+      <p>In words: every filled value sits exactly at the centre, so it adds nothing to the spread and nothing to any co-movement with other columns.</p>
+      <ul>
+        <li><strong>Mean or median:</strong> the median for skewed columns such as income, where the mean is pulled by the tail; the mean keeps the column's average unchanged under MCAR.</li>
+        <li><strong>In models:</strong> with several correlated features, the others absorb the missing part of \(x\), biasing their coefficients; standard errors come out too small, as if the guesses were data. For a tree, the blanks merge into the median's neighbourhood, so a blank that meant “risky” now looks average.</li>
+      </ul>
+      <p><strong>Fixes:</strong> add a missing indicator (most of the damage to prediction goes away), use model-based imputation under MAR, and multiple imputation when you need standard errors. Always fit the median on training rows. (<a href="#numeric-impute">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">9</span>How do XGBoost and LightGBM handle missing values? Should you impute first?</summary><div class="ans">
+      <p><strong>At every split they try sending the blank rows left and right and keep whichever gives the higher gain, a learned default direction per node. So usually you shouldn't impute first.</strong></p>
+      <p><strong>The mechanism.</strong> \(G\) and \(H\) are the sums of the loss's first and second derivatives over the rows in a child, \(\lambda\) is the L2 penalty on leaf values and \(\gamma\) the cost of a split. Only non-missing values are sorted and scanned, and the blanks' sums are added to one side, then the other:</p>
+      <div class="mj">\[ \begin{aligned} \text{Gain} &amp;= \tfrac12\Big[\frac{G_L^2}{H_L + \lambda} + \frac{G_R^2}{H_R + \lambda} \\ &amp;\qquad - \frac{(G_L + G_R)^2}{H_L + H_R + \lambda}\Big] - \gamma \end{aligned} \]</div>
+      <div class="mj">\[ \begin{aligned} \text{blanks left:}\quad G_L &amp;\leftarrow G_L + G_{\text{miss}} \\ H_L &amp;\leftarrow H_L + H_{\text{miss}} \\ \text{blanks right:}\quad G_R &amp;\leftarrow G_R + G_{\text{miss}} \\ H_R &amp;\leftarrow H_R + H_{\text{miss}} \end{aligned} \]</div>
+      <p><strong>Why it beats a fill value:</strong> the direction is chosen by the loss, so informative blanks go where they belong, and the choice can differ by node; a median fill would put blanks among typical values everywhere.</p>
+      <ul>
+        <li><strong>Others:</strong> CatBoost treats numeric blanks as smaller than every value by default, so a split can isolate them; sklearn's HistGradientBoosting learns a direction like XGBoost.</li>
+        <li><strong>The trap:</strong> if a feature had no blanks in training, nothing was learned, and a blank at serving goes to an arbitrary or majority side. A pipeline bug that blanks a field can silently make risky rows look safe, so monitor missing rates.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> a tree routes blanks but can't reconstruct the value. If blanks are MAR and the feature matters, a good model-based imputation can add a little; and if the same features feed a linear model, you need imputation for that model anyway. (<a href="#native">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">10</span>When is it fine to drop rows or columns with missing values?</summary><div class="ans">
+      <p><strong>Drop rows only when the blanks are MCAR and few and you have data to spare. Drop a column only when it's mostly blank and neither its values nor its blankness predict the target.</strong></p>
+      <ul>
+        <li><strong>Rows:</strong> under MAR or MNAR the complete rows aren't representative, so the model is biased towards the kind of row that's usually complete. And the deployed model still meets blanks, so you need a strategy for them anyway. With many columns each a little blank, dropping incomplete rows can throw away a large share of the data.</li>
+        <li><strong>Columns:</strong> a column that's 95% blank but whose <em>presence</em> predicts the target should become an indicator, not be deleted. Check the target rate for blank and non-blank rows first.</li>
+        <li><strong>Rows with a missing target</strong> can't train a supervised model, but ask why they're missing. In credit, only approved applicants have outcomes, so the training data is a selected sample (reject inference).</li>
+      </ul>
+      <p><strong>Trade-off:</strong> dropping is simple and invents nothing, but it wastes data and can bias the sample. Imputation keeps the data but adds guesses. (<a href="#drop">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">11</span>When do you need multiple imputation?</summary><div class="ans">
+      <p><strong>When you need inference (standard errors, intervals, p-values) from data with blanks. Single imputation treats guesses as observed values, so those intervals come out too narrow.</strong></p>
+      <p><strong>The mechanism:</strong> create \(M\) completed datasets, each with random draws for the blanks (MICE with noise), fit the same model on each, and pool with Rubin's rules:</p>
+      <div class="mj">\[ \begin{aligned} \bar Q &amp;= \frac{1}{M} \sum_{m=1}^{M} \hat Q_m \\ B &amp;= \frac{1}{M - 1} \sum_{m=1}^{M} \big(\hat Q_m - \bar Q\big)^2 \\ T &amp;= \bar W + \Big(1 + \frac{1}{M}\Big) B \end{aligned} \]</div>
+      <p>In words: \(\hat Q_m\) is the estimate from dataset \(m\), \(\bar W\) the average of their squared standard errors, and \(B\) how much the estimates disagree across imputations. The pooled estimate is the average, and the total variance \(T\) adds the imputation uncertainty \(B\) that single imputation throws away.</p>
+      <p><strong>Trade-offs:</strong> \(M\) times the cost, and it assumes MAR. Include the outcome in the imputation model here (unlike a prediction pipeline, where the target isn't available for new rows). For pure prediction it rarely pays off: averaging predictions over the imputations is at most a mild ensemble. (<a href="#multiple">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">12</span>How do you detect and treat outliers? When do you keep them?</summary><div class="ans">
+      <p><strong>First decide whether each one is an error or a genuine extreme. Fix errors, often by turning them into missing values; limit the influence of genuine extremes; and keep them whenever they're what the model is meant to find.</strong></p>
+      <p><strong>Detection:</strong></p>
+      <div class="mj">\[ \begin{aligned} z_i &amp;= \frac{x_i - \bar x}{s} \\ z_i^{\text{robust}} &amp;= \frac{0.6745\,(x_i - \tilde x)}{\text{MAD}} \\ \text{lower fence} &amp;= Q_1 - 1.5\,\text{IQR} \\ \text{upper fence} &amp;= Q_3 + 1.5\,\text{IQR} \end{aligned} \]</div>
+      <p>In words: the z-score counts standard deviations from the mean, but outliers inflate the standard deviation and hide themselves (masking). The robust version uses the median \(\tilde x\) and the median absolute deviation (MAD), which a few extremes can't move; flag above about 3.5. The fences use the quartiles \(Q_1, Q_3\) and \(\text{IQR} = Q_3 - Q_1\); log skewed data first, or they flag the real long tail. For odd combinations of normal-looking values, an isolation forest; in regression, large residuals at high leverage (an unusual \(x\)). Plus domain limits.</p>
+      <ul>
+        <li><strong>Treat:</strong> fix errors from the source or set them to missing; cap genuine extremes at training percentiles (winsorize); transform with a log or Box-Cox; or use a robust loss (Huber, absolute error) or a tree.</li>
+        <li><strong>Why it matters:</strong> one extreme value moves the mean and inflates the standard deviation, so scaling squeezes everything else; squared loss lets a far point pull harder the further it is, without limit (Huber caps the pull). Trees are robust to extreme inputs, but not to extreme targets with squared loss.</li>
+        <li><strong>Keep them</strong> in fraud, anomaly detection or large claims, where the extremes are the positives. Production contains extremes too, so the model must handle them.</li>
+      </ul>
+      <p><strong>Trap:</strong> removing outliers from the test set flatters the score. Decide the rule on training data and apply it identically everywhere, including at serving. (<a href="#outliers">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">13</span>How do you encode a high-cardinality categorical?</summary><div class="ans">
+      <p><strong>Not with one-hot. Use out-of-fold, smoothed target encoding or count encoding (often both), native categorical support in a boosting library, or a learned embedding in a neural net, with rare levels grouped.</strong></p>
+      <ul>
+        <li><strong>Why not one-hot:</strong> thousands of sparse columns; rare levels get noisy coefficients; a tree can peel off only one level per split, so the feature's signal is spread thin and barely used.</li>
+        <li><strong>Target encoding:</strong> each level becomes its average target, shrunk towards the overall mean:
+          <div class="mj">\[ \text{enc}(c) = \frac{n_c\, \bar y_c + m\, \bar y}{n_c + m} \]</div>
+          Here \(n_c\) is the level's row count, \(\bar y_c\) its average target, \(\bar y\) the overall average, and \(m\) how many rows' worth of weight the overall average gets. One column, ordered by risk, so one tree split can separate risky levels from safe ones. Computed out-of-fold to avoid leakage.</li>
+        <li><strong>Count encoding:</strong> each level becomes its frequency. No target, so no target leakage, and popularity is often predictive in itself.</li>
+        <li><strong>Native support:</strong> CatBoost's ordered target statistics, LightGBM's categorical splits (levels sorted by their gradient statistics, then cut).</li>
+        <li><strong>Embeddings</strong> in a neural net: a learned vector per level, so similar levels share strength. <strong>Hashing</strong> for huge or open-ended vocabularies in linear models.</li>
+      </ul>
+      <p><strong>Trade-offs:</strong> target encoding risks leakage and drifts as levels' rates change; counts collide (equal counts look identical); hashing collides; embeddings need data per level. In every case, group levels below a count threshold into “Other” and decide what an unseen level gets (the prior, 0, an “unknown” index). (<a href="#encoding">06</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">14</span>Why does target encoding leak, and how do you prevent it?</summary><div class="ans">
+      <p><strong>Each training row's own label is inside its category's average, so the feature partly is the label. Prevent it with out-of-fold encoding plus smoothing, fitted inside each cross-validation training fold.</strong></p>
+      <p><strong>The mechanism:</strong> for a level with one row, the encoding equals that row's label. For a level with \(n_c\) rows, a positive raises its own encoding by about \(1/n_c\). The model learns “high encoding means positive”, which is true in training because of the rows' own labels and false for new rows. Even a category with no real relationship to the target looks predictive in training, most strongly for small levels.</p>
+      <ul>
+        <li><strong>Out-of-fold:</strong> split the training rows into \(K\) folds and encode each fold from the other folds' averages; train on those. Validation, test and live rows use averages from all training rows.</li>
+        <li><strong>Smoothing:</strong> shrink each level towards the overall mean with a prior weight \(m\) (the overall mean counts as \(m\) extra rows), so small levels can't take extreme values.</li>
+        <li><strong>Inside cross-validation:</strong> computing the encodings on all the data and then cross-validating lets validation labels shape the training features. The encoder goes in the pipeline. sklearn's <code>TargetEncoder</code> cross-fits in <code>fit_transform</code>, which is what a pipeline calls; <code>fit</code> then <code>transform</code> on the same rows would leak.</li>
+        <li><strong>Time-ordered data:</strong> encode from earlier rows only. CatBoost's ordered target statistics do this along a random order.</li>
+      </ul>
+      <p><strong>Follow-up, the leave-one-out trap:</strong> excluding just the row itself looks safe but isn't.</p>
+      <div class="mj">\[ \text{enc}_{-i} = \frac{S_c - y_i}{n_c - 1} \]</div>
+      <p>Within one level the sum \(S_c\) and count \(n_c\) are fixed, so the encoding falls as \(y_i\) rises: every positive gets a slightly lower value than every negative in its level, and a deep enough tree can separate them, level by level. <strong>A quick check:</strong> compare the encoded feature's AUC on training rows with its AUC on validation rows; a big gap is leakage. (<a href="#te-leak">06</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">15</span>Frequency encoding: when?</summary><div class="ans">
+      <p><strong>When how common a category is predicts the target, or when you need a one-column, leakage-free encoding for a high-cardinality feature in a tree model.</strong></p>
+      <div class="mj">\[ \text{freq}(c) = \frac{n_c}{n} \]</div>
+      <p>In words: a level seen in \(n_c\) of the \(n\) training rows is replaced by that share (or by the count itself).</p>
+      <ul>
+        <li><strong>Why it works:</strong> popularity carries meaning. A merchant seen millions of times is an established business; a device model seen twice is unusual, which matters in fraud; niche product categories behave differently from mass-market ones.</li>
+        <li><strong>Why it's safe:</strong> it never touches the target, so there's no target leakage, and it works without labels (anomaly detection).</li>
+        <li><strong>Where it fits:</strong> tree models, usually next to a target encoding, since the two carry different information (how common versus how risky).</li>
+      </ul>
+      <p><strong>Trade-offs:</strong> levels with equal counts become identical even if they behave differently; counts depend on data volume and window, so use shares or a fixed trailing window (“transactions at this merchant in the last 30 days”) computed the same way at serving; an unseen level gets 0, which is usually meaningful. In a linear model it's weak on its own, since it assumes the effect grows linearly with popularity. (<a href="#freq-enc">06</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">16</span>A category appears at inference that wasn't in training. What happens?</summary><div class="ans">
+      <p><strong>Whatever the encoder does by default, which can be a crash or a silent wrong answer. Decide it on purpose for each encoder, and test it.</strong></p>
+      <ul>
+        <li><strong>One-hot:</strong> sklearn raises an error by default. With <code>handle_unknown="ignore"</code> the row is all zeros, which the model reads as “none of the known levels”; with rare-level grouping it goes to the “infrequent” column.</li>
+        <li><strong>Ordinal codes:</strong> an error, or an arbitrary code that lands wherever the thresholds put it. sklearn's <code>OrdinalEncoder</code> can map unseen levels to <code>NaN</code>, so a tree that handles blanks routes them like blanks.</li>
+        <li><strong>Target encoding:</strong> the prior, the overall mean. A sensible “know nothing” value.</li>
+        <li><strong>Count encoding:</strong> 0, which honestly says “never seen”.</li>
+        <li><strong>Embeddings:</strong> a reserved “unknown” index. Train it by mapping rare levels to it, or its vector stays random.</li>
+        <li><strong>Hashing:</strong> lands in some bucket and shares it with whatever else is there.</li>
+      </ul>
+      <p><strong>Why it matters:</strong> a mismatch between training and serving codes is a classic silent production bug. <strong>The safeguard:</strong> group rare levels into “Other” in training, so the model has learned how to treat a rare or unknown level, and monitor the share of unseen levels in production. A jump means a new product, a renamed category or a broken upstream mapping. (<a href="#rare">06</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">17</span>Do trees need scaling or one-hot encoding?</summary><div class="ans">
+      <p><strong>Scaling, never. One-hot, sometimes: a tree needs numbers (unless its library handles categories natively), but for many levels other encodings work better.</strong></p>
+      <ul>
+        <li><strong>Scaling:</strong> a split is a threshold on one feature, “income below t”. Any monotone rescaling or transform (standardizing, a log) moves the threshold with the data and gives exactly the same partition of the rows.</li>
+        <li><strong>One-hot:</strong> fine for a few levels. For many, each split peels off one level and rare levels' columns offer tiny gains, so the signal is spread thin.</li>
+        <li><strong>Ordinal codes</strong> work for trees, because several cuts can carve out any levels, but an arbitrary order wastes splits on separating levels that sit far apart.</li>
+        <li><strong>Better for many levels:</strong> target or count encoding, or native categorical support (LightGBM, CatBoost, XGBoost, sklearn's HistGradientBoosting). Ordering levels by their target statistic lets one split group them, which for a binary target finds the best two-way grouping.</li>
+      </ul>
+      <p><strong>Follow-up, what trees do care about:</strong> extreme targets under squared loss (leaf means and boosting gradients get pulled; use Huber), leakage, and correlated features splitting importance. (<a href="#enc-table">06</a>, <a href="#scaling">07</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">18</span>Standardization vs normalization.</summary><div class="ans">
+      <p><strong>Standardization rescales a column to mean 0 and standard deviation 1. Normalization usually means min-max scaling to \([0, 1]\), and in sklearn's <code>Normalizer</code> it means rescaling each row to unit length.</strong></p>
+      <div class="mj">\[ \begin{aligned} \text{standardize:}\quad \tilde x &amp;= \frac{x - \mu}{\sigma} \\ \text{min-max:}\quad \tilde x &amp;= \frac{x - x_{\min}}{x_{\max} - x_{\min}} \\ \text{robust:}\quad \tilde x &amp;= \frac{x - \operatorname{median}}{\text{IQR}} \end{aligned} \]</div>
+      <ul>
+        <li><strong>Standardization</strong> is the default for penalized linear models, SVMs, kNN, PCA and neural nets: everything built on distances, penalties or gradient descent.</li>
+        <li><strong>Min-max</strong> suits naturally bounded features (pixels, percentages) or models that need bounded inputs.</li>
+        <li><strong>Robust scaling</strong> (subtract the median, divide by the IQR, \(Q_3 - Q_1\), the spread of the middle half) when outliers would otherwise set the scale.</li>
+        <li><strong>Row normalization</strong> for vectors compared by direction, such as TF-IDF text vectors with cosine similarity.</li>
+      </ul>
+      <p><strong>Why scale at all:</strong> mixed units make gradient descent zig-zag through a stretched loss surface, let one feature dominate distances, and make a penalty punish features with small numeric ranges more. <strong>Trade-offs:</strong> min-max is fragile, since one outlier sets the range and new values fall outside \([0, 1]\); standardization isn't robust either; and neither changes the shape of a skewed column, which is a transform's job. Fit on training rows only. (<a href="#scaling">07</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">19</span>A feature is heavily right-skewed. What do you do, and does it matter for XGBoost?</summary><div class="ans">
+      <p><strong>For linear models, distance-based methods and neural nets, transform it: a log, Box-Cox or Yeo-Johnson, or a quantile transform. For XGBoost it doesn't matter, because trees only use the order of values.</strong></p>
+      <div class="mj">\[ x^{(\lambda)} = \begin{cases} \dfrac{x^{\lambda} - 1}{\lambda} &amp; \lambda \ne 0 \\ \log x &amp; \lambda = 0 \end{cases} \]</div>
+      <p>In words: Box-Cox is a family of power transforms with the log at \(\lambda = 0\); \(\lambda\) is chosen by maximum likelihood on training data to make the column as close to normal as possible. It needs positive values; use \(\log(1 + x)\) for counts with zeros and Yeo-Johnson for negative values.</p>
+      <ul>
+        <li><strong>Why it helps:</strong> a few huge values dominate squared loss and act as high-leverage points; multiplicative effects become additive after a log; relationships often become more linear; scaling becomes meaningful.</li>
+        <li><strong>Quantile transform:</strong> the most robust option, but it bends relationships, distorts distances, and clips values beyond the training range.</li>
+        <li><strong>XGBoost:</strong> a threshold on \(\log x\) is a threshold on \(x\), so the splits are identical.</li>
+      </ul>
+      <p><strong>Follow-up, a skewed target is different, even for XGBoost:</strong> with squared loss, the largest targets dominate the gradients. Options are a log target (which then predicts something close to the median, so totals come out low unless corrected) or a loss suited to the target, such as Huber, Poisson or Tweedie. (<a href="#scaling">07</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">20</span>Collinearity: why it's a problem, how to detect it, what to do.</summary><div class="ans">
+      <p><strong>Highly correlated features make a linear model's individual coefficients unstable and hard to interpret, though predictions are usually fine. Detect it with VIF and the condition number; if you need the coefficients, drop, combine, use PCA, or use ridge.</strong></p>
+      <div class="mj">\[ \begin{aligned} \operatorname{Var}(\hat\beta_j) &amp;= \frac{\sigma^2}{\sum_i (x_{ij} - \bar x_j)^2} \cdot \text{VIF}_j \\ \text{VIF}_j &amp;= \frac{1}{1 - R_j^2} \end{aligned} \]</div>
+      <p>In words: \(\sigma^2\) is the noise variance and \(R_j^2\) is how well the other features predict feature \(j\). Only the part of \(x_j\) they can't predict helps estimate \(\beta_j\), so as \(R_j^2\) nears 1 the coefficient's variance blows up.</p>
+      <ul>
+        <li><strong>Why it hurts:</strong> the data can't say which twin deserves the credit, so the coefficients slide along a flat valley: large standard errors, signs that flip, each feature insignificant alone while the pair is clearly significant together. Predictions depend on the combined effect, which is well pinned down, so they're fine while the correlation holds, and swing for rows that break it.</li>
+        <li><strong>Detect:</strong> correlation matrix (pairwise only, misses one column being a combination of several); VIF per feature (above 5 worth a look, above 10 serious); condition number of the standardized feature matrix (above about 30).</li>
+        <li><strong>Fix:</strong> nothing, if only predictions matter and the pattern is stable; drop one twin; combine them (a sum, a ratio, an index); PCA; ridge, which shares the weight between twins (lasso keeps one arbitrarily, elastic net keeps the group).</li>
+      </ul>
+      <p><strong>Follow-up:</strong> trees predict fine, but correlated features split their importance (next question). (<a href="#collinearity">08</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">21</span>Two correlated features both show low importance in a random forest. Why?</summary><div class="ans">
+      <p><strong>They share the credit. The forest uses one twin or the other at different splits, so impurity importance divides their joint importance between them, and permutation importance barely drops when one is shuffled, because the other covers for it.</strong></p>
+      <ul>
+        <li><strong>Impurity importance</strong> adds up the gain from every split on a feature. Whichever twin wins a given split takes that split's credit. A random forest samples features at each split, so both twins win some splits, and each ends up with roughly half of what one would get alone.</li>
+        <li><strong>Permutation importance</strong> shuffles one feature and measures the drop in score. The model still has the twin, so the score barely moves. Shuffling one twin also creates rows that never occur, like a large area in one unit and a small area in the other.</li>
+        <li><strong>Boosting</strong> tends to lean on one twin and ignore the other, so the split is less even but equally arbitrary.</li>
+      </ul>
+      <p><strong>Why it matters:</strong> you might drop both and lose the signal, or conclude the underlying concept doesn't matter. <strong>Fix:</strong> group correlated features (cluster them by correlation), then permute each group together, or drop the group and refit; for SHAP, sum the group's values. (<a href="#collinearity">08</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">22</span>You add “the merchant's fraud rate” as a feature. What can go wrong?</summary><div class="ans">
+      <p><strong>It's target encoding in disguise, so it can leak in three ways: through the current row's own label, through future rows, and through test rows. It's also noisy for small merchants.</strong></p>
+      <ul>
+        <li><strong>The row's own label:</strong> if the rate includes the transaction being scored, a fraud raises its own feature. Compute it out-of-fold, or from earlier transactions only.</li>
+        <li><strong>Future rows:</strong> a rate over the whole dataset includes frauds that happened after the transaction. Compute it as of the transaction's time.</li>
+        <li><strong>Label delay:</strong> fraud labels arrive weeks later (chargebacks). At scoring time, recent transactions have no labels yet, so the feature must use only labels that would have been known then; a rate that counts them anyway looks better offline than it can be live.</li>
+        <li><strong>Pooling:</strong> computed over training and test rows together, it lets test labels shape training features.</li>
+        <li><strong>Small merchants:</strong> one fraud in three transactions gives a wild rate. Smooth towards the overall rate, and add the transaction count as its own feature.</li>
+      </ul>
+      <p><strong>Why it's worth the care:</strong> done right, entity-level risk rates are among the strongest features. <strong>Trade-off:</strong> they drift (fraudsters move to new merchants), and new merchants have no history, so the prior and the count carry the load at first. (<a href="#features">09</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">23</span>How do you do feature selection without leaking?</summary><div class="ans">
+      <p><strong>Treat selection as part of training: run it inside each cross-validation training fold, as a pipeline step, never on the full dataset before cross-validation.</strong></p>
+      <p><strong>The mechanism:</strong> take thousands of pure-noise features and random labels, keep the few most correlated with the labels on all rows, then cross-validate: accuracy comes out well above chance. The selection saw the validation labels and kept features that happen to fit them. Inside the pipeline, each fold selects using its own training rows, so the validation score measures the whole procedure honestly.</p>
+      <ul>
+        <li><strong>Filters</strong> (correlation, mutual information): fast, but one feature at a time, so they miss features that only work together and keep redundant copies.</li>
+        <li><strong>Wrappers</strong> (recursive feature elimination, forward selection): use the model, but expensive and easy to overfit without nesting.</li>
+        <li><strong>Embedded:</strong> L1 zeros out weak coefficients but picks among correlated features arbitrarily; tree impurity importance is biased towards high-cardinality features; permutation importance on validation data is fairer but hides correlated features.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> different folds may select different features; that's expected, since you're evaluating the procedure. The final model reruns selection on all training data, and the final number comes from an untouched test set, or from nested cross-validation (an inner loop selects, an outer loop scores). (<a href="#select-cv">10</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">24</span>SMOTE: before or after the split, and does it help?</summary><div class="ans">
+      <p><strong>After the split, on training folds only, inside cross-validation. And on tabular data with gradient boosting it rarely beats class weights or a well-chosen threshold.</strong></p>
+      <div class="mj">\[ \begin{aligned} x_{\text{new}} &amp;= x_i + u\,(x_{\text{nn}} - x_i) \\ u &amp;\sim \text{Uniform}(0, 1) \end{aligned} \]</div>
+      <p>In words: a synthetic positive is placed at a random point on the line between a real positive \(x_i\) and one of its nearest positive neighbours.</p>
+      <ul>
+        <li><strong>Before the split:</strong> synthetic points built from validation rows end up in training, near-copies of what you validate on, so the score is inflated.</li>
+        <li><strong>Pitfalls:</strong> interpolated points can be unrealistic (half-way values of integer or categorical columns, points between two separate fraud patterns that land among genuine rows); it amplifies label noise; it depends on scaling, since it uses distances; and it distorts probabilities with no simple correction.</li>
+        <li><strong>The better order:</strong> keep the loss proper and move the threshold to \(t^* = C_{FP} / (C_{FP} + C_{FN})\), where \(C_{FP}\) and \(C_{FN}\) are the costs of a false alarm and a miss; then class weights; then undersampling negatives, undoing the probability inflation with \(\operatorname{logit} p = \operatorname{logit} p_s + \log q\), where \(p_s\) is the model's probability on the resampled data, \(q\) the share of negatives kept, and \(\operatorname{logit} p = \log\big(p/(1 - p)\big)\).</li>
+      </ul>
+      <p><strong>Follow-up:</strong> judge any of these with PR-AUC and precision and recall at the operating threshold, not accuracy, and never resample the validation or test sets: they must keep the real base rate. (<a href="#imbalance">11</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">25</span>Overfitting vs underfitting: how do you tell, and how do you fix each?</summary><div class="ans">
+      <p><strong>Compare training and validation performance. Both poor means underfitting (high bias); training good and validation poor means overfitting (high variance). Learning and validation curves confirm which.</strong></p>
+      <div class="mj">\[ \mathbb E\big[(y - \hat f)^2\big] = \text{bias}^2 + \text{variance} + \sigma^2 \]</div>
+      <p>In words: \(\hat f\) is the fitted model and \(f\) the true function. Bias is how far the average fitted model, over many training sets, is from \(f\) (too simple); variance is how much \(\hat f\) changes between training sets (too flexible); \(\sigma^2\) is noise no model can remove.</p>
+      <ul>
+        <li><strong>Learning curve</strong> (scores against training-set size): curves that meet low means underfitting, and more data won't help; a gap that narrows as data grows means overfitting, and more data will.</li>
+        <li><strong>Validation curve</strong> (scores against one complexity setting): pick the validation peak, or the simplest setting near it.</li>
+        <li><strong>Fix underfitting:</strong> better features (ratios, aggregates, interactions), more capacity, less regularization, longer training; check label noise.</li>
+        <li><strong>Fix overfitting:</strong> more data, fewer or cleaner features, grouped rare levels and smoothed encodings, stronger regularization, shallower trees, early stopping, bagging.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> a big gap isn't always overfitting. If a feature leaks only in training rows, or the validation period differs from the training period, the gap comes from the data; check with a time-based split and adversarial validation before adding regularization. (<a href="#fit">12</a>)</p>
+    </div></details>
+
+    <!-- sheet -->
+    <h2 id="sheet"><span class="pn">15</span>Cheat sheet</h2>
+    <div class="sheet">
+      <h3>The rule and the split</h3>
+      <p>Anything that learns a number is fitted on training folds, inside the pipeline. Split as deployment works: by time (with a gap) for forecasting and credit, by group for repeated entities, stratified for rare classes. Look at the test set once.</p>
+      <h3>Missing values</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Mechanism</th><th>Blank depends on</th><th>Handling</th></tr></thead>
+        <tbody>
+          <tr><td>MCAR</td><td>Nothing</td><td>Drop: no bias, less data. Mean fill: shrinks spread</td></tr>
+          <tr><td>MAR</td><td>Observed columns</td><td>Impute from them (model-based, MICE)</td></tr>
+          <tr><td>MNAR</td><td>The value itself</td><td>Keep the blank as a feature; sensitivity analysis for inference</td></tr>
+        </tbody>
+      </table></div>
+      <p>Categorical: a “Missing” level by default; the mode only if MCAR, few, and not predictive. Numeric: median plus indicator; model-based under MAR; native handling in boosting. Indicator \(I\) with its own intercept \(\theta\), mean-fill damage (share \(r\) missing), and Rubin's total variance over \(M\) imputations:</p>
+      <div class="mj">\[ \begin{aligned} \hat y &amp;= \beta_0 + \beta \tilde x + \theta I \\ \operatorname{Var}(\tilde x) &amp;\approx (1 - r)\operatorname{Var}(x) \\ \operatorname{Corr}(\tilde x, z) &amp;\approx \sqrt{1 - r}\, \operatorname{Corr}(x, z) \\ T &amp;= \bar W + (1 + 1/M)\, B \end{aligned} \]</div>
+      <h3>Outliers</h3>
+      <p>z-score (flag above 3), robust z (flag above 3.5), IQR fences:</p>
+      <div class="mj">\[ \begin{aligned} z &amp;= (x - \bar x)/s \\ z^{\text{robust}} &amp;= 0.6745\,(x - \tilde x)/\text{MAD} \\ \text{low fence} &amp;= Q_1 - 1.5\,\text{IQR} \\ \text{high fence} &amp;= Q_3 + 1.5\,\text{IQR} \end{aligned} \]</div>
+      <p>Error: fix it or set it missing. Genuine: cap, log, robust loss, or keep it (fraud).</p>
+      <h3>Encoding</h3>
+      <p>Smoothed target encoding (out-of-fold), the leave-one-out version that leaks, frequency, and the hashing collision chance:</p>
+      <div class="mj">\[ \begin{aligned} \text{enc}(c) &amp;= \frac{n_c \bar y_c + m \bar y}{n_c + m} \\ \text{enc}_{-i} &amp;= \frac{S_c - y_i}{n_c - 1} \\ \text{freq}(c) &amp;= n_c / n \\ P_{\text{collide}} &amp;\approx 1 - e^{-K/B} \end{aligned} \]</div>
+      <p>Few levels: one-hot (drop one if unregularized with an intercept). Many: target plus count encoding, native categorical, or embeddings. Unseen: the prior, 0, or an “unknown” index.</p>
+      <h3>Scaling and transforms</h3>
+      <p>Standardize, min-max, robust, Box-Cox (log at \(\lambda = 0\)), cyclical hour:</p>
+      <div class="mj">\[ \begin{aligned} \tilde x &amp;= (x - \mu)/\sigma \\ \tilde x &amp;= (x - x_{\min})/(x_{\max} - x_{\min}) \\ \tilde x &amp;= (x - \operatorname{median})/\text{IQR} \\ x^{(\lambda)} &amp;= (x^{\lambda} - 1)/\lambda \\ h_{\sin} &amp;= \sin(2\pi h/24) \\ h_{\cos} &amp;= \cos(2\pi h/24) \end{aligned} \]</div>
+      <p>Scale for distances, penalties, gradient descent and PCA. Trees: never.</p>
+      <h3>Collinearity</h3>
+      <p>VIF above 5 is worth a look, above 10 serious; condition number above about 30.</p>
+      <div class="mj">\[ \begin{aligned} \text{VIF}_j &amp;= \frac{1}{1 - R_j^2} \\ \operatorname{Var}(\hat\beta_j) &amp;= \frac{\sigma^2 \cdot \text{VIF}_j}{\sum_i (x_{ij} - \bar x_j)^2} \end{aligned} \]</div>
+      <p>It hurts coefficients, not predictions. In trees, twins split the importance.</p>
+      <h3>Imbalance and fit</h3>
+      <p>Cost threshold, prior correction after resampling, SMOTE, bias–variance:</p>
+      <div class="mj">\[ \begin{aligned} t^* &amp;= \frac{C_{FP}}{C_{FP} + C_{FN}} \\ \operatorname{logit} p &amp;= \operatorname{logit} p_s + \log q \\ x_{\text{new}} &amp;= x_i + u\,(x_{\text{nn}} - x_i) \\ \mathbb E\big[(y - \hat f)^2\big] &amp;= \text{bias}^2 + \text{var} + \sigma^2 \end{aligned} \]</div>
+      <p>Threshold first, weights second, resampling last, and only on training folds. Metrics: PR-AUC, precision and recall at the threshold, cost.</p>
+    </div>
+
+    <footer><a href="./">More study notes</a> · <a href="../">Deepam Minda</a></footer>
+  </article>
+</div>
+<a class="jump" href="#tldr">Contents ↑</a>
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+  svg: { fontCache: "global" },
+  options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script>
+(function () {
+  var d = document.getElementById("tocd");
+  var wide = window.matchMedia("(min-width: 1081px)");
+  function sync() { d.open = wide.matches; }
+  sync();
+  if (wide.addEventListener) wide.addEventListener("change", sync);
+  var jump = document.querySelector(".jump");
+  jump.addEventListener("click", function () { if (!wide.matches) d.open = true; });
+  d.addEventListener("click", function (e) {
+    if (!wide.matches && e.target.closest("a")) d.open = false;
+  });
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+  function spy() {
+    var y = window.scrollY + 120, cur = 0;
+    targets.forEach(function (t, i) { if (t && t.getBoundingClientRect().top + window.scrollY <= y) cur = i; });
+    links.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
+  }
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+})();
+</script>
+
+<script>
+(function () {
+  var root = document.documentElement, b = document.getElementById("theme-toggle");
+  function cur() { return root.getAttribute("data-theme") === "light" ? "light" : "dark"; }
+  function label() { b.setAttribute("aria-label", "Switch to " + (cur() === "dark" ? "light" : "dark") + " mode"); }
+  b.addEventListener("click", function () {
+    var n = cur() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", n);
+    try { localStorage.setItem("deepam-theme", n); } catch (e) {}
+    label();
+  });
+  label();
+})();
+</script>
+</body>
+</html>
