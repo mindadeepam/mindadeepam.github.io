@@ -1,0 +1,1319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070707">
+<title>The data science project lifecycle · Deepam Minda</title>
+<meta name="description" content="From a business problem to a monitored model: framing, metrics, labels, validation, baselines, error analysis, A/B tests, deployment, monitoring and communication, on one running credit example.">
+<meta property="og:title" content="The data science project lifecycle">
+<meta property="og:description" content="From a business problem to a monitored model: framing, metrics, labels, validation, baselines, error analysis, A/B tests, deployment, monitoring and communication, on one running credit example.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem("deepam-theme"); } catch (e) {}
+  if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<link rel="stylesheet" href="../assets/design/tokens.css?v=1">
+<link rel="stylesheet" href="../assets/design/components.css?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<style>
+/* Green graph-paper theme for the recurrent-notebook content.
+   Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
+   One sans for text, one mono for labels; MathJax draws the maths. Green = the cell / notebook,
+   slate = the hidden state, orange only for gradients. */
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
+body {
+  margin: 0; color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: 50% 0;
+  font: 16.5px/1.7 var(--sans); letter-spacing: -.003em;
+  padding-inline: 20px; padding-block: 44px 88px;
+  -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 640px) { body { font-size: 16px; padding-inline: 16px; padding-block: 24px 80px; } }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+table, button { font: inherit; }
+code { font: .86em var(--mono); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; }
+
+.page { max-width: 1200px; margin: 0 auto; display: grid; gap: 52px; grid-template-columns: 220px minmax(0, 860px); justify-content: center; }
+@media (max-width: 1080px) { .page { grid-template-columns: minmax(0, 860px); gap: 0; } }
+
+/* contents */
+.toc { position: sticky; top: 28px; align-self: start; font: 13.5px/1.4 var(--sans); max-height: calc(100vh - 56px); overflow-y: auto; }
+.toc summary { display: none; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--ink-2); text-decoration: none; }
+.toc a:hover { background: var(--surface); color: var(--ink); }
+.toc a.on { color: var(--ink); background: var(--surface); box-shadow: inset 2px 0 0 var(--cell); }
+.toc .n { font: 500 11px var(--mono); color: var(--ink-3); margin-right: 8px; }
+.toc .label { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 10px 10px; }
+.toc li.part { font: 500 10.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 14px 10px 4px; }
+@media (max-width: 1080px) {
+  .toc { position: static; margin-bottom: 26px; max-height: none; }
+  .toc .label { display: none; }
+  .toc details { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  .toc summary { display: block; cursor: pointer; padding: 12px 14px; font: 500 14px var(--sans); list-style: none; }
+  .toc summary::-webkit-details-marker { display: none; }
+  .toc summary::after { content: "+"; float: right; color: var(--ink-3); }
+  .toc details[open] summary::after { content: "–"; }
+  .toc details ol { padding: 0 6px 10px; }
+}
+.jump {
+  display: none; position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+  font: 500 13px var(--sans); color: var(--ink); background: var(--surface); text-decoration: none;
+  border: 1px solid var(--rule); border-radius: 999px; padding: 9px 14px;
+}
+@media (max-width: 1080px) { .jump { display: block; } }
+
+/* article */
+article { min-width: 0; }
+header.hero { display: grid; gap: 10px; margin-bottom: 26px; }
+.kicker { font: 500 12px/1 var(--mono); color: var(--ink-3); letter-spacing: .02em; }
+h1 { margin: 0; font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.6rem); line-height: 1.1; font-weight: 600; letter-spacing: -.028em; text-wrap: balance; }
+.dek { margin: 0; font-size: 1.1rem; line-height: 1.55; color: var(--ink-2); max-width: 40em; }
+.meta { font: 12px/1.5 var(--mono); color: var(--ink-3); }
+.key { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.key span::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--c); margin-right: 6px; vertical-align: middle; }
+
+h2 { font-size: 1.36rem; line-height: 1.25; font-weight: 600; letter-spacing: -.018em; margin: 56px 0 12px; text-wrap: balance; scroll-margin-top: 16px; }
+h2 .pn { font: 500 .74em/1 var(--mono); color: var(--ink-3); margin-right: .7em; letter-spacing: 0; }
+h3 { font-size: 1.04rem; font-weight: 600; letter-spacing: -.01em; margin: 30px 0 6px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 1.25em; }
+li { margin-bottom: 5px; }
+li::marker { color: var(--ink-3); }
+strong { font-weight: 600; }
+.mj { overflow-x: auto; overflow-y: hidden; margin: 4px 0 16px; padding: 2px 0; }
+mjx-container[display="true"] { margin: 0 !important; }
+
+/* plan and summary panels */
+.tldr { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 22px 6px; margin-bottom: 14px; }
+.tldr h2 { margin: 0 0 10px; font: 500 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.tldr ol { padding-left: 1.3em; }
+.tldr li { margin-bottom: 8px; }
+.tldr p { margin: 0 0 12px; font-size: 15.5px; }
+.tldr .tbl { margin: 4px 0 12px; }
+
+/* notes: quote-style, coloured by kind */
+.note { margin: 16px 0 20px; padding: 2px 0 2px 16px; border-left: 2px solid var(--c); color: var(--ink-2); font-size: .97em; }
+.note > .nl { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); margin: 4px 0 8px; }
+.note strong { color: var(--ink); }
+.note.ask { --c: var(--cell); }
+.note.say { --c: var(--hid); }
+.note.trap { --c: var(--grad); }
+.note.lab { --c: var(--cell); }
+.note .q { font-style: italic; color: var(--ink); }
+.note ul { margin: 0 0 10px; }
+.note li { margin-bottom: 5px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 6px 0 20px; }
+table { border-collapse: collapse; width: 100%; font-size: .93em; line-height: 1.5; }
+th { text-align: left; vertical-align: bottom; font: 500 11px/1.4 var(--mono); color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; padding: 0 14px 8px 0; border-bottom: 1px solid var(--ink-3); }
+td { padding: 8px 14px 8px 0; vertical-align: top; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+td .src { display: block; font: 11.5px/1.4 var(--mono); color: var(--ink-3); margin-top: 2px; }
+
+/* gate cards */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0 20px; }
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.gc { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 4px; font-size: 15.5px; line-height: 1.6; }
+.gc h4 { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.gc h4 .tag { font: 500 11px var(--mono); color: var(--c); }
+.gc.g1 { --c: var(--cell); }
+.gc.g2 { --c: var(--ink-3); }
+.gc p { margin-bottom: 10px; }
+
+/* figures */
+figure { margin: 18px 0 24px; }
+.plate { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 10px; overflow-x: auto; }
+.plate svg { display: block; width: 100%; height: auto; min-width: 460px; max-width: 700px; margin: 0 auto; }
+@media (max-width: 500px) { .plate svg { max-width: none; } }
+figcaption { font-size: .86rem; line-height: 1.5; color: var(--ink-3); margin-top: 10px; }
+.dg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink-2); }
+.dg .v { font-family: var(--serif); font-style: italic; font-size: 19px; fill: var(--ink); }
+.dg .v .s { font-size: 12.5px; }
+.dg .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; fill: var(--ink-3); }
+.dg .gl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--gate); }
+.dg .gs { font-family: var(--serif); font-style: normal; font-size: 12px; fill: var(--ink-3); }
+.dg .cl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--ink); }
+.dg .cs { font-family: var(--sans); font-size: 12px; fill: var(--ink-2); }
+.dg .optx { font: 500 17px var(--sans); fill: var(--ink); }
+.dg .cell { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.dg .hid { stroke: var(--hid); stroke-width: 2.4; fill: none; }
+.dg .hid.thick { stroke-width: 3.6; }
+.dg .in { stroke: var(--ink-3); stroke-width: 1.5; fill: none; }
+.dg .gw { stroke: var(--gate); stroke-width: 1.6; fill: none; }
+.dg .cw { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+.dg .grad { stroke: var(--grad); fill: none; stroke-linecap: round; }
+.dg .gbox { fill: var(--gate-wash); stroke: var(--gate); stroke-width: 1.3; }
+.dg .box { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .op { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.3; }
+.dg .dot { fill: var(--ink-2); }
+.dg .cellon { fill: var(--cell-wash); stroke: var(--cell); stroke-width: 1; }
+.dg .celloff { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.dg .stream { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.mk-cell { fill: var(--cell); } .mk-hid { fill: var(--hid); } .mk-in { fill: var(--ink-3); }
+.mk-gate { fill: var(--gate); } .mk-cw { fill: var(--ink-2); } .mk-grad { fill: var(--grad); }
+
+/* questions */
+details.qa { border-bottom: 1px solid var(--rule); }
+details.qa:first-of-type { border-top: 1px solid var(--rule); }
+details.qa summary { cursor: pointer; padding: 11px 2px; font-weight: 500; font-size: 15.5px; line-height: 1.45; list-style: none; display: flex; gap: 12px; }
+details.qa summary::-webkit-details-marker { display: none; }
+details.qa summary .qn { font: 500 11.5px/1.9 var(--mono); color: var(--ink-3); flex: none; min-width: 1.9em; }
+details.qa summary::after { content: "+"; margin-left: auto; color: var(--ink-3); flex: none; }
+details.qa[open] summary::after { content: "–"; }
+details.qa .ans { padding: 0 4px 12px 32px; font-size: 15.5px; color: var(--ink-2); }
+summary:focus-visible, a:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+
+.sheet { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 6px; }
+.sheet h3 { margin: 4px 0 6px; font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: .9rem; color: var(--ink-3); }
+
+/* code blocks */
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; margin: 8px 0 20px; overflow-x: auto; font: 12.8px/1.6 var(--mono); color: var(--ink); white-space: pre; }
+pre.code code { font: inherit; background: none; border: 0; padding: 0; }
+pre.code .cm { color: var(--ink-3); }
+@media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
+
+/* public copy: colours, fonts and sizes come from the site's tokens.css; this maps the notebook's
+   token names onto them (green_theme.css's own token block is left out of public pages). */
+:root {
+  --paper: var(--void); --ink: var(--text); --ink-2: var(--soft); --ink-3: var(--muted);
+  --accent: var(--amber);
+  --cell: var(--green); --cell-wash: var(--green-wash); --hid: var(--blue); --hid-wash: var(--blue-wash);
+  --gate: var(--neutral); --gate-wash: var(--neutral-wash); --grad: var(--orange); --grad-wash: var(--orange-wash);
+  --sans: var(--font-sans); --mono: var(--font-mono);
+  --serif: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
+}
+body { padding-block-start: 0; letter-spacing: 0; }
+/* the shared header sits inside the notebook's side padding */
+.site-header { width: min(100%, 1260px); margin-bottom: 40px; }
+.site-header a:hover { text-decoration: none; }
+@media (max-width: 720px) { .site-header { width: 100%; margin-bottom: 26px; } }
+/* the site's type scale */
+h1 { font-weight: 600; font-size: var(--fs-title); line-height: 1.12; letter-spacing: -.02em; }
+h2 { font-size: var(--fs-h2); letter-spacing: -.01em; }
+h3 { font-size: var(--fs-h3); }
+.dek { font-size: 18px; }
+.toc a.on { box-shadow: inset 2px 0 0 var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline-color: var(--accent); }
+footer .site-nav { display: block; margin-top: 10px; }
+.next { margin-top: 36px; font-weight: 500; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="a-cell" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path class="mk-cell" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-hid" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto"><path class="mk-hid" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-in" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-in" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-gate" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-cw" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-cw" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-grad" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path class="mk-grad" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">study notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
+<div class="page">
+  <nav class="toc" aria-label="Contents">
+    <details id="tocd" open>
+      <summary>Contents</summary>
+      <div class="label">Contents</div>
+      <ol>
+        <li><a href="#tldr"><span class="n">00</span>In short</a></li>
+        <li><a href="#loop"><span class="n">01</span>The loop, and the running example</a></li>
+        <li><a href="#framing"><span class="n">02</span>Problem framing</a></li>
+        <li><a href="#metrics"><span class="n">03</span>Success metrics</a></li>
+        <li><a href="#data"><span class="n">04</span>Data and labels</a></li>
+        <li><a href="#prep"><span class="n">05</span>EDA and data preparation</a></li>
+        <li><a href="#validation"><span class="n">06</span>Validation strategy, before modelling</a></li>
+        <li><a href="#baseline"><span class="n">07</span>Baseline first, then iterate</a></li>
+        <li><a href="#modelling"><span class="n">08</span>Modelling and tuning</a></li>
+        <li><a href="#errors"><span class="n">09</span>Error analysis and interpretability</a></li>
+        <li><a href="#online"><span class="n">10</span>From offline to online</a></li>
+        <li><a href="#deploy"><span class="n">11</span>Deployment</a></li>
+        <li><a href="#monitor"><span class="n">12</span>Monitoring and maintenance</a></li>
+        <li><a href="#people"><span class="n">13</span>Communication and project management</a></li>
+        <li><a href="#failures"><span class="n">14</span>Failure modes across the lifecycle</a></li>
+        <li><a href="#questions"><span class="n">15</span>Interview questions</a></li>
+        <li><a href="#sheet"><span class="n">16</span>Cheat sheet: the lifecycle as a checklist</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <article>
+    <header class="hero">
+      <div class="tag">Study notes · Data science practice</div>
+      <h1>The data science project lifecycle</h1>
+      <p class="dek">How a project gets from a business problem to a monitored model, and the judgement calls along the way: framing, metrics, labels, validation, baselines, modelling, error analysis, experiments, deployment and monitoring. For each stage: what you do and why, the trade-offs, how it goes wrong, and what a senior reviewer checks, on one credit-default model.</p>
+      <div class="meta">About 35 minutes, plus 20 questions · one running example: a lender's default model ·
+        <span class="key"><span style="--c: var(--gate)">define</span><span style="--c: var(--hid)">build</span><span style="--c: var(--cell)">ship and run</span></span>
+      </div>
+    </header>
+
+    <section class="tldr" id="tldr" aria-labelledby="tldr-h">
+      <h2 id="tldr-h">In short</h2>
+      <ol>
+        <li><strong>Start from the decision, not the model:</strong> business objective → the decision the prediction changes → the ML task. If no decision changes, there's no project.</li>
+        <li><strong>Choose metrics in layers:</strong> a business metric, an offline metric that measures the model where the decision is made, online metrics for the experiment, and guardrails, all fixed before you look. Thresholds come from the costs of each mistake; calibration matters whenever a score is used as a probability.</li>
+        <li><strong>The label and the split define “better”.</strong> Write the label and its window down, never count outcomes that haven't matured as negatives, and validate out of time, grouped by customer, with a holdout you touch once.</li>
+        <li><strong>Baseline first:</strong> today's policy, then logistic regression, then gradient boosting. Most of the gain comes from labels, features and error analysis, not from tuning.</li>
+        <li><strong>Offline wins often fail online</strong> through selection bias, proxy metrics, drift and training–serving skew. Shadow mode checks the plumbing; a randomized champion–challenger with loss caps checks the value.</li>
+        <li><strong>After launch, watch what you can see now</strong> (data quality, input and score drift, early outcomes) while the real labels arrive. Retrain on evidence, not habit, and guard against feedback loops where the model decides which labels you get.</li>
+      </ol>
+    </section>
+
+    <!-- loop -->
+    <h2 id="loop"><span class="pn">01</span>The loop, and the running example</h2>
+    <p>A project is a loop, not a line. Each stage hands a decision to the next, and later stages keep sending you back: error analysis to the labels, a flat experiment to the metric, monitoring to retraining or to a new framing. Each box below is a section of this note.</p>
+    <figure>
+      <div class="plate" style="padding:12px 4px">
+        <svg class="dg" viewBox="0 0 440 414" style="min-width:0;max-width:520px" role="img" aria-label="The lifecycle as a loop of eleven stages in a snake layout. Define: 02 frame, 03 metrics, 04 data and labels. Build: 05 prepare, 06 validate, 07 baseline, 08 model and tuning, 09 error analysis. Ship and run: 10 shadow and A/B test, 11 deploy, 12 monitor. A green arrow runs from monitor back to frame: retrain or re-frame. A dashed arrow runs from error analysis back to prepare: fix labels and features. A dashed band around the bottom: 13 communicate and manage, at every stage.">
+          <path class="cw" d="M84 14 V41" marker-end="url(#a-cw)"/>
+          <text class="lbl" x="96" y="26">a business problem</text>
+          <rect x="22" y="44" width="124" height="46" rx="8" style="fill:var(--gate-wash);stroke:var(--gate);stroke-width:1.5"/>
+          <text class="lbl" x="84" y="62" text-anchor="middle" style="fill:var(--gate)">02</text><text x="84" y="81" text-anchor="middle" style="fill:var(--ink);font-size:15px">Frame</text>
+          <rect x="162" y="44" width="124" height="46" rx="8" style="fill:var(--gate-wash);stroke:var(--gate);stroke-width:1.5"/>
+          <text class="lbl" x="224" y="62" text-anchor="middle" style="fill:var(--gate)">03</text><text x="224" y="81" text-anchor="middle" style="fill:var(--ink);font-size:15px">Metrics</text>
+          <rect x="302" y="44" width="124" height="46" rx="8" style="fill:var(--gate-wash);stroke:var(--gate);stroke-width:1.5"/>
+          <text class="lbl" x="364" y="62" text-anchor="middle" style="fill:var(--gate)">04</text><text x="364" y="81" text-anchor="middle" style="fill:var(--ink);font-size:15px">Data, labels</text>
+          <rect x="302" y="128" width="124" height="46" rx="8" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.5"/>
+          <text class="lbl" x="364" y="146" text-anchor="middle" style="fill:var(--hid)">05</text><text x="364" y="165" text-anchor="middle" style="fill:var(--ink);font-size:15px">Prepare</text>
+          <rect x="162" y="128" width="124" height="46" rx="8" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.5"/>
+          <text class="lbl" x="224" y="146" text-anchor="middle" style="fill:var(--hid)">06</text><text x="224" y="165" text-anchor="middle" style="fill:var(--ink);font-size:15px">Validate</text>
+          <rect x="22" y="128" width="124" height="46" rx="8" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.5"/>
+          <text class="lbl" x="84" y="146" text-anchor="middle" style="fill:var(--hid)">07</text><text x="84" y="165" text-anchor="middle" style="fill:var(--ink);font-size:15px">Baseline</text>
+          <rect x="22" y="212" width="124" height="46" rx="8" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.5"/>
+          <text class="lbl" x="84" y="230" text-anchor="middle" style="fill:var(--hid)">08</text><text x="84" y="249" text-anchor="middle" style="fill:var(--ink);font-size:15px">Model, tuning</text>
+          <rect x="162" y="212" width="124" height="46" rx="8" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.5"/>
+          <text class="lbl" x="224" y="230" text-anchor="middle" style="fill:var(--hid)">09</text><text x="224" y="249" text-anchor="middle" style="fill:var(--ink);font-size:15px">Error analysis</text>
+          <rect x="302" y="212" width="124" height="46" rx="8" style="fill:var(--cell-wash);stroke:var(--cell);stroke-width:1.5"/>
+          <text class="lbl" x="364" y="230" text-anchor="middle" style="fill:var(--cell)">10</text><text x="364" y="249" text-anchor="middle" style="fill:var(--ink);font-size:15px">Shadow, A/B</text>
+          <rect x="302" y="296" width="124" height="46" rx="8" style="fill:var(--cell-wash);stroke:var(--cell);stroke-width:1.5"/>
+          <text class="lbl" x="364" y="314" text-anchor="middle" style="fill:var(--cell)">11</text><text x="364" y="333" text-anchor="middle" style="fill:var(--ink);font-size:15px">Deploy</text>
+          <rect x="162" y="296" width="124" height="46" rx="8" style="fill:var(--cell-wash);stroke:var(--cell);stroke-width:1.5"/>
+          <text class="lbl" x="224" y="314" text-anchor="middle" style="fill:var(--cell)">12</text><text x="224" y="333" text-anchor="middle" style="fill:var(--ink);font-size:15px">Monitor</text>
+          <path class="cw" d="M146 67 H159" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M286 67 H299" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M364 90 V125" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M302 151 H289" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M162 151 H149" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M84 174 V209" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M146 235 H159" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M286 235 H299" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M364 258 V293" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M302 319 H289" marker-end="url(#a-cw)"/>
+          <path d="M162 319 H10 V67 H19" style="stroke:var(--cell);stroke-width:2.2;fill:none" marker-end="url(#a-cell)"/>
+          <text class="lbl" x="84" y="310" text-anchor="middle" style="fill:var(--cell)">retrain or re-frame</text>
+          <path d="M262 212 V194 H404 V177" style="stroke:var(--hid);stroke-width:1.6;stroke-dasharray:5 4;fill:none" marker-end="url(#a-hid)"/>
+          <text class="lbl" x="322" y="189" text-anchor="middle" style="fill:var(--hid)">fix labels, features</text>
+          <rect x="10" y="360" width="420" height="46" rx="10" style="fill:none;stroke:var(--ink-3);stroke-width:1.2;stroke-dasharray:4 4"/>
+          <text x="220" y="379" text-anchor="middle" style="fill:var(--ink);font-size:14px">13 · Communicate and manage, at every stage</text>
+          <text class="lbl" x="220" y="397" text-anchor="middle">scope · updates · model card · when to stop</text>
+        </svg>
+      </div>
+      <figcaption>The lifecycle as a loop. Purple stages define the problem, blue ones build the model, green ones ship and run it. Monitoring feeds new labels back for retraining, or sends you back to framing when the business changes. Error analysis sends you back to the data far more often than to the model.</figcaption>
+    </figure>
+
+    <h3 id="example">The running example</h3>
+    <p>A digital lender offers small unsecured personal loans, about ₹50,000 over 12 months, applied for and decided inside its app in seconds. Today it approves with a credit-bureau score cut-off plus a few policy rules (identity verified, no serious delinquency right now). It approves 40% of applicants, and 6% of the loans it makes go bad. The business asks: <em>can a model approve more good borrowers without raising losses?</em></p>
+    <p>The economics, used throughout (1 lakh = 100,000):</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Outcome</th><th>Per loan</th><th>Where it comes from</th></tr></thead>
+      <tbody>
+        <tr><td>Repaid</td><td>+₹5,000</td><td>Interest earned, minus funding and running costs</td></tr>
+        <tr><td>Defaulted</td><td>−₹28,000</td><td>On average ₹35,000 is still owed when a loan defaults (the exposure at default), and 80% of it is never recovered (the loss given default)</td></tr>
+      </tbody>
+    </table></div>
+    <p>So the expected loss on a loan is the textbook product:</p>
+    <div class="mj">\[ \text{EL} = \text{PD} \times \text{LGD} \times \text{EAD} \]</div>
+    <p>In words: the chance it defaults (PD), times the share lost if it does (LGD, here 0.8), times what's owed at that point (EAD, here ₹35,000). At 10,000 applications a month, the lender makes 4,000 loans and 240 of them default: about ₹67 lakh of each month's lending is lost to defaults over the loans' life, while the 3,760 good loans earn about ₹1.9 crore.</p>
+
+    <!-- framing -->
+    <h2 id="framing"><span class="pn">02</span>Problem framing</h2>
+    <p>Framing turns a vague goal into three precise statements, in this order:</p>
+    <ol>
+      <li><strong>Business objective:</strong> grow lending profit, meaning more approvals at no higher loss rate.</li>
+      <li><strong>Decision:</strong> for each application, when it's submitted, approve or decline, and at what limit.</li>
+      <li><strong>ML task:</strong> estimate the probability of default (PD): the chance this applicant goes 90+ days past due within 12 months, using only what is known at application time.</li>
+    </ol>
+    <p><strong>Keep the prediction separate from the decision.</strong> The model outputs a PD; a policy turns the PD into approve, decline or a limit. The cut-off can then move when funding costs or risk appetite change, without retraining, and each part can be tested on its own. It also means the PD has to be a real probability, not just a ranking (<a href="#calibration">03</a>).</p>
+
+    <h3>Five questions before any data work</h3>
+    <ul>
+      <li><strong>Is ML needed at all?</strong> A model earns its place when the decision repeats often enough for small gains to add up, rules leave value on the table, labels exist or can be collected, and the pattern is stable enough to learn. Here: 10,000 decisions a month, ₹67 lakh of monthly losses and years of labelled loans, so yes. With 200 applications a month, a points scorecard or a credit officer is the better tool.</li>
+      <li><strong>What's the baseline heuristic?</strong> Today's bureau cut-off plus rules. The project's value is the gap between the model and this policy at the same approval rate, not the gap to random guessing.</li>
+      <li><strong>What action will the prediction drive?</strong> Approve, decline, set the limit, perhaps the price. If nothing can change (a partner fixes the policy, say), there's no project. Note too that the action creates the label: only approved loans can default (<a href="#selection">04</a>).</li>
+      <li><strong>What does a mistake cost?</strong> Call default the positive class. A false negative, approving someone who defaults, costs about ₹28,000. A false positive, declining someone who would have repaid, costs the ₹5,000 margin plus that customer's future business. The costs differ more than fivefold, so accuracy, which counts them equally, is the wrong yardstick.</li>
+      <li><strong>What are the constraints?</strong>
+        <ul>
+          <li><em>Latency:</em> the applicant is waiting, and the bureau call takes most of the few seconds available.</li>
+          <li><em>Interpretability:</em> a declined applicant must be told the main reasons, and the credit-risk team must be able to audit the model.</li>
+          <li><em>Regulation and consent:</em> only data the applicant agreed to share; no protected attributes such as religion or gender, and no obvious proxies for them.</li>
+          <li><em>Timing:</em> only data that exists at the moment of decision. Anything recorded later is leakage.</li>
+        </ul>
+      </li>
+    </ul>
+
+    <h3>Size the prize before you start</h3>
+    <ul>
+      <li><strong>The ceiling:</strong> a perfect model at today's 40% approval rate would swap all 240 monthly defaulters for good borrowers. Each swap gains the loss avoided plus the margin earned, ₹28,000 + ₹5,000, so the ceiling is about ₹79 lakh a month.</li>
+      <li><strong>A realistic target:</strong> swapping a quarter of them, 60 a month, is worth about ₹20 lakh a month. Set against what a model actually delivers, it later decides when to ship (<a href="#people">13</a>).</li>
+    </ul>
+    <p><strong>Write it down</strong> in a one-page framing document:</p>
+    <ul>
+      <li>the objective, the decision, and who owns it;</li>
+      <li>the prediction target, the moment it's made, and the unit (the applicant, not each application);</li>
+      <li>the baseline, the metric and the constraints;</li>
+      <li>a success criterion, and a kill criterion such as “if the model can't beat today's policy by an agreed margin at today's approval rate on out-of-time data, we stop”.</li>
+    </ul>
+
+    <p><strong>Where it goes wrong</strong></p>
+    <ul>
+      <li><strong>Solving the wrong problem.</strong> Many loans that miss the very first instalment are fraud: the borrower never meant to pay. That needs identity and device signals, not credit history, and mixing the two blurs both models.</li>
+      <li><strong>No lever:</strong> an accurate prediction that nobody can act on.</li>
+      <li><strong>A vague prediction time.</strong> “Predict default” without “as of the application” later lets post-decision data leak in.</li>
+      <li><strong>The wrong task type:</strong> a yes/no classifier when the decision needs a probability (pricing, limits, expected loss) or a ranking (a review queue).</li>
+    </ul>
+    <p><strong>What a senior person checks</strong></p>
+    <ul>
+      <li>“If the model were perfect, what would we do differently, and what's that worth?”</li>
+      <li>“What exactly is known at the moment of prediction?”</li>
+      <li>“What does today's policy achieve, measured the same way?”</li>
+      <li>“Who owns the decision, and have they signed off the success and kill criteria?”</li>
+    </ul>
+
+    <!-- metrics -->
+    <h2 id="metrics"><span class="pn">03</span>Success metrics</h2>
+    <p>Four layers, each answering a different question:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Layer</th><th>Question</th><th>Credit example</th></tr></thead>
+      <tbody>
+        <tr><td>Business</td><td>Did the P&amp;L improve?</td><td>Profit per application; loss rate at the approval rate</td></tr>
+        <tr><td>Offline</td><td>Is the new model better on past data?</td><td>Bad rate at today's approval rate; Gini (2·AUC − 1); calibration by score band</td></tr>
+        <tr><td>Online</td><td>Is it better live?</td><td>Early delinquency of the new model's loans; approval rate</td></tr>
+        <tr><td>Guardrails</td><td>Did anything break?</td><td>Approvals for thin-file applicants (little credit history); fairness gaps; latency; complaints; early fraud</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3 id="offline-metric">Choosing an offline metric that tracks the business one</h3>
+    <p>The business metric is slow (defaults take a year) or can't be computed offline (you never see what declined applicants would have done). So you need an offline stand-in, and it has to pass four tests:</p>
+    <ol>
+      <li><strong>It measures where the decision is made.</strong> The lender will approve about 40%, so what matters is the ordering around that cut-off. AUC averages over every possible cut-off, including ones nobody will use. Report the bad rate among the 40% the model would approve, next to AUC. Some of those 40% were declined in the past and have no outcome, so they must be filled in (<a href="#selection">04</a>), which is why the live test has the final word.</li>
+      <li><strong>It's weighted by money when amounts vary.</strong> A model that catches many small defaults and misses the large ones wins on counts and loses on rupees. Count each default by its rupee loss (exposure × loss given default), not as 1.</li>
+      <li><strong>It matches how the score is used.</strong> If only the order matters (a fixed approval rate, a review queue), ranking metrics are enough: AUC; Gini \(= 2\,\text{AUC} - 1\), which rescales it so random ordering scores 0 and perfect ordering 1; and KS, the largest gap between the score distributions of goods and bads. If the number itself is used (expected loss, pricing, a cut-off from the economics), add calibration.</li>
+      <li><strong>It has predicted online results before.</strong> Across past model changes, did offline gains turn into live gains? If not, fix the offline metric before trusting it.</li>
+    </ol>
+    <p>The most faithful offline metric is a simulation of the decision itself: run the new policy over past applications and add up the profit. Its blind spot is that past outcomes exist only for approved applicants (<a href="#selection">04</a>).</p>
+
+    <h3 id="threshold">Thresholds come from costs</h3>
+    <p>Approve when the expected gain beats the expected loss. With PD \(p\), gain \(G\) if the loan is repaid and loss \(L\) if it isn't:</p>
+    <div class="mj">\[ (1 - p)\,G &gt; p\,L \quad\Longleftrightarrow\quad p &lt; p^* = \frac{G}{G + L} \]</div>
+    <p>In words: approve while the chance of default is below the break-even point, where the margin on good loans exactly pays for the bad ones. Here \(p^* = 5{,}000 / 33{,}000 \approx 15\%\). It's the general rule \(t^* = C_{FP}/(C_{FP} + C_{FN})\) with \(C_{FP} = G\) and \(C_{FN} = L\).</p>
+    <p>With 1,000 applicants in each risk band, approving from the safest band down:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Band</th><th>PD</th><th>Profit per loan</th><th>Cumulative profit</th></tr></thead>
+      <tbody>
+        <tr><td>A</td><td>2%</td><td>₹4,340</td><td>₹43.4 lakh</td></tr>
+        <tr><td>B</td><td>5%</td><td>₹3,350</td><td>₹76.9 lakh</td></tr>
+        <tr><td>C</td><td>10%</td><td>₹1,700</td><td><strong>₹93.9 lakh</strong></td></tr>
+        <tr><td>D</td><td>18%</td><td>−₹940</td><td>₹84.5 lakh</td></tr>
+        <tr><td>E</td><td>30%</td><td>−₹4,900</td><td>₹35.5 lakh</td></tr>
+      </tbody>
+    </table></div>
+    <p>Profit peaks after band C. Approving band D still leaves the whole book profitable (the average PD of A to D is under 15%), but every band-D loan loses money. <strong>Set the cut-off where the marginal applicant breaks even, not where the average does.</strong></p>
+    <p>Other ways the threshold gets set: a <strong>risk-appetite</strong> cap on the portfolio's bad rate (the lender may stop short of the profit maximum); <strong>capacity</strong>, where a “refer” band around the cut-off goes to manual underwriting, sized to the team; or a target approval rate. Whatever the method, choose it on validation data, confirm it on the test set, and revisit it when costs or the applicant mix change.</p>
+    <p><strong>The limit follows the same logic.</strong> A bigger limit raises the margin on a good loan and the exposure on a bad one, and can raise the PD itself if the repayment strains the borrower's income. Offer the largest limit at which \((1 - p)\,G\) still beats \(p\,L\), with \(p\), \(G\) and \(L\) all evaluated at that limit.</p>
+
+    <h3 id="calibration">Calibration, when the score is used as a probability</h3>
+    <p>A model is calibrated if, among applicants given a PD of 10%, about 10% default:</p>
+    <div class="mj">\[ \Pr(y = 1 \mid \hat p = q) = q \quad \text{for every } q \]</div>
+    <p>The break-even rule uses the PD as a probability, so it needs calibration. Suppose every PD came out at half its true value. Band D would show 9%, below the 15% break-even, and be approved at a loss. AUC, Gini and KS wouldn't move, because the order is unchanged.</p>
+    <ul>
+      <li><strong>Check it</strong> on out-of-time data: the predicted against the observed bad rate in each score band, the average predicted PD against the observed rate, and a proper score such as the Brier score or log loss.</li>
+      <li><strong>Fix it</strong> with Platt scaling (a two-parameter logistic fit to the scores) or isotonic regression (any monotone correction; needs more data), fitted on recent held-out data. Both are monotone, so the ranking barely changes (isotonic's flat steps create a few ties). If you reweighted or undersampled the classes, the probabilities are inflated by design and must be corrected before use.</li>
+      <li><strong>It breaks before the ranking does.</strong> A recession raises every applicant's risk: the order may hold while every PD is too low. So recalibration is a cheaper, more frequent fix than retraining.</li>
+    </ul>
+
+    <h3>Guardrails</h3>
+    <p>Metrics that must not get worse, each with a margin agreed before the test: approvals for <strong>thin-file</strong> applicants (people with little credit history, whom a bureau-heavy model can shut out), approval and error rates across groups, decision latency at the 99th percentile, the complaint rate, and the first-payment default rate (first instalment missed: an early fraud signal).</p>
+
+    <p><strong>Where it goes wrong</strong></p>
+    <ul>
+      <li>AUC chosen because it's the default, though the business works at one cut-off.</li>
+      <li>Accuracy on a 6% positive class: approving everyone is 94% accurate.</li>
+      <li>Comparing the bad rates of two policies with different approval rates. The stricter one always looks safer.</li>
+      <li>A proxy optimised until it stops meaning anything (Goodhart's law): cutting first-payment defaults by approving only salaried applicants.</li>
+      <li>Choosing or changing the metric after seeing results.</li>
+    </ul>
+    <p><strong>What a senior person checks</strong></p>
+    <ul>
+      <li>“Show me the metric at the operating point, and in rupees.”</li>
+      <li>“Is the model calibrated near the cut-off, on recent data?”</li>
+      <li>“Which guardrails, with which margins, did we agree before looking?”</li>
+    </ul>
+
+    <!-- data -->
+    <h2 id="data"><span class="pn">04</span>Data and labels</h2>
+    <h3>Sources, and four questions for each</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Source</th><th>Examples</th><th>Watch for</th></tr></thead>
+      <tbody>
+        <tr><td>Application form</td><td>Stated income, employment, loan amount</td><td>Self-reported, so it can be gamed</td></tr>
+        <tr><td>Credit bureau</td><td>Past delinquencies, use of existing credit limits, recent enquiries</td><td>Each pull costs money; “no record” is itself a signal</td></tr>
+        <tr><td>In-app behaviour, with consent</td><td>Regular salary credits, bills paid on time, spending volatility</td><td>Moves with product campaigns, not just with risk</td></tr>
+        <tr><td>Bank statements, with consent</td><td>Cash-flow history</td><td>Only some applicants share them</td></tr>
+        <tr><td>Device and identity</td><td>Device age, accounts seen on one device</td><td>Mostly fraud signals</td></tr>
+      </tbody>
+    </table></div>
+    <p>For each source ask: is it available at decision time, within the latency budget? What share of applicants have it? Are we allowed to use it for lending? Will it still exist, with the same meaning, next year?</p>
+    <p><strong>Point-in-time correctness.</strong> Each training row must see the data exactly as it was at its application timestamp: the bureau report pulled then, the app history up to then. Joining today's value of a table (current balance, current address) leaks the future into the past.</p>
+
+    <h3 id="label-def">Defining the label</h3>
+    <p>“Default” is a definition you choose, and it should match the loss the business cares about:</p>
+    <ul>
+      <li><strong>The event:</strong> 90+ days past due (DPD) is the usual “bad” for consumer loans. It's the standard regulatory default definition and where many regulators class a loan as non-performing. Write-offs and settlements for less than was owed count as bad too.</li>
+      <li><strong>The window:</strong> within the first 12 months on book. Too short misses late defaults; too long makes the newest complete labels very old.</li>
+      <li><strong>Exclusions:</strong> loans cancelled during the cooling-off period, deaths, and confirmed fraud, which belongs to a fraud model.</li>
+      <li><strong>Indeterminates:</strong> loans that reached, say, 30–89 DPD and recovered. Scorecard practice often drops them from training to sharpen the contrast between good and bad, but they stay in evaluation (counted as goods), because they'll be scored in production. Dropping them raises the training bad rate, so calibrate on the full population.</li>
+    </ul>
+    <p><strong>Choosing the window.</strong> Plot <strong>vintage curves</strong>: for each monthly batch of loans, the cumulative bad rate by months on book. Pick the point where the curves flatten, so most eventual defaults have shown up. A <strong>roll-rate</strong> table (what share of loans at 30 DPD go on to 90 DPD) tells you whether an earlier, lower threshold is a good stand-in.</p>
+
+    <h3 id="label-delay">Label delay</h3>
+    <p>With a 12-month window, the newest complete labels are at least a year old. Three ways to live with that:</p>
+    <ul>
+      <li><strong>Never count immature loans as good.</strong> A loan paid out last month hasn't had time to default. Train and evaluate only on cohorts whose window has closed.</li>
+      <li><strong>Early proxy labels:</strong> first-payment default (the first instalment missed) or 30+ DPD at 3 months on book. Validate each on old vintages: does it rank applicants and model versions the same way the full label does?</li>
+      <li><strong>Use partial outcomes:</strong> a survival (time-to-default) model treats an immature loan as <em>censored</em>, survived so far, rather than good, so recent loans still contribute.</li>
+    </ul>
+    <aside class="note trap"><p class="nl">Trap</p><p>“The last few months look much cleaner.” If last quarter's bad rate is half the long-run rate, the borrowers didn't improve: their labels haven't arrived. Training on them teaches the model that whatever is typical of recent applicants is safe.</p></aside>
+
+    <h3 id="selection">Selection bias, and reject inference</h3>
+    <p>Outcomes exist only for approved applicants, but the model will score everyone who applies. Three consequences:</p>
+    <ul>
+      <li>The training population (approved) is safer than the scoring population (all applicants), and the riskiest region has no labels at all, so the model extrapolates there.</li>
+      <li>If past approvals used information the model doesn't have, such as an underwriter's judgement, the approved members of a risky-looking group were the best of that group. The model then underestimates risk for the rest of it.</li>
+      <li>Gini measured on approved loans alone understates the model, because the old cut-off already removed the riskiest applicants.</li>
+    </ul>
+    <p><strong>Reject inference</strong>, in one line: estimating what declined applicants would have done. Best done by approving a small, capped, random slice below the cut-off; next best from their bureau outcomes at other lenders; least reliably by statistical patches (reweighting, inferred labels), which add assumptions rather than information.</p>
+    <p>Other sampling biases to name: a new acquisition channel changes who applies, and the training period may be unusual (a boom year, a lockdown).</p>
+
+    <h3 id="contracts">Data contracts and quality checks</h3>
+    <p>A <strong>data contract</strong> is an agreement between the team that produces a dataset and the teams that use it: the schema, what each field means (is a null “no history” or “not fetched”?), how fresh it is, and how changes are announced and versioned. Without one, an upstream team renames a code or changes a unit, and the model quietly degrades.</p>
+    <p>Checks to automate, in training and in serving:</p>
+    <ul>
+      <li>schema and types; one row per application;</li>
+      <li>null rates and ranges against expected bounds, including sentinel values like −999 that mean “missing”;</li>
+      <li>row counts and freshness against expected volumes;</li>
+      <li>distributions against a reference period, with the population stability index (PSI, <a href="#drift">12</a>);</li>
+      <li>the label rate by cohort: a sudden jump usually means a definition or pipeline change, not a change in borrowers.</li>
+    </ul>
+    <p>A training run should stop on a failed check. Live scoring should alert and fall back.</p>
+
+    <p><strong>Where it goes wrong</strong></p>
+    <ul>
+      <li>Post-decision fields used as features: collections calls, the limit actually granted, a bureau report pulled after the application, which already shows this lender's own enquiry or even the new loan.</li>
+      <li>Fraud and credit losses mixed in one label.</li>
+      <li>One person's repeat applications in both training and test.</li>
+      <li>A feature that exists in the warehouse but can't be computed in real time.</li>
+    </ul>
+    <p><strong>What a senior person checks</strong></p>
+    <ul>
+      <li>“Show me the label definition, and the vintage curves behind the window.”</li>
+      <li>“For each feature, when is it known relative to the decision?”</li>
+      <li>“Who owns each source, and what happens when it changes?”</li>
+    </ul>
+
+    <!-- prep -->
+    <h2 id="prep"><span class="pn">05</span>EDA and data preparation</h2>
+    <p>Inside a project, exploratory analysis has one job: confirm the data means what you think before anything is built on it. Cleaning, imputation, encoding and feature construction are covered in depth in the companion note, <em>Data preparation and feature engineering</em>; this section is the lifecycle view.</p>
+    <p><strong>What to look at first, in this order:</strong></p>
+    <ol>
+      <li><strong>Volumes over time:</strong> applications and approvals by month. Gaps and jumps are pipeline events or policy changes you need to know about.</li>
+      <li><strong>The label by cohort:</strong> the bad rate by the month loans were paid out. It shows maturity, policy changes and seasonality at once.</li>
+      <li><strong>Missingness, and what it means:</strong> “no bureau record” describes a thin-file applicant, not a data error. Keep that information as a feature rather than imputing it away.</li>
+      <li><strong>Single-feature power:</strong> a feature that separates goods from bads almost perfectly on its own is leakage until proven otherwise.</li>
+      <li><strong>Stability:</strong> each feature's distribution month by month. A feature that drifted a lot in the past will drift in production.</li>
+    </ol>
+    <p><strong>Preparation decisions that matter for the rest of the lifecycle:</strong></p>
+    <ul>
+      <li>every transformation (scaling, imputation, encoding, binning) is fitted on training data only, inside a pipeline, so it's refit in each fold and applied identically when serving;</li>
+      <li>aggregates such as “payments in the last 90 days” are computed as of the application timestamp;</li>
+      <li>the same feature code runs in training and in serving, or you'll meet training–serving skew (<a href="#skew">11</a>).</li>
+    </ul>
+    <p><strong>Where it goes wrong:</strong> imputing with statistics from all the data, including the test period; dropping rows with missing bureau data, which silently removes thin-file applicants, the very group the business wants to grow; hours of plots that never change a decision.</p>
+    <p><strong>What a senior person checks:</strong> “Which findings changed the label, the split or the features?” If none, the EDA was decoration.</p>
+
+    <!-- validation -->
+    <h2 id="validation"><span class="pn">06</span>Validation strategy, before modelling</h2>
+    <p>Decide how “better” will be measured before training anything. The split defines the question the score answers, and choosing it after seeing results invites leakage and wishful thinking.</p>
+
+    <h3 id="oot">Out of time, with a gap</h3>
+    <p>The model will be trained on the past and used on the future, so the evaluation must be too:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Set</th><th>Applications from</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td>Train</td><td>Months 1–18</td><td>Fitting</td></tr>
+        <tr><td>Validation</td><td>Months 19–21</td><td>Tuning, early stopping, calibration, the threshold</td></tr>
+        <tr><td>Test</td><td>Months 22–24</td><td>One final estimate, looked at once</td></tr>
+      </tbody>
+    </table></div>
+    <p>All of them have matured 12-month labels.</p>
+    <ul>
+      <li><strong>Why not a random split:</strong> interest rates, the economy, the marketing mix and the product all move. A random split mixes periods, so the test looks like the training data and hides that drift. If a random split scores much higher than the out-of-time one, something leaks through time or the relationship is drifting.</li>
+      <li><strong>A gap, if history allows:</strong> in production, the newest data a model can learn from is at least a year older than the applicants it scores, because of the label window. Leaving a gap between the training and test periods copies that, so the test shows the decay you'll really face. In the table, the validation quarter doubles as a 3-month gap; to see the full decay, also train on months 1–9 and test on 22–24. Without a gap, expect the live model to do somewhat worse than the test says.</li>
+      <li><strong>Walk-forward checks</strong>, several successive test windows, show whether performance is stable or one quarter was lucky.</li>
+    </ul>
+
+    <h3>Group splits</h3>
+    <p>One person can apply many times. If their applications land on both sides, the model is graded partly on memory. Within the training period, split folds by customer (group k-fold), and on the test set report returning and new applicants separately.</p>
+
+    <h3>Leakage, the short checklist</h3>
+    <ul>
+      <li>Every feature exists at decision time (<a href="#data">04</a>).</li>
+      <li>Preprocessing, target encoding and feature selection are fitted inside each training fold.</li>
+      <li>No oversampling before the split.</li>
+      <li>Duplicates and repeat applicants handled.</li>
+      <li>Threshold and calibration chosen on validation, never on test.</li>
+      <li>Suspiciously good results investigated before they're celebrated.</li>
+    </ul>
+
+    <h3 id="holdout">The untouched holdout, and how big it must be</h3>
+    <p>Every decision made while looking at a dataset uses it up: its score becomes optimistic. The test set is looked at once, at the end, after every choice is frozen. Its size is set by the number of <em>bads</em>, not rows. With 300 bads in the test set (three months of this lender's loans hold about 700), AUC has a standard error of about 0.016, so a 95% interval is about ±0.03 (±0.06 in Gini). A 0.005 AUC gain is noise. To compare two models, use a paired bootstrap on the same rows, which is much tighter than two separate intervals because the models' errors are correlated.</p>
+
+    <p><strong>Where it goes wrong:</strong> random splits on time-ordered data; tuning on the test set (“just one more look”); too few bads in the test to tell models apart; a validation period that's unusual, such as a festive season or a policy change.</p>
+    <p><strong>What a senior person checks</strong></p>
+    <ul>
+      <li>“Does the split copy how the model will be used?”</li>
+      <li>“How big is the gap between the random-split and out-of-time scores?”</li>
+      <li>“How many bads are in the test set, and what's the interval?”</li>
+    </ul>
+
+    <!-- baseline -->
+    <h2 id="baseline"><span class="pn">07</span>Baseline first, then iterate</h2>
+    <p>Before a strong model, build the simplest things that could work, and evaluate them exactly as the final model will be: same test set, same operating point. Illustrative numbers:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Step</th><th>Out-of-time Gini</th><th>Bad rate at 40% approval</th></tr></thead>
+      <tbody>
+        <tr><td>Today's policy (the bar to beat): bureau cut-off and rules</td><td>0.45</td><td>6.0%</td></tr>
+        <tr><td>Logistic regression, 10 binned features (what simple features carry)</td><td>0.52</td><td>5.3%</td></tr>
+        <tr><td>Gradient boosting, 150 features (what interactions add)</td><td>0.56</td><td>5.0%</td></tr>
+      </tbody>
+    </table></div>
+    <p>At 4,000 loans a month, going from 6.0% to 5.0% is 40 fewer defaults, worth about 40 × ₹33,000 ≈ ₹13 lakh a month. One caveat a reviewer will raise: a model's top 40% includes applicants the old policy declined, who have no outcomes. Their outcomes are filled in from bureau records at other lenders or by reject inference (<a href="#selection">04</a>), so these figures are estimates until the live test (<a href="#online">10</a>).</p>
+    <p><strong>Why baselines matter</strong></p>
+    <ul>
+      <li><strong>They set the bar.</strong> The project's value is the gap to today's policy, not to random.</li>
+      <li><strong>They catch bugs and leakage.</strong> If boosting beats logistic regression by a mile, look for a leaking feature before celebrating. If nothing beats the policy, the features may carry little signal.</li>
+      <li><strong>They price complexity.</strong> Logistic regression is easier to explain, audit and monitor. Here boosting cuts the bad rate a further 0.3 points (5.3% → 5.0%), 12 defaults or about ₹4 lakh a month: that has to be worth more than its extra cost in maintenance and explanation.</li>
+      <li><strong>They're the fallback.</strong> A simple model or the rules can decide when the main model is down.</li>
+    </ul>
+    <p><strong>Then iterate, one change at a time.</strong> Log every experiment (data version, features, parameters, the score with its interval), and keep a change only if its gain beats the noise. The usual order of payoff: fix labels and leakage, add strong features, choose the model, and only then tune.</p>
+    <p><strong>Where it goes wrong:</strong> no baseline, so a Gini of 0.56 means nothing; a straw-man baseline (untuned, missing obvious features) that flatters the new model; baselines scored on a different split.</p>
+    <p><strong>What a senior person checks:</strong> “What's the gain over today's policy at the operating point, with an interval, and is it worth the complexity?”</p>
+
+    <!-- modelling -->
+    <h2 id="modelling"><span class="pn">08</span>Modelling and tuning</h2>
+    <h3>Choosing the model</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Situation</th><th>Default choice</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Tabular data, thousands of rows or more</td><td>Gradient-boosted trees</td><td>Mixed types, missing values and interactions out of the box; scores in milliseconds; explained with SHAP</td></tr>
+        <tr><td>Small data, or transparency above all</td><td>Logistic regression, or a points scorecard on binned features</td><td>Each feature's effect is a few numbers anyone can audit</td></tr>
+        <tr><td>Sequences of transactions</td><td>Aggregates (counts, sums, trends) fed to the booster first</td><td>A sequence model costs latency and explainability; add one only if it beats good aggregates</td></tr>
+        <tr><td>Text or images</td><td>A pretrained encoder, its embeddings fed to the booster</td><td>Labels are scarce; reuse what's already learned</td></tr>
+      </tbody>
+    </table></div>
+    <p>For the lender: gradient boosting with <strong>monotonic constraints</strong>, so predicted risk can never fall as missed payments rise, or as the share of income already going to loan repayments rises. They usually cost little accuracy, and they make the model stable across retrains, explainable, and defensible in a credit review.</p>
+    <p>Constraints shape the choice as much as accuracy: latency, explanation requirements, how often it must be retrained, and what the team can maintain.</p>
+
+    <h3>Hyperparameter search</h3>
+    <p>For boosting, a handful of settings matter:</p>
+    <ul>
+      <li>the learning rate and number of trees, set together through early stopping;</li>
+      <li>tree size: depth or number of leaves, and the minimum data in a leaf;</li>
+      <li>row and column subsampling;</li>
+      <li>L2 regularization on the leaf values.</li>
+    </ul>
+    <p>Random search or Bayesian optimization over these, with log scales for the learning rate and regularization, finds good settings in a few dozen trials. A grid wastes most of its trials on settings that barely matter. Tune on the validation period, never on the test. Expect small gains: tuning rarely adds as much as a better label or one strong feature, and the best of many noisy trials is optimistic (the winner's curse), which is why the test set stays untouched.</p>
+
+    <h3>Early stopping</h3>
+    <p>Train with a small learning rate, score the validation set after each tree, and stop once the validation loss hasn't improved for, say, 100 trees. The number of trees becomes a fitted quantity instead of a guess, and training stops before the model starts memorizing noise. Two cautions: early-stop on validation, never on test; and when refitting on training plus validation data for the final model, reuse the tree count you found (or scale it up a little for the extra data).</p>
+    <p><strong>Refit before shipping, or ship what you tested?</strong> Refitting on all matured data, test quarter included, buys recency, which matters when the world drifts. But the refit model is no longer the one you measured, and the calibrator and threshold were fitted on validation data it has now trained on. A common answer: refit with every setting frozen, refit the calibrator on a recent held-out slice, and check the result in shadow mode before the ramp.</p>
+
+    <h3>Imbalance and reproducibility</h3>
+    <ul>
+      <li><strong>A 6% bad rate isn't extreme.</strong> Train on the natural rate. If you reweight or undersample, recalibrate afterwards (<a href="#calibration">03</a>).</li>
+      <li><strong>Every model must be rebuildable</strong> from a code commit, a data snapshot and a config: fixed seeds, pinned library versions, logged parameters. In lending you may have to explain a two-year-old decision.</li>
+    </ul>
+    <p><strong>Where it goes wrong:</strong> tuning before fixing the data; picking the top of a leaderboard whose differences are noise; an ensemble too slow to serve inside the latency budget; a model that's non-monotone in a way no credit officer can defend.</p>
+    <p><strong>What a senior person checks</strong></p>
+    <ul>
+      <li>“What did tuning add over the defaults, and is it bigger than the noise?”</li>
+      <li>“Can we rebuild this exact model from the commit and the data snapshot?”</li>
+    </ul>
+
+    <!-- errors -->
+    <h2 id="errors"><span class="pn">09</span>Error analysis and interpretability</h2>
+    <p>An aggregate metric hides where the model fails. Error analysis finds the biggest fixable failure, and it sends you back to the data far more often than to the model.</p>
+
+    <h3>Slice the metrics</h3>
+    <p>Compute the operating-point metric and the calibration for each segment that matters: bureau record or thin file, acquisition channel, loan-amount band, salaried or self-employed, new or returning, region. Report each slice's size and interval, because small slices are noisy. The typical finding is one segment, often thin-file applicants, that is much worse or badly calibrated, hidden by the average.</p>
+
+    <h3>Sort the failures into buckets</h3>
+    <p>Read the worst errors: the confident ones, such as applicants given a PD under 3% who defaulted, and high-PD applicants who repaid. Group them by cause, estimate what fixing each bucket would gain, and fix the biggest first.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Bucket</th><th>Example</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td>Label error</td><td>A payment the bank posted late shows as 30 DPD</td><td>Fix the label pipeline</td></tr>
+        <tr><td>Wrong problem</td><td>First instalment never paid: fraud, not credit risk</td><td>Route to the fraud model; drop from the credit label</td></tr>
+        <tr><td>Missing information</td><td>Thin-file applicants with no bureau data</td><td>Consented cash-flow features; a separate segment model</td></tr>
+        <tr><td>Feature bug</td><td>Income stored in thousands for one channel</td><td>Fix it, and add a range check</td></tr>
+        <tr><td>Unpredictable</td><td>Sudden job loss after approval</td><td>Accept it, and price for it</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Interpretability</h3>
+    <ul>
+      <li><strong>Global: what drives the model.</strong> SHAP importance, the average absolute contribution of each feature, is more reliable than the trees' built-in split-gain importance, which favours features with many distinct values.</li>
+      <li><strong>Shape: how a feature acts.</strong> A partial dependence plot shows the average predicted PD as one feature varies. Check that it moves the way the domain expects (risk rises with credit utilization). With correlated features it averages over impossible combinations, so read it with care; accumulated local effects (ALE) plots avoid this.</li>
+      <li><strong>Local: why this applicant.</strong> SHAP splits one prediction into per-feature contributions, in log-odds for a boosted classifier, that add up to this applicant's prediction minus the average prediction.</li>
+    </ul>
+
+    <h3 id="reason-codes">Reason codes for a declined applicant</h3>
+    <p>In many jurisdictions a lender must tell a declined applicant the main reasons. From SHAP: take the features that pushed this applicant's risk up the most, and map each to a fixed, plain-language reason, such as “recent missed payments” or “high use of existing credit limits”. Group correlated features under one reason. Good reason codes are:</p>
+    <ul>
+      <li><strong>stable:</strong> similar applicants get similar reasons, and a retrain doesn't reshuffle them;</li>
+      <li><strong>understandable and actionable:</strong> something the applicant recognises and could change;</li>
+      <li><strong>lawful:</strong> never a protected attribute or an obvious proxy, and nothing like “your phone model”.</li>
+    </ul>
+    <p>SHAP explains the model, not the world. “Lower your utilization and you'll be approved” holds only if the model's relationship is causal and nothing else changes.</p>
+    <p><strong>Fairness</strong> belongs here too: compare approval and error rates across groups, and test whether any feature acts as a proxy for a protected attribute (a postcode can stand in for a community).</p>
+
+    <p><strong>Where it goes wrong:</strong> looking only at the aggregate; “fixing” a slice by overfitting to it; reading SHAP or importance as cause and effect; reason codes that change with every retrain.</p>
+    <p><strong>What a senior person checks</strong></p>
+    <ul>
+      <li>“Which slice is worst, and why?”</li>
+      <li>“Show me twenty of the most confident errors.”</li>
+      <li>“Would a credit officer accept these reason codes?”</li>
+    </ul>
+
+    <!-- online -->
+    <h2 id="online"><span class="pn">10</span>From offline to online</h2>
+    <h3 id="transfer">Why offline gains often don't transfer</h3>
+    <ul>
+      <li><strong>Selection bias.</strong> The test set holds only applicants the old policy approved. A new model differs from that policy mostly on applicants it declined, and their outcomes were never seen.</li>
+      <li><strong>Proxy mismatch.</strong> The offline metric (Gini) isn't the business metric (profit at the cut-off).</li>
+      <li><strong>Drift.</strong> By launch, the test period is months old: new channels, new rates, a different economy.</li>
+      <li><strong>Training–serving skew.</strong> Live features are computed differently from training features (<a href="#skew">11</a>).</li>
+      <li><strong>Gains in the wrong place.</strong> Better ordering among applicants far from the cut-off changes no decision.</li>
+      <li><strong>Behaviour.</strong> Applicants and fraudsters react to a new policy; a looser cut-off attracts riskier applicants.</li>
+      <li><strong>Leakage</strong> made the offline score too good to begin with.</li>
+    </ul>
+
+    <h3 id="swap">Swap-set analysis</h3>
+    <p>Line up the old and new policies at the same approval rate. Most applicants get the same decision from both. What matters are the <strong>swap-outs</strong>, approved by the old policy and declined by the new, and the <strong>swap-ins</strong>, declined by the old and approved by the new. Swap-outs have outcomes, because the old policy approved them. Swap-ins mostly don't. So the offline case for the new model rests on half the evidence, and only a live test supplies the other half.</p>
+
+    <h3 id="shadow">Shadow mode</h3>
+    <p>Score live applications with the new model, keep acting on the old policy, and log both. It checks the plumbing at no risk:</p>
+    <ul>
+      <li>latency and timeouts under real load;</li>
+      <li>feature parity: the live features against the same features recomputed offline for the same applications;</li>
+      <li>the live score distribution against the out-of-time test (a large population stability index, PSI, points to skew or drift);</li>
+      <li>the size and make-up of the swap sets.</li>
+    </ul>
+    <p>It can't tell you whether swap-ins repay. Only approving some of them can.</p>
+
+    <h3 id="ab">Champion–challenger: the A/B test for credit</h3>
+    <ul>
+      <li><strong>What to randomize:</strong> applicants, by a hash of the customer ID, not individual applications, so someone who reapplies stays in the same arm. Most applicants go to the current model (the champion), a small slice, say 10%, to the new one (the challenger).</li>
+      <li><strong>Protection:</strong> hard policy rules apply in both arms; the challenger gets loss caps (smaller first limits for its swap-ins, a ceiling on total exposure) and a kill switch tied to the guardrails.</li>
+      <li><strong>Primary metric:</strong> profit per applicant, or the bad rate compared at the same approval rate, never the raw bad rate.</li>
+      <li><strong>Guardrails:</strong> approvals for thin-file applicants, fairness gaps, first-payment default, latency, complaints.</li>
+      <li><strong>Duration and power:</strong> each group needs about \(n \approx 16\,p(1-p)/\delta^2\) loans (80% power, 5% significance). Comparing whole arms, seeing 30+ DPD at 3 months on book fall from 3.0% to 2.5% needs about 18,000 loans per arm: four years for a 10% challenger making 400 loans a month.</li>
+      <li><strong>So read the swap sets, where the gap is large.</strong> If about 15% of approvals swap, the 6.0% → 5.0% gain means swap-outs default at roughly 12% and swap-ins at roughly 5%. On the full label, about 300 swap-ins then suffice: five months of the challenger's lending at about 60 a month. Early-delinquency proxies give a first read a quarter after that; the full label takes a year.</li>
+    </ul>
+    <aside class="note trap"><p class="nl">Trap</p><p>“The challenger's bad rate is lower, so it's better.” A model that approves fewer people almost always has a lower bad rate. Compare at the same approval rate, on profit per applicant, or on the swap sets directly: the challenger's swap-ins against the champion's swap-outs.</p></aside>
+
+    <h3 id="real">Is the result real?</h3>
+    <ul>
+      <li><strong>Check the split first.</strong> The arms' sizes must match the design (a chi-square test for sample ratio mismatch). A mismatch means assignment or logging is broken, and nothing downstream can be trusted.</li>
+      <li><strong>Pre-register</strong> one primary metric, the guardrails with their margins, the duration and the analysis.</li>
+      <li><strong>Don't peek.</strong> Stopping the first time \(p &lt; 0.05\) inflates false positives, unless a sequential test was planned.</li>
+      <li><strong>Read an interval, not just a p-value:</strong> does its low end still beat the cost of the change?</li>
+      <li><strong>Check consistency</strong> across months and the pre-registered segments, without hunting through dozens of segments for a winner.</li>
+      <li><strong>Read only matured cohorts</strong>, on a proxy that has been validated against the full label.</li>
+    </ul>
+    <p><strong>Where it goes wrong:</strong> comparing bad rates at different approval rates; randomizing by application; reading immature cohorts; no loss caps; declaring victory on an unvalidated proxy.</p>
+    <p><strong>What a senior person checks</strong></p>
+    <ul>
+      <li>“What did shadow mode show about feature parity?”</li>
+      <li>“Are we comparing at the same approval rate, or on profit?”</li>
+      <li>“Which proxy are we reading, and has it ranked models correctly before?”</li>
+    </ul>
+
+    <!-- deploy -->
+    <h2 id="deploy"><span class="pn">11</span>Deployment</h2>
+    <h3>Batch or real time</h3>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Batch</th><th>Real time</th></tr></thead>
+      <tbody>
+        <tr><td>When</td><td>The decision can wait: pre-approved offers, collections lists, nightly limit reviews</td><td>Someone is waiting: a loan application, a payment</td></tr>
+        <tr><td>Gains</td><td>Simple, cheap, easy to rerun and audit</td><td>Uses the freshest data</td></tr>
+        <tr><td>Costs</td><td>Scores go stale between runs</td><td>Needs online features, low latency, high availability and a fallback</td></tr>
+      </tbody>
+    </table></div>
+    <p>The application decision is real time. Pre-approved limits for existing customers could be batch, refreshed nightly.</p>
+
+    <h3>Latency budget</h3>
+    <p>Split the time the applicant waits into parts, and give each an owner. An example for a 3-second decision:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Step</th><th>Budget</th></tr></thead>
+      <tbody>
+        <tr><td>Bureau call (external)</td><td>About 2 s: the biggest part, and the least controllable</td></tr>
+        <tr><td>Assemble features</td><td>100 ms</td></tr>
+        <tr><td>Score the model</td><td>10 ms</td></tr>
+        <tr><td>Rules, logging, response</td><td>50 ms</td></tr>
+      </tbody>
+    </table></div>
+    <p>Budget for the slowest 1% of requests, not the average. Decide the fallback in advance: if the bureau times out, refer the application or decide on rules alone. A timeout must never turn into a silent approval.</p>
+
+    <h3 id="skew">Training–serving skew</h3>
+    <p>The model sees different numbers live than it saw in training, even though nothing is “wrong” in either place. Typical causes:</p>
+    <ul>
+      <li>two code paths: SQL in the warehouse for training, service code for serving;</li>
+      <li>different windows for aggregates, such as “last 30 days” ending at midnight in training but at the request time live;</li>
+      <li>late-arriving data that is in the warehouse but didn't exist at decision time;</li>
+      <li>different handling of nulls, defaults or categories never seen before.</li>
+    </ul>
+    <p>The fixes: one feature definition used by both paths; <strong>log the features at serving time and train on the logged values</strong>; parity tests in shadow mode.</p>
+
+    <h3>Feature stores</h3>
+    <p>A feature store keeps each feature's definition once and serves it twice: an offline store with full history and point-in-time joins for training, and an online store with the latest values at low latency for serving. It prevents skew and lets models share features. It's also infrastructure with a running cost: for a single batch model, a well-tested feature pipeline is enough.</p>
+
+    <h3>Versioning, reproducibility and rollback</h3>
+    <ul>
+      <li><strong>Version everything that changes a decision:</strong> code, data snapshot, feature definitions, model file, configuration, and the policy (cut-offs, limits) separately from the model.</li>
+      <li><strong>Log every decision</strong> with the model version, the features it saw and the reason codes. Lending decisions get disputed and audited months later.</li>
+      <li><strong>Roll out in stages</strong> (1% → 10% → 50% → 100%) behind a flag, with the previous model kept running. Rollback is then a config switch, not a redeploy.</li>
+      <li><strong>Rollback doesn't undo loans.</strong> Every loan a bad model approved stays on the book for a year, so cap exposure during the ramp.</li>
+    </ul>
+    <p><strong>Where it goes wrong:</strong> a feature that can't be computed in real time; no fallback; the cut-off hard-coded inside model code; nobody able to say which model made a given decision.</p>
+    <p><strong>What a senior person checks</strong></p>
+    <ul>
+      <li>“What happens when the bureau times out?”</li>
+      <li>“Which model version, and which feature values, decided this application last March?”</li>
+      <li>“How fast can we roll back, and how much exposure builds up meanwhile?”</li>
+    </ul>
+
+    <!-- monitor -->
+    <h2 id="monitor"><span class="pn">12</span>Monitoring and maintenance</h2>
+    <p>Defaults take a year to show, so monitoring is mostly about what you can see before the labels arrive. Watch in layers, fastest first:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Layer</th><th>What to watch</th><th>Tells you</th></tr></thead>
+      <tbody>
+        <tr><td>Service</td><td>Latency, errors, timeouts, fallback rate</td><td>The system is up</td></tr>
+        <tr><td>Data quality</td><td>Nulls, ranges, schema, freshness, volumes</td><td>The inputs are intact</td></tr>
+        <tr><td>Input drift</td><td>PSI or KS for each feature against training</td><td>The applicants changed</td></tr>
+        <tr><td>Prediction drift</td><td>Score PSI, approval rate, average PD, mix of reason codes</td><td>The decisions changed</td></tr>
+        <tr><td>Early outcomes</td><td>First-payment default; 30+ DPD by months on book, per monthly cohort</td><td>Performance may be slipping</td></tr>
+        <tr><td>Full outcomes</td><td>Gini and calibration on matured cohorts</td><td>How good the model really is</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3 id="drift">Drift: PSI and KS</h3>
+    <div class="mj">\[ \text{PSI} = \sum_i (a_i - e_i)\, \ln\frac{a_i}{e_i} \]</div>
+    <p>In words: cut the feature (or the score) into bins on the training data, usually deciles, then compare the live share \(a_i\) with the training share \(e_i\) in each bin. Two bins moving from 50/50 to 40/60 give 0.04. The usual rule of thumb: below 0.1 stable, 0.1 to 0.25 worth a look, above 0.25 a real shift.</p>
+    <ul>
+      <li><strong>KS</strong>, used here as a drift test between training and live data, compares two distributions of a continuous feature by the largest gap between their cumulative shares. On large samples its p-value flags trivial shifts, so alert on the size of the statistic, not on significance.</li>
+      <li><strong>Drift isn't degradation.</strong> A cashback campaign can shift spending features without changing anyone's risk; a recession can leave the inputs unchanged while risk rises (concept drift). Drift says “look”; outcomes say whether the model got worse.</li>
+      <li><strong>With delayed labels, watch the vintage curves:</strong> each monthly cohort's 30+ DPD rate by months on book. A new cohort climbing faster than older ones at the same age is the earliest real warning, months before 90+ DPD shows.</li>
+    </ul>
+
+    <h3 id="retrain">Retraining: triggers or a schedule</h3>
+    <ul>
+      <li><strong>A schedule</strong> (retrain every quarter) is simple and predictable, but it can be too frequent (no new labels have matured, so you refit noise) or too late (an abrupt shift).</li>
+      <li><strong>Triggers</strong> retrain when there's a reason: early outcomes beyond a threshold, calibration off on recent cohorts, high PSI on important features or the score, or a new product, channel or policy.</li>
+      <li><strong>Match the cadence to how fast labels arrive and how fast the world moves.</strong> A credit model gains new full labels only as cohorts mature, so monthly monitoring, recalibration when levels drift, and a rebuild every year or two (or on a trigger) is typical. A fraud model faces adversaries and gets most labels within weeks (some chargebacks take months), so weekly to monthly retraining is common.</li>
+      <li><strong>Never auto-deploy a retrained model.</strong> It's a challenger: compare it with the champion on the latest matured data, then shadow and ramp it like any new model.</li>
+    </ul>
+
+    <h3 id="feedback">Feedback loops</h3>
+    <p>The model decides who gets a loan, and only those people produce labels. Each retrain sees a narrower, safer population, and the model can never learn that it was wrong about the people it declined. Mitigations:</p>
+    <ul>
+      <li>a small, capped, random exploration slice below the cut-off, which keeps labels coming where the model is least sure;</li>
+      <li>logging the probability of each decision (in the exploration slice, where approval isn't certain either way), so later training can reweight;</li>
+      <li>keeping data from before the model's own policy took over.</li>
+    </ul>
+    <p>A second loop: actions taken because of the score, such as early collections calls to high-PD borrowers, change the outcomes, so the next model learns from treated borrowers. Record the treatment, and account for it when building labels.</p>
+
+    <p><strong>Where it goes wrong:</strong> monitoring only outcomes, which arrive too late; hundreds of drift alerts nobody reads; alerts with no owner or runbook; retraining on immature or treatment-contaminated labels.</p>
+    <p><strong>What a senior person checks</strong></p>
+    <ul>
+      <li>“What would tell us the model is broken before the defaults arrive?”</li>
+      <li>“Who gets alerted, and what do they do?”</li>
+      <li>“How is a retrained model validated before it replaces the champion?”</li>
+    </ul>
+
+    <!-- people -->
+    <h2 id="people"><span class="pn">13</span>Communication and project management</h2>
+    <h3>Scoping and milestones</h3>
+    <p>Break the project into phases that each end in a decision:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Phase</th><th>Deliverable</th><th>Decision</th></tr></thead>
+      <tbody>
+        <tr><td>Framing, 1–2 weeks</td><td>Framing document, data audit, baseline numbers</td><td>Is it worth doing?</td></tr>
+        <tr><td>First model, 3–5 weeks</td><td>Out-of-time results against today's policy, at the operating point</td><td>Is the gain real and big enough?</td></tr>
+        <tr><td>Shadow, 2–4 weeks</td><td>Feature parity, latency, swap-set profile</td><td>Is it safe to test live?</td></tr>
+        <tr><td>Challenger, months</td><td>Early-outcome readout</td><td>Ship, iterate or stop</td></tr>
+      </tbody>
+    </table></div>
+    <p>The durations are illustrative. The data audit is the step most often underestimated.</p>
+
+    <h3>Stakeholders and updates</h3>
+    <p>Credit risk owns the policy, product owns the applicant's experience, engineering owns serving, compliance owns data use and reason codes, finance owns the P&amp;L, and operations owns collections and fraud. Bring compliance in during framing, not at launch: a feature vetoed late costs weeks. In regulated lending, an independent model-validation team also reviews the model before it goes live; book its time early.</p>
+    <p>Updates go in business terms, with the uncertainty and the next step: “On last year's applicants, at today's approval rate, the model would have cut defaults from 6.0% to 5.0%, about ₹13 lakh a month; the live test will tighten that estimate. Next: two weeks of shadow mode.” Lead with the decision and the money; the method comes after, if they ask.</p>
+
+    <h3>Saying no to scope creep</h3>
+    <p>Tie every request to the objective and the date. “Can it also set the interest rate?” becomes “Yes, as phase two. Adding it now moves the launch by six weeks. Which matters more?” Keep a written backlog, so the no is a “later”, not a refusal.</p>
+
+    <h3 id="model-card">Documentation: the model card</h3>
+    <p>A model card lets someone who wasn't there understand, use and audit the model. It records:</p>
+    <ul>
+      <li>the purpose, intended use, and uses it's <em>not</em> for (pricing, say, or applicant groups it never saw);</li>
+      <li>the data sources, label definition, training and test periods, and exclusions;</li>
+      <li>performance overall and by segment, with intervals, and calibration;</li>
+      <li>fairness checks and known limitations;</li>
+      <li>the monitoring plan, retraining triggers, owner and version.</li>
+    </ul>
+    <p>Keep a decision log next to it: what was decided, when, by whom, and why.</p>
+
+    <h3>Estimating timelines, and when to stop</h3>
+    <ul>
+      <li><strong>Estimate per phase, as ranges</strong>, and re-estimate at each milestone. Data access, cleaning and label work usually take longer than modelling, and integration and compliance review need calendar time you don't control.</li>
+      <li><strong>Stop polishing</strong> when the next gain is smaller than the noise, or worth less than the delay costs. Here the first model reaches about ₹13 lakh of the ₹20 lakh target: enough to clear the kill bar, so ship it, and chase the rest through challengers. Every month of waiting forgoes that ₹13 lakh.</li>
+      <li><strong>Stop the project</strong> when the kill criterion hits. If the out-of-time gain over today's policy can't clear the agreed bar, say so early: a clear no is a result.</li>
+    </ul>
+    <p><strong>Where it goes wrong:</strong> building alone and unveiling a finished model nobody asked for; vetoes discovered at launch; promising a number before the data audit; decisions that live only in someone's head.</p>
+    <p><strong>What a senior person checks</strong></p>
+    <ul>
+      <li>“Can the business owner state the success and kill criteria?”</li>
+      <li>“Could an auditor who wasn't here understand the model from its card?”</li>
+      <li>“Has independent model validation signed off, and on which version?”</li>
+    </ul>
+
+    <!-- failures -->
+    <h2 id="failures"><span class="pn">14</span>Failure modes across the lifecycle</h2>
+    <p>The same few failures account for most projects that disappoint. For each, how it shows up and how to catch and fix it:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Failure</th><th>How it shows up</th><th>Catch and fix</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Wrong problem</strong><br><span class="src">framing</span></td><td>A good model nobody uses; “defaults” that are really fraud</td><td>Ask what decision changes; separate fraud from credit</td></tr>
+        <tr><td><strong>Metric away from the cut-off</strong><br><span class="src">metrics</span></td><td>AUC up, profit flat</td><td>Bad rate at the operating point; rupee weighting; a profit simulation</td></tr>
+        <tr><td><strong>Uncalibrated scores</strong><br><span class="src">metrics</span></td><td>The right order but the wrong cut-off; losses above plan</td><td>Predicted against actual by band; recalibrate on recent data</td></tr>
+        <tr><td><strong>Leakage</strong><br><span class="src">data, validation</span></td><td>Too-good scores; one feature dominates; random split far above out-of-time</td><td>Point-in-time features; pipelines; single-feature checks</td></tr>
+        <tr><td><strong>Immature labels counted as good</strong><br><span class="src">data</span></td><td>Recent cohorts look safest</td><td>Maturity windows; validated proxies; survival models</td></tr>
+        <tr><td><strong>Selection bias</strong><br><span class="src">data, online</span></td><td>Fine on approved applicants, poor on swap-ins</td><td>Capped random approvals; champion–challenger</td></tr>
+        <tr><td><strong>Random split on time-ordered data</strong><br><span class="src">validation</span></td><td>The offline score is never seen again</td><td>Out-of-time split with a gap</td></tr>
+        <tr><td><strong>No real baseline</strong><br><span class="src">baseline</span></td><td>Nobody can say whether the model adds value</td><td>Today's policy and a simple model, same test, same operating point</td></tr>
+        <tr><td><strong>Overfit to validation</strong><br><span class="src">modelling</span></td><td>Test well below validation</td><td>An untouched holdout; fewer tuning rounds</td></tr>
+        <tr><td><strong>Training–serving skew</strong><br><span class="src">deployment</span></td><td>The live score distribution differs from the test's</td><td>Log served features; one definition; parity checks in shadow</td></tr>
+        <tr><td><strong>Unequal comparison</strong><br><span class="src">online</span></td><td>The challenger looks safer because it approves fewer</td><td>Compare at equal approval rate, on profit, or on swap sets</td></tr>
+        <tr><td><strong>Silent drift</strong><br><span class="src">monitoring</span></td><td>Losses rise months later</td><td>Feature and score PSI; vintage curves; retraining triggers</td></tr>
+        <tr><td><strong>Feedback loop</strong><br><span class="src">monitoring</span></td><td>Each retrain sees a narrower population</td><td>An exploration slice; logged decision probabilities</td></tr>
+        <tr><td><strong>Scope creep and silos</strong><br><span class="src">project</span></td><td>Late launches; surprised stakeholders</td><td>Phases that end in decisions; compliance in from framing</td></tr>
+      </tbody>
+    </table></div>
+
+    <!-- questions -->
+    <h2 id="questions"><span class="pn">15</span>Interview questions</h2>
+    <p>Answer out loud first, then open the answer. Each answer stands on its own.</p>
+
+    <h3>The whole project</h3>
+    <details class="qa"><summary><span class="qn">1</span>Walk me through a project end to end.</summary><div class="ans">
+      <p><strong>Tell it as a chain of decisions: the business problem and the decision it drove, how success was measured, the label and the split, the baseline, the model and why, what error analysis changed, how it went live, how it's monitored, and the result in money.</strong></p>
+      <p>A sample answer on a lending model, in about a minute:</p>
+      <p>“A lender approved loans with a bureau-score cut-off and wanted more approvals at the same loss rate. The decision was approve or decline at application time, so I framed it as predicting 90+ days past due within 12 months, using only data known at application.</p>
+      <p>Success was profit at today's approval rate. Offline, I tracked the bad rate at that approval rate, plus calibration, because the cut-off came from the economics: break-even at about 15% PD. I trained only on matured cohorts, with an out-of-time split grouped by customer and a test quarter touched once.</p>
+      <p>Against today's policy and a logistic regression, gradient boosting with monotonic constraints cut the bad rate at the same approval rate from 6.0% to 5.0%, about ₹13 lakh a month. Error analysis showed first-instalment defaults were mostly fraud, so they moved to the fraud model.</p>
+      <p>We ran it in shadow mode to check feature parity and latency, then as a 10% challenger with loss caps, reading early delinquency. It's monitored with feature and score PSI and vintage curves, and retrained on triggers.”</p>
+      <ul>
+        <li><strong>What the listener is scoring:</strong> the order (the decision before the model), numbers at the operating point, one or two real trade-offs you made, something that went wrong and how you caught it.</li>
+        <li><strong>Have one stage ready to go deep on:</strong> the label definition, the validation design or the launch.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> breadth against depth. Give the whole skeleton in the first minute, then offer to go deeper. Running out of time before evaluation and monitoring is the common failure, and it's what interviewers remember.</p>
+      <p><strong>Follow-up:</strong> “What would you do differently?” Have a real answer, such as bringing compliance in at framing, starting a random exploration slice from day one, or agreeing the kill criterion up front.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">2</span>When would you not use ML?</summary><div class="ans">
+      <p><strong>When a rule gets most of the value, when no decision would change, when there are no labels and no way to get them, when the volume is too small to repay the cost, or when the decision must follow an explicit rule set by law or policy.</strong></p>
+      <ul>
+        <li><strong>A rule is the requirement:</strong> eligibility set by law (minimum age, verified identity) is a rule, not a prediction.</li>
+        <li><strong>Too few decisions:</strong> at 200 loan applications a month, a points scorecard or a credit officer beats a model that must be built, served, monitored and maintained for as long as it runs.</li>
+        <li><strong>No labels:</strong> if outcomes can't be observed, or arrive too late to matter, start with rules and collect labels.</li>
+        <li><strong>No lever:</strong> if nobody can act on the prediction, accuracy is worthless.</li>
+        <li><strong>An unstable world:</strong> if the pattern changes faster than you can relearn it.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> rules are transparent and quick but brittle and maintained by hand; a model generalizes but costs upkeep. In practice the answer is often rules first, then a model, then both together: hard rules for what must never happen, and a model for the grey zone.</p>
+      <p><strong>Follow-up:</strong> “When do you switch from rules to a model?” When volume and the value of better decisions justify it, labels have accumulated, and a model beats the rules by a clear margin at the operating point.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">3</span>Why start with a baseline? How do you choose between logistic regression and gradient boosting?</summary><div class="ans">
+      <p><strong>A baseline sets the bar and exposes bugs. Logistic regression wins when data is small or transparency is paramount; boosting wins when there's enough data and interactions matter. The gap between them tells you whether the extra complexity pays.</strong></p>
+      <ul>
+        <li><strong>Baselines:</strong> today's policy (the real bar: the project's value is the gap to it), then a simple model. Score all of them on the same out-of-time test, at the same operating point.</li>
+        <li><strong>They catch problems:</strong> a model far above logistic regression usually means a leaking feature; nothing beating the policy means weak features.</li>
+        <li><strong>Logistic regression or a scorecard:</strong> transparent, stable across retrains, easy to monitor, familiar to auditors. It needs binning or transforms for curved effects and misses interactions unless you build them.</li>
+        <li><strong>Gradient boosting:</strong> captures interactions (“low income is fine if it's steady”), curved effects and missing values on its own. Monotonic constraints and SHAP make it explainable enough for most credit uses.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> accuracy against simplicity and governance cost. Decide on the money: if boosting cuts the bad rate from 5.3% to 5.0% on 4,000 loans a month, that's 12 fewer defaults, about ₹4 lakh a month, to weigh against the cost of maintaining and explaining a bigger model.</p>
+      <p><strong>Follow-up:</strong> “Boosting beats logistic regression by 0.15 Gini. Happy?” Suspicious. Check for leakage first: single-feature power, random against out-of-time scores, and when each top feature becomes known.</p>
+    </div></details>
+
+    <h3>Metrics and thresholds</h3>
+    <details class="qa"><summary><span class="qn">4</span>How do you choose a metric?</summary><div class="ans">
+      <p><strong>Start from the decision and the cost of each mistake. Pick the business metric the decision moves, an offline metric that measures the model where the decision is made, and guardrails, all fixed before looking at results.</strong></p>
+      <ul>
+        <li><strong>The decision sets the metric.</strong> A fixed approval rate needs good ordering at that rate (the bad rate among approvals). A cut-off from the economics needs calibrated probabilities. A review team that handles 500 cases a day needs precision in the top 500.</li>
+        <li><strong>Weight by money</strong> when amounts differ: missing one large default can outweigh catching ten small ones.</li>
+        <li><strong>Imbalance:</strong> accuracy is useless at a 6% bad rate (approving everyone scores 94%), and AUC averages over cut-offs nobody uses. Prefer metrics at the operating point.</li>
+        <li><strong>Validate the offline metric:</strong> has it predicted live results in past launches?</li>
+        <li><strong>Guardrails</strong>, with margins: thin-file approvals, fairness gaps, latency, complaints.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> a metric close to the business, like a profit simulation, is noisy and rests on assumptions; a clean statistical metric like AUC is stable but can move without the business moving. Report both.</p>
+      <p><strong>Follow-up:</strong> “AUC went up but profit didn't. Why?” The gain was away from the cut-off, calibration broke so the cut-off landed in the wrong place, or the swap-ins behave worse than the approved population suggested.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">5</span>How do you set the decision threshold?</summary><div class="ans">
+      <p><strong>From the costs of each mistake, using calibrated probabilities: approve while the expected gain beats the expected loss. Capacity or risk appetite can override it.</strong></p>
+      <p>With PD \(p\), margin \(G\) on a repaid loan and loss \(L\) on a default, approve when \((1 - p)\,G &gt; p\,L\), that is when \(p &lt; G/(G + L)\). With a ₹5,000 margin and a ₹28,000 loss, the break-even PD is about 15%.</p>
+      <ul>
+        <li><strong>Marginal, not average:</strong> the last applicant approved should break even. A book can be profitable overall while its riskiest approved band loses money.</li>
+        <li><strong>Other constraints:</strong> a cap on the portfolio bad rate, a manual-review band sized to the team, a target approval rate.</li>
+        <li><strong>Procedure:</strong> choose on validation data, confirm on the test set, revisit when costs or the applicant mix change. Without calibration, sweep thresholds on validation and add up the total cost at each.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> the profit-maximizing cut-off against risk appetite and customer experience: a tighter cut-off is safer but turns away more good customers.</p>
+      <p><strong>Follow-up:</strong> “Funding costs rise and the margin falls to ₹4,000.” Break-even drops to 4,000/32,000 = 12.5%, and the cut-off tightens without retraining, because the policy is kept separate from the model.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">6</span>When does calibration matter, and how do you check and fix it?</summary><div class="ans">
+      <p><strong>Whenever the score is used as a number rather than just an order: expected loss, pricing, limits, a cut-off from the economics, or combining models. Check predicted against observed by score band; fix with Platt scaling or isotonic regression on recent held-out data.</strong></p>
+      <ul>
+        <li><strong>Why it bites:</strong> if every PD is half its true value, a band whose true PD is 18% shows 9%, falls under a 15% break-even, and is approved at a loss. AUC, Gini and KS don't change, because the order is the same.</li>
+        <li><strong>Check:</strong> a reliability table by decile (predicted against observed bad rate), the average PD against the observed rate, and the Brier score or log loss against a constant-rate baseline.</li>
+        <li><strong>Fix:</strong> Platt scaling fits two parameters (good for small data and S-shaped distortion); isotonic regression fits any monotone correction (needs more data). Both keep the order. After resampling the classes, correct the probabilities for the true base rate.</li>
+        <li><strong>What breaks it:</strong> class reweighting or resampling, a change in the overall default rate (a recession), a change in the applicant mix (a new channel), and raw boosting scores in some setups.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> isotonic regression is flexible but can overfit small data; Platt is stable but assumes the distortion has a sigmoid shape.</p>
+      <p><strong>Follow-up:</strong> “Ranking holds but calibration has drifted since launch. Retrain?” Usually recalibrate first: it's cheaper and the order still holds. Retrain if the ranking itself decays.</p>
+    </div></details>
+
+    <h3>Data, labels and validation</h3>
+    <details class="qa"><summary><span class="qn">7</span>How do you handle label delay?</summary><div class="ans">
+      <p><strong>Never treat outcomes that haven't matured as negatives. Train and evaluate on matured cohorts, and act sooner with early proxy labels that have been validated against the final label.</strong></p>
+      <ul>
+        <li><strong>Maturity window:</strong> read it off vintage curves, the cumulative bad rate of each monthly cohort by months on book, at the point where they flatten.</li>
+        <li><strong>Proxies:</strong> first-payment default, or 30+ days past due at 3 months on book. Check on old cohorts that they rank applicants and model versions the same way as the full 12-month label.</li>
+        <li><strong>Partial information:</strong> a survival model treats a young loan as censored (survived so far), not as good, so recent data still contributes.</li>
+        <li><strong>Validation:</strong> leave a gap between training and test periods that matches the delay in production.</li>
+        <li><strong>Monitoring:</strong> drift and vintage curves now, full metrics when cohorts mature.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> a short window gives fresher data and faster iteration but misses late defaults, and can reward models that delay default rather than prevent it. A long window is complete but old.</p>
+      <p><strong>Follow-up:</strong> “The last three months show half the usual bad rate. Good news?” No: their labels haven't arrived. Exclude them, or wait.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">8</span>You only see outcomes for approved loans. What does that do, and what can you do about it?</summary><div class="ans">
+      <p><strong>The training data is a filtered, safer population, so the model is blindest exactly where its new decisions differ: below the old cut-off. Real labels from a small, capped, random approval slice fix it; statistical reject inference only patches it.</strong></p>
+      <ul>
+        <li><strong>Effects:</strong> no labels below the old cut-off, so the model extrapolates there. If underwriters used extra information, the approved applicants in risky-looking groups were unusually good, so the model underestimates risk for the rest of those groups. And Gini measured on approved loans alone understates the model.</li>
+        <li><strong>Offline evaluation:</strong> the new model's swap-ins, approved now but declined before, have no outcomes, so the offline case rests on half the evidence.</li>
+        <li><strong>Fixes, most trustworthy first:</strong> capped random approvals below the cut-off; a champion–challenger test; bureau outcomes of declined applicants who borrowed elsewhere; reweighting by the inverse probability of approval, or assigning inferred labels.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> exploration costs real losses and must be capped and agreed with the risk team; without it, the model can never learn about the people it declines.</p>
+      <p><strong>Follow-up:</strong> “Why can't reweighting alone fix it?” Applicants who were always declined have an approval probability of zero, and no weight can recover a region with no data.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">9</span>How would you design the validation for a credit model?</summary><div class="ans">
+      <p><strong>Out of time and grouped by customer: a later validation period for every choice, and a still later test period looked at once, ideally after a gap like the label delay.</strong></p>
+      <ul>
+        <li><strong>Layout:</strong> train on applications from months 1–18, validate on 19–21, test on 22–24, all with matured labels.</li>
+        <li><strong>Why out of time:</strong> rates, the economy and the applicant mix move. A random split mixes periods and hides that drift.</li>
+        <li><strong>Why a gap, if history allows:</strong> a live model learns from data at least a year older than the applicants it scores. The gap copies that decay; without it, the test flatters the model a little.</li>
+        <li><strong>Why grouped:</strong> repeat applicants on both sides let the model score on memory.</li>
+        <li><strong>Leakage control:</strong> preprocessing, encoders and feature selection fitted inside training folds; threshold and calibration on validation.</li>
+        <li><strong>Size:</strong> set by the number of bads. With 300 bads, AUC's 95% interval is about ±0.03, so compare models with a paired bootstrap.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> a more recent test period is more representative but leaves less, older data for training. Walk-forward evaluation over several windows is more reliable but costs more compute.</p>
+      <p><strong>Follow-up:</strong> “Random-split AUC is 0.80, out-of-time 0.70. What does it mean?” Leakage through time or through repeat customers, or a relationship that drifts. Find the features that drive the gap.</p>
+    </div></details>
+
+    <h3>Experiments and production</h3>
+    <details class="qa"><summary><span class="qn">10</span>The model is great offline but bad in production. Why?</summary><div class="ans">
+      <p><strong>Either the offline estimate was wrong (leakage, a random split, selection bias, a proxy metric) or production differs from the test (drift, training–serving skew, changed behaviour). Check the cheap, mechanical causes first.</strong></p>
+      <ol>
+        <li><strong>The pipeline:</strong> compare logged live features with the same features recomputed offline for the same applications. Skew and broken feeds are the most common cause and the fastest to find.</li>
+        <li><strong>The population:</strong> PSI of the features and the score between the test set and live traffic. A new channel or campaign may have changed who applies.</li>
+        <li><strong>The offline number:</strong> the gap between random-split and out-of-time scores, single-feature checks for leakage, whether the labels were mature.</li>
+        <li><strong>The metric:</strong> did the offline gains sit near the cut-off, and in rupees?</li>
+        <li><strong>Selection bias:</strong> the new model's swap-ins were never in the offline test.</li>
+        <li><strong>Reactions:</strong> applicants or fraudsters adapting to the new policy.</li>
+      </ol>
+      <p><strong>Trade-off:</strong> some causes can't be told apart without labels. Skew and drift show at once; selection bias shows only through a randomized test.</p>
+      <p><strong>Follow-up:</strong> “How would you have caught it before launch?” Shadow mode with feature-parity checks, an out-of-time test with a gap, and a small capped challenger before full rollout.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">11</span>How do you know your A/B test result is real?</summary><div class="ans">
+      <p><strong>Check the experiment's validity before its result, then read the result as an interval that is practically meaningful, pre-registered and consistent over time.</strong></p>
+      <ul>
+        <li><strong>Validity:</strong> no sample ratio mismatch (a chi-square test of arm sizes against the design); assignment by a stable hash of the user; the same logging in both arms; no interference between them.</li>
+        <li><strong>Pre-registration:</strong> one primary metric, guardrails with margins, the duration and the analysis, all fixed before launch.</li>
+        <li><strong>No peeking</strong>, unless a sequential test was planned: stopping at the first \(p &lt; 0.05\) inflates false positives.</li>
+        <li><strong>An interval:</strong> does its low end still clear the cost of the change, or the smallest effect worth shipping?</li>
+        <li><strong>Consistency:</strong> the effect holds week by week (a fading effect suggests novelty) and in the pre-registered segments.</li>
+        <li><strong>For credit:</strong> compare at the same approval rate or on profit, read only matured cohorts, on proxies validated against the final label.</li>
+        <li><strong>Twyman's law:</strong> a surprisingly large result is usually a bug.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> stricter significance and longer tests mean fewer false wins but slower decisions and more missed real gains.</p>
+      <p><strong>Follow-up:</strong> “One of 20 segments is significant at \(p = 0.03\). Ship for that segment?” No. With 20 looks, at least one false positive is likely (\(1 - 0.95^{20} \approx 64\%\)). Treat it as a hypothesis for the next test.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">12</span>The challenger model has a lower bad rate than the champion. Ship it?</summary><div class="ans">
+      <p><strong>Not yet. A stricter model always has a lower bad rate, so first check how many people each approves. Compare at the same approval rate or on profit per applicant, on matured labels.</strong></p>
+      <ul>
+        <li><strong>Example:</strong> the champion approves 40% with a 6.0% bad rate; the challenger approves 32% with 5.2%. The fair comparison is the champion's bad rate among its own safest 32%, or profit per applicant in each arm.</li>
+        <li><strong>Swap sets:</strong> the clearest read compares the challenger's swap-ins (approved only by it) with the champion's swap-outs (approved only by the champion). Score both models on every applicant, so each arm's swap sets are defined; randomization makes each arm's swap set a fair sample of the same kind of applicant.</li>
+        <li><strong>Validity:</strong> labels matured for every cohort read, split checked, guardrails passed.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> fewer approvals mean fewer losses but less revenue and more good customers turned away. Profit per applicant puts both on one scale.</p>
+      <p><strong>Follow-up:</strong> “Profit per applicant is equal, but the challenger approves fewer. Which one?” That's a strategy call, not a modelling one: a growth phase favours more approvals, a cautious one favours fewer, safer loans. Put the trade-off to the business explicitly.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">13</span>What is training–serving skew, and how do you prevent it?</summary><div class="ans">
+      <p><strong>The model receives different feature values live than it was trained on, usually because features are computed by different code or at different times. Prevent it with one feature definition, logged serving features and parity checks.</strong></p>
+      <ul>
+        <li><strong>Causes:</strong> warehouse SQL for training and service code for serving; windows that end at midnight in one and at the request time in the other; late-arriving data that's in the warehouse but wasn't there at decision time; different handling of nulls and unseen categories.</li>
+        <li><strong>Detection:</strong> in shadow mode, compare logged live features with offline recomputations for the same applications; compare the live score distribution with the test set's.</li>
+        <li><strong>Prevention:</strong> a shared feature definition (a feature store or a shared library); training on features logged at serving time; point-in-time joins; tests for nulls and unseen values.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> training on logged features guarantees parity, but only for features you've been logging, which delays new features. A feature store prevents skew at the cost of infrastructure.</p>
+      <p><strong>Follow-up:</strong> “Give an example.” “Payments from this device in the last 24 hours” computed by a nightly batch for training but by a live counter for serving: the window edges and late events differ, so the model sees different numbers.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">14</span>How do you detect drift, and what do you do about it?</summary><div class="ans">
+      <p><strong>Compare live distributions of the inputs and the score with training using PSI or KS, watch early outcomes by cohort, and act according to what drifted and whether performance actually fell.</strong></p>
+      <ul>
+        <li><strong>PSI:</strong> bin a feature on the training data, then sum \((a_i - e_i)\ln(a_i/e_i)\) over bins, where \(a_i\) is the live share and \(e_i\) the training share. Below 0.1 stable, 0.1–0.25 a look, above 0.25 a real shift.</li>
+        <li><strong>KS:</strong> the largest gap between two cumulative distributions. On big samples, alert on the statistic's size, since the p-value flags trivial shifts.</li>
+        <li><strong>Kinds:</strong> the inputs change (covariate shift: a campaign brings new applicants); or the relationship between inputs and default changes (concept drift), either uniformly (a recession lifts every applicant's risk, so the order holds and recalibration fixes it) or by reordering (some sectors are hit harder, so retrain).</li>
+        <li><strong>Actions:</strong> a pipeline bug, fix the data; input drift with stable outcomes, watch and check calibration in the new segment; a uniform rise in risk, recalibrate; a reordering, retrain or add features.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> sensitive alerts catch problems early but cause alert fatigue. Alert on the score and the most important features, with thresholds tied to actions.</p>
+      <p><strong>Follow-up:</strong> “Score PSI is 0.3 but the bad rate hasn't moved.” Either the population moved without its risk changing, or the labels simply haven't arrived. Find which features moved, and check calibration on the new segment as its cohorts mature.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">15</span>When do you retrain?</summary><div class="ans">
+      <p><strong>When there's evidence it will help: new matured labels, measured decay, or a known change in the world. Not by habit. And a retrained model must beat the current one before it replaces it.</strong></p>
+      <ul>
+        <li><strong>Triggers:</strong> early outcomes (30+ days past due by months on book) worse than past cohorts at the same age; calibration off on recent cohorts; PSI above about 0.25 on the score or key features; a new product, channel or policy.</li>
+        <li><strong>A schedule</strong> gives a floor and predictability. Set its pace by how fast labels arrive: a credit model gains full labels slowly, so monitor monthly, recalibrate when levels drift, rebuild every year or two; a fraud model faces adversaries and faster labels, so retrain weekly to monthly.</li>
+        <li><strong>Recalibrate or retrain:</strong> if the order holds but the levels are off (a recession lifting everyone's risk), recalibrate. If the order itself decays, retrain.</li>
+        <li><strong>Process:</strong> train, compare with the champion on the latest matured data, shadow, then ramp.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> frequent retraining tracks change but adds release risk and chases noise when no new labels have matured; rare retraining is stable but slow to react.</p>
+      <p><strong>Follow-up:</strong> “What can go wrong when you retrain?” Immature labels counted as good, a feedback loop narrowing the population each time, and upstream data that changed meaning without anyone noticing.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">16</span>How do you produce reason codes for a declined applicant?</summary><div class="ans">
+      <p><strong>Compute each feature's contribution to this applicant's risk (SHAP for a boosted model, points for a scorecard), take the ones that raised the risk most, and map each to a fixed, plain-language reason.</strong></p>
+      <ul>
+        <li><strong>SHAP:</strong> contributions in log-odds that add up to this applicant's score minus the average score, so “what pushed this person's risk up” is well defined.</li>
+        <li><strong>A reason catalogue:</strong> each feature maps to one reason, and correlated features (several measures of utilization) share one, so the explanation doesn't split across near-duplicates.</li>
+        <li><strong>Requirements:</strong> stable across similar applicants and across retrains; understandable and actionable; never a protected attribute or a proxy for one.</li>
+        <li><strong>Monotonic constraints</strong> help: the reasons always point the way a credit officer expects.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> with correlated features SHAP can split credit unpredictably, so grouping features into reasons is what makes the codes stable. A scorecard gives exact reasons but usually less accuracy.</p>
+      <p><strong>Follow-up:</strong> “Can the applicant act on ‘high utilization’?” Usually, yes, but SHAP explains the model, not causes in the world, so never promise that changing one thing will get them approved.</p>
+    </div></details>
+
+    <h3>People and process</h3>
+    <details class="qa"><summary><span class="qn">17</span>How do you explain a model to non-technical stakeholders?</summary><div class="ans">
+      <p><strong>Explain the decision and its effect in their terms, show it working on examples and in a simple table, be honest about uncertainty, and keep the method for when they ask.</strong></p>
+      <ul>
+        <li><strong>Lead with what changes and what it's worth:</strong> “at today's approval rate, about 40 fewer defaults a month, worth around ₹13 lakh”.</li>
+        <li><strong>A gains table:</strong> sort applicants by score into ten equal bands and show each band's default rate. “The riskiest tenth of applicants holds about a quarter of the defaults; the safest tenth almost never defaults” makes the model's value visible without the word AUC.</li>
+        <li><strong>Examples:</strong> two real applicants, their scores, and the top reasons for each.</li>
+        <li><strong>What drives it:</strong> the main factors in plain words, each moving in the expected direction.</li>
+        <li><strong>Limits:</strong> where it's weaker (thin-file applicants), what could go wrong, and how you'd know.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> simplicity against accuracy. A simplified story must not mislead: “the model learned that missed payments predict default” is fine; “missed payments cause default, so the model knows the cause” is not.</p>
+      <p><strong>Follow-up:</strong> “Why should we trust it?” Out-of-time results against today's policy, the shadow period, a capped live test, and monitoring that would catch a problem early.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">18</span>How do you prioritize between improving the model and shipping?</summary><div class="ans">
+      <p><strong>Ship when the model beats the current policy by a measured, meaningful margin and the guardrails pass, then keep improving through challenger releases. Each month of delay gives up the gain already in hand.</strong></p>
+      <ul>
+        <li><strong>Compare value:</strong> a month's delay forgoes the model's monthly value (say ₹13 lakh) once. Polishing pays only if its extra monthly gain, times the chance it works, summed over the model's life, beats that, and only if it couldn't ship later as a challenger anyway. Usually it can.</li>
+        <li><strong>Shipping teaches what offline work can't:</strong> outcomes for swap-ins, real latency, real drift.</li>
+        <li><strong>The biggest remaining gains are usually data:</strong> better labels, new sources. They take calendar time, so run them in parallel with the launch.</li>
+        <li><strong>Don't ship if</strong> the guardrails fail, calibration is off, the gain is inside the noise, or monitoring and rollback aren't ready.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> shipping early puts a less polished model in production and may need a second release; waiting loses value and learns less.</p>
+      <p><strong>Follow-up:</strong> “What would make you delay a launch?” Failed feature parity in shadow mode, an unexplained gap between validation and test, missing monitoring or rollback, or an open compliance question.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">19</span>How do you scope a project, estimate its timeline, and decide when to stop?</summary><div class="ans">
+      <p><strong>Scope it by the decision and a measurable success criterion, split it into phases that each end in a go/no-go decision, estimate each phase as a range, re-estimate at every milestone, and agree a kill criterion up front.</strong></p>
+      <ul>
+        <li><strong>Phases:</strong> framing and a data audit; a first model judged against today's policy; shadow mode; a live challenger. Each has a deliverable and a decision.</li>
+        <li><strong>Front-load the uncertainty:</strong> data access and label quality sink more timelines than modelling does, so audit them in the first week or two.</li>
+        <li><strong>Dependencies:</strong> compliance review, engineering capacity for serving, and data owners all need calendar time you don't control.</li>
+        <li><strong>Stopping:</strong> stop polishing when the next gain is below the noise or worth less than the delay; stop the project when the kill criterion hits, and say so early.</li>
+        <li><strong>Scope creep:</strong> new requests go to a written backlog, with their cost to the date made explicit.</li>
+      </ul>
+      <p><strong>Trade-off:</strong> a detailed upfront plan will be wrong; no plan drifts. Short phases that end in decisions balance the two.</p>
+      <p><strong>Follow-up:</strong> “Halfway through, the business also wants a pricing model.” Offer it as phase two, and say what adding it now would do to the launch date, so they choose.</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">20</span>What goes into a model card, and why bother?</summary><div class="ans">
+      <p><strong>Enough for someone who wasn't there to use, audit and maintain the model: its purpose and limits, data and label, performance by segment, fairness checks, monitoring and ownership.</strong></p>
+      <ul>
+        <li><strong>Purpose:</strong> intended use, and uses it's not for.</li>
+        <li><strong>Data:</strong> sources, label definition and window, training and test periods, exclusions.</li>
+        <li><strong>Performance:</strong> overall and by segment, with intervals; calibration.</li>
+        <li><strong>Risks:</strong> fairness checks, known limitations, segments where it's weak.</li>
+        <li><strong>Operations:</strong> monitoring plan, retraining triggers, owner, version.</li>
+      </ul>
+      <p><strong>Why bother:</strong> audits and disputes months later, handovers when people leave, model-risk reviews in regulated lending, and stopping the model from being reused for things it wasn't built for. Writing it also forces you to state the limitations.</p>
+      <p><strong>Trade-off:</strong> documentation takes time and goes stale. Keep it short, version it with the model, and generate the numbers from the training pipeline.</p>
+      <p><strong>Follow-up:</strong> “What's the most important line?” The intended use and the uses it's not for: much of the harm models do comes from being applied where they were never validated.</p>
+    </div></details>
+
+    <!-- sheet -->
+    <h2 id="sheet"><span class="pn">16</span>Cheat sheet: the lifecycle as a checklist</h2>
+    <div class="sheet">
+      <h3>Frame</h3>
+      <ul>
+        <li>Objective → decision → prediction target, moment and unit</li>
+        <li>ML needed? Today's policy measured as the baseline</li>
+        <li>Cost of each kind of mistake; latency, explanation, regulation, consent</li>
+        <li>Prize sized; success and kill criteria agreed in writing</li>
+      </ul>
+      <h3>Metrics</h3>
+      <ul>
+        <li>Business, offline, online and guardrail metrics, fixed in advance</li>
+        <li>Offline metric at the operating point, in money; has it predicted live results?</li>
+        <li>Threshold from costs: \(p^* = G/(G + L)\), marginal not average</li>
+        <li>Calibration checked by band if the score is used as a probability</li>
+      </ul>
+      <h3>Data and labels</h3>
+      <ul>
+        <li>Every feature known at decision time; point-in-time joins</li>
+        <li>Label event, window and exclusions written down; vintage curves</li>
+        <li>Immature outcomes never counted as negatives; proxies validated</li>
+        <li>Selection bias named; an exploration slice if possible</li>
+        <li>Data contracts and automated quality checks</li>
+      </ul>
+      <h3>Prepare and validate</h3>
+      <ul>
+        <li>EDA that changes decisions: volumes, label by cohort, missingness, single-feature power, stability</li>
+        <li>Transforms fitted on training data, inside a pipeline</li>
+        <li>Out-of-time split with a gap, grouped by customer</li>
+        <li>Test set touched once, with enough bads for a useful interval</li>
+      </ul>
+      <h3>Baseline, model, errors</h3>
+      <ul>
+        <li>Today's policy → simple model → boosting, all on the same test</li>
+        <li>Monotonic constraints where the domain demands them; early stopping on validation</li>
+        <li>Slices with intervals; failure buckets; label errors fixed first</li>
+        <li>SHAP reason codes that are stable, actionable and lawful; fairness checked</li>
+      </ul>
+      <h3>Online and deployment</h3>
+      <ul>
+        <li>Swap sets profiled; shadow mode for parity and latency</li>
+        <li>Champion–challenger by customer hash, loss caps, kill switch</li>
+        <li>Compare at equal approval rate or on profit; split checked; no peeking</li>
+        <li>Latency budget and fallback; one feature definition; served features logged</li>
+        <li>Everything versioned; every decision logged; staged rollout with fast rollback</li>
+      </ul>
+      <h3>Monitoring and people</h3>
+      <ul>
+        <li>Service → data quality → drift → early outcomes → full outcomes</li>
+        <li>Retrain on triggers; retrained models go through challenger testing</li>
+        <li>Feedback loops guarded with exploration and logged decision probabilities</li>
+        <li>Phases that end in decisions; compliance in from day one; model card and decision log</li>
+      </ul>
+      <h3>Formulas</h3>
+      <div class="mj">\[ \begin{aligned} p^* &amp;= \frac{G}{G + L} \\ \text{EL} &amp;= \text{PD} \times \text{LGD} \times \text{EAD} \\ \text{Gini} &amp;= 2\,\text{AUC} - 1 \\ \text{PSI} &amp;= \textstyle\sum_i (a_i - e_i) \ln (a_i / e_i) \\ n &amp;\approx 16\, p(1 - p) / \delta^2 \ \text{per group} \end{aligned} \]</div>
+    </div>
+
+    <footer><a href="./">More study notes</a> · <a href="../">Deepam Minda</a></footer>
+  </article>
+</div>
+<a class="jump" href="#tldr">Contents ↑</a>
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+  svg: { fontCache: "global" },
+  options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script>
+(function () {
+  var d = document.getElementById("tocd");
+  var wide = window.matchMedia("(min-width: 1081px)");
+  function sync() { d.open = wide.matches; }
+  sync();
+  if (wide.addEventListener) wide.addEventListener("change", sync);
+  var jump = document.querySelector(".jump");
+  jump.addEventListener("click", function () { if (!wide.matches) d.open = true; });
+  d.addEventListener("click", function (e) {
+    if (!wide.matches && e.target.closest("a")) d.open = false;
+  });
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+  function spy() {
+    var y = window.scrollY + 120, cur = 0;
+    targets.forEach(function (t, i) { if (t && t.getBoundingClientRect().top + window.scrollY <= y) cur = i; });
+    links.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
+  }
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+})();
+</script>
+
+<script>
+(function () {
+  var root = document.documentElement, b = document.getElementById("theme-toggle");
+  function cur() { return root.getAttribute("data-theme") === "light" ? "light" : "dark"; }
+  function label() { b.setAttribute("aria-label", "Switch to " + (cur() === "dark" ? "light" : "dark") + " mode"); }
+  b.addEventListener("click", function () {
+    var n = cur() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", n);
+    try { localStorage.setItem("deepam-theme", n); } catch (e) {}
+    label();
+  });
+  label();
+})();
+</script>
+</body>
+</html>
