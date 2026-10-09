@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070707">
 <title>Deep learning basics · Deepam Minda</title>
 <meta name="description" content="Forward pass and backprop in NumPy, optimizers, activations, losses, initialization, normalization, regularization, residuals, convolutions and reading loss curves.">
 <meta property="og:title" content="Deep learning basics">
@@ -11,12 +12,15 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
 <script>
 (function () {
-  try { var t = localStorage.getItem("deepam-theme"); if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+  var t = null;
+  try { t = localStorage.getItem("deepam-theme"); } catch (e) {}
+  if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", t);
 })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Fraunces:opsz,SOFT,WONK,wght@9..144,0,0,600&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
 <style>
 /* Green graph-paper theme for the recurrent-notebook content.
    Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
@@ -237,11 +241,60 @@ pre.code code { font: inherit; background: none; border: 0; padding: 0; }
 pre.code .cm { color: var(--ink-3); }
 @media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
 
-/* public copy: links back to the site */
-.crumbs { max-width: 1132px; margin: 0 auto 28px; display: flex; flex-wrap: wrap; gap: 8px; font: 500 12px/1.6 var(--mono); color: var(--ink-3); }
-.crumbs a { color: var(--ink-2); }
-.crumbs a:hover { color: var(--link); }
-@media (max-width: 1080px) { .crumbs { max-width: 860px; } }
+/* public copy: the main site's palette (near-black void, warm ink, amber accent), header,
+   display face and mono, over the notebook layout. Graph paper stays, fainter. Token blocks
+   repeat green_theme.css's selectors so they win by order. */
+:root {
+  --paper: #f6f7f3; --grid: rgba(20, 23, 20, .03); --grid-major: rgba(20, 23, 20, .055); --surface: #fbfcf9;
+  --ink: #141714; --ink-2: #3f453e; --ink-3: #62675f; --rule: #dadcd4;
+  --accent: #9b6700; --link: #8a5c00;
+  --cell: #007b62; --cell-wash: #e1efe9; --grad: #ad4c22; --grad-wash: #f6e6dc;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --display: "Fraunces", Georgia, serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #080807; --grid: rgba(255, 255, 255, .02); --grid-major: rgba(255, 255, 255, .04); --surface: #121210;
+    --ink: #f3f2ee; --ink-2: #b8b5ad; --ink-3: #8f8d87; --rule: #262522;
+    --accent: #ffc400; --link: #ffc400;
+    --cell: #00a884; --cell-wash: #0a1d18; --hid: #8fb6d2; --hid-wash: #121a20;
+    --gate: #cfccc4; --gate-wash: #171714; --grad: #ef7d47; --grad-wash: #26170e;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #080807; --grid: rgba(255, 255, 255, .02); --grid-major: rgba(255, 255, 255, .04); --surface: #121210;
+  --ink: #f3f2ee; --ink-2: #b8b5ad; --ink-3: #8f8d87; --rule: #262522;
+  --accent: #ffc400; --link: #ffc400;
+  --cell: #00a884; --cell-wash: #0a1d18; --hid: #8fb6d2; --hid-wash: #121a20;
+  --gate: #cfccc4; --gate-wash: #171714; --grad: #ef7d47; --grad-wash: #26170e;
+}
+body { padding-block-start: 0; }
+h1 { font-family: var(--display); font-weight: 600; font-size: clamp(2.2rem, 1.5rem + 2.4vw, 3.2rem); line-height: .98; letter-spacing: -.05em; }
+.kicker { color: var(--accent); }
+.toc a.on { box-shadow: inset 2px 0 0 var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline-color: var(--accent); }
+
+/* the site's header */
+.site-head { max-width: 1260px; margin: 0 auto 40px; min-height: 72px; display: flex; align-items: center;
+  justify-content: space-between; gap: 24px; border-bottom: 1px solid var(--rule); font-family: var(--mono); }
+.site-head .mark { color: var(--ink); font-size: 14px; font-weight: 700; letter-spacing: -.02em; }
+.site-head .mark::before { content: ">"; margin-right: 8px; color: var(--accent); }
+.site-head nav { display: flex; align-items: center; flex-wrap: wrap; gap: 28px; font-size: 15px; color: var(--ink-3); }
+.site-head a { color: inherit; }
+.site-head a:hover { color: var(--accent); text-decoration: none; }
+.site-toggle { width: 32px; height: 32px; display: inline-grid; place-items: center; margin: -5px 0; padding: 0;
+  border: 1px solid var(--rule); border-radius: 50%; background: transparent; color: var(--ink-2); cursor: pointer;
+  transition: border-color .16s ease, color .16s ease, transform .16s ease; }
+.site-toggle:hover { border-color: var(--accent); color: var(--accent); transform: rotate(10deg); }
+.site-toggle span { grid-area: 1 / 1; font-size: 16px; line-height: 1; }
+.site-toggle .moon { display: none; }
+:root[data-theme="light"] .site-toggle .sun { display: none; }
+:root[data-theme="light"] .site-toggle .moon { display: inline; }
+@media (max-width: 720px) {
+  .site-head { min-height: 64px; margin-bottom: 26px; }
+  .site-head nav { gap: 16px; font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .site-toggle { transition: none; } .site-toggle:hover { transform: none; } }
 footer .site-nav { display: block; margin-top: 10px; }
 .next { margin-top: 36px; font-weight: 500; }
 </style>
@@ -258,8 +311,7 @@ footer .site-nav { display: block; margin-top: 10px; }
   </defs>
 </svg>
 
-<button type="button" class="theme-toggle" id="theme-toggle"><span class="dot"></span><span class="t">Dark mode</span></button>
-<nav class="crumbs" aria-label="Site"><a href="../">deepam</a><span aria-hidden="true">/</span><a href="./">study notes</a></nav>
+<header class="site-head"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">study notes</a><button type="button" class="site-toggle" id="theme-toggle" title="Switch color mode"><span class="sun" aria-hidden="true">☀</span><span class="moon" aria-hidden="true">☾</span></button></nav></header>
 <div class="page">
   <nav class="toc" aria-label="Contents">
     <details id="tocd" open>
@@ -680,9 +732,9 @@ for o in range(C_out):
     <h2 id="questions"><span class="pn">16</span>Interview questions</h2>
     <p>Answer out loud first, then open the answer.</p>
     <details class="qa"><summary><span class="qn">1</span>Why do we need non-linear activations?</summary><div class="ans"><p>Without them, any stack of layers is one linear map, since \(W_2 W_1 x = (W_2 W_1) x\). It can only draw straight decision boundaries. The non-linearity between layers is what lets depth build complex functions.</p></div></details>
-    <details class="qa"><summary><span class="qn">2</span>Walk through forward and backward propagation for a two-layer network.</summary><div class="ans"><p>Forward: \(z_1 = W_1 x + b_1\), \(a_1 = \text{ReLU}(z_1)\), \(z_2 = W_2 a_1 + b_2\), \(\hat y = \text{softmax}(z_2)\), cross-entropy loss, storing each value. Backward: \(\delta_2 = \hat y - y\); \(\partial L/\partial W_2 = \delta_2 a_1^\top\), \(\partial L/\partial b_2 = \delta_2\); \(\delta_1 = (W_2^\top \delta_2) \odot \text{ReLU}'(z_1)\); \(\partial L/\partial W_1 = \delta_1 x^\top\), \(\partial L/\partial b_1 = \delta_1\). Then a gradient step on every weight.</p></div></details>
+    <details class="qa"><summary><span class="qn">2</span>Walk through forward and backward propagation for a two-layer network.</summary><div class="ans"><p>Forward, storing every value for the backward pass:</p><div class="mj">\[ \begin{aligned} z_1 &amp;= W_1 x + b_1 \\ a_1 &amp;= \text{ReLU}(z_1) \\ z_2 &amp;= W_2 a_1 + b_2 \\ \hat y &amp;= \text{softmax}(z_2), \qquad L = -\textstyle\sum_k y_k \log \hat y_k \end{aligned} \]</div><p>Backward, from the output down:</p><div class="mj">\[ \begin{aligned} \delta_2 &amp;= \hat y - y \\ \partial L/\partial W_2 &amp;= \delta_2\, a_1^\top, \qquad \partial L/\partial b_2 = \delta_2 \\ \delta_1 &amp;= (W_2^\top \delta_2) \odot \text{ReLU}'(z_1) \\ \partial L/\partial W_1 &amp;= \delta_1\, x^\top, \qquad \partial L/\partial b_1 = \delta_1 \end{aligned} \]</div><p>Then a gradient step on every weight.</p></div></details>
     <details class="qa"><summary><span class="qn">3</span>Why is backprop efficient compared with numerical gradients?</summary><div class="ans"><p>Reverse-mode differentiation: from one scalar loss, one backward pass (about two forward passes of compute) reuses all the stored intermediates and yields every weight's gradient. Finite differences need a forward pass per weight, so millions of passes. The price is memory for the stored activations.</p></div></details>
-    <details class="qa"><summary><span class="qn">4</span>Derive the gradient of softmax with cross-entropy.</summary><div class="ans"><p>With \(\hat y_k = e^{z_k}/\sum_j e^{z_j}\) and \(L = -\sum_k y_k \log \hat y_k\) for one-hot \(y\): \(\partial L/\partial z_i = \hat y_i - y_i\). The softmax's Jacobian and the log cancel neatly, which is why the pair is always used together.</p></div></details>
+    <details class="qa"><summary><span class="qn">4</span>Derive the gradient of softmax with cross-entropy.</summary><div class="ans"><p>For a one-hot label \(y\):</p><div class="mj">\[ \begin{aligned} \hat y_k &amp;= \frac{e^{z_k}}{\sum_j e^{z_j}}, \qquad L = -\sum_k y_k \log \hat y_k \\ \frac{\partial L}{\partial z_i} &amp;= \hat y_i - y_i \end{aligned} \]</div><p>The softmax's Jacobian and the log cancel neatly, which is why the pair is always used together.</p></div></details>
     <details class="qa"><summary><span class="qn">5</span>Why use cross-entropy rather than MSE for classification?</summary><div class="ans"><p>Cross-entropy is the maximum-likelihood loss for categorical labels, and its gradient at the logits is \(\hat y - y\): big when confidently wrong. MSE through a sigmoid or softmax multiplies by the activation's slope, which is near 0 when the output is saturated, so learning stalls exactly when the model is most wrong.</p></div></details>
     <details class="qa"><summary><span class="qn">6</span>What causes vanishing and exploding gradients, and how do you fix them?</summary><div class="ans"><p>The backward pass multiplies one Jacobian per layer (weights times activation slopes), so the product shrinks or grows exponentially with depth. Fixes: ReLU-family activations (slope 1), He/Xavier initialization, BatchNorm/LayerNorm, residual connections, gradient clipping for explosions, gated cells (LSTM/GRU) in recurrent nets.</p></div></details>
     <details class="qa"><summary><span class="qn">7</span>Xavier vs He initialization? What if you initialize everything to zero?</summary><div class="ans"><p>Both keep the variance of activations (and gradients) roughly constant across layers: Xavier \(\text{Var}(w) = 2/(n_{in} + n_{out})\) for tanh/sigmoid, He \(2/n_{in}\) for ReLU, which zeroes half its inputs. All zeros (or all equal) makes every unit in a layer identical with identical gradients, so they never differentiate (symmetry).</p></div></details>
@@ -690,7 +742,7 @@ for o in range(C_out):
     <details class="qa"><summary><span class="qn">9</span>How does dropout work? Why scale by \(1/(1-p)\)? What happens at inference?</summary><div class="ans"><p>During training each unit is zeroed with probability \(p\), which stops units co-adapting and acts like averaging many thinned networks. Scaling the survivors by \(1/(1-p)\) keeps the expected activation unchanged (inverted dropout), so at inference dropout is simply switched off with no rescaling.</p></div></details>
     <details class="qa"><summary><span class="qn">10</span>L1 vs L2 vs weight decay. Why AdamW?</summary><div class="ans"><p>L2 penalizes squared weights, shrinking them smoothly; L1 penalizes absolute values, pushing some exactly to 0. With plain SGD, L2 and weight decay are the same. With Adam, an L2 term in the gradient gets rescaled per weight, weakening it for weights with large gradient history. AdamW decays the weights directly, decoupled from the gradient, so regularization works as intended.</p></div></details>
     <details class="qa"><summary><span class="qn">11</span>Adam vs SGD with momentum. Why does Adam need bias correction?</summary><div class="ans"><p>Momentum averages gradients to smooth the path; Adam also scales each weight's step by its recent gradient size, so it needs less tuning and handles uneven scales. SGD with momentum sometimes generalizes a bit better on vision tasks. \(m\) and \(v\) start at 0, so early averages are biased toward 0; dividing by \(1 - \beta^t\) corrects that.</p></div></details>
-    <details class="qa"><summary><span class="qn">12</span>Why do residual connections help?</summary><div class="ans"><p>\(y = x + F(x)\) gives \(\partial y/\partial x = I + \partial F/\partial x\): an identity path for the gradient through any depth. The block only has to learn a correction, and doing nothing (\(F = 0\)) is easy. They made very deep networks trainable, and the same idea underlies the transformer's residual stream and the LSTM's cell.</p></div></details>
+    <details class="qa"><summary><span class="qn">12</span>Why do residual connections help?</summary><div class="ans"><div class="mj">\[ y = x + F(x) \quad\Longrightarrow\quad \frac{\partial y}{\partial x} = I + \frac{\partial F}{\partial x} \]</div><p>The \(I\) is an identity path for the gradient through any depth. The block only has to learn a correction, and doing nothing (\(F = 0\)) is easy. They made very deep networks trainable, and the same idea underlies the transformer's residual stream and the LSTM's cell.</p></div></details>
     <details class="qa"><summary><span class="qn">13</span>When do you add vectors and when do you concatenate them?</summary><div class="ans"><p>Concatenation followed by a linear layer equals separate projections then a sum, \(W[x;y] = W_1 x + W_2 y\). So concatenating gives each input its own weights, at the cost of width. Adding forces a shared space and keeps the width fixed. Add for updates to the same representation (residuals, positional encodings, the residual stream); concatenate for different sources (LSTM inputs, bi-LSTM outputs, attention heads, U-Net skips, feature fusion).</p></div></details>
     <details class="qa"><summary><span class="qn">14</span>Why a CNN instead of a dense network for images? What does a 1×1 convolution do?</summary><div class="ans"><p>Parameter sharing and locality: a small filter reused everywhere has few weights, uses neighbourhood structure and detects a pattern anywhere. A dense layer would need a weight per pixel per unit and relearn each pattern at each position. A 1×1 convolution mixes channels at each pixel: cheap channel reduction or expansion (bottlenecks) plus a non-linearity, the CNN version of a per-token FFN.</p></div></details>
     <details class="qa"><summary><span class="qn">15</span>Compute the output size and parameters of a convolution layer.</summary><div class="ans"><p>Output side \((n + 2p - k)/s + 1\): a 32×32 input, 3×3 kernel, padding 1, stride 1 stays 32×32; stride 2 gives 16×16. Parameters: \(k^2 C_{in} C_{out} + C_{out}\), so 3×3, 64→128 has \(9 \times 64 \times 128 + 128 = 73{,}856\), independent of image size.</p></div></details>
@@ -749,17 +801,9 @@ window.MathJax = {
 
 <script>
 (function () {
-  var root = document.documentElement, b = document.getElementById("theme-toggle"), t = b.querySelector(".t");
-  function cur() {
-    var a = root.getAttribute("data-theme");
-    if (a === "dark" || a === "light") return a;
-    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  }
-  function label() {
-    var c = cur();
-    t.textContent = c === "dark" ? "Light mode" : "Dark mode";
-    b.setAttribute("aria-label", "Switch to " + (c === "dark" ? "light" : "dark") + " mode");
-  }
+  var root = document.documentElement, b = document.getElementById("theme-toggle");
+  function cur() { return root.getAttribute("data-theme") === "light" ? "light" : "dark"; }
+  function label() { b.setAttribute("aria-label", "Switch to " + (cur() === "dark" ? "light" : "dark") + " mode"); }
   b.addEventListener("click", function () {
     var n = cur() === "dark" ? "light" : "dark";
     root.setAttribute("data-theme", n);

@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070707">
 <title>Transformers · Deepam Minda</title>
 <meta name="description" content="Seq2seq and attention, the transformer part by part, BERT and GPT, fine-tuning and LoRA, with diagrams, pseudocode and practice questions.">
 <meta property="og:title" content="Transformers">
@@ -11,12 +12,15 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
 <script>
 (function () {
-  try { var t = localStorage.getItem("deepam-theme"); if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+  var t = null;
+  try { t = localStorage.getItem("deepam-theme"); } catch (e) {}
+  if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", t);
 })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Fraunces:opsz,SOFT,WONK,wght@9..144,0,0,600&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
 <style>
 /* Green graph-paper theme for the recurrent-notebook content.
    Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
@@ -237,11 +241,60 @@ pre.code code { font: inherit; background: none; border: 0; padding: 0; }
 pre.code .cm { color: var(--ink-3); }
 @media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
 
-/* public copy: links back to the site */
-.crumbs { max-width: 1132px; margin: 0 auto 28px; display: flex; flex-wrap: wrap; gap: 8px; font: 500 12px/1.6 var(--mono); color: var(--ink-3); }
-.crumbs a { color: var(--ink-2); }
-.crumbs a:hover { color: var(--link); }
-@media (max-width: 1080px) { .crumbs { max-width: 860px; } }
+/* public copy: the main site's palette (near-black void, warm ink, amber accent), header,
+   display face and mono, over the notebook layout. Graph paper stays, fainter. Token blocks
+   repeat green_theme.css's selectors so they win by order. */
+:root {
+  --paper: #f6f7f3; --grid: rgba(20, 23, 20, .03); --grid-major: rgba(20, 23, 20, .055); --surface: #fbfcf9;
+  --ink: #141714; --ink-2: #3f453e; --ink-3: #62675f; --rule: #dadcd4;
+  --accent: #9b6700; --link: #8a5c00;
+  --cell: #007b62; --cell-wash: #e1efe9; --grad: #ad4c22; --grad-wash: #f6e6dc;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --display: "Fraunces", Georgia, serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #080807; --grid: rgba(255, 255, 255, .02); --grid-major: rgba(255, 255, 255, .04); --surface: #121210;
+    --ink: #f3f2ee; --ink-2: #b8b5ad; --ink-3: #8f8d87; --rule: #262522;
+    --accent: #ffc400; --link: #ffc400;
+    --cell: #00a884; --cell-wash: #0a1d18; --hid: #8fb6d2; --hid-wash: #121a20;
+    --gate: #cfccc4; --gate-wash: #171714; --grad: #ef7d47; --grad-wash: #26170e;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #080807; --grid: rgba(255, 255, 255, .02); --grid-major: rgba(255, 255, 255, .04); --surface: #121210;
+  --ink: #f3f2ee; --ink-2: #b8b5ad; --ink-3: #8f8d87; --rule: #262522;
+  --accent: #ffc400; --link: #ffc400;
+  --cell: #00a884; --cell-wash: #0a1d18; --hid: #8fb6d2; --hid-wash: #121a20;
+  --gate: #cfccc4; --gate-wash: #171714; --grad: #ef7d47; --grad-wash: #26170e;
+}
+body { padding-block-start: 0; }
+h1 { font-family: var(--display); font-weight: 600; font-size: clamp(2.2rem, 1.5rem + 2.4vw, 3.2rem); line-height: .98; letter-spacing: -.05em; }
+.kicker { color: var(--accent); }
+.toc a.on { box-shadow: inset 2px 0 0 var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline-color: var(--accent); }
+
+/* the site's header */
+.site-head { max-width: 1260px; margin: 0 auto 40px; min-height: 72px; display: flex; align-items: center;
+  justify-content: space-between; gap: 24px; border-bottom: 1px solid var(--rule); font-family: var(--mono); }
+.site-head .mark { color: var(--ink); font-size: 14px; font-weight: 700; letter-spacing: -.02em; }
+.site-head .mark::before { content: ">"; margin-right: 8px; color: var(--accent); }
+.site-head nav { display: flex; align-items: center; flex-wrap: wrap; gap: 28px; font-size: 15px; color: var(--ink-3); }
+.site-head a { color: inherit; }
+.site-head a:hover { color: var(--accent); text-decoration: none; }
+.site-toggle { width: 32px; height: 32px; display: inline-grid; place-items: center; margin: -5px 0; padding: 0;
+  border: 1px solid var(--rule); border-radius: 50%; background: transparent; color: var(--ink-2); cursor: pointer;
+  transition: border-color .16s ease, color .16s ease, transform .16s ease; }
+.site-toggle:hover { border-color: var(--accent); color: var(--accent); transform: rotate(10deg); }
+.site-toggle span { grid-area: 1 / 1; font-size: 16px; line-height: 1; }
+.site-toggle .moon { display: none; }
+:root[data-theme="light"] .site-toggle .sun { display: none; }
+:root[data-theme="light"] .site-toggle .moon { display: inline; }
+@media (max-width: 720px) {
+  .site-head { min-height: 64px; margin-bottom: 26px; }
+  .site-head nav { gap: 16px; font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .site-toggle { transition: none; } .site-toggle:hover { transform: none; } }
 footer .site-nav { display: block; margin-top: 10px; }
 .next { margin-top: 36px; font-weight: 500; }
 </style>
@@ -258,8 +311,7 @@ footer .site-nav { display: block; margin-top: 10px; }
   </defs>
 </svg>
 
-<button type="button" class="theme-toggle" id="theme-toggle"><span class="dot"></span><span class="t">Dark mode</span></button>
-<nav class="crumbs" aria-label="Site"><a href="../">deepam</a><span aria-hidden="true">/</span><a href="./">study notes</a></nav>
+<header class="site-head"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">study notes</a><button type="button" class="site-toggle" id="theme-toggle" title="Switch color mode"><span class="sun" aria-hidden="true">☀</span><span class="moon" aria-hidden="true">☾</span></button></nav></header>
 <div class="page">
   <nav class="toc" aria-label="Contents">
     <details id="tocd" open>
@@ -985,17 +1037,9 @@ window.MathJax = {
 
 <script>
 (function () {
-  var root = document.documentElement, b = document.getElementById("theme-toggle"), t = b.querySelector(".t");
-  function cur() {
-    var a = root.getAttribute("data-theme");
-    if (a === "dark" || a === "light") return a;
-    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  }
-  function label() {
-    var c = cur();
-    t.textContent = c === "dark" ? "Light mode" : "Dark mode";
-    b.setAttribute("aria-label", "Switch to " + (c === "dark" ? "light" : "dark") + " mode");
-  }
+  var root = document.documentElement, b = document.getElementById("theme-toggle");
+  function cur() { return root.getAttribute("data-theme") === "light" ? "light" : "dark"; }
+  function label() { b.setAttribute("aria-label", "Switch to " + (cur() === "dark" ? "light" : "dark") + " mode"); }
   b.addEventListener("click", function () {
     var n = cur() === "dark" ? "light" : "dark";
     root.setAttribute("data-theme", n);
