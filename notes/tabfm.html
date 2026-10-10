@@ -231,7 +231,7 @@ footer .site-nav { display: block; margin-top: 10px; }
   </defs>
 </svg>
 
-<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">study notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
 <div class="page">
   <nav class="toc" aria-label="Contents">
     <details id="tocd" open>
@@ -252,7 +252,7 @@ footer .site-nav { display: block; margin-top: 10px; }
 
   <article>
     <header class="hero">
-      <div class="tag">Study notes · Tabular foundation models</div>
+      <div class="tag">Notes · Tabular foundation models</div>
       <h1>TabFM: in-context learning for tables</h1>
       <p class="dek">Google's tabular foundation model, from 30 June 2026: hand it your labelled rows and the rows to predict, and it answers in a forward pass, with no training on your data. What it is, how it works, where it beats gradient-boosted trees and where it doesn't.</p>
       <div class="meta">About 12 minutes · builds on the <a href="./transformers.html#tf">attention and transformer notes</a> ·
@@ -476,7 +476,7 @@ y_test = head(predictor(rows, mask)[N:])            <span class="cm"># 24 layers
       <h3>Pipeline</h3>
       <div class="mj">\[ \text{cells} \to \text{tokens} \to (\text{column attn} \to \text{row attn}) \times 2 \to \text{row vectors} \to \text{predictor (attend to labelled rows)} \to \hat y \]</div>
     </div>
-    <footer>Sources: Google Research blog, “Introducing TabFM” (30 Jun 2026); arXiv 2609.37959; github.com/google-research/tabfm; Hollmann et al., Nature 2025 (TabPFN v2); TabICL (ICML 2025).<span class="site-nav"><a href="./">More study notes</a> · <a href="../">Deepam Minda</a></span></footer>
+    <footer>Sources: Google Research blog, “Introducing TabFM” (30 Jun 2026); arXiv 2609.37959; github.com/google-research/tabfm; Hollmann et al., Nature 2025 (TabPFN v2); TabICL (ICML 2025).<span class="site-nav"><a href="./">More notes</a> · <a href="../">Deepam Minda</a></span></footer>
 
   </article>
 </div>

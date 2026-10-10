@@ -231,7 +231,7 @@ footer .site-nav { display: block; margin-top: 10px; }
   </defs>
 </svg>
 
-<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">study notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
 <div class="page">
   <nav class="toc" aria-label="Contents">
     <details id="tocd" open>
@@ -260,7 +260,7 @@ footer .site-nav { display: block; margin-top: 10px; }
 
   <article>
     <header class="hero">
-      <div class="tag">Study notes · Data</div>
+      <div class="tag">Notes · Data</div>
       <h1>Data preparation and feature engineering</h1>
       <p class="dek">What to do to a tabular dataset before a model sees it, and why each step exists: the first look, cleaning, honest splits, missing values, outliers, encoding categories, scaling, collinearity, building and selecting features, class imbalance, and telling overfitting from underfitting.</p>
       <div class="meta">About 45 minutes · mechanisms, trade-offs, pseudocode and 25 questions</div>
@@ -472,7 +472,12 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>A <strong>missing indicator</strong> is a 0/1 column that records whether the original value was blank, added next to the filled-in column. The model can then give blanks their own effect, and it knows which values are real and which were filled in.</p>
     <p><strong>In a linear model it frees the blank rows' prediction.</strong> Fill blanks with any constant \(c\), giving the filled column \(\tilde x\) (\(x\) where observed, \(c\) where blank), and add the indicator \(I\):</p>
     <div class="mj">\[ \begin{aligned} \hat y &amp;= \beta_0 + \beta\, \tilde x + \theta I \\ \text{observed rows:}\quad \hat y &amp;= \beta_0 + \beta x \\ \text{blank rows:}\quad \hat y &amp;= \beta_0 + \beta c + \theta \end{aligned} \]</div>
-    <p>In words: the blank rows get their own intercept through \(\theta\), so the slope \(\beta\) is pinned only by real \(x\) values, and without regularization the choice of \(c\) doesn't change the fit at all. Without the indicator, blank rows are forced onto the line at \(x = c\), and if blanks behave unlike a typical value, they drag \(\beta\) around.</p>
+    <p>In words:</p>
+    <ul>
+      <li><strong>Without the indicator,</strong> a blank row is treated as a real point at \(x = c\), so the one fitted line has to pass near it too. If blank rows have unusual targets, they pull the line. Real rows (1, 1), (2, 2), (3, 3) have slope 1; add two blank rows with \(y = 8\), filled at \(c = 0\), and the fitted slope becomes −1.8.</li>
+      <li><strong>With the indicator,</strong> a blank row's prediction \(\beta_0 + \beta c + \theta\) is one free number, and \(\theta\) sets it to the blank rows' own level (8 here). The line is then fitted to the real rows alone, so \(\beta\) stays exactly 1.</li>
+      <li><strong>So the choice of \(c\) doesn't matter:</strong> \(\theta\) absorbs it (\(\theta = 8 - c\) here). The exception is regularization: a far-off \(c\) such as −999 needs a huge \(\theta\), which the penalty shrinks, so fill with the median.</li>
+    </ul>
     <p><strong>Add one when:</strong></p>
     <ul>
       <li>the target rate differs between blank and non-blank rows, or MNAR is plausible;</li>
@@ -1366,7 +1371,7 @@ df.groupby(blank)["target"].mean()</code></pre>
       <p>Threshold first, weights second, resampling last, and only on training folds. Metrics: PR-AUC, precision and recall at the threshold, cost.</p>
     </div>
 
-    <footer><a href="./">More study notes</a> · <a href="../">Deepam Minda</a></footer>
+    <footer><a href="./">More notes</a> · <a href="../">Deepam Minda</a></footer>
   </article>
 </div>
 <a class="jump" href="#tldr">Contents ↑</a>

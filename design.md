@@ -58,7 +58,7 @@ Dark is the default; `html[data-theme="light"]` switches. Each page sets `data-t
 
 ## Components
 
-- **Header** (`components.css`): `> deepam` on the left; `blog`, `study notes` and the round sun/moon toggle on the right; a faint rule underneath. Same markup on every page (copy it from the comment in `components.css`).
+- **Header** (`components.css`): `> deepam` on the left; `blog`, `notes` and the round sun/moon toggle on the right; a faint rule underneath. Same markup on every page (copy it from the comment in `components.css`).
 - **Tag**: a green dot and a short lowercase mono label (`.tag`). It names a section: "learning", "writing". Amber by default; `.tag-muted` for status lines like "applied ML engineer".
 - **List row**: title at `--fs-row`, an optional one-line description in `--muted`, and the date in mono on the right. No borders or cards.
 - **Graph paper** (`.graph-paper`): faint 20px and 100px grid behind reading pages, i.e. note pages and blog posts. Never behind the home page or list pages.
@@ -75,7 +75,7 @@ Dark is the default; `html[data-theme="light"]` switches. Each page sets `data-t
 
 - **Home:** header; the muted tag ("applied ML engineer"); the name at `--fs-hero`; a short intro; links.
 - **List page** (blog, study notes): header; the tag as the page's only heading (it is the `h1`); the list right below it. No big title, because the nav and the tag already say where you are.
-- **Reading page** (blog post, note): header; graph paper; the tag ("writing", or "Study notes · topic"); title at `--fs-title`; date or reading meta in mono; then the body. Notes add the contents rail on wide screens.
+- **Reading page** (blog post, note): header; graph paper; the tag ("writing", or "Notes · topic"); title at `--fs-title`; date or reading meta in mono; then the body. Notes add the contents rail on wide screens.
 
 ## Don'ts
 

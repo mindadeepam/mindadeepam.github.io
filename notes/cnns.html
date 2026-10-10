@@ -231,7 +231,7 @@ footer .site-nav { display: block; margin-top: 10px; }
   </defs>
 </svg>
 
-<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">study notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
 <div class="page">
   <nav class="toc" aria-label="Contents">
     <details id="tocd" open>
@@ -260,7 +260,7 @@ footer .site-nav { display: block; margin-top: 10px; }
 
   <article>
     <header class="hero">
-      <div class="tag">Study notes · Neural networks</div>
+      <div class="tag">Notes · Neural networks</div>
       <h1>Convolutional neural networks</h1>
       <p class="dek">Why convolution suits images, what a conv layer costs, how libraries actually compute it (im2col, FFT, Winograd), how to get full resolution back after downsampling, the architectures from LeNet to ConvNeXt, and how CNNs compare with vision transformers.</p>
       <div class="meta">About 45 minutes · formulas, figures, pseudocode and 22 questions · pairs with Deep learning basics</div>
@@ -1238,7 +1238,7 @@ def pixel_shuffle(x, r):
       <p>CNN: locality and equivariance built in, less data, cost linear in pixels, multi-scale. ViT: global from layer 1, content-dependent mixing, more data, cost \(O(N^2 D)\) with \(N = HW/P^2\). Hybrids: conv stems, Swin, CoAtNet; ConvNeXt from the other side.</p>
     </div>
 
-    <footer>Sources: LeCun et al. 1998 (LeNet); Chellapilla et al. 2006 (unrolled convolution); Krizhevsky et al. 2012 (AlexNet); Lin et al. 2013 (Network in Network); Simonyan and Zisserman 2014 (VGG); Szegedy et al. 2015 and 2016 (Inception); He et al. 2016 (ResNet; pre-activation ResNets); Chetlur et al. 2014 (cuDNN); Mathieu et al. 2014 and Vasilache et al. 2015 (FFT convolutions); Lavin and Gray 2016 (Winograd); Long et al. 2015 (FCN); Ronneberger et al. 2015 (U-Net); Badrinarayanan et al. 2017 (SegNet); Chen et al. 2017 (DeepLab); Wang et al. 2018 (hybrid dilated convolution); Shi et al. 2016 (pixel shuffle); Odena et al. 2016 (checkerboard artifacts); Aitken et al. 2017 (ICNR); Luo et al. 2016 (effective receptive field); Yosinski et al. 2014 (transferability); Veit et al. 2016; Huang et al. 2017 (DenseNet); Howard et al. 2017 and Sandler et al. 2018 (MobileNet); Chollet 2017 (Xception); Xie et al. 2017 (ResNeXt); Wu and He 2018 (GroupNorm); Li et al. 2018 (loss landscapes); Zhang et al. 2019 (Fixup); Tan and Le 2019 (EfficientNet); Azulay and Weiss 2019; Zhang 2019 (anti-aliased CNNs); Cordonnier et al. 2020; Dosovitskiy et al. 2021 (ViT); Touvron et al. 2021 (DeiT); Liu et al. 2021 (Swin); Xiao et al. 2021 (early convolutions); Dai et al. 2021 (CoAtNet); Brock et al. 2021 (NF-Nets); Kumar et al. 2022 (LP-FT); Liu et al. 2022 (ConvNeXt); Ding et al. 2022 (RepLKNet).<span class="site-nav"><a href="./">More study notes</a> · <a href="../">Deepam Minda</a></span></footer>
+    <footer>Sources: LeCun et al. 1998 (LeNet); Chellapilla et al. 2006 (unrolled convolution); Krizhevsky et al. 2012 (AlexNet); Lin et al. 2013 (Network in Network); Simonyan and Zisserman 2014 (VGG); Szegedy et al. 2015 and 2016 (Inception); He et al. 2016 (ResNet; pre-activation ResNets); Chetlur et al. 2014 (cuDNN); Mathieu et al. 2014 and Vasilache et al. 2015 (FFT convolutions); Lavin and Gray 2016 (Winograd); Long et al. 2015 (FCN); Ronneberger et al. 2015 (U-Net); Badrinarayanan et al. 2017 (SegNet); Chen et al. 2017 (DeepLab); Wang et al. 2018 (hybrid dilated convolution); Shi et al. 2016 (pixel shuffle); Odena et al. 2016 (checkerboard artifacts); Aitken et al. 2017 (ICNR); Luo et al. 2016 (effective receptive field); Yosinski et al. 2014 (transferability); Veit et al. 2016; Huang et al. 2017 (DenseNet); Howard et al. 2017 and Sandler et al. 2018 (MobileNet); Chollet 2017 (Xception); Xie et al. 2017 (ResNeXt); Wu and He 2018 (GroupNorm); Li et al. 2018 (loss landscapes); Zhang et al. 2019 (Fixup); Tan and Le 2019 (EfficientNet); Azulay and Weiss 2019; Zhang 2019 (anti-aliased CNNs); Cordonnier et al. 2020; Dosovitskiy et al. 2021 (ViT); Touvron et al. 2021 (DeiT); Liu et al. 2021 (Swin); Xiao et al. 2021 (early convolutions); Dai et al. 2021 (CoAtNet); Brock et al. 2021 (NF-Nets); Kumar et al. 2022 (LP-FT); Liu et al. 2022 (ConvNeXt); Ding et al. 2022 (RepLKNet).<span class="site-nav"><a href="./">More notes</a> · <a href="../">Deepam Minda</a></span></footer>
 
   </article>
 </div>
