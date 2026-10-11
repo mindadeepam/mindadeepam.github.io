@@ -20,8 +20,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="../assets/design/tokens.css?v=1" />
-    <link rel="stylesheet" href="../assets/design/components.css?v=1" />
+    <link rel="stylesheet" href="../assets/design/tokens.css?v=2" />
+    <link rel="stylesheet" href="../assets/design/components.css?v=2" />
     <link rel="stylesheet" href="../styles.css?v=26" />
   </head>
   <body>
@@ -30,6 +30,7 @@
       <nav aria-label="Primary navigation">
         <a href="../blog/">blog</a>
         <a href="./" aria-current="page">notes</a>
+        <button class="nav-search" type="button" data-search title="Search notes">search<kbd></kbd></button>
         <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to light mode" title="Switch color mode">
           <span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span>
           <span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span>
@@ -48,7 +49,7 @@
         <!-- notes:start -->
         <a class="post-row note-row" href="./data-preparation.html">
           <span>Data preparation and feature engineering</span>
-          <time datetime="2026-10-10">10 Oct 2026</time>
+          <time datetime="2026-10-12">12 Oct 2026</time>
         </a>
         <a class="post-row note-row" href="./decision-trees.html">
           <span>Decision trees</span>
@@ -106,5 +107,6 @@
       <p>© Deepam Minda</p>
     </footer>
     <script src="../script.js?v=17"></script>
+      <script src="palette.js?v=bd7ca56118" defer></script>
   </body>
 </html>

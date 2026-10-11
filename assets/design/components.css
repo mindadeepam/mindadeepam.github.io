@@ -6,7 +6,8 @@
    <header class="site-header">
      <a class="mark" href="/">deepam</a>
      <nav aria-label="Primary navigation">
-       <a href="/blog/">blog</a> <a href="/notes/">study notes</a>
+       <a href="/blog/">blog</a> <a href="/notes/">notes</a>
+       <button class="nav-search" type="button" data-search title="Search notes">search<kbd></kbd></button>
        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to light mode" title="Switch color mode">
          <span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span>
          <span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span>
@@ -66,6 +67,31 @@
   transform: translateY(-1px);
 }
 
+/* Search: opens the ⌘K palette (notes/palette.js, which also fills in the shortcut). Looks like a nav link. */
+.nav-search {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.nav-search:hover {
+  color: var(--amber);
+  transform: translateY(-1px);
+}
+
+.nav-search kbd {
+  margin-left: 6px;
+  font: inherit;
+  opacity: 0.6;
+}
+
 .theme-toggle {
   width: 32px;
   height: 32px;
@@ -120,6 +146,10 @@ html[data-theme="light"] .theme-icon-moon {
     gap: 16px;
     font-size: 14px;
   }
+
+  .nav-search kbd {
+    display: none;
+  }
 }
 
 /* The tag: a green dot and a short mono label. It names a section ("learning", "writing")
@@ -172,6 +202,7 @@ html[data-theme="light"] .theme-icon-moon {
   }
 
   .theme-toggle:hover,
+  .nav-search:hover,
   .site-header nav a:hover {
     transform: none;
   }

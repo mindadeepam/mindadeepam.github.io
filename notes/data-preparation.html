@@ -18,8 +18,8 @@
   document.documentElement.setAttribute("data-theme", t);
 })();
 </script>
-<link rel="stylesheet" href="../assets/design/tokens.css?v=1">
-<link rel="stylesheet" href="../assets/design/components.css?v=1">
+<link rel="stylesheet" href="../assets/design/tokens.css?v=2">
+<link rel="stylesheet" href="../assets/design/components.css?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
@@ -193,6 +193,67 @@ pre.code code { font: inherit; background: none; border: 0; padding: 0; }
 pre.code .cm { color: var(--ink-3); }
 @media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
 
+/* deep dive: a detail kept out of the reading flow. Without JS (or with ?dive=inline) it is a plain
+   collapsible; with JS the summary opens the content in a side panel (full screen on phones). */
+details.dive { margin: 14px 0 20px; }
+details.dive > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px; padding: 4px 0; }
+details.dive > summary::-webkit-details-marker { display: none; }
+.dive-tag { font: 500 12px/1.6 var(--mono); color: var(--accent, var(--link)); flex: none; }
+.dive-tag::before { content: "+ "; }
+details.dive[open] > summary .dive-tag::before { content: "– "; }
+.dive-title { font-weight: 500; color: var(--ink); }
+details.dive > summary:hover .dive-title { text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; }
+.dive-body { border-left: 2px solid var(--rule); padding: 2px 0 2px 18px; margin: 8px 0 4px 2px; }
+.dive-panel-mode details.dive > summary .dive-tag::before { content: ""; }
+.dive-panel-mode details.dive > summary .dive-title::after { content: " \2192"; color: var(--accent, var(--link)); }
+.dive-scrim { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, .45); opacity: 0; transition: opacity .2s ease; }
+.dive-scrim.open { opacity: 1; }
+.dive-sheet { position: fixed; top: 0; right: 0; bottom: 0; z-index: 91; width: min(680px, 100vw); overflow-y: auto; overscroll-behavior: contain;
+  background: var(--paper); border-left: 1px solid var(--rule); padding: 0 30px 56px; transform: translateX(100%); transition: transform .22s ease; }
+.dive-sheet.open { transform: none; }
+.dive-sheet .dive-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  background: var(--paper); padding: 20px 0 12px; margin-bottom: 14px; border-bottom: 1px solid var(--rule); }
+.dive-sheet .dive-head .dive-tag::before { content: ""; }
+.dive-sheet .dive-head h2 { margin: 2px 0 0; font-size: 18px; line-height: 1.35; font-weight: 600; }
+.dive-sheet .dive-close { flex: none; background: none; border: 0; padding: 4px 2px; cursor: pointer; color: var(--ink-3); font: 500 12px/1.6 var(--mono); }
+.dive-sheet .dive-close:hover { color: var(--ink); }
+.dive-sheet .dive-body { border-left: 0; padding: 0; margin: 0; }
+body.dive-lock { overflow: hidden; }
+@media (max-width: 720px) { .dive-sheet { width: 100vw; border-left: 0; padding: 0 18px 44px; } }
+@media (prefers-reduced-motion: reduce) { .dive-sheet, .dive-scrim { transition: none; } }
+
+/* reader notes (site_js/reader-notes.js): highlights, the note popover and the list; saved per browser */
+mark.nh { color: inherit; background: color-mix(in srgb, var(--accent, var(--link)) 18%, transparent); border-bottom: 1px solid var(--accent, var(--link)); border-radius: 2px; cursor: pointer; }
+mark.nh:focus-visible { outline: 2px solid var(--accent, var(--link)); outline-offset: 1px; }
+.nh-ask { position: absolute; z-index: 95; padding: 5px 11px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface); color: var(--accent, var(--link)); font: 500 12px/1.4 var(--mono); cursor: pointer; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+.nh-pop { position: absolute; z-index: 95; width: min(360px, calc(100vw - 24px)); padding: 12px 14px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); box-shadow: 0 10px 30px rgba(0, 0, 0, .25); }
+.nh-pop .nh-quote { margin: 0 0 8px; padding-left: 10px; border-left: 2px solid var(--accent, var(--link)); color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+.nh-pop textarea { box-sizing: border-box; width: 100%; min-height: 70px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--sans); resize: vertical; }
+.nh-pop textarea:focus { outline: 2px solid var(--accent, var(--link)); outline-offset: 0; }
+.nh-row { display: flex; gap: 14px; margin-top: 8px; }
+.nh-btn { padding: 2px 0; border: 0; background: none; cursor: pointer; color: var(--ink-3); font: 500 12px/1.6 var(--mono); }
+.nh-btn:hover { color: var(--ink); }
+.nh-save, .nh-go { color: var(--accent, var(--link)); }
+.nh-meta { margin: 0 0 4px; color: var(--ink-3); font: 500 12px/1.5 var(--mono); }
+.nh-text { margin: 0; color: var(--ink); font-size: 15px; line-height: 1.55; }
+.nh-sheet .nh-head-btns { display: flex; gap: 16px; flex: none; }
+.nh-sheet .nh-copy { color: var(--accent, var(--link)); }
+.nh-item { padding: 14px 0 16px; border-bottom: 1px solid var(--rule); }
+.nh-item blockquote { margin: 6px 0 8px; padding-left: 12px; border-left: 2px solid var(--accent, var(--link)); color: var(--ink-2); font-size: 15px; line-height: 1.55; }
+.nh-empty { color: var(--ink-2); }
+.nh-toc .n { color: var(--accent, var(--link)); }
+mjx-container.nh-eq { background: color-mix(in srgb, var(--accent, var(--link)) 14%, transparent); border-bottom: 1px solid var(--accent, var(--link)); border-radius: 3px; cursor: pointer; }
+mjx-container.nh-pick { outline: 1px dashed var(--accent, var(--link)); outline-offset: 3px; border-radius: 3px; }
+article mjx-container { cursor: pointer; }
+.nh-quote mjx-container.nh-eqcopy, .nh-item mjx-container.nh-eqcopy { cursor: default; font-size: 92%; margin: 2px 0 !important; overflow-x: auto; max-width: 100%; }
+.nh-hint { margin: -6px 0 4px; color: var(--ink-3); font-size: 13.5px; }
+.nav-search kbd { font: inherit; opacity: .6; margin-left: 6px; }
+.nh-editbox { margin-top: 6px; }
+.nh-editbox textarea { box-sizing: border-box; width: 100%; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--sans); resize: vertical; }
+.nh-editbox textarea:focus { outline: 2px solid var(--accent, var(--link)); outline-offset: 0; }
+.nh-sheet .nh-clear:hover { color: var(--grad, #c75a1a); }
+.nh-item [hidden], .nh-pop [hidden] { display: none !important; }
+
 /* public copy: colours, fonts and sizes come from the site's tokens.css; this maps the notebook's
    token names onto them (green_theme.css's own token block is left out of public pages). */
 :root {
@@ -231,7 +292,7 @@ footer .site-nav { display: block; margin-top: 10px; }
   </defs>
 </svg>
 
-<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">notes</a><button class="nav-search" type="button" data-search title="Search notes">search<kbd></kbd></button><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
 <div class="page">
   <nav class="toc" aria-label="Contents">
     <details id="tocd" open>
@@ -677,6 +738,45 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li><strong>High cardinality hurts.</strong> Thousands of sparse columns; rare levels get noisy coefficients; memory grows. A tree can only peel off one level per split, so a high-cardinality feature's signal is spread thin across many weak columns and needs many splits to use.</li>
       <li><strong>Best for:</strong> a handful to a few dozen levels, in linear models and neural nets.</li>
     </ul>
+    <details class="dive" id="dive-onehot">
+      <summary><span class="dive-tag">deep dive</span><span class="dive-title">Dropping a level, and why regularized models don't need to</span></summary>
+      <div class="dive-body">
+        <p><strong>The trap, in numbers.</strong> Say a city's effect on salary is Delhi 30, Mumbai 40, Bangalore 50. With an intercept and all three one-hot columns, the model is \(\hat y = \beta_0 + \beta_D D + \beta_M M + \beta_B B\), and many coefficient sets give exactly these predictions:</p>
+        <div class="tbl"><table>
+          <thead><tr><th>\(\beta_0\)</th><th>Delhi</th><th>Mumbai</th><th>Bangalore</th><th>Penalty \(\sum \beta_j^2\)</th></tr></thead>
+          <tbody>
+            <tr><td>10</td><td>20</td><td>30</td><td>40</td><td>2,900</td></tr>
+            <tr><td>40</td><td>−10</td><td>0</td><td>10</td><td>200</td></tr>
+            <tr><td>50</td><td>−20</td><td>−10</td><td>0</td><td>500</td></tr>
+          </tbody>
+        </table></div>
+        <p>Add any number to \(\beta_0\) and subtract it from every level's coefficient, and the predictions don't change. So an unregularized fit has infinitely many equally good answers (\(X^\top X\) can't be inverted). Dropping one level removes that freedom. The last row is what “drop Bangalore” gives: Bangalore's coefficient is forced to 0, so the intercept is Bangalore's level and every coefficient reads as “difference from Bangalore”.</p>
+        <p><strong>Ridge removes the freedom by itself.</strong> Its penalty \(\lambda \sum_j \beta_j^2\) (the intercept isn't penalized) differs between the rows, so among all the equally good fits it takes the one with the smallest penalty: the middle row, where the level coefficients sum to zero. The intercept becomes a centre and each level a deviation from it. The answer is unique without dropping anything.</p>
+        <p><strong>Under Ridge, dropping a level is worse, not just unnecessary.</strong> The penalty pulls every penalized coefficient towards 0. With all levels kept, they're pulled towards a shared centre, and every level is treated the same way. Drop one, and that level has no coefficient to shrink while the others are pulled relative to it, so the fit depends on which level you happened to drop. Same data (Delhi seen only twice, the other two cities ten times each), same \(\lambda = 1\):</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Encoding</th><th>Delhi's prediction (true effect 30)</th></tr></thead>
+          <tbody>
+            <tr><td>All three kept</td><td>33.7</td></tr>
+            <tr><td>Drop Bangalore</td><td>36.0</td></tr>
+            <tr><td>Drop Delhi</td><td>37.1</td></tr>
+            <tr><td>Drop Mumbai</td><td>33.4</td></tr>
+          </tbody>
+        </table></div>
+        <p>None of these is “the” right answer. The point is that keeping every level gives one answer that doesn't hinge on an arbitrary choice.</p>
+        <p><strong>Other penalties.</strong> Elastic net has an L2 part, so the same argument holds: keep all levels. Lasso (L1 alone) doesn't always settle on a unique answer when columns are perfectly collinear, but it still runs, and keeping all levels is common since it zeroes some out anyway.</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Model</th><th>Drop one level?</th></tr></thead>
+          <tbody>
+            <tr><td>Unregularized linear or logistic regression, when you'll read the coefficients</td><td>Yes</td></tr>
+            <tr><td>Ridge, elastic net, sklearn's <code>LogisticRegression</code> (L2 by default)</td><td>No: keep all</td></tr>
+            <tr><td>Lasso</td><td>Optional</td></tr>
+            <tr><td>Trees, boosting, neural nets</td><td>No need (harmless either way)</td></tr>
+          </tbody>
+        </table></div>
+        <p>sklearn's plain <code>LinearRegression</code> doesn't fail with all levels kept: its solver returns the smallest-coefficient answer (here 40 with −10, 0 and +10). The predictions are fine, but the coefficients are one arbitrary choice among many, so don't interpret them.</p>
+        <p><strong>Say it in an interview:</strong> “Dropping a level fixes an identifiability problem: with an intercept, the \(K\) dummies are perfectly collinear. A ridge penalty already makes the solution unique, and keeping all \(K\) means the shrinkage treats every level symmetrically, instead of depending on which level I dropped.”</p>
+      </div>
+    </details>
 
     <h3 id="ordinal">Ordinal (label) encoding</h3>
     <p>One integer per level.</p>
@@ -1422,5 +1522,79 @@ window.MathJax = {
   label();
 })();
 </script>
+
+<script>
+/* deep dives: open a <details class="dive"> in a side panel instead of inline. ?dive=inline keeps them inline. */
+(function () {
+  var dives = document.querySelectorAll("details.dive");
+  if (!dives.length || /[?&]dive=inline\b/.test(location.search)) return;
+  document.documentElement.classList.add("dive-panel-mode");
+  var scrim = document.createElement("div");
+  scrim.className = "dive-scrim";
+  scrim.hidden = true;
+  var sheet = document.createElement("aside");
+  sheet.className = "dive-sheet";
+  sheet.hidden = true;
+  sheet.setAttribute("role", "dialog");
+  sheet.setAttribute("aria-modal", "true");
+  sheet.setAttribute("aria-labelledby", "dive-sheet-title");
+  sheet.innerHTML = '<div class="dive-head"><div><div class="dive-tag">deep dive</div><h2 id="dive-sheet-title"></h2></div>'
+    + '<button type="button" class="dive-close" aria-label="Close the deep dive">close \u2715</button></div><div class="dive-slot"></div>';
+  document.body.appendChild(scrim);
+  document.body.appendChild(sheet);
+  var slot = sheet.querySelector(".dive-slot"), title = sheet.querySelector("h2"), closeBtn = sheet.querySelector(".dive-close");
+  var current = null;
+  function open(d, focus) {
+    if (current) return;
+    current = d;
+    var s = d.querySelector("summary");
+    title.textContent = d.querySelector(".dive-title").textContent;
+    slot.appendChild(d.querySelector(".dive-body"));   /* move, so typeset maths comes along */
+    scrim.hidden = false; sheet.hidden = false; sheet.scrollTop = 0;
+    requestAnimationFrame(function () { scrim.classList.add("open"); sheet.classList.add("open"); });
+    document.body.classList.add("dive-lock");
+    s.setAttribute("aria-expanded", "true");
+    if (focus !== false) closeBtn.focus();
+    if (history.replaceState) history.replaceState(null, "", "#" + d.id);
+  }
+  function close() {
+    if (!current) return;
+    var d = current, s = d.querySelector("summary"), body = slot.firstElementChild;
+    current = null;
+    scrim.classList.remove("open"); sheet.classList.remove("open");
+    document.body.classList.remove("dive-lock");
+    s.setAttribute("aria-expanded", "false");
+    s.focus();
+    if (history.replaceState) history.replaceState(null, "", location.pathname + location.search);
+    setTimeout(function () { if (body) d.appendChild(body); scrim.hidden = true; sheet.hidden = true; }, 230);
+  }
+  Array.prototype.forEach.call(dives, function (d) {
+    var s = d.querySelector("summary");
+    s.setAttribute("aria-haspopup", "dialog");
+    s.setAttribute("aria-expanded", "false");
+    s.addEventListener("click", function (e) { e.preventDefault(); open(d); });
+  });
+  closeBtn.addEventListener("click", close);
+  scrim.addEventListener("click", close);
+  document.addEventListener("keydown", function (e) {
+    if (!current) return;
+    if (e.key === "Escape") { e.preventDefault(); close(); return; }
+    if (e.key !== "Tab") return;
+    var f = sheet.querySelectorAll('a[href], button, summary, [tabindex]:not([tabindex="-1"])');
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  function fromHash(focus) {
+    var h = location.hash && document.getElementById(location.hash.slice(1));
+    if (h && h.classList.contains("dive")) open(h, focus);
+  }
+  window.addEventListener("hashchange", function () { fromHash(true); });
+  fromHash(false);
+})();
+</script>
+<script src="palette.js?v=bd7ca56118" defer></script>
+<script src="reader-notes.js?v=cb3d5028bd" defer></script>
 </body>
 </html>

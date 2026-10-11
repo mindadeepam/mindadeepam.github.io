@@ -58,7 +58,10 @@ Dark is the default; `html[data-theme="light"]` switches. Each page sets `data-t
 
 ## Components
 
-- **Header** (`components.css`): `> deepam` on the left; `blog`, `notes` and the round sun/moon toggle on the right; a faint rule underneath. Same markup on every page (copy it from the comment in `components.css`).
+- **Header** (`components.css`): `> deepam` on the left; `blog`, `notes`, `search ⌘K` and the round sun/moon toggle on the right; a faint rule underneath. Same markup on every page (copy it from the comment in `components.css`).
+- **Search and shortcuts** (`notes/palette.js`, loaded by every page): ⌘K (Ctrl+K) or the header's `search` opens a palette over all notes: titles, sections and text, from `notes/search.json`. Enter opens here, ⌘Enter in a new tab, Esc closes. T switches the theme when you're not typing.
+- **Deep dive** (notes): a detail kept out of the reading flow. One quiet line in the text (`deep dive` + title + →) opens it in a side panel, full screen on phones.
+- **Reader notes** (`notes/reader-notes.js`): select text or tap an equation, then `note`. Notes are highlights saved in the reader's own browser only, listed under "Your notes" at the end of the contents, with copy all, edit and delete. Nothing is sent anywhere.
 - **Tag**: a green dot and a short lowercase mono label (`.tag`). It names a section: "learning", "writing". Amber by default; `.tag-muted` for status lines like "applied ML engineer".
 - **List row**: title at `--fs-row`, an optional one-line description in `--muted`, and the date in mono on the right. No borders or cards.
 - **Graph paper** (`.graph-paper`): faint 20px and 100px grid behind reading pages, i.e. note pages and blog posts. Never behind the home page or list pages.

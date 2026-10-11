@@ -18,8 +18,8 @@
   document.documentElement.setAttribute("data-theme", t);
 })();
 </script>
-<link rel="stylesheet" href="../assets/design/tokens.css?v=1">
-<link rel="stylesheet" href="../assets/design/components.css?v=1">
+<link rel="stylesheet" href="../assets/design/tokens.css?v=2">
+<link rel="stylesheet" href="../assets/design/components.css?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
@@ -193,6 +193,67 @@ pre.code code { font: inherit; background: none; border: 0; padding: 0; }
 pre.code .cm { color: var(--ink-3); }
 @media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
 
+/* deep dive: a detail kept out of the reading flow. Without JS (or with ?dive=inline) it is a plain
+   collapsible; with JS the summary opens the content in a side panel (full screen on phones). */
+details.dive { margin: 14px 0 20px; }
+details.dive > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px; padding: 4px 0; }
+details.dive > summary::-webkit-details-marker { display: none; }
+.dive-tag { font: 500 12px/1.6 var(--mono); color: var(--accent, var(--link)); flex: none; }
+.dive-tag::before { content: "+ "; }
+details.dive[open] > summary .dive-tag::before { content: "– "; }
+.dive-title { font-weight: 500; color: var(--ink); }
+details.dive > summary:hover .dive-title { text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; }
+.dive-body { border-left: 2px solid var(--rule); padding: 2px 0 2px 18px; margin: 8px 0 4px 2px; }
+.dive-panel-mode details.dive > summary .dive-tag::before { content: ""; }
+.dive-panel-mode details.dive > summary .dive-title::after { content: " \2192"; color: var(--accent, var(--link)); }
+.dive-scrim { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, .45); opacity: 0; transition: opacity .2s ease; }
+.dive-scrim.open { opacity: 1; }
+.dive-sheet { position: fixed; top: 0; right: 0; bottom: 0; z-index: 91; width: min(680px, 100vw); overflow-y: auto; overscroll-behavior: contain;
+  background: var(--paper); border-left: 1px solid var(--rule); padding: 0 30px 56px; transform: translateX(100%); transition: transform .22s ease; }
+.dive-sheet.open { transform: none; }
+.dive-sheet .dive-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  background: var(--paper); padding: 20px 0 12px; margin-bottom: 14px; border-bottom: 1px solid var(--rule); }
+.dive-sheet .dive-head .dive-tag::before { content: ""; }
+.dive-sheet .dive-head h2 { margin: 2px 0 0; font-size: 18px; line-height: 1.35; font-weight: 600; }
+.dive-sheet .dive-close { flex: none; background: none; border: 0; padding: 4px 2px; cursor: pointer; color: var(--ink-3); font: 500 12px/1.6 var(--mono); }
+.dive-sheet .dive-close:hover { color: var(--ink); }
+.dive-sheet .dive-body { border-left: 0; padding: 0; margin: 0; }
+body.dive-lock { overflow: hidden; }
+@media (max-width: 720px) { .dive-sheet { width: 100vw; border-left: 0; padding: 0 18px 44px; } }
+@media (prefers-reduced-motion: reduce) { .dive-sheet, .dive-scrim { transition: none; } }
+
+/* reader notes (site_js/reader-notes.js): highlights, the note popover and the list; saved per browser */
+mark.nh { color: inherit; background: color-mix(in srgb, var(--accent, var(--link)) 18%, transparent); border-bottom: 1px solid var(--accent, var(--link)); border-radius: 2px; cursor: pointer; }
+mark.nh:focus-visible { outline: 2px solid var(--accent, var(--link)); outline-offset: 1px; }
+.nh-ask { position: absolute; z-index: 95; padding: 5px 11px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface); color: var(--accent, var(--link)); font: 500 12px/1.4 var(--mono); cursor: pointer; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+.nh-pop { position: absolute; z-index: 95; width: min(360px, calc(100vw - 24px)); padding: 12px 14px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); box-shadow: 0 10px 30px rgba(0, 0, 0, .25); }
+.nh-pop .nh-quote { margin: 0 0 8px; padding-left: 10px; border-left: 2px solid var(--accent, var(--link)); color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+.nh-pop textarea { box-sizing: border-box; width: 100%; min-height: 70px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--sans); resize: vertical; }
+.nh-pop textarea:focus { outline: 2px solid var(--accent, var(--link)); outline-offset: 0; }
+.nh-row { display: flex; gap: 14px; margin-top: 8px; }
+.nh-btn { padding: 2px 0; border: 0; background: none; cursor: pointer; color: var(--ink-3); font: 500 12px/1.6 var(--mono); }
+.nh-btn:hover { color: var(--ink); }
+.nh-save, .nh-go { color: var(--accent, var(--link)); }
+.nh-meta { margin: 0 0 4px; color: var(--ink-3); font: 500 12px/1.5 var(--mono); }
+.nh-text { margin: 0; color: var(--ink); font-size: 15px; line-height: 1.55; }
+.nh-sheet .nh-head-btns { display: flex; gap: 16px; flex: none; }
+.nh-sheet .nh-copy { color: var(--accent, var(--link)); }
+.nh-item { padding: 14px 0 16px; border-bottom: 1px solid var(--rule); }
+.nh-item blockquote { margin: 6px 0 8px; padding-left: 12px; border-left: 2px solid var(--accent, var(--link)); color: var(--ink-2); font-size: 15px; line-height: 1.55; }
+.nh-empty { color: var(--ink-2); }
+.nh-toc .n { color: var(--accent, var(--link)); }
+mjx-container.nh-eq { background: color-mix(in srgb, var(--accent, var(--link)) 14%, transparent); border-bottom: 1px solid var(--accent, var(--link)); border-radius: 3px; cursor: pointer; }
+mjx-container.nh-pick { outline: 1px dashed var(--accent, var(--link)); outline-offset: 3px; border-radius: 3px; }
+article mjx-container { cursor: pointer; }
+.nh-quote mjx-container.nh-eqcopy, .nh-item mjx-container.nh-eqcopy { cursor: default; font-size: 92%; margin: 2px 0 !important; overflow-x: auto; max-width: 100%; }
+.nh-hint { margin: -6px 0 4px; color: var(--ink-3); font-size: 13.5px; }
+.nav-search kbd { font: inherit; opacity: .6; margin-left: 6px; }
+.nh-editbox { margin-top: 6px; }
+.nh-editbox textarea { box-sizing: border-box; width: 100%; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--sans); resize: vertical; }
+.nh-editbox textarea:focus { outline: 2px solid var(--accent, var(--link)); outline-offset: 0; }
+.nh-sheet .nh-clear:hover { color: var(--grad, #c75a1a); }
+.nh-item [hidden], .nh-pop [hidden] { display: none !important; }
+
 /* public copy: colours, fonts and sizes come from the site's tokens.css; this maps the notebook's
    token names onto them (green_theme.css's own token block is left out of public pages). */
 :root {
@@ -231,7 +292,7 @@ footer .site-nav { display: block; margin-top: 10px; }
   </defs>
 </svg>
 
-<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">notes</a><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">notes</a><button class="nav-search" type="button" data-search title="Search notes">search<kbd></kbd></button><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
 <div class="page">
   <nav class="toc" aria-label="Contents">
     <details id="tocd" open>
@@ -1613,5 +1674,7 @@ window.MathJax = {
   label();
 })();
 </script>
+<script src="palette.js?v=bd7ca56118" defer></script>
+<script src="reader-notes.js?v=cb3d5028bd" defer></script>
 </body>
 </html>

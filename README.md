@@ -15,6 +15,9 @@ blog/post.html             Blog post shell
 posts/                     Markdown sources and post index
 notes/index.html           Study notes index (rows between notes:start/end markers)
 notes/*.html               Study notes, prebuilt standalone pages
+notes/palette.js           ⌘K search and the T theme shortcut, loaded by every page (generated)
+notes/reader-notes.js      Reader notes: highlights saved in the reader's browser (generated)
+notes/search.json          Search index of every note (generated)
 resume/build_resume.py     Generates the resume PDF
 output/pdf/                Generated resume linked from the home page
 api/github-activity.js     Optional Vercel serverless endpoint
@@ -109,6 +112,7 @@ Study notes are long-form standalone HTML pages in [`notes/`](./notes), each wit
 - To add a hand-written note, put the full HTML page in `notes/` and add a row between the markers, newest first, copying an existing row's markup.
 - Preview `/notes/` and the note itself, including MathJax rendering and phone width.
 - Never commit private notes, interview prep, or links to private repositories.
+- `palette.js`, `reader-notes.js` and `search.json` come from the same build; don't edit them here. The build also keeps the `palette.js?v=` version in the hand-written pages current.
 
 ## Resume PDF
 
