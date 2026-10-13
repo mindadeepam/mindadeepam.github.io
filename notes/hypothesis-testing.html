@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#070707">
 <title>Hypothesis testing, A/B tests and power · Deepam Minda</title>
-<meta name="description" content="How a test decides, power and sample size, which test when, heavy tails, A/B testing end to end, peeking and multiple comparisons, Bayesian A/B, and what to do when you can&#x27;t randomize.">
+<meta name="description" content="Standard errors, z-scores and confidence intervals from scratch, then how a test decides, power and sample size, which test when, heavy tails, A/B testing end to end, peeking and multiple comparisons, Bayesian A/B, and what to do when you can&#x27;t randomize.">
 <meta property="og:title" content="Hypothesis testing, A/B tests and power">
-<meta property="og:description" content="How a test decides, power and sample size, which test when, heavy tails, A/B testing end to end, peeking and multiple comparisons, Bayesian A/B, and what to do when you can&#x27;t randomize.">
+<meta property="og:description" content="Standard errors, z-scores and confidence intervals from scratch, then how a test decides, power and sample size, which test when, heavy tails, A/B testing end to end, peeking and multiple comparisons, Bayesian A/B, and what to do when you can&#x27;t randomize.">
 <meta property="og:type" content="article">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
 <script>
@@ -300,18 +300,19 @@ footer .site-nav { display: block; margin-top: 10px; }
       <div class="label">Contents</div>
       <ol>
         <li><a href="#tldr"><span class="n">00</span>In short</a></li>
-        <li><a href="#logic"><span class="n">01</span>The logic of a test</a></li>
-        <li><a href="#power"><span class="n">02</span>Errors, power and sample size</a></li>
-        <li><a href="#tests"><span class="n">03</span>Which test when</a></li>
-        <li><a href="#clt"><span class="n">04</span>The CLT and heavy tails</a></li>
-        <li><a href="#hand"><span class="n">05</span>Quick tests by hand</a></li>
-        <li><a href="#ab"><span class="n">06</span>A/B testing end to end</a></li>
-        <li><a href="#multi"><span class="n">07</span>Many looks and many metrics</a></li>
-        <li><a href="#bayes"><span class="n">08</span>Bayesian A/B testing</a></li>
-        <li><a href="#causal"><span class="n">09</span>When you can't A/B test</a></li>
-        <li><a href="#code"><span class="n">10</span>Pseudocode</a></li>
-        <li><a href="#questions"><span class="n">11</span>Interview questions</a></li>
-        <li><a href="#sheet"><span class="n">12</span>Cheat sheet</a></li>
+        <li><a href="#basics"><span class="n">01</span>The building blocks: spread, standard error and z-scores</a></li>
+        <li><a href="#logic"><span class="n">02</span>The logic of a test</a></li>
+        <li><a href="#power"><span class="n">03</span>Errors, power and sample size</a></li>
+        <li><a href="#tests"><span class="n">04</span>Which test when</a></li>
+        <li><a href="#clt"><span class="n">05</span>The CLT and heavy tails</a></li>
+        <li><a href="#hand"><span class="n">06</span>Quick tests by hand</a></li>
+        <li><a href="#ab"><span class="n">07</span>A/B testing end to end</a></li>
+        <li><a href="#multi"><span class="n">08</span>Many looks and many metrics</a></li>
+        <li><a href="#bayes"><span class="n">09</span>Bayesian A/B testing</a></li>
+        <li><a href="#causal"><span class="n">10</span>When you can't A/B test</a></li>
+        <li><a href="#code"><span class="n">11</span>Pseudocode</a></li>
+        <li><a href="#questions"><span class="n">12</span>Interview questions</a></li>
+        <li><a href="#sheet"><span class="n">13</span>Cheat sheet</a></li>
       </ol>
     </details>
   </nav>
@@ -320,13 +321,14 @@ footer .site-nav { display: block; margin-top: 10px; }
     <header class="hero">
       <div class="tag">Notes · Statistics</div>
       <h1>Hypothesis testing, A/B tests and power</h1>
-      <p class="dek">How a test turns noisy data into a decision, and how that goes wrong: what a p-value is and isn't, power and sample size derived step by step, which test fits which data, skew and whales, quick tests by hand, A/B tests end to end (units, hashing, SRM, CUPED, interference), peeking and many metrics, the Bayesian version, and what to do when you can't randomize.</p>
-      <div class="meta">About 60 minutes, plus 32 questions · one running test: 10.0% vs 10.8% conversion, 10,000 users per arm · every number checked by simulation</div>
+      <p class="dek">How a test turns noisy data into a decision, and how that goes wrong: standard errors, z-scores and confidence intervals from scratch, what a p-value is and isn't, power and sample size derived step by step, which test fits which data, skew and whales, quick tests by hand, A/B tests end to end (units, hashing, SRM, CUPED, interference), peeking and many metrics, the Bayesian version, and what to do when you can't randomize.</p>
+      <div class="meta">About 75 minutes, plus 36 questions · one running test: 10.0% vs 10.8% conversion, 10,000 users per arm · every number checked by simulation</div>
     </header>
 
     <section class="tldr" id="tldr" aria-labelledby="tldr-h">
       <h2 id="tldr-h">In short</h2>
       <ol>
+        <li><strong>Everything rests on the standard error,</strong> the typical wobble of an estimate between reruns: \(\sigma/\sqrt n\) for a mean, and for a difference between independent groups the variances add. A z-score counts how many standard errors an estimate sits from what “no effect” predicts; when there is no effect, the central limit theorem makes it close to a standard normal, so ±1.96 marks the 5% line, and the estimate ± 1.96 SE is the 95% confidence interval.</li>
         <li><strong>A p-value is the chance of data at least this extreme if there were no effect.</strong> It is not the chance that there's no effect, and it says nothing about size. A test and a confidence interval are the same calculation: the 95% interval holds every effect the test wouldn't reject at 5%.</li>
         <li><strong>Power is the chance of catching an effect that is really there.</strong> For a two-sided 5% test with 80% power you need about \(16\sigma^2/\delta^2\) users per arm, so halving the smallest effect you care about quadruples the sample. Small tests that “win” overstate the effect, sometimes several times over.</li>
         <li><strong>Pick the test by the question and the unit, not by habit.</strong> Welch's t for means, the two-proportion z (the same as a 2×2 chi-square) for rates, Fisher or exact binomial for small counts. Mann–Whitney tests whether one group tends to be larger, not whether its mean is. Permutation tests and the bootstrap cover what has no formula.</li>
@@ -336,8 +338,157 @@ footer .site-nav { display: block; margin-top: 10px; }
       </ol>
     </section>
 
+    <!-- basics -->
+    <h2 id="basics"><span class="pn">01</span>The building blocks: spread, standard error and z-scores</h2>
+    <p>Every test in this note is built from four quantities: an average, the spread of the data around it, the <strong>standard error</strong> (how much an average wobbles from one sample to the next) and the <strong>z-score</strong> (how many standard errors an estimate sits from where “no effect” says it should be). This section builds each one from scratch on tiny numbers, and works through exactly the calculation that section <a href="#logic">02</a> runs on the running example. If these are familiar, skip ahead.</p>
+    <p><strong>Notation.</strong> Greek letters are the truth about the whole population, which you never see directly: the mean \(\mu\) (“mu”) and the standard deviation \(\sigma\) (“sigma”). Latin letters are what you compute from a sample: the mean \(\bar x\) (“x-bar”) and the standard deviation \(s\). A hat marks an estimate: \(\hat p\) is a conversion rate measured on a sample, an estimate of the true rate \(p\).</p>
+
+    <h3 id="spread">Mean, variance and standard deviation</h3>
+    <p><strong>The example.</strong> Five users' weekly spend, in rupees: 0, 0, 0, 0 and 500. Four spent nothing; one is a whale.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>User</th><th>Spend \(x\)</th><th>Distance from the mean, \(x - \bar x\)</th><th>Squared</th></tr></thead>
+      <tbody>
+        <tr><td>1 to 4 (each)</td><td>0</td><td>−100</td><td>10,000</td></tr>
+        <tr><td>5</td><td>500</td><td>+400</td><td>160,000</td></tr>
+        <tr><td><strong>Total of all five</strong></td><td>500</td><td>0</td><td>200,000</td></tr>
+      </tbody>
+    </table></div>
+    <div class="mj">\[ \begin{aligned} \bar x &amp;= \frac{1}{n}\sum_{i=1}^{n} x_i = \frac{500}{5} = 100 \\ s^2 &amp;= \frac{1}{n-1}\sum_{i=1}^{n} (x_i - \bar x)^2 = \frac{200{,}000}{4} = 50{,}000, \qquad s = 224 \\ \sigma^2 &amp;= \frac{1}{N}\sum_{i=1}^{N} (x_i - \mu)^2 = \frac{200{,}000}{5} = 40{,}000, \qquad \sigma = 200 \end{aligned} \]</div>
+    <p>In words: the mean shares the total out equally. The <strong>variance</strong> is the average squared distance from the mean. Squaring stops the minus and plus distances from cancelling (they always sum to zero, as the table's third column shows), and it makes far-out points count heavily: the whale supplies 160,000 of the 200,000. The <strong>standard deviation</strong> (SD) is the square root of the variance, which brings it back to rupees: a typical distance from the mean of about ₹200 (a root-mean-square distance: four users are 100 away and one is 400). The middle line treats the five users as a sample from some bigger population; the last line treats them as the whole population (of size \(N\)), which is how they're used from here on: \(\mu = 100\), \(\sigma = 200\).</p>
+    <ul>
+      <li><strong>Why \(n - 1\) for a sample.</strong> The distances are measured from the sample's own mean, which sits in the middle of the sample's points, closer to them than the true mean is. So the squared distances come out a little too small, and dividing by \(n - 1\) instead of \(n\) corrects for exactly that. Check: over all 125 equally likely samples of 3 drawn with replacement (each draw any of the five), dividing by \(n\) gives 26,667 on average, two-thirds of the true 40,000; dividing by \(n - 1 = 2\) gives exactly 40,000. At A/B-test sizes the two are indistinguishable.</li>
+      <li><strong>Degrees of freedom</strong> come from the same place: the \(n\) deviations from the sample mean always sum to zero, so once \(n - 1\) of them are known the last is fixed. Only \(n - 1\) are free, and that count is the degrees of freedom that t and chi-square tests quote.</li>
+      <li><strong>Notation used later.</strong> A capital \(X\) stands for a random quantity, such as the spend of a randomly picked user. \(\operatorname{Var}(X)\) is its variance, and \(\mathbb E[X]\) is its <strong>expected value</strong>: the average over the whole population, or over endless repeats. So \(\mu = \mathbb E[X]\) and \(\sigma^2 = \mathbb E\big[(X - \mu)^2\big]\).</li>
+    </ul>
+
+    <h3 id="sampling">The sampling distribution: an average is random too</h3>
+    <p>Treat the five users as the whole population. Pick two of them at random (each pick is any of the five, so the same user can come up twice) and average their spend. Which users you get is luck, so the average is luck too: it's a random number with a distribution of its own. All 5 × 5 = 25 pairs are equally likely, and only the whale matters:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Pair</th><th>Pairs out of 25</th><th>Average</th><th>Share</th></tr></thead>
+      <tbody>
+        <tr><td>No whale</td><td>16</td><td>0</td><td>64%</td></tr>
+        <tr><td>One whale</td><td>8</td><td>250</td><td>32%</td></tr>
+        <tr><td>Two whales</td><td>1</td><td>500</td><td>4%</td></tr>
+      </tbody>
+    </table></div>
+    <div class="mj">\[ \begin{aligned} \text{mean of the averages} &amp;= \frac{16 \times 0 + 8 \times 250 + 1 \times 500}{25} = 100 \\ \text{variance of the averages} &amp;= \frac{16 \times 100^2 + 8 \times 150^2 + 1 \times 400^2}{25} = 20{,}000 \\ \text{SD of the averages} &amp;= \sqrt{20{,}000} = 141 \end{aligned} \]</div>
+    <p>In words: this list of possible averages, with how often each comes up, is the <strong>sampling distribution</strong> of the average. It's centred on the true mean (100), so the average is right on average. And it's narrower than the users themselves, an SD of 141 against 200, because the whale now has to be picked twice to drag the average all the way to 500 (4% of the time instead of 20%).</p>
+    <p>A real experiment gives you one sample per arm: a single draw from this distribution. Every test asks how far that one draw could plausibly be from the truth, which needs the width of the sampling distribution without rerunning anything. That width is the standard error.</p>
+
+    <h3 id="se">The standard error</h3>
+    <p><strong>The standard error (SE) of an estimate is the standard deviation of its sampling distribution:</strong> how much the estimate would typically move if you redid the sample. For the average of two of the five users it's 141. It can be worked out without listing every sample:</p>
+    <ol>
+      <li><strong>One user</strong> has variance \(\sigma^2\) (40,000 here).</li>
+      <li><strong>The sum of \(n\) independent users has variance \(n\sigma^2\),</strong> because variances of independent things add (shown below). The 25 pair sums (0, 500 or 1,000) have variance 80,000, twice 40,000.</li>
+      <li><strong>The average is the sum divided by \(n\),</strong> and dividing a quantity by \(n\) divides its variance by \(n^2\): variance is in squared units, so halving every value quarters every squared distance. The average of two has variance 80,000/4 = 20,000, as counted above.</li>
+      <li><strong>Take the square root</strong> to get back to the data's units.</li>
+    </ol>
+    <div class="mj">\[ \begin{aligned} \operatorname{Var}(x_1 + \dots + x_n) &amp;= n\sigma^2 \\ \operatorname{Var}(\bar x) &amp;= \frac{n\sigma^2}{n^2} = \frac{\sigma^2}{n} \\ \text{SE}(\bar x) &amp;= \frac{\sigma}{\sqrt n} \end{aligned} \]</div>
+    <p>In words: an average of \(n\) users wobbles less than one user does, by a factor of \(\sqrt n\). For the five users (\(\sigma = 200\)) the SE is 141 at \(n = 2\), 63 at 10, 20 at 100 and 2 at 10,000. Four times the users halves the SE. In practice \(\sigma\) is unknown, and the sample's \(s\) is plugged in.</p>
+    <p><strong>Why variances add.</strong> Write each value as its mean plus a deviation: \(X = \mu_X + d_X\) and \(Y = \mu_Y + d_Y\). The sum's deviation is \(d_X + d_Y\), the difference's is \(d_X - d_Y\), and squaring them gives</p>
+    <div class="mj">\[ \begin{aligned} \operatorname{Var}(X + Y) &amp;= \mathbb E\big[(d_X + d_Y)^2\big] = \operatorname{Var}(X) + \operatorname{Var}(Y) + 2\operatorname{Cov}(X, Y) \\ \operatorname{Var}(X - Y) &amp;= \mathbb E\big[(d_X - d_Y)^2\big] = \operatorname{Var}(X) + \operatorname{Var}(Y) - 2\operatorname{Cov}(X, Y) \\ \operatorname{Cov}(X, Y) &amp;= \mathbb E[d_X\, d_Y] \end{aligned} \]</div>
+    <p>In words: the <strong>covariance</strong> is the average product of the two deviations. It's positive when the two tend to be high together and negative when one tends to be high while the other is low. For <em>independent</em> values, knowing \(d_X\) tells you nothing about \(d_Y\): whatever \(d_X\) is, the \(d_Y\) that comes with it still averages to zero, so the products average to zero too, and the variances simply add, for a sum and for a difference alike. Dividing the covariance by both standard deviations gives the <strong>correlation</strong>, \(\rho = \operatorname{Cov}(X, Y)/(\sigma_X \sigma_Y)\), which runs from −1 to 1; it comes back in paired tests and CUPED, where it is deliberately not zero.</p>
+    <p><strong>The running example.</strong> The rest of the note follows one test: a checkout change tried on 20,000 users split evenly. Control (A): 1,000 of 10,000 convert, 10.0%. Treatment (B): 1,080 of 10,000, 10.8%. Gaps between rates are in <strong>points</strong> (percentage points): 10.8% − 10.0% is 0.8 points, or 0.008 as a proportion.</p>
+    <p><strong>The SE of a conversion rate.</strong> A conversion rate is the average of a 0/1 column: 1 if the user converted, 0 if not. Take ten users, one of whom converted. The mean is 0.1; nine values sit 0.1 below it and one sits 0.9 above, so the variance (dividing by \(n\), treating the ten as the whole population) is \((9 \times 0.1^2 + 0.9^2)/10 = (0.09 + 0.81)/10 = 0.09\), which is \(0.1 \times 0.9\). In general a share \(p\) of the values sit \(1 - p\) above the mean and a share \(1 - p\) sit \(p\) below it, so the variance is \(p(1-p)^2 + (1-p)p^2 = p(1-p)\). Put that into \(\sigma/\sqrt n\):</p>
+    <div class="mj">\[ \begin{aligned} \text{SE}(\hat p) &amp;= \sqrt{\frac{p(1-p)}{n}} \\ \text{SE}_A &amp;= \sqrt{\frac{0.10 \times 0.90}{10{,}000}} = 0.0030 \\ \text{SE}_B &amp;= \sqrt{\frac{0.108 \times 0.892}{10{,}000}} = 0.0031 \end{aligned} \]</div>
+    <p>In words: the control rate of 10.0% would typically move by 0.30 points (0.0030) if the experiment were rerun, and the treatment's 10.8% by 0.31 points. The square root covers the whole fraction: \(p(1-p)/\sqrt n\) gives 0.0009, more than 3× too small.</p>
+    <p><strong>The SE of a difference between two independent groups.</strong> What a test cares about is the gap \(\hat p_B - \hat p_A\). The arms are independent, so the variance of the gap is the sum of the two variances:</p>
+    <div class="mj">\[ \begin{aligned} \text{SE}(\hat p_B - \hat p_A) &amp;= \sqrt{\text{SE}_A^2 + \text{SE}_B^2} = \sqrt{\frac{\hat p_A(1-\hat p_A)}{n_A} + \frac{\hat p_B(1-\hat p_B)}{n_B}} \\ &amp;= \sqrt{0.00000900 + 0.00000963} = 0.00432 \end{aligned} \]</div>
+    <p>In words: if control happens to come out high and treatment low, the gap is off by both errors at once. Subtracting one noisy number from another adds their noise; it doesn't cancel it. But add the variances, not the SEs: \(0.0030 + 0.0031 = 0.0061\) would assume the two errors always hit full size in opposite directions, which independent errors rarely do.</p>
+    <p><strong>The pooled SE, used under \(H_0\).</strong> A test asks how surprising the gap would be <em>if there were no difference</em> (the null hypothesis \(H_0\), section <a href="#pieces">02</a>). In that world both arms share one conversion rate, and the best estimate of it uses all 20,000 users: \(\hat p = 2{,}080/20{,}000 = 0.104\). Putting that single rate into both arms' variances gives the pooled SE, written \(\text{SE}_0\):</p>
+    <div class="mj">\[ \begin{aligned} \text{SE}_0 &amp;= \sqrt{\frac{\hat p(1-\hat p)}{n_A} + \frac{\hat p(1-\hat p)}{n_B}} = \sqrt{\hat p\,(1-\hat p)\Big(\frac{1}{n_A} + \frac{1}{n_B}\Big)} \\ &amp;= \sqrt{0.104 \times 0.896 \times 0.0002} = 0.00432 \end{aligned} \]</div>
+    <p>In words: this is the \(\text{SE}_0\) of section <a href="#logic">02</a>, the same “variances add” formula with the shared rate in place of each arm's own. Both versions round to 0.00432 here; they drift apart when the two rates do. The test uses the pooled one, computed in the world it assumes; the confidence interval (below) uses the unpooled one, which assumes nothing about the gap.</p>
+    <aside class="note trap"><p class="nl">Trap</p><p>Mixing up the standard deviation and the standard error. The SD describes how different <em>users</em> are from each other: ₹200 for the five users, 0.3 for a 10% conversion column. More users never shrink it. The SE describes how much the <em>average</em> would move between reruns, \(\sigma/\sqrt n\), and it shrinks with every user added. Tests and intervals for an average use the SE. Use the SD by mistake and a 95% interval (below) for a 10% rate on 10,000 users becomes ±59 points instead of ±0.59: \(\sqrt{10{,}000} = 100\) times too wide. Error bars on charts carry the same ambiguity, so check which one is drawn.</p></aside>
+
+    <h3 id="clt-basics">The central limit theorem</h3>
+    <p><strong>In plain words:</strong> the sampling distribution of an average gets closer and closer to a bell-shaped curve, the <strong>normal distribution</strong>, as the number of values in the average grows, whatever shape the data themselves have, as long as the values are independent draws from the same distribution and its variance is finite. The bell is centred on the true mean, and its width is the standard error:</p>
+    <div class="mj">\[ \bar x \approx \mathcal N\Big(\mu,\ \frac{\sigma^2}{n}\Big) \]</div>
+    <p>In words: \(\mathcal N(\text{centre}, \text{variance})\) is a bell curve, and \(X \sim \mathcal N(\mu, \sigma^2)\) reads “\(X\) is normal with mean \(\mu\) and variance \(\sigma^2\)”. For large \(n\), the average lands in a bell centred on \(\mu\) with standard deviation \(\sigma/\sqrt n\), the SE. The <strong>standard normal</strong>, \(\mathcal N(0, 1)\), is the bell with centre 0 and SD 1.</p>
+    <p><strong>By hand on the five users.</strong> The data could hardly be less bell-shaped: two spikes, 80% at ₹0 and 20% at ₹500. Counting every possible sample gives the exact distribution of the average for each \(n\):</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 660 222" role="img" aria-label="Three bar charts of where the average spend lands, for the five users. One user: 80 percent at 0 and 20 percent at 500. Average of 2 users: 64 percent at 0, 32 percent at 250, 4 percent at 500. Average of 10 users: a hump peaking at the true mean of 100 with 30 percent, falling away to the right. A dashed line marks the true mean, 100, in each panel. The SD of the average falls from 200 to 141 to 63.">
+          <text x="125" y="22" text-anchor="middle" style="fill:var(--ink)">one user</text>
+          <text class="lbl" x="125" y="40" text-anchor="middle">SD 200</text>
+          <path class="in" d="M28 196 H222"/>
+          <rect x="31.0" y="78.0" width="18" height="118.0" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <text x="40.0" y="72.0" text-anchor="middle" style="font-size:12px">80%</text>
+          <rect x="201.0" y="166.5" width="18" height="29.5" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <text x="210.0" y="160.5" text-anchor="middle" style="font-size:12px">20%</text>
+          <path d="M74.0 82 V196" style="stroke:var(--grad);stroke-width:1.3;stroke-dasharray:4 3;fill:none"/>
+          <text class="lbl" x="40.0" y="212" text-anchor="middle">0</text>
+          <text class="lbl" x="74.0" y="212" text-anchor="middle">100</text>
+          <text class="lbl" x="125.0" y="212" text-anchor="middle">250</text>
+          <text class="lbl" x="210.0" y="212" text-anchor="middle">500</text>
+          <text x="339" y="22" text-anchor="middle" style="fill:var(--ink)">average of 2 users</text>
+          <text class="lbl" x="339" y="40" text-anchor="middle">SD 141</text>
+          <path class="in" d="M242 196 H436"/>
+          <rect x="245.0" y="78.0" width="18" height="118.0" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <text x="254.0" y="72.0" text-anchor="middle" style="font-size:12px">64%</text>
+          <rect x="330.0" y="137.0" width="18" height="59.0" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <text x="339.0" y="131.0" text-anchor="middle" style="font-size:12px">32%</text>
+          <rect x="415.0" y="188.6" width="18" height="7.4" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <text x="424.0" y="182.6" text-anchor="middle" style="font-size:12px">4%</text>
+          <path d="M288.0 82 V196" style="stroke:var(--grad);stroke-width:1.3;stroke-dasharray:4 3;fill:none"/>
+          <text class="lbl" x="254.0" y="212" text-anchor="middle">0</text>
+          <text class="lbl" x="288.0" y="212" text-anchor="middle">100</text>
+          <text class="lbl" x="339.0" y="212" text-anchor="middle">250</text>
+          <text class="lbl" x="424.0" y="212" text-anchor="middle">500</text>
+          <text x="553" y="22" text-anchor="middle" style="fill:var(--ink)">average of 10 users</text>
+          <text class="lbl" x="553" y="40" text-anchor="middle">SD 63</text>
+          <path class="in" d="M456 196 H650"/>
+          <rect x="461.5" y="154.0" width="13" height="42.0" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <rect x="478.5" y="91.1" width="13" height="104.9" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <rect x="495.5" y="78.0" width="13" height="118.0" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <text x="502.0" y="72.0" text-anchor="middle" style="font-size:12px">30%</text>
+          <rect x="512.5" y="117.3" width="13" height="78.7" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <rect x="529.5" y="161.6" width="13" height="34.4" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <rect x="546.5" y="185.7" width="13" height="10.3" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <rect x="563.5" y="193.8" width="13" height="2.2" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <path d="M502.0 82 V196" style="stroke:var(--grad);stroke-width:1.3;stroke-dasharray:4 3;fill:none"/>
+          <text class="lbl" x="468.0" y="212" text-anchor="middle">0</text>
+          <text class="lbl" x="502.0" y="212" text-anchor="middle">100</text>
+          <text class="lbl" x="553.0" y="212" text-anchor="middle">250</text>
+          <text class="lbl" x="638.0" y="212" text-anchor="middle">500</text>
+          <text x="80" y="94" style="fill:var(--grad);font-size:12px">true mean</text>
+        </svg>
+      </div>
+      <figcaption>Where the average of \(n\) users lands, counting every possible sample; each panel has its own vertical scale, and the dashed line is the true mean. At \(n = 10\) the shares are 10.7% at 0, 26.8% at 50, 30.2% at 100, 20.1% at 150, 8.8% at 200, 2.6% at 250 and 0.6% at 300 or more.</figcaption>
+    </figure>
+    <p>Two things happen together as \(n\) grows: the averages crowd around the true mean (the SD falls like \(200/\sqrt n\): 200, 141, 63, and 20 at \(n = 100\)), and the lopsided shape evens out, from two spikes to a hump to, by \(n = 100\), nearly a bell. The data themselves never change shape: a million of these users are still 80% at ₹0 and 20% at ₹500. Only the average becomes normal.</p>
+    <p><strong>Why tests rely on it.</strong> Conversion and revenue per user are averages, so by the CLT each arm's estimate is close to a bell, and the difference of two independent bells is again a bell, with the variances added. So under \(H_0\) the gap divided by its SE is close to the standard normal, and one table of that one curve answers every “how surprising is this?” question. How fast the bell forms depends on how skewed the data are: section <a href="#clt-why">05</a> shows why tests on means still work for skewed metrics, and <a href="#how-much-n">how large the sample must be</a>; “\(n \ge 30\)” is only safe for mild skew.</p>
+
+    <h3 id="z-score">z-scores</h3>
+    <p><strong>Standardizing a value.</strong> A z-score re-expresses a value as its distance from the mean, measured in standard deviations:</p>
+    <div class="mj">\[ z = \frac{x - \mu}{\sigma} \]</div>
+    <p>In words: how many SDs above (positive) or below (negative) the mean a value sits. The whale: \((500 - 100)/200 = +2.0\). Each of the others: \((0 - 100)/200 = -0.5\). Standardized values always have mean 0 and SD 1: here the five z-scores sum to \(4 \times (-0.5) + 2 = 0\), and their squares average \((4 \times 0.25 + 4)/5 = 1\). Standardizing doesn't change the shape (these are still two spikes), but an estimate is already close to a bell by the CLT, so its standardized version is close to \(\mathcal N(0, 1)\) whatever the metric: that's what lets one table serve every metric.</p>
+    <p><strong>The z-score of an estimate</strong> uses the same recipe on the sampling distribution: the estimate in place of the value, the value \(H_0\) predicts in place of the mean, and the standard error in place of the SD:</p>
+    <div class="mj">\[ \begin{aligned} z &amp;= \frac{\text{estimate} - \text{value under } H_0}{\text{SE}} \\ &amp;= \frac{(\hat p_B - \hat p_A) - 0}{\text{SE}_0} = \frac{0.008}{0.00432} = 1.85 \end{aligned} \]</div>
+    <p>In words: the running example's gap sits 1.85 standard errors above the zero that “no effect” predicts. If \(H_0\) is true, the CLT makes this z a draw from the standard normal, so how surprising 1.85 is can be read off that one curve.</p>
+    <p><strong>The numbers to know.</strong> \(\Phi(z)\) (capital phi) is the share of the standard normal below \(z\) (<code>norm.cdf</code> in SciPy). Roughly 68% of the bell lies within ±1, 95% within ±2 and 99.7% within ±3. The exact cut-offs used for tests and intervals are below; a two-sided test counts surprises in both directions, a one-sided test in only one (section <a href="#sides">02</a>):</p>
+    <div class="tbl"><table>
+      <thead><tr><th>\(z\)</th><th>Share between \(-z\) and \(+z\)</th><th>Share beyond, each side</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td>1.645</td><td>90%</td><td>5%</td><td>90% intervals; one-sided tests at 5%</td></tr>
+        <tr><td>1.960</td><td>95%</td><td>2.5%</td><td>95% intervals; two-sided tests at 5%</td></tr>
+        <tr><td>2.576</td><td>99%</td><td>0.5%</td><td>99% intervals; two-sided tests at 1%</td></tr>
+      </tbody>
+    </table></div>
+    <p>The same cut-offs have names: \(z_q\) is the point with a share \(q\) of the standard normal below it, so \(z_{0.95} = 1.645\), \(z_{0.975} = 1.96\) and \(z_{0.995} = 2.576\). A two-sided test at level \(\alpha\) (the false-positive rate you accept, section <a href="#alpha">02</a>) uses \(z_{1-\alpha/2}\): 1.96 when \(\alpha = 0.05\). Power calculations add \(z_{0.8} = 0.84\).</p>
+    <p><strong>Reading a z of 1.85.</strong> It's past 1.645 but short of 1.96: outside the middle 90% of the bell, inside the middle 95%. So the share of the bell at least this far from 0, in either direction, is between 5% and 10%. Exactly: \(\Phi(1.85) = 0.968\), so 3.2% of the bell lies above 1.85 and another 3.2% below −1.85, 6.4% in all. That 6.4% is the p-value of section <a href="#pvalue">02</a>.</p>
+
+    <h3 id="ci">Confidence intervals</h3>
+    <p>The CLT says the estimate lands within 1.96 SE of the truth in 95% of reruns. Turned around: in 95% of reruns the truth lies within 1.96 SE of the estimate. So the interval “estimate ± 1.96 SE” catches the truth 95% of the time:</p>
+    <div class="mj">\[ \begin{aligned} \text{CI} &amp;= \text{estimate} \pm z \times \text{SE} \\ \text{CI}_{95}(p_A) &amp;= 0.100 \pm 1.96 \times 0.0030 = [0.0941,\ 0.1059] \\ \text{CI}_{95}(p_B - p_A) &amp;= 0.008 \pm 1.96 \times 0.00432 = [-0.0005,\ 0.0165] \end{aligned} \]</div>
+    <p>In words: the control rate is pinned down to between 9.41% and 10.59%. The gap could be anything from a 0.05-point loss to a 1.65-point gain. That interval contains 0, which is the same finding as \(z = 1.85\) falling short of 1.96, seen from the other side. The gap's margin (±0.85 points) is about \(\sqrt 2\) times one arm's (±0.59), because both arms wobble.</p>
+    <p><strong>The confidence level sets \(z\).</strong> For the gap, the 90% interval (\(z = 1.645\)) is +0.09 to +1.51 points and excludes 0; the 99% interval (\(z = 2.576\)) is −0.31 to +1.91. More confidence costs width. The 90% interval excluding 0 matches the p-value of 0.064 being below 0.10.</p>
+    <p><strong>What “95%” means.</strong> It's a property of the recipe, not of one interval: in 10,000 simulated reruns of a 10% rate on 10,000 users, 94.9% of the intervals built this way contained the true 10%.</p>
+    <aside class="note trap"><p class="nl">Trap</p><p>“There's a 95% probability that the true lift is between −0.05 and +1.65 points.” Not for a confidence interval: the true lift is a fixed number, so a given interval either contains it or doesn't, and the 95% belongs to the procedure. That reading belongs to a Bayesian credible interval (section <a href="#bayes">09</a>), which with a flat prior and large samples gives nearly the same numbers.</p></aside>
+    <p><strong>When t replaces z:</strong> with a small sample, \(s\) is itself noisy, so the multiplier comes from Student's t distribution (2.04 rather than 1.96 with 30 <a href="#spread">degrees of freedom</a>); at A/B-test sizes they coincide (section <a href="#zt">04</a>).</p>
+    <p><strong>Say it in an interview:</strong> “The standard error is the standard deviation of an estimate across reruns of the experiment: \(\sigma/\sqrt n\) for a mean, \(\sqrt{p(1-p)/n}\) for a rate, and for a difference between independent groups the variances add, so \(\sqrt{\text{SE}_A^2 + \text{SE}_B^2}\). A z-score is the estimate minus what the null predicts, in standard errors; by the CLT it's close to standard normal under the null, so ±1.96 marks the 5% two-sided line. A 95% interval is the estimate ± 1.96 SE: here a 0.8-point lift with an SE of 0.43 points gives −0.05 to +1.65.”</p>
+
     <!-- logic -->
-    <h2 id="logic"><span class="pn">01</span>The logic of a test</h2>
+    <h2 id="logic"><span class="pn">02</span>The logic of a test</h2>
     <p>A hypothesis test is proof by contradiction, with noise. Assume nothing happened, work out what results chance alone would produce under that assumption, and ask whether what you saw looks like one of them. If it would be very unusual, you drop the assumption.</p>
     <p><strong>The running example.</strong> A checkout change is tested on 20,000 users split evenly. Control: 1,000 of 10,000 convert (10.0%). Treatment: 1,080 of 10,000 convert (10.8%). Did the change work, or is a 0.8-point gap the kind of thing that happens by chance?</p>
 
@@ -345,18 +496,18 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ol>
       <li><strong>The null hypothesis \(H_0\):</strong> the “nothing happened” claim, stated precisely enough to compute with: \(p_B = p_A\). The <strong>alternative</strong> \(H_1\) is what you'd believe instead: \(p_B \ne p_A\) (two-sided) or \(p_B \gt p_A\) (one-sided).</li>
       <li><strong>A test statistic:</strong> one number measuring how far the data sit from \(H_0\), in units of noise.</li>
-      <li><strong>Its sampling distribution under \(H_0\):</strong> how that number would spread across many repeats of the experiment if \(H_0\) were true. For differences in averages the central limit theorem makes it close to a standard normal.</li>
+      <li><strong>Its sampling distribution under \(H_0\):</strong> how that number would spread across many repeats of the experiment if \(H_0\) were true. For differences in averages the central limit theorem (section <a href="#clt-basics">01</a>) makes it close to a standard normal.</li>
       <li><strong>The p-value:</strong> where the observed statistic falls in that distribution.</li>
       <li><strong>The significance level \(\alpha\)</strong> and a decision rule fixed before looking: reject \(H_0\) when \(p \le \alpha\).</li>
     </ol>
-    <p>For the running example, the statistic is the gap divided by its standard error (SE), the typical size of the gap's wobble from sample to sample. Under \(H_0\) both groups share one rate, so it's estimated from both groups together (“pooled”):</p>
+    <p>For the running example, the statistic is a z-score: the gap divided by its standard error (SE), the typical size of the gap's wobble from sample to sample. Section <a href="#se">01</a> builds this SE formula step by step, and <a href="#z-score">explains z-scores</a>. Under \(H_0\) both groups share one rate, so it's estimated from both groups together (“pooled”):</p>
     <div class="mj">\[ \begin{aligned} \hat p &amp;= \frac{x_A + x_B}{n_A + n_B} = \frac{2080}{20000} = 0.104 \\ \text{SE}_0 &amp;= \sqrt{\hat p\,(1 - \hat p)\Big(\frac{1}{n_A} + \frac{1}{n_B}\Big)} = 0.00432 \\ z &amp;= \frac{\hat p_B - \hat p_A}{\text{SE}_0} = \frac{0.008}{0.00432} = 1.85 \end{aligned} \]</div>
     <p>In words: if the change did nothing, both groups would convert at about 10.4%, and a gap between two groups of 10,000 would typically wobble by 0.43 points. The observed gap of 0.8 points is 1.85 wobbles from zero.</p>
 
     <h3 id="pvalue">The p-value, exactly</h3>
     <p><strong>The p-value is the probability, computed assuming \(H_0\) is true, of a test statistic at least as extreme as the one observed.</strong> Here “extreme” means \(\lvert z \rvert \ge 1.85\) in either direction:</p>
     <div class="mj">\[ \begin{aligned} p &amp;= P\big(\lvert Z \rvert \ge 1.85 \mid H_0\big) \\ &amp;= 2\,\big(1 - \Phi(1.85)\big) = 0.064 \end{aligned} \]</div>
-    <p>In words: \(\Phi\) is the standard normal's cumulative probability. If the change truly did nothing, about 6.4% of experiments like this one would show a gap of 0.8 points or more, in one direction or the other.</p>
+    <p>In words: \(\Phi(z)\) is the share of the standard normal below \(z\) (section <a href="#z-score">01</a>). If the change truly did nothing, about 6.4% of experiments like this one would show a gap of 0.8 points or more, in one direction or the other.</p>
     <p><strong>What it is not.</strong> Each of these is a common wrong reading:</p>
     <ul>
       <li><strong>Not the probability that \(H_0\) is true.</strong> The p-value is computed <em>assuming</em> \(H_0\); it can't also be its probability. That probability depends on how many tested ideas actually work. If 10% of ideas work and tests have 80% power, then among results with \(p \lt 0.05\), 36% are false positives (0.9 × 0.05 = 0.045 false against 0.1 × 0.8 = 0.08 real). With 30% power it's 60%.</li>
@@ -365,8 +516,8 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li><strong>\(1 - p\) is not the probability the effect is real, or that it will replicate.</strong></li>
       <li><strong>\(p \gt 0.05\) is not evidence of no effect.</strong> Here the interval below runs up to +1.65 points, a 16% relative lift. Absence of evidence isn't evidence of absence, unless the test had the power to see the effect you care about.</li>
     </ul>
-    <p><strong>Under \(H_0\), p-values are uniform.</strong> Every value between 0 and 1 is equally likely, so 5% of experiments with no effect land below 0.05 and 1% below 0.01. That's what \(\alpha\) means, and it's why an A/A test (section <a href="#aa">06</a>) should produce a flat histogram of p-values.</p>
-    <aside class="note trap"><p class="nl">Trap</p><p>“p = 0.064, so there's a 6.4% chance the change does nothing.” No: it's a 6.4% chance of a gap this big <em>if</em> the change does nothing. Turning that around needs a prior on how often changes work, which is the Bayesian calculation in section <a href="#bayes">08</a>.</p></aside>
+    <p><strong>Under \(H_0\), p-values are uniform.</strong> Every value between 0 and 1 is equally likely, so 5% of experiments with no effect land below 0.05 and 1% below 0.01. That's what \(\alpha\) means, and it's why an A/A test (section <a href="#aa">07</a>) should produce a flat histogram of p-values.</p>
+    <aside class="note trap"><p class="nl">Trap</p><p>“p = 0.064, so there's a 6.4% chance the change does nothing.” No: it's a 6.4% chance of a gap this big <em>if</em> the change does nothing. Turning that around needs a prior on how often changes work, which is the Bayesian calculation in section <a href="#bayes">09</a>.</p></aside>
 
     <h3 id="alpha">Alpha and the decision rule</h3>
     <p>\(\alpha\) is chosen before the data: the false-positive rate you accept when \(H_0\) is true. Rejecting when \(p \le 0.05\) is the same as rejecting when \(\lvert z \rvert \ge 1.96\), since 5% of a standard normal lies beyond ±1.96. Here 1.85 falls short, so the result is not significant at 5%.</p>
@@ -390,14 +541,14 @@ footer .site-nav { display: block; margin-top: 10px; }
     </ul>
 
     <h3 id="duality">Tests and confidence intervals are one calculation</h3>
-    <p>A 95% confidence interval is the set of effect sizes that a 5% test would <em>not</em> reject. So “the interval excludes 0” and “\(p \lt 0.05\) for \(H_0\!: \delta = 0\)” are the same statement. For the gap, using each group's own variance (no \(H_0\) to assume):</p>
+    <p>A 95% confidence interval (estimate ± 1.96 SE, section <a href="#ci">01</a>) is the set of effect sizes that a 5% test would <em>not</em> reject. So “the interval excludes 0” and “\(p \lt 0.05\) for \(H_0\!: \delta = 0\)” are the same statement (\(\delta\) is the true gap, \(p_B - p_A\)). For the gap, using each group's own variance (no \(H_0\) to assume):</p>
     <div class="mj">\[ \begin{aligned} \text{SE} &amp;= \sqrt{\frac{\hat p_A(1 - \hat p_A)}{n_A} + \frac{\hat p_B(1 - \hat p_B)}{n_B}} = 0.00432 \\ \text{CI}_{95} &amp;= 0.008 \pm 1.96 \times 0.00432 \\ &amp;= [-0.0005,\ 0.0165] \end{aligned} \]</div>
     <p>In words: the data fit anything from a 0.05-point loss to a 1.65-point gain. The interval contains 0, matching \(p = 0.064\). It also shows what the p-value hides: the result is <em>uncertain</em>, not “no effect”.</p>
-    <p><strong>What the “95%” means.</strong> It describes the procedure: over many repeats of the experiment, 95% of intervals built this way contain the true effect. A given interval either contains it or doesn't. It is <em>not</em> “a 95% probability that the true lift is between −0.05 and +1.65 points”; that is the reading of a Bayesian credible interval (section <a href="#bayes">08</a>), which with a flat prior and large samples happens to give nearly the same numbers.</p>
+    <p><strong>What the “95%” means.</strong> It describes the procedure: over many repeats of the experiment, 95% of intervals built this way contain the true effect. A given interval either contains it or doesn't. It is <em>not</em> “a 95% probability that the true lift is between −0.05 and +1.65 points”; that is the reading of a Bayesian credible interval (section <a href="#bayes">09</a>), which with a flat prior and large samples happens to give nearly the same numbers.</p>
     <ul>
       <li><strong>The small mismatch:</strong> the test used the pooled SE (computed as if \(H_0\) were true) and the interval the unpooled one. Here both round to 0.00432; when the rates differ a lot they differ slightly, and a borderline result can disagree. Duality is exact when the same SE is used.</li>
       <li><strong>One-sided tests pair with one-sided bounds:</strong> the one-sided 5% test matches the lower bound \(0.008 - 1.645 \times 0.00432 = 0.0009\), which is above 0.</li>
-      <li><strong>The same test in another form:</strong> a chi-square test on the 2×2 table (converted or not, by group) gives \(\chi^2 = 3.43 = 1.85^2\) and the same \(p = 0.064\). With one degree of freedom, chi-square is z squared.</li>
+      <li><strong>The same test in another form:</strong> a chi-square test on the 2×2 table (converted or not, by group) gives \(\chi^2 = 3.43 = 1.85^2\) and the same \(p = 0.064\). With one <a href="#spread">degree of freedom</a>, chi-square is z squared.</li>
     </ul>
     <h3 id="tost">Showing “no worse”: non-inferiority and equivalence</h3>
     <p>A non-significant result doesn't show that two versions are the same. To claim that, turn the hypotheses around so that “different” is the null, using a margin \(m\): the largest difference you'd treat as no difference.</p>
@@ -409,7 +560,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p><strong>Say it in an interview:</strong> “I'd report the lift with its 95% interval, here +0.8 points with an interval from −0.05 to +1.65. The p-value of 0.064 says a gap this big would turn up about 6% of the time with no real effect, so it's not significant at 5%, but the interval shows the test can't rule out a lift worth having. It's underpowered rather than negative.”</p>
 
     <!-- power -->
-    <h2 id="power"><span class="pn">02</span>Errors, power and sample size</h2>
+    <h2 id="power"><span class="pn">03</span>Errors, power and sample size</h2>
 
     <h3 id="errors">Two ways to be wrong</h3>
     <div class="tbl"><table>
@@ -463,7 +614,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>Read the picture as a tug of war. Moving the line right (smaller \(\alpha\)) shrinks the orange tails but grows \(\beta\). The only way to shrink both is to move the blue bell further right, and its centre sits at \(\delta/\text{SE}\): the true effect measured in standard errors.</p>
 
     <h3 id="derive-n">Deriving the sample-size formula</h3>
-    <p>Setup: two arms of \(n\) users each, a metric with per-user variance \(\sigma^2\) in both arms, and a true difference \(\delta\) between the arms' means. Each arm's mean has variance \(\sigma^2/n\), and the variances of independent things add when you subtract them, so the gap has \(\text{SE} = \sqrt{2\sigma^2/n}\).</p>
+    <p>Setup: two arms of \(n\) users each, a metric with per-user variance \(\sigma^2\) in both arms, and a true difference \(\delta\) between the arms' means. Each arm's mean has variance \(\sigma^2/n\), and the variances of independent things add when you subtract them, so the gap has \(\text{SE} = \sqrt{2\sigma^2/n}\) (section <a href="#se">01</a>). Below, \(z_q\) is the point with a share \(q\) of the standard normal below it: \(z_{0.975} = 1.96\), \(z_{0.8} = 0.84\).</p>
     <ol>
       <li><strong>Under \(H_0\),</strong> \(z = \text{gap}/\text{SE}\) is standard normal, and the test rejects when \(z \gt z_{1-\alpha/2}\) (1.96), or below \(-1.96\).</li>
       <li><strong>Under \(H_1\),</strong> the gap's mean is \(\delta\) instead of 0, so \(z\) is normal with mean \(\delta/\text{SE}\) and standard deviation 1. That's the blue bell.</li>
@@ -485,7 +636,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     </table></div>
     <p>Halving the lift from 0.5 to 0.25 points quadruples the users, because \(n \propto 1/\delta^2\). The last column uses the pooled rate under \(H_0\) and each arm's own \(p(1-p)\) under \(H_1\), as most calculators do; planning with the baseline variance is within about 3.5% of it.</p>
     <p><strong>The running example's power.</strong> With 10,000 per arm, \(\text{SE} = \sqrt{2 \times 0.09 / 10000} = 0.00424\). If the true lift were 0.8 points, \(\delta/\text{SE} = 1.89\) and power is \(\Phi(1.89 - 1.96) \approx 0.47\). Even if the change truly works as well as it looked, the test had less than an even chance of saying so. Turned around, the MDE for a given \(n\) is \(\delta = 2.80\sqrt{2\sigma^2/n}\): 1.19 points at 10,000 per arm, 0.53 at 50,000, 0.38 at 100,000.</p>
-    <p><strong>Days, not just users.</strong> Divide the total users by the daily traffic entering the test and round <em>up to whole weeks</em>: 44,150 users at 20,000 a day is 2.2 days, but the test should still run a full week so every weekday is represented (section <a href="#duration">06</a>).</p>
+    <p><strong>Days, not just users.</strong> Divide the total users by the daily traffic entering the test and round <em>up to whole weeks</em>: 44,150 users at 20,000 a day is 2.2 days, but the test should still run a full week so every weekday is represented (section <a href="#duration">07</a>).</p>
 
     <h3 id="moves">What moves power</h3>
     <p>Starting from the design above (22,075 per arm, 80% power for a 0.8-point lift), changing one thing at a time:</p>
@@ -502,7 +653,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <tr><td>90/10 split instead of 50/50 (same total)</td><td>–</td><td>×2.78 total</td><td>SE \(\propto \sqrt{1/f + 1/(1-f)}\), smallest at \(f = 0.5\)</td></tr>
       </tbody>
     </table></div>
-    <p>Variance reduction is the cheapest lever: it buys the same power as more users without waiting longer. Section <a href="#cuped">06</a> shows how.</p>
+    <p>Variance reduction is the cheapest lever: it buys the same power as more users without waiting longer. Section <a href="#cuped">07</a> shows how.</p>
 
     <h3 id="typem">Why underpowered tests mislead: the winner's curse</h3>
     <p>With 10,000 per arm, a result can only be significant if the observed lift exceeds \(1.96 \times 0.00424 = 0.83\) points. Suppose the true lift is a modest 0.25 points. Most runs fall short; the few that clear the bar are the ones where noise pushed the estimate far up. Conditioning on significance selects the lucky draws:</p>
@@ -517,12 +668,12 @@ footer .site-nav { display: block; margin-top: 10px; }
     </table></div>
     <p>In words: a <strong>Type M</strong> (magnitude) error is the exaggeration ratio, the average size of a significant estimate divided by the true effect. A <strong>Type S</strong> (sign) error is a significant result pointing the wrong way. At low power, “significant” mostly means “lucky”, so the reported lift is inflated and later shrinks: the launch delivers less than the test promised.</p>
     <ul>
-      <li><strong>Fixes:</strong> power the test for a realistic effect, not a hoped-for one; distrust big lifts from small tests; shrink estimates towards what past experiments typically found (a Bayesian prior, section <a href="#bayes">08</a>); replicate surprising wins.</li>
+      <li><strong>Fixes:</strong> power the test for a realistic effect, not a hoped-for one; distrust big lifts from small tests; shrink estimates towards what past experiments typically found (a Bayesian prior, section <a href="#bayes">09</a>); replicate surprising wins.</li>
       <li><strong>“Post-hoc power” doesn't help.</strong> Power computed from the observed effect is a fixed function of the p-value (a p of 0.05 always gives about 50%), so it adds no information. Power is a design quantity, computed for the MDE before the test.</li>
     </ul>
 
     <!-- tests -->
-    <h2 id="tests"><span class="pn">03</span>Which test when</h2>
+    <h2 id="tests"><span class="pn">04</span>Which test when</h2>
     <p>Every test in this section has the same skeleton: an estimate, its standard error, their ratio, and a reference distribution. What changes is the data type, how the standard error is computed, and which reference distribution is honest for the sample size. The <a href="#choose">decision table</a> at the end of the section collects them.</p>
 
     <h3 id="zt">z or t?</h3>
@@ -530,7 +681,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <div class="mj">\[ t = \frac{\bar x - \mu_0}{s / \sqrt n} \]</div>
     <p>In words: how many estimated standard errors the sample mean is from the hypothesised value \(\mu_0\).</p>
     <ul>
-      <li><strong>Why not just use 1.96:</strong> \(s\) is itself an estimate, and at small \(n\) it's noisy. When it comes out too small, \(t\) gets too big, so \(t\) has heavier tails than a normal. If the data are normal, \(t\) follows Student's t distribution with \(n - 1\) degrees of freedom, which accounts for exactly that extra noise.</li>
+      <li><strong>Why not just use 1.96:</strong> \(s\) is itself an estimate, and at small \(n\) it's noisy. When it comes out too small, \(t\) gets too big, so \(t\) has heavier tails than a normal. If the data are normal, \(t\) follows Student's t distribution with \(n - 1\) degrees of freedom, which accounts for exactly that extra noise. (The degrees of freedom count the deviations left free after the mean is estimated from the same data: the \(n - 1\) of \(s\), section <a href="#spread">01</a>.)</li>
       <li><strong>How much it matters:</strong> the 5% two-sided critical value is 2.571 at 5 degrees of freedom, 2.228 at 10, 2.042 at 30, 1.984 at 100 and 1.962 at 1,000. Using 1.96 on a one-sample test with \(n = 5\) gives a 12% false-positive rate instead of 5%; at \(n = 10\), 8%; at \(n = 30\), 6%.</li>
       <li><strong>At A/B-test sizes they coincide.</strong> With thousands of users per arm, t and z are the same number, which is why online experiments talk about “z-tests” for means too.</li>
       <li><strong>The fine print:</strong> t is exact only for normal data. For small, skewed samples neither t nor z is exact, and a permutation or exact test (below) is safer.</li>
@@ -553,7 +704,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     </ul>
     <p>Same data, opposite conclusions. Users differ from each other by a lot (standard deviation about 3.5) while the change moves each of them by about 1.2. The unpaired test has to see the change through all that between-user spread; pairing subtracts each user's own baseline and removes it:</p>
     <div class="mj">\[ \operatorname{Var}(\text{after} - \text{before}) = \sigma_a^2 + \sigma_b^2 - 2\rho\,\sigma_a \sigma_b \]</div>
-    <p>In words: when before and after are strongly correlated (\(\rho = 0.99\) here), subtracting cancels almost all the variance. CUPED (section <a href="#cuped">06</a>) is the same trick for A/B tests, where each user is only in one arm but their pre-experiment behaviour plays the role of “before”.</p>
+    <p>In words: when before and after are strongly correlated (correlation \(\rho = 0.99\) here; covariance and correlation are defined in section <a href="#se">01</a>), subtracting cancels almost all the variance. CUPED (section <a href="#cuped">07</a>) is the same trick for A/B tests, where each user is only in one arm but their pre-experiment behaviour plays the role of “before”.</p>
     <p>The non-parametric version is the <strong>Wilcoxon signed-rank test</strong>, which ranks the absolute differences and compares the rank sums of positive and negative ones.</p>
 
     <h3 id="welch">Two independent groups: Student vs Welch</h3>
@@ -579,7 +730,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ul>
       <li><strong>Two-proportion z-test:</strong> the running example. Use the pooled SE for the test (it's computed under \(H_0\), where the rates are equal) and the unpooled SE for the interval. It needs a handful of successes and failures in each arm (a common rule: at least 10 of each).</li>
       <li><strong>Chi-square test of independence:</strong> are two categorical variables related? Compare observed counts \(O\) in each cell of a table with the counts \(E\) expected if they were independent (row total × column total / grand total). For a 2×2 table it's the two-proportion z-test squared.</li>
-      <li><strong>Chi-square goodness of fit:</strong> do counts match a fixed expected split? The sample-ratio-mismatch check (section <a href="#srm">06</a>) and “is this die fair?” are this test.</li>
+      <li><strong>Chi-square goodness of fit:</strong> do counts match a fixed expected split? The sample-ratio-mismatch check (section <a href="#srm">07</a>) and “is this die fair?” are this test.</li>
     </ul>
     <div class="mj">\[ \chi^2 = \sum_{\text{cells}} \frac{(O - E)^2}{E} \]</div>
     <p>In words: each cell's surprise, squared and scaled by how big that cell was expected to be. Degrees of freedom: \((r-1)(c-1)\) for an \(r \times c\) table, and categories − 1 for goodness of fit. Example: 600 rolls of a die giving 90, 110, 95, 105, 120 and 80 against 100 each: \(\chi^2 = (100 + 100 + 25 + 25 + 400 + 400)/100 = 10.5\) on 5 degrees of freedom, \(p = 0.062\). Not enough to call the die loaded.</p>
@@ -592,7 +743,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <tr><td>Fisher's exact</td><td>0.031</td></tr>
       </tbody>
     </table></div>
-    <p>The expected counts here are 5.5, right at the edge, and the uncorrected chi-square's p-value (0.013) is less than half the exact one (0.031). For a single proportion against a fixed value, the <strong>exact binomial test</strong> plays the same role (the coin in section <a href="#coin">05</a>). Exact tests on counts are slightly conservative: the counts are whole numbers, so the achievable p-values jump and the real false-positive rate sits a little below \(\alpha\).</p>
+    <p>The expected counts here are 5.5, right at the edge, and the uncorrected chi-square's p-value (0.013) is less than half the exact one (0.031). For a single proportion against a fixed value, the <strong>exact binomial test</strong> plays the same role (the coin in section <a href="#coin">06</a>). Exact tests on counts are slightly conservative: the counts are whole numbers, so the achievable p-values jump and the real false-positive rate sits a little below \(\alpha\).</p>
 
     <h3 id="mwu">Mann–Whitney: what it actually tests</h3>
     <p>The Mann–Whitney U test (also called the Wilcoxon rank-sum test) ranks all observations together and compares the groups' rank sums. Equivalently, it counts how often a random B beats a random A:</p>
@@ -604,7 +755,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li>Mann–Whitney: B is “better”, typical \(p = 6 \times 10^{-6}\). Most pairs are zero against zero (ties); among the rest, B wins more often because it has more non-zero users.</li>
       <li>In 98% of the runs both tests were significant, in opposite directions.</li>
     </ul>
-    <p>Both tests are right about their own question. The business question is total revenue, which is the mean, so the t-test is the relevant one. Choose the test by the quantity you want to make a decision about, then deal with the data's shape (section <a href="#clt">04</a>).</p>
+    <p>Both tests are right about their own question. The business question is total revenue, which is the mean, so the t-test is the relevant one. Choose the test by the quantity you want to make a decision about, then deal with the data's shape (section <a href="#clt">05</a>).</p>
 
     <h3 id="perm">Permutation tests</h3>
     <p>If the treatment changed nothing for anyone (the “sharp null”), each user's outcome would have been the same in either arm, so the group labels are arbitrary. Shuffle the labels many times, recompute the statistic each time, and see where the real one falls.</p>
@@ -633,10 +784,10 @@ footer .site-nav { display: block; margin-top: 10px; }
 
     <h3 id="assume">Assumptions, in order of how much they matter</h3>
     <ol>
-      <li><strong>Independence</strong> between the units analysed. The most important and the most often broken: page views of one user, users in one city, buyers sharing inventory. When it fails, the SE is too small and false positives soar (16% instead of 5% in the example in section <a href="#units">06</a>), and no amount of data fixes it.</li>
-      <li><strong>The estimate is close to normal.</strong> Means of large samples are, thanks to the CLT, unless the metric is very skewed (section <a href="#clt">04</a>).</li>
+      <li><strong>Independence</strong> between the units analysed. The most important and the most often broken: page views of one user, users in one city, buyers sharing inventory. When it fails, the SE is too small and false positives soar (16% instead of 5% in the example in section <a href="#units">07</a>), and no amount of data fixes it.</li>
+      <li><strong>The estimate is close to normal.</strong> Means of large samples are, thanks to the CLT, unless the metric is very skewed (section <a href="#clt">05</a>).</li>
       <li><strong>Equal variances.</strong> Only Student's t needs it; use Welch.</li>
-      <li><strong>No interference between arms.</strong> One unit's treatment mustn't change another's outcome (section <a href="#interference">06</a>).</li>
+      <li><strong>No interference between arms.</strong> One unit's treatment mustn't change another's outcome (section <a href="#interference">07</a>).</li>
     </ol>
 
     <h3 id="choose">Decision table</h3>
@@ -658,10 +809,10 @@ footer .site-nav { display: block; margin-top: 10px; }
     </table></div>
 
     <!-- clt -->
-    <h2 id="clt"><span class="pn">04</span>The CLT and heavy tails</h2>
+    <h2 id="clt"><span class="pn">05</span>The CLT and heavy tails</h2>
 
     <h3 id="clt-why">Why tests on means work for skewed metrics</h3>
-    <p>The central limit theorem says that the average of \(n\) independent draws from any distribution with a finite variance \(\sigma^2\) is approximately normal for large \(n\):</p>
+    <p>The central limit theorem (built up by hand in section <a href="#clt-basics">01</a>) says that the average of \(n\) independent draws from any distribution with a finite variance \(\sigma^2\) is approximately normal for large \(n\):</p>
     <div class="mj">\[ \begin{aligned} \bar X &amp;\approx \mathcal N\Big(\mu,\ \frac{\sigma^2}{n}\Big) \\ \text{SE}(\bar X) &amp;= \frac{\sigma}{\sqrt n} \\ \text{SE}(\hat p) &amp;= \sqrt{\frac{p(1-p)}{n}} \end{aligned} \]</div>
     <p>In words: individual revenue can be wildly skewed, but the <em>average</em> over many users wobbles in a bell shape around the true mean, with a wobble that shrinks like \(1/\sqrt n\). A t-test only needs the average to be normal, not the data.</p>
     <aside class="note trap"><p class="nl">Trap</p><p>Three slips that come up under pressure. (1) “Revenue per user becomes normal with more users.” It never does; only the average does. (2) “The bell appears as the number of experiments grows.” It's the number of users <em>per average</em>, \(n\), that matters. (3) \(\text{SE} = p(1-p)/\sqrt n\). The square root covers the whole variance: \(\sqrt{p(1-p)/n}\). For 10% at 10,000 users that's 0.003, so the 95% interval is ±0.59 points.</p></aside>
@@ -708,7 +859,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <tr><td><strong>Cap (winsorize)</strong> at a high percentile fixed in advance, e.g. 99.9th</td><td>Mean of capped revenue: close to the mean, much less noisy</td><td>Biased for the raw mean; must be set before looking, same cap for both arms</td></tr>
         <tr><td><strong>Log</strong>, \(\log(1 + x)\)</td><td>Roughly the geometric mean: multiplicative, “typical” change</td><td>Not the mean; can disagree with revenue in sign</td></tr>
         <tr><td><strong>Trimmed mean</strong> (Yuen's test)</td><td>Mean of the middle, dropping the top and bottom k%</td><td>On zero-heavy data it can trim away every buyer</td></tr>
-        <tr><td><strong>Rank test</strong> (Mann–Whitney)</td><td>Whether B tends to be larger</td><td>Not revenue (section <a href="#mwu">03</a>)</td></tr>
+        <tr><td><strong>Rank test</strong> (Mann–Whitney)</td><td>Whether B tends to be larger</td><td>Not revenue (section <a href="#mwu">04</a>)</td></tr>
         <tr><td><strong>Variance reduction</strong> (CUPED, regression)</td><td>The same mean, with less noise</td><td>Needs pre-experiment data</td></tr>
         <tr><td><strong>More users or a longer test</strong></td><td>The same mean</td><td>Time and traffic</td></tr>
       </tbody>
@@ -739,10 +890,10 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>In words: \(f(x_q)\) is the density at that quantile. Where data are sparse (the tail), the quantile is poorly pinned down. For normal data the median's SE is \(1.25\,\sigma/\sqrt n\), 25% noisier than the mean; for exponential data with mean 1, the 90th percentile's SE is \(3/\sqrt n\). Because the density is unknown, test quantiles with a bootstrap over the randomized unit (users, not requests, since one user's requests are correlated) or with quantile regression and clustered standard errors.</p>
 
     <!-- hand -->
-    <h2 id="hand"><span class="pn">05</span>Quick tests by hand</h2>
+    <h2 id="hand"><span class="pn">06</span>Quick tests by hand</h2>
 
     <h3 id="coin">Is the coin biased? 80 heads in 100 tosses</h3>
-    <p>Under \(H_0\) (a fair coin), the number of heads \(X\) is binomial with \(n = 100\), \(p = 0.5\): mean \(np = 50\), standard deviation \(\sqrt{np(1-p)} = 5\).</p>
+    <p>Under \(H_0\) (a fair coin), the number of heads \(X\) is binomial with \(n = 100\), \(p = 0.5\): mean \(np = 50\), standard deviation \(\sqrt{np(1-p)} = 5\) (100 independent 0/1 tosses, each with variance \(p(1-p)\), and variances add: section <a href="#se">01</a>).</p>
     <div class="mj">\[ \begin{aligned} z &amp;= \frac{80 - 50}{5} = 6 \\ p_{\text{normal}} &amp;= 2\,\big(1 - \Phi(6)\big) \approx 2 \times 10^{-9} \\ p_{\text{exact}} &amp;= 2\,P(X \ge 80) \approx 1.1 \times 10^{-9} \end{aligned} \]</div>
     <p>In words: 80 heads is six standard deviations from what a fair coin gives. Both the normal approximation and the exact binomial say the coin is biased beyond reasonable doubt. A 95% interval for the coin's heads rate is \(0.8 \pm 1.96 \times 0.04 = [0.72, 0.88]\) (the Wilson interval, better near 0 or 1, gives [0.71, 0.87]); it's nowhere near 0.5.</p>
     <p><strong>The interesting case is the borderline one.</strong> 60 heads in 100:</p>
@@ -795,8 +946,8 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>In words: two intervals only fail to overlap when the gap exceeds \(1.96 \times (1 + 1) = 3.92\), but significance needs only \(1.96 \times 1.41 = 2.77\), because standard errors combine by the square root of summed squares, not by adding. Intervals that just touch correspond to \(p \approx 0.006\). Compare the interval <em>of the difference</em>, not two separate intervals.</p>
 
     <!-- ab -->
-    <h2 id="ab"><span class="pn">06</span>A/B testing end to end</h2>
-    <p>The statistics of an A/B test are the two-sample test from section <a href="#tests">03</a>. Almost everything that goes wrong in practice is upstream of it: the wrong metric, the wrong unit, broken assignment, a test that stopped too early, or arms that leak into each other. The steps below are in the order you'd plan them.</p>
+    <h2 id="ab"><span class="pn">07</span>A/B testing end to end</h2>
+    <p>The statistics of an A/B test are the two-sample test from section <a href="#tests">04</a>. Almost everything that goes wrong in practice is upstream of it: the wrong metric, the wrong unit, broken assignment, a test that stopped too early, or arms that leak into each other. The steps below are in the order you'd plan them.</p>
 
     <h3 id="metric">1. Choose the metric before anything else</h3>
     <ul>
@@ -876,7 +1027,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>Much of the variance in a metric is just “who the user is”: heavy users spend a lot in any arm. A user's behaviour before the experiment predicts that part, and because it was measured before assignment, the treatment can't have affected it. CUPED (Controlled-experiment Using Pre-Experiment Data) subtracts the predictable part.</p>
     <p><strong>Derivation.</strong> Let \(Y\) be the metric during the test and \(X\) the same user's pre-period value. Define an adjusted metric for any constant \(\theta\):</p>
     <div class="mj">\[ \begin{aligned} Y^{\text{cv}} &amp;= Y - \theta\,(X - \bar X) \\ \operatorname{Var}(Y^{\text{cv}}) &amp;= \operatorname{Var}(Y) - 2\theta \operatorname{Cov}(Y, X) + \theta^2 \operatorname{Var}(X) \end{aligned} \]</div>
-    <p>In words: subtracting a multiple of a correlated variable removes variance (the middle term) but adds some of \(X\)'s own (the last term). Find the best \(\theta\): the derivative with respect to \(\theta\) is \(-2\operatorname{Cov}(Y,X) + 2\theta\operatorname{Var}(X)\); set it to zero.</p>
+    <p>In words: this is the variance of a difference (section <a href="#se">01</a>) applied to \(Y\) and \(\theta X\): scaling by \(\theta\) multiplies \(X\)'s variance by \(\theta^2\) and the covariance by \(\theta\), and subtracting the constant \(\theta \bar X\) changes no variance. Subtracting a multiple of a correlated variable removes variance (the middle term) but adds some of \(X\)'s own (the last term). Find the best \(\theta\): the derivative with respect to \(\theta\) is \(-2\operatorname{Cov}(Y,X) + 2\theta\operatorname{Var}(X)\); set it to zero.</p>
     <div class="mj">\[ \begin{aligned} \theta^* &amp;= \frac{\operatorname{Cov}(Y, X)}{\operatorname{Var}(X)} \\ \operatorname{Var}(Y^{\text{cv}}) &amp;= \operatorname{Var}(Y) - \frac{\operatorname{Cov}(Y, X)^2}{\operatorname{Var}(X)} \\ &amp;= \operatorname{Var}(Y)\,\big(1 - \rho^2\big) \end{aligned} \]</div>
     <p>In words: \(\theta^*\) is the slope from regressing \(Y\) on \(X\). Because the correlation is \(\rho = \operatorname{Cov}(Y, X)/(\sigma_X \sigma_Y)\), the subtracted term \(\operatorname{Cov}(Y, X)^2/\operatorname{Var}(X)\) equals \(\rho^2 \operatorname{Var}(Y)\). What's left is the part of \(Y\) that \(X\) can't explain: a fraction \(1 - \rho^2\). Users needed scale the same way.</p>
     <p><strong>Why it doesn't bias the effect.</strong> The estimated effect is</p>
@@ -931,7 +1082,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ul>
       <li><strong>Pre-specify</strong> the few segments with a reason to differ; treat the rest as exploration that needs a new test.</li>
       <li><strong>Test the difference, not two p-values.</strong> “Significant on Android (p = 0.03), not on iOS (p = 0.20)” doesn't show the effect differs by platform: the difference between significant and not significant is not itself significant. Test the interaction (treatment × platform).</li>
-      <li><strong>Correct</strong> for the number of segments (section <a href="#multi">07</a>), and expect segment effects to be exaggerated, since each segment has a fraction of the power.</li>
+      <li><strong>Correct</strong> for the number of segments (section <a href="#multi">08</a>), and expect segment effects to be exaggerated, since each segment has a fraction of the power.</li>
       <li>Models of heterogeneous effects (causal forests, uplift models) are useful for targeting, but they find patterns in noise too; confirm targeting rules in a fresh test.</li>
     </ul>
 
@@ -942,7 +1093,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p><strong>Relative lifts need their own interval.</strong> Lifts are usually reported in percent, \(\hat L = \bar Y_B/\bar Y_A - 1\), and the denominator is noisy too. By the delta method:</p>
     <div class="mj">\[ \operatorname{Var}(\hat L) \approx \frac{\operatorname{Var}(\bar Y_B)}{\mu_A^2} + \frac{\mu_B^2\,\operatorname{Var}(\bar Y_A)}{\mu_A^4} \]</div>
     <p>In words: the first term is the noise in the treatment mean, the second the noise in the control mean that the ratio divides by. For the running example the lift is +8.0% with an SE of 4.5 points, so the 95% interval is [−0.8%, +16.8%]; working on the log of the ratio gives [−0.4%, +17.2%], and a bootstrap [−0.7%, +17.3%]. Simply dividing the absolute interval by the control rate ([−0.5%, +16.5%]) ignores the control's noise.</p>
-    <p><strong>Metrics conditioned on a post-treatment outcome.</strong> Spend per buyer, session length among active users and delivery time among completed orders compare <em>different sets of people</em> in the two arms, because the treatment changes who buys, stays or completes. If a change converts extra low spenders, spend per buyer falls even though nobody spends less (the Mann–Whitney example in section <a href="#mwu">03</a> is exactly this). Read such metrics as descriptions, not causal effects. Decide on metrics averaged over all randomized (or triggered) users, such as revenue per user.</p>
+    <p><strong>Metrics conditioned on a post-treatment outcome.</strong> Spend per buyer, session length among active users and delivery time among completed orders compare <em>different sets of people</em> in the two arms, because the treatment changes who buys, stays or completes. If a change converts extra low spenders, spend per buyer falls even though nobody spends less (the Mann–Whitney example in section <a href="#mwu">04</a> is exactly this). Read such metrics as descriptions, not causal effects. Decide on metrics averaged over all randomized (or triggered) users, such as revenue per user.</p>
     <p><strong>Simpson's paradox when the split changes.</strong> Ramping treatment from 1% to 50% mid-test mixes days with different baselines. Day 1: control 99,000 users at 10%, treatment 1,000 at 11%. Day 2, a weaker day: 50,000 each, at 5% and 5.5%. Treatment wins on both days, yet pooled it loses, 5.6% against 8.3%, because most of its users came on the weak day. Compare within periods and combine with fixed weights (here +0.75 points), or analyse only the period with a stable split.</p>
     <p><strong>Twyman's law:</strong> any figure that looks interesting or different is usually wrong. A surprisingly large lift should start a hunt for bugs (sample ratio, logging, a broken control) before a celebration.</p>
 
@@ -962,7 +1113,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p><strong>Say it in an interview:</strong> “I'd fix the metric, the guardrails, the MDE and the unit first; size the test from the MDE and the metric's variance, rounded up to full weeks; assign with a salted hash; check the sample ratio and balance before reading anything; analyse at the randomization unit with CUPED; and decide from the interval against a practical threshold, not from the p-value alone.”</p>
 
     <!-- multi -->
-    <h2 id="multi"><span class="pn">07</span>Many looks and many metrics</h2>
+    <h2 id="multi"><span class="pn">08</span>Many looks and many metrics</h2>
     <p>A 5% test is a promise about one look at one metric. Each extra look, metric, variant or segment is another chance for noise to cross the line, and the chances add up.</p>
 
     <h3 id="peeking">Peeking: why checking every day breaks the 5%</h3>
@@ -1053,7 +1204,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     </ul>
 
     <!-- bayes -->
-    <h2 id="bayes"><span class="pn">08</span>Bayesian A/B testing</h2>
+    <h2 id="bayes"><span class="pn">09</span>Bayesian A/B testing</h2>
     <p>The Bayesian version answers the question people actually ask, “how likely is it that B is better, and by how much?”, at the price of stating a prior belief.</p>
 
     <h3 id="beta">The Beta-Binomial model</h3>
@@ -1068,7 +1219,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ul>
       <li><strong>The question.</strong> The p-value is \(P(\text{data this extreme} \mid H_0)\); the posterior gives \(P(B \gt A \mid \text{data})\) directly, plus a full distribution for the size of the lift and losses in business units.</li>
       <li><strong>The numbers can coincide.</strong> With a flat prior and large samples, \(P(B \gt A) \approx 1 - \) the one-sided p-value (0.968 against \(1 - 0.032\)), and the credible interval matches the confidence interval. The interpretation differs; the arithmetic often barely does.</li>
-      <li><strong>Where it genuinely helps:</strong> an informative prior built from past experiments shrinks noisy estimates towards realistic effects, which is the cure for the winner's curse in section <a href="#typem">02</a>; and expected loss turns the result into a decision.</li>
+      <li><strong>Where it genuinely helps:</strong> an informative prior built from past experiments shrinks noisy estimates towards realistic effects, which is the cure for the winner's curse in section <a href="#typem">03</a>; and expected loss turns the result into a decision.</li>
     </ul>
 
     <h3 id="bayes-catch">Not a free lunch</h3>
@@ -1096,7 +1247,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>A multi-armed bandit shifts traffic towards whichever arm looks better as data arrive. Thompson sampling, for instance, sends each user to an arm with probability equal to the posterior probability that it's the best. It earns more <em>during</em> the experiment (less regret), which suits short-lived choices with many options: headlines, promotions, ad creative. The cost is inference: the losing arms get few users, so their estimates stay noisy, and adaptive allocation biases the plain difference in means. It also optimizes only the immediate reward, with no guardrails or long-term effects. To learn an effect size and decide a launch, run an A/B test; to earn while choosing, use a bandit.</p>
 
     <!-- causal -->
-    <h2 id="causal"><span class="pn">09</span>When you can't A/B test</h2>
+    <h2 id="causal"><span class="pn">10</span>When you can't A/B test</h2>
     <p>Sometimes randomizing is impossible (a pricing change by law applies to everyone; a city-wide launch already happened), unethical, or too slow. Observational methods then estimate what <em>would</em> have happened without the change. Each rests on one key assumption that the data can't fully verify, so each comes with checks that make it more credible.</p>
 
     <h3 id="did">Difference-in-differences</h3>
@@ -1134,7 +1285,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>An instrumental variable (something that shifts treatment but affects the outcome only through it, such as a random encouragement) is a sixth option when one exists. Whatever the method, a randomized test, even a small one or a holdout, is stronger evidence than any of them.</p>
 
     <!-- code -->
-    <h2 id="code"><span class="pn">10</span>Pseudocode</h2>
+    <h2 id="code"><span class="pn">11</span>Pseudocode</h2>
     <p>Python-flavoured, short enough to write from memory. <code>Phi</code> is the standard normal CDF and <code>Phi_inv</code> its inverse. Each was run as real code on the note's examples; the results are in the → comments.</p>
 
     <h3>Two-proportion z-test</h3>
@@ -1224,7 +1375,7 @@ def n_per_arm_props(p1, p2, alpha=0.05, power=0.8):
     reject[order[:k_max]] = True       <span class="cm"># all ranks up to it</span>
     return reject
 
-<span class="cm"># the ten p-values in section 07 → 4 rejections</span></code></pre>
+<span class="cm"># the ten p-values in section 08 → 4 rejections</span></code></pre>
 
     <h3>Sample ratio check and delta-method variance</h3>
     <pre class="code"><code>def srm_check(n_ctrl, n_treat, share_ctrl=0.5):
@@ -1245,10 +1396,54 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
 <span class="cm"># SE of the CTR gap: sqrt(var_A + var_B)</span></code></pre>
 
     <!-- questions -->
-    <h2 id="questions"><span class="pn">11</span>Interview questions</h2>
-    <p>Answer out loud first, then open the answer. Each answer stands on its own: the short answer, the mechanism, the why, then the trade-off or the likely follow-up. Questions 5, 16, 17, 22 and 27 are hand drills; do them with a pen.</p>
+    <h2 id="questions"><span class="pn">12</span>Interview questions</h2>
+    <p>Answer out loud first, then open the answer. Each answer stands on its own: the short answer, the mechanism, the why, then the trade-off or the likely follow-up. Questions 2, 9, 20, 21, 26 and 31 are hand drills; do them with a pen.</p>
 
-    <details class="qa"><summary><span class="qn">1</span>What is a p-value? What is it not?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">1</span>What's the difference between a standard deviation and a standard error? Why does the SE shrink with √n and not n?</summary><div class="ans">
+      <p><strong>The SD measures how spread out the individual values are; the SE measures how much an estimate, such as the average, would move between reruns of the sample. For a mean, \(\text{SE} = \sigma/\sqrt n\).</strong></p>
+      <ul>
+        <li><strong>Example:</strong> five users spending 0, 0, 0, 0 and ₹500 have an SD of ₹200. The average of 2 random users has an SE of 141; of 100 users, 20. More users never shrink the SD; they always shrink the SE.</li>
+        <li><strong>Why \(\sqrt n\):</strong> the sum of \(n\) independent values has variance \(n\sigma^2\) (variances of independent things add). The average divides the sum by \(n\), which divides the variance by \(n^2\), leaving \(\sigma^2/n\); the square root is \(\sigma/\sqrt n\). Independent errors partly cancel, so the sum's wobble grows only like \(\sqrt n\) while the sum itself grows like \(n\).</li>
+        <li><strong>For a rate:</strong> a 0/1 column has variance \(p(1-p)\), so \(\text{SE} = \sqrt{p(1-p)/n}\): 0.003 at 10% on 10,000 users. The root covers everything; \(p(1-p)/\sqrt n\) is more than 3× too small.</li>
+        <li><strong>Which to use:</strong> tests and intervals for an average use the SE; describing how varied the users are uses the SD.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> precision is expensive. Halving an interval's width means halving the SE, which takes 4× the users. (<a href="#se">01</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">2</span>Drill: control converts 1,000 of 10,000 users, treatment 1,080 of 10,000. Give the SE and 95% interval for the control rate and for the gap.</summary><div class="ans">
+      <p><strong>Control: SE 0.003, interval 9.41% to 10.59%. Gap: 0.8 points, SE 0.43 points, interval −0.05 to +1.65 points.</strong></p>
+      <ul>
+        <li><strong>Control:</strong> \(\sqrt{0.1 \times 0.9/10{,}000} = 0.3/100 = 0.003\); margin \(1.96 \times 0.003 = 0.0059\).</li>
+        <li><strong>Treatment:</strong> \(\sqrt{0.108 \times 0.892/10{,}000} = 0.0031\).</li>
+        <li><strong>Gap:</strong> \(\sqrt{0.00000900 + 0.00000963} = 0.00432\) (square the unrounded SEs); margin \(1.96 \times 0.00432 = 0.0085\); interval \(0.008 \pm 0.0085\).</li>
+        <li><strong>Reading:</strong> the interval includes 0, so the gap isn't significant at 5% (\(z = 1.85\)), but it also includes lifts worth having: the test is underpowered, not negative. The 90% interval, \(0.008 \pm 1.645 \times 0.00432\), runs from +0.09 to +1.51 points and excludes 0.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> the gap's margin (±0.85 points) is about \(\sqrt 2\) times one arm's (±0.59), so judging the lift against one arm's margin overstates significance. (<a href="#ci">01</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">3</span>Why do variances add when you subtract two independent estimates? And why does the z-test use a pooled SE?</summary><div class="ans">
+      <p><strong>The gap is off by both arms' errors, and nothing lines them up to cancel (sometimes they offset, sometimes they compound), so on average the variances add: \(\operatorname{Var}(B - A) = \operatorname{Var}(B) + \operatorname{Var}(A) - 2\operatorname{Cov}(A, B)\), and the covariance is zero for independent arms. The pooled SE is the same formula with the single rate that \(H_0\) assumes.</strong></p>
+      <ul>
+        <li><strong>The algebra:</strong> the gap's deviation is \(d_B - d_A\). Squaring gives \(d_B^2 + d_A^2 - 2d_A d_B\), and the cross term averages to zero when the arms are independent.</li>
+        <li><strong>Not the SEs:</strong> \(0.0030 + 0.0031 = 0.0061\) overstates the wobble; \(\sqrt{0.0030^2 + 0.0031^2} = 0.0043\) is right. With equal arms the gap's SE is \(\sqrt 2\) times one arm's.</li>
+        <li><strong>Pooled:</strong> under \(H_0\) both arms share one rate, best estimated from everyone: \(2{,}080/20{,}000 = 0.104\), giving \(\text{SE}_0 = \sqrt{0.104 \times 0.896 \times (1/10{,}000 + 1/10{,}000)} = 0.00432\). The test is computed in the world it assumes; the interval uses each arm's own rate.</li>
+        <li><strong>When the covariance isn't zero:</strong> the same users measured twice (paired tests) or a pre-period covariate (CUPED). Positive correlation makes the difference <em>less</em> noisy, which is the whole point of those designs.</li>
+      </ul>
+      <p>(<a href="#se">01</a>, <a href="#paired">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">4</span>What is a z-score? A test gives z = 1.85: what does that tell you, and which critical values should you know by heart?</summary><div class="ans">
+      <p><strong>A z-score is a distance measured in standard deviations: \((x - \mu)/\sigma\) for a value, (estimate − value under \(H_0\))/SE for a test statistic. A z of 1.85 puts the gap 1.85 standard errors from zero: between the 90% and 95% cut-offs, so the two-sided p-value is between 0.05 and 0.10 (it's 0.064).</strong></p>
+      <ul>
+        <li><strong>Why one table works:</strong> standardizing gives any quantity mean 0 and SD 1, and by the CLT the test statistic is close to the standard normal under \(H_0\).</li>
+        <li><strong>Cut-offs:</strong> 1.645 (90% in the middle, 5% beyond on each side), 1.96 (95%, 2.5% each side), 2.576 (99%, 0.5% each side). Rule of thumb: 68%, 95% and 99.7% within ±1, ±2 and ±3.</li>
+        <li><strong>Reading 1.85:</strong> \(\Phi(1.85) = 0.968\), so 3.2% of the bell lies beyond it on each side: two-sided \(p = 0.064\), one-sided 0.032.</li>
+        <li><strong>Where the cut-offs reappear:</strong> a two-sided 5% test rejects when \(\lvert z \rvert \ge 1.96\); a 95% interval is the estimate ± 1.96 SE; the sample-size formula uses \((1.96 + 0.84)^2\).</li>
+      </ul>
+      <p><strong>Follow-up:</strong> with a small sample and an estimated SD, the reference curve is Student's t, with wider cut-offs (2.04 at 30 degrees of freedom). (<a href="#z-score">01</a>, <a href="#zt">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">5</span>What is a p-value? What is it not?</summary><div class="ans">
       <p><strong>The probability, computed assuming the null hypothesis is true, of getting a test statistic at least as extreme as the one observed.</strong></p>
       <ul>
         <li><strong>Example:</strong> 10.0% vs 10.8% conversion with 10,000 users per arm gives \(z = 1.85\) and \(p = 0.064\): with no real effect, a gap this big (either way) turns up 6.4% of the time.</li>
@@ -1257,10 +1452,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>Not evidence of no effect when large:</strong> \(p = 0.064\) came with an interval from −0.05 to +1.65 points, which includes worthwhile lifts.</li>
         <li><strong>Under \(H_0\) it's uniform:</strong> 5% of no-effect tests give \(p \lt 0.05\), by design.</li>
       </ul>
-      <p><strong>Follow-up:</strong> “why 0.05?” Convention. Choose \(\alpha\) by the cost of a false positive against a missed effect. (<a href="#pvalue">01</a>)</p>
+      <p><strong>Follow-up:</strong> “why 0.05?” Convention. Choose \(\alpha\) by the cost of a false positive against a missed effect. (<a href="#pvalue">02</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">2</span>The test gives p = 0.03. Is there a 97% chance the treatment works? Is there a 95% chance the true lift is inside the 95% interval?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">6</span>The test gives p = 0.03. Is there a 97% chance the treatment works? Is there a 95% chance the true lift is inside the 95% interval?</summary><div class="ans">
       <p><strong>No. 0.03 is the chance of data this extreme if the treatment did nothing, not the chance that it does nothing.</strong></p>
       <ul>
         <li><strong>Reversing it needs Bayes' rule and a base rate.</strong> Say 10% of ideas truly work, and tests have 80% power at \(\alpha = 0.05\). Out of 1,000 ideas: 900 duds give 45 false positives; 100 real ones give 80 true positives. So 45 of 125 “wins” (36%) are false. With 30% power it's 60%.</li>
@@ -1268,20 +1463,20 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>What you can say:</strong> “the data would be unusual if there were no effect; the estimated lift is X with interval [L, U].”</li>
         <li><strong>The interval, likewise:</strong> “95%” describes the procedure: 95% of intervals built this way contain the true lift, and a given interval either does or doesn't. “95% probability the lift is in here” is the reading of a Bayesian credible interval, which with a flat prior and big samples gives nearly the same numbers.</li>
       </ul>
-      <p><strong>Follow-up:</strong> a Bayesian analysis gives \(P(B \gt A \mid \text{data})\) directly, but only relative to a prior (section <a href="#bayes">08</a>). (<a href="#pvalue">01</a>)</p>
+      <p><strong>Follow-up:</strong> a Bayesian analysis gives \(P(B \gt A \mid \text{data})\) directly, but only relative to a prior (section <a href="#bayes">09</a>). (<a href="#pvalue">02</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">3</span>Explain Type I and Type II errors and power. Which is worse?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">7</span>Explain Type I and Type II errors and power. Which is worse?</summary><div class="ans">
       <p><strong>Type I: declaring an effect that isn't there (rate \(\alpha\)). Type II: missing an effect that is there (rate \(\beta\)). Power \(= 1 - \beta\), the chance of detecting a real effect of a given size.</strong></p>
       <ul>
         <li><strong>\(\alpha\) is about worlds with no effect; power about worlds with one.</strong> Power isn't one number: it depends on the true effect size, which is why it's quoted at the MDE.</li>
         <li><strong>The trade-off:</strong> for a fixed sample, lowering \(\alpha\) moves the critical value out and raises \(\beta\). Only more data, less variance or a bigger effect reduces both.</li>
         <li><strong>Which is worse depends on the decision.</strong> Shipping a useless but costly feature (Type I) vs missing a revenue win (Type II). For guardrails (crash rate), a missed harm is the costly error, so they often use a looser \(\alpha\) or more power.</li>
       </ul>
-      <p><strong>Follow-up:</strong> in A/B testing, Type II is the silent one: underpowered tests that “show nothing” kill good ideas, and the few that “win” are exaggerated (Type M). (<a href="#errors">02</a>)</p>
+      <p><strong>Follow-up:</strong> in A/B testing, Type II is the silent one: underpowered tests that “show nothing” kill good ideas, and the few that “win” are exaggerated (Type M). (<a href="#errors">03</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">4</span>Derive the sample size for an A/B test.</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">8</span>Derive the sample size for an A/B test.</summary><div class="ans">
       <p><strong>Require the distribution of z under the alternative to sit \(z_{1-\alpha/2} + z_{1-\beta}\) standard errors from zero, then solve for n.</strong></p>
       <ol>
         <li>Two arms of \(n\), per-user variance \(\sigma^2\): \(\text{SE} = \sqrt{2\sigma^2/n}\).</li>
@@ -1291,10 +1486,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li>Substitute the SE: \(n = (z_{1-\alpha/2} + z_{1-\beta})^2 \cdot 2\sigma^2/\delta^2\).</li>
         <li>With 1.96 and 0.84: \(2 \times 2.80^2 = 15.7\), so \(n \approx 16\sigma^2/\delta^2\) per arm.</li>
       </ol>
-      <p><strong>Intuition:</strong> the factor 2 is two noisy means; \(\delta^2\) in the denominator means halving the effect quadruples the users. For proportions, \(\sigma^2 = p(1-p)\). (<a href="#derive-n">02</a>)</p>
+      <p><strong>Intuition:</strong> the factor 2 is two noisy means; \(\delta^2\) in the denominator means halving the effect quadruples the users. For proportions, \(\sigma^2 = p(1-p)\). (<a href="#derive-n">03</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">5</span>Drill: baseline conversion 10%, detect +0.5 points, 5% two-sided, 80% power. How many users? And at a 5% baseline, +10% relative?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">9</span>Drill: baseline conversion 10%, detect +0.5 points, 5% two-sided, 80% power. How many users? And at a 5% baseline, +10% relative?</summary><div class="ans">
       <p><strong>About 57,600 per arm by the rule of thumb (56,512 by the exact formula); about 30,400 per arm for the second.</strong></p>
       <ul>
         <li><strong>First:</strong> \(\sigma^2 = 0.1 \times 0.9 = 0.09\), \(\delta = 0.005\). \(16 \times 0.09 / 0.000025 = 57{,}600\). With 15.7 instead of 16: 56,512. Each arm's own variance: 57,763.</li>
@@ -1302,10 +1497,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>In relative terms:</strong> \(n = 16\,\text{CV}^2/r^2\) with \(\text{CV}^2 = (1-p)/p\): \(16 \times 19 / 0.01 = 30{,}400\).</li>
         <li><strong>To days:</strong> two arms × 57,600 = 115,200 users; at 20,000 eligible a day that's 6 days, so run a full week (two is safer).</li>
       </ul>
-      <p><strong>Follow-up:</strong> the 0.8-point version needs 22,075 (formula) or 22,500 (rule); a 0.25-point lift needs about 230,000. (<a href="#derive-n">02</a>, <a href="#cv">05</a>)</p>
+      <p><strong>Follow-up:</strong> the 0.8-point version needs 22,075 (formula) or 22,500 (rule); a 0.25-point lift needs about 230,000. (<a href="#derive-n">03</a>, <a href="#cv">06</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">6</span>What happens to the required sample size if you halve the MDE, want 90% power, use α = 0.01, go one-sided, halve the variance, or split 90/10?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">10</span>What happens to the required sample size if you halve the MDE, want 90% power, use α = 0.01, go one-sided, halve the variance, or split 90/10?</summary><div class="ans">
       <p><strong>×4, ×1.34, ×1.49, ×0.79, ×0.5, and ×2.78 total users.</strong></p>
       <ul>
         <li><strong>Halve the MDE:</strong> \(n \propto 1/\delta^2\), so ×4.</li>
@@ -1315,20 +1510,20 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>Half the variance</strong> (CUPED at \(\rho \approx 0.71\)): ×0.5.</li>
         <li><strong>90/10 split:</strong> SE \(\propto \sqrt{1/f + 1/(1-f)}\): \(11.1\) vs \(4\) for 50/50, so 2.78× the total for the same precision. The small arm is the bottleneck.</li>
       </ul>
-      <p><strong>Follow-up:</strong> variance reduction is the cheapest lever because it costs no extra time. (<a href="#moves">02</a>)</p>
+      <p><strong>Follow-up:</strong> variance reduction is the cheapest lever because it costs no extra time. (<a href="#moves">03</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">7</span>A small test shows a big, significant lift. Why might you distrust it?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">11</span>A small test shows a big, significant lift. Why might you distrust it?</summary><div class="ans">
       <p><strong>Because at low power, only estimates inflated by noise can cross the significance line: the winner's curse.</strong></p>
       <ul>
         <li><strong>The mechanism:</strong> with 10,000 per arm on a 10% baseline, a result is significant only if the observed lift exceeds \(1.96 \times 0.00424 = 0.83\) points. If the truth is 0.25 points, power is 9%, and the significant results overstate it by 4.1× on average (Type M); 6% of them even have the wrong sign (Type S).</li>
         <li><strong>The tell:</strong> a lift much bigger than past experiments in the area, from a test sized for a bigger effect, with p just under 0.05.</li>
         <li><strong>What to do:</strong> replicate, or extend the test; shrink the estimate towards historical effects (a Bayesian prior); plan the next launch on a conservative number.</li>
       </ul>
-      <p><strong>Follow-up:</strong> “compute the observed power” doesn't help: it's a function of the p-value (p = 0.05 always gives about 50%). (<a href="#typem">02</a>)</p>
+      <p><strong>Follow-up:</strong> “compute the observed power” doesn't help: it's a function of the p-value (p = 0.05 always gives about 50%). (<a href="#typem">03</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">8</span>One-sided or two-sided? When is one-sided acceptable?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">12</span>One-sided or two-sided? When is one-sided acceptable?</summary><div class="ans">
       <p><strong>Two-sided by default. One-sided only if chosen before the data and a result in the other direction would lead to the same action as no effect.</strong></p>
       <ul>
         <li><strong>What it does:</strong> puts all of \(\alpha\) in one tail, so the critical value drops from 1.96 to 1.645 and power rises (about 21% fewer users).</li>
@@ -1336,10 +1531,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>Why switching after seeing the data is p-hacking:</strong> choosing the tail that matches the observed sign means you'd “find” an effect whenever \(\lvert z \rvert \gt 1.645\), which happens 10% of the time under \(H_0\). The running example: two-sided 0.064, one-sided 0.032.</li>
         <li><strong>Cost:</strong> a one-sided test can't tell you the change hurt.</li>
       </ul>
-      <p><strong>Follow-up:</strong> to show a change is <em>not worse</em>, use a non-inferiority test (one-sided, against a margin) or two one-sided tests for equivalence; a non-significant two-sided test proves nothing. (<a href="#sides">01</a>, <a href="#tost">01</a>)</p>
+      <p><strong>Follow-up:</strong> to show a change is <em>not worse</em>, use a non-inferiority test (one-sided, against a margin) or two one-sided tests for equivalence; a non-significant two-sided test proves nothing. (<a href="#sides">02</a>, <a href="#tost">02</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">9</span>t or z? And Student's t or Welch's t?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">13</span>t or z? And Student's t or Welch's t?</summary><div class="ans">
       <p><strong>t when the spread is estimated from a small sample (at A/B-test sizes t and z coincide); and Welch rather than Student, because it doesn't assume equal variances and costs almost nothing when they are equal.</strong></p>
       <ul>
         <li><strong>Why t:</strong> \(t = (\bar x - \mu_0)/(s/\sqrt n)\). When \(s\) happens to come out small, \(t\) is inflated, so its tails are heavier than a normal's. For normal data it follows Student's t with \(n - 1\) degrees of freedom: critical values 2.571 at 5, 2.228 at 10, 2.042 at 30, 1.984 at 100. Using 1.96 with \(n = 5\) gives 12% false positives.</li>
@@ -1348,10 +1543,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>When variances are equal:</strong> power 33.9% (Welch) vs 34.0% (Student) in a simulation.</li>
         <li><strong>Don't pre-test</strong> for equal variances and then choose; the two-stage procedure has worse error rates than always using Welch.</li>
       </ul>
-      <p><strong>Follow-up:</strong> t is exact only for normal data, so small, skewed samples call for a permutation or exact test. Student is fairly robust with equal group sizes, which is why the problem shows up in unbalanced rollouts. (<a href="#zt">03</a>, <a href="#welch">03</a>)</p>
+      <p><strong>Follow-up:</strong> t is exact only for normal data, so small, skewed samples call for a permutation or exact test. Student is fairly robust with equal group sizes, which is why the problem shows up in unbalanced rollouts. (<a href="#zt">04</a>, <a href="#welch">04</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">10</span>When would you use a paired test, and why is it more powerful?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">14</span>When would you use a paired test, and why is it more powerful?</summary><div class="ans">
       <p><strong>When the same units are measured twice (before and after, two models on the same queries) or are naturally matched. Pairing removes the between-unit variance.</strong></p>
       <ul>
         <li><strong>The mechanism:</strong> \(\operatorname{Var}(\text{after} - \text{before}) = \sigma_a^2 + \sigma_b^2 - 2\rho\sigma_a\sigma_b\). With high correlation, almost all the variance cancels.</li>
@@ -1359,20 +1554,20 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>The non-parametric version:</strong> Wilcoxon signed-rank.</li>
         <li><strong>Caveat:</strong> before/after without a control group isn't an experiment: anything else that changed in between is mixed in.</li>
       </ul>
-      <p><strong>Follow-up:</strong> CUPED is the A/B-test version of the same idea, using pre-period behaviour as the “before”. (<a href="#paired">03</a>)</p>
+      <p><strong>Follow-up:</strong> CUPED is the A/B-test version of the same idea, using pre-period behaviour as the “before”. (<a href="#paired">04</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">11</span>What does the Mann–Whitney U test actually test? When could it mislead on revenue?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">15</span>What does the Mann–Whitney U test actually test? When could it mislead on revenue?</summary><div class="ans">
       <p><strong>Whether a random draw from B tends to beat a random draw from A: whether \(P(B \gt A) + \tfrac12 P(B = A)\) differs from ½ (formally its null is identical distributions). It tests medians, or means, only if one distribution is a shifted copy of the other.</strong></p>
       <ul>
         <li><strong>The mechanism:</strong> rank all values together; \(U\) counts the pairs B wins, ties counting half.</li>
         <li><strong>Where it misleads:</strong> B converts 11% vs 10%, but buyers spend 80 vs 100, so mean revenue per user is 8.8 vs 10.0: B loses money. With lognormal spend and 50,000 per arm, Welch typically says A is better (\(p \approx 5 \times 10^{-5}\)) while Mann–Whitney says B is “better” (\(p \approx 6 \times 10^{-6}\)); in 98% of simulated runs both were significant in opposite directions. Most pairs are zero-zero ties and B has more non-zeros.</li>
         <li><strong>When it's right:</strong> ordinal data (ratings), small samples, or when “does the typical user do better?” is the question.</li>
       </ul>
-      <p><strong>Follow-up:</strong> for skewed revenue, keep the mean and fix the noise (capping, CUPED, more users) rather than changing the question. (<a href="#mwu">03</a>)</p>
+      <p><strong>Follow-up:</strong> for skewed revenue, keep the mean and fix the noise (capping, CUPED, more users) rather than changing the question. (<a href="#mwu">04</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">12</span>What is a chi-square test? How does it relate to the two-proportion z-test, and when do you use Fisher's exact test?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">16</span>What is a chi-square test? How does it relate to the two-proportion z-test, and when do you use Fisher's exact test?</summary><div class="ans">
       <p><strong>It compares observed counts with the counts expected under a null: \(\chi^2 = \sum (O - E)^2/E\). For a 2×2 table it equals the two-proportion z-test squared. Fisher's test replaces it when expected counts are small.</strong></p>
       <ul>
         <li><strong>Independence:</strong> \(E\) = row total × column total / grand total; \((r-1)(c-1)\) degrees of freedom.</li>
@@ -1380,20 +1575,20 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>The link:</strong> the running example's 2×2 table gives \(\chi^2 = 3.43 = 1.85^2\), same \(p = 0.064\).</li>
         <li><strong>Small counts:</strong> when expected counts fall below about 5, the approximation breaks. 9/20 vs 2/20: chi-square \(p = 0.013\), Yates-corrected 0.034, Fisher exact 0.031.</li>
       </ul>
-      <p><strong>Follow-up:</strong> exact tests on counts are slightly conservative because the achievable p-values jump. (<a href="#props">03</a>)</p>
+      <p><strong>Follow-up:</strong> exact tests on counts are slightly conservative because the achievable p-values jump. (<a href="#props">04</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">13</span>Bootstrap vs permutation test: what does each give, and when do you use them?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">17</span>Bootstrap vs permutation test: what does each give, and when do you use them?</summary><div class="ans">
       <p><strong>The bootstrap gives an interval (uncertainty around the data as they are); a permutation test gives a p-value (how unusual the data are when labels are shuffled).</strong></p>
       <ul>
         <li><strong>Bootstrap:</strong> resample units with replacement, recompute the statistic, take percentiles. For medians, percentiles, ratios, anything without a formula. Fails for tiny samples, extremes like the maximum, heavy tails (it can't invent unseen whales), and dependent data resampled as independent.</li>
         <li><strong>Permutation:</strong> under the sharp null labels are arbitrary; shuffle them and recompute. Exact under randomization, any statistic. A = 3, 5, 4, 6 vs B = 7, 8, 6, 9: 4 of 70 splits are as extreme, \(p = 0.057\) (a t-test claims 0.017).</li>
         <li><strong>Both:</strong> resample or shuffle the randomized unit (users or clusters), never individual events.</li>
       </ul>
-      <p><strong>Follow-up:</strong> the permutation null is “identical distributions”, stronger than “equal means”. (<a href="#perm">03</a>, <a href="#boot">03</a>)</p>
+      <p><strong>Follow-up:</strong> the permutation null is “identical distributions”, stronger than “equal means”. (<a href="#perm">04</a>, <a href="#boot">04</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">14</span>Revenue per user is very skewed. Why can you still use a t-test, and how big must n be?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">18</span>Revenue per user is very skewed. Why can you still use a t-test, and how big must n be?</summary><div class="ans">
       <p><strong>The t-test needs the average to be normal, not the data, and the central limit theorem delivers that if n is large relative to the skew.</strong></p>
       <ul>
         <li><strong>CLT:</strong> \(\bar X \approx \mathcal N(\mu, \sigma^2/n)\) for any distribution with finite variance; the mean's skewness is \(\gamma/\sqrt n\).</li>
@@ -1401,10 +1596,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>Evidence:</strong> a one-sample t-test on exponential data (\(\gamma = 2\)) at \(n = 30\) gives 7.3% false positives, lopsided 6.6% low and 0.7% high; at 1,420 it's 4.8%. Balanced two-sample tests are more forgiving: the shared skew largely cancels in the difference.</li>
         <li><strong>When it fails:</strong> infinite variance (Pareto tail index below 2), or a sample too small to have seen the whales, so the SE is underestimated.</li>
       </ul>
-      <p><strong>Trap:</strong> revenue per user never becomes normal; only its average does. And \(\text{SE} = \sqrt{p(1-p)/n}\), not \(p(1-p)/\sqrt n\). (<a href="#clt">04</a>)</p>
+      <p><strong>Trap:</strong> revenue per user never becomes normal; only its average does. And \(\text{SE} = \sqrt{p(1-p)/n}\), not \(p(1-p)/\sqrt n\). (<a href="#clt">05</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">15</span>Your revenue metric is driven by a few whales. How do you test it?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">19</span>Your revenue metric is driven by a few whales. How do you test it?</summary><div class="ans">
       <p><strong>Keep the mean as the target and reduce its noise: cap at a pre-set high percentile, add CUPED, and size the test with the metric's real variance. Know what a log or trimmed mean would change.</strong></p>
       <ul>
         <li><strong>The problem:</strong> 5% buyers with lognormal spend gives a CV of about 14; the top 1% of users bring 75% of revenue. A 10% lift needs about 296,000 users per arm.</li>
@@ -1413,10 +1608,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>Trimmed mean:</strong> trimming 10% per side removes every buyer when only 5% buy: power 0.</li>
         <li><strong>Mann–Whitney:</strong> tests mostly conversion here: about 5% power, no better than chance.</li>
       </ul>
-      <p><strong>Follow-up:</strong> report the uncapped estimate too. Splitting revenue into conversion × spend per buyer helps explain a result, but spend per buyer compares different sets of buyers in the two arms, so it's a description, not a causal effect; revenue per randomized user stays the decision metric. (<a href="#tail-fixes">04</a>, <a href="#traps">06</a>)</p>
+      <p><strong>Follow-up:</strong> report the uncapped estimate too. Splitting revenue into conversion × spend per buyer helps explain a result, but spend per buyer compares different sets of buyers in the two arms, so it's a description, not a causal effect; revenue per randomized user stays the decision metric. (<a href="#tail-fixes">05</a>, <a href="#traps">07</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">16</span>Drill: 80 heads in 100 tosses. Is the coin biased? What about 60?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">20</span>Drill: 80 heads in 100 tosses. Is the coin biased? What about 60?</summary><div class="ans">
       <p><strong>80: yes, overwhelmingly (z = 6, p ≈ 10⁻⁹). 60: borderline, and the exact test says not at 5%.</strong></p>
       <ul>
         <li><strong>Setup:</strong> fair coin, \(X \sim \text{Bin}(100, 0.5)\): mean 50, sd \(\sqrt{100 \times 0.25} = 5\).</li>
@@ -1424,10 +1619,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>60 heads:</strong> \(z = 2.0\), normal \(p = 0.046\); with the continuity correction \(z = 1.9\), \(p = 0.057\); exact \(p = 0.057\). The uncorrected normal is too optimistic at the boundary.</li>
         <li><strong>The exact rule:</strong> reject at 5% for 61+ or 39− heads; its actual false-positive rate is 3.5% because counts are whole numbers.</li>
       </ul>
-      <p><strong>Follow-up:</strong> 8 of 10 heads: exact \(p = 0.11\), not significant (the normal approximation says 0.058; at \(np = 5\) it's unreliable). To detect a 55% coin with 80% power: about 783 tosses. (<a href="#coin">05</a>)</p>
+      <p><strong>Follow-up:</strong> 8 of 10 heads: exact \(p = 0.11\), not significant (the normal approximation says 0.058; at \(np = 5\) it's unreliable). To detect a 55% coin with 80% power: about 783 tosses. (<a href="#coin">06</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">17</span>Drill: X ~ N(10, 9) and Y ~ N(5, 16), independent. What is P(X > Y)? And do overlapping confidence intervals mean no significant difference?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">21</span>Drill: X ~ N(10, 9) and Y ~ N(5, 16), independent. What is P(X > Y)? And do overlapping confidence intervals mean no significant difference?</summary><div class="ans">
       <p><strong>P(X > Y) = Φ(1) ≈ 0.84. And no: overlapping intervals can still hide a significant difference.</strong></p>
       <ul>
         <li><strong>Difference of normals:</strong> \(X - Y \sim \mathcal N(10 - 5,\ 9 + 16) = \mathcal N(5, 25)\); variances add even when subtracting. \(P(X - Y \gt 0) = P(Z \gt -1) = 0.84\).</li>
@@ -1435,10 +1630,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>Sums:</strong> four draws of \(\mathcal N(10, 9)\) sum to \(\mathcal N(40, 36)\); their mean is \(\mathcal N(10, 2.25)\).</li>
         <li><strong>Overlap:</strong> means 10 and 13, each SE 1. Intervals [8.04, 11.96] and [11.04, 14.96] overlap, but the difference has SE \(\sqrt 2 = 1.41\), \(z = 2.12\), \(p = 0.034\). Non-overlap needs a gap of 3.92; significance needs only 2.77. Intervals that just touch mean \(p \approx 0.006\).</li>
       </ul>
-      <p>(<a href="#normals">05</a>, <a href="#overlap">05</a>)</p>
+      <p>(<a href="#normals">06</a>, <a href="#overlap">06</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">18</span>Design an A/B test for a new checkout flow, end to end.</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">22</span>Design an A/B test for a new checkout flow, end to end.</summary><div class="ans">
       <p><strong>Metric and guardrails, unit, MDE and sample size, assignment, checks, analysis, decision rule: all written down before launch.</strong></p>
       <ul>
         <li><strong>Metric:</strong> primary = orders per user (or conversion); guardrails = revenue per user, payment failures, latency, refunds; trust = sample ratio.</li>
@@ -1449,10 +1644,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>Analysis:</strong> Welch or z on per-user values with CUPED; delta method for ratio metrics; pre-registered segments only; Holm for several variants.</li>
         <li><strong>Decision:</strong> the interval against a practical threshold, guardrails fine, novelty checked (daily effect stable).</li>
       </ul>
-      <p>(<a href="#ab">06</a>)</p>
+      <p>(<a href="#ab">07</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">19</span>You randomize by user but measure click-through rate per page view. What's wrong with the usual z-test, and how do you fix it?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">23</span>You randomize by user but measure click-through rate per page view. What's wrong with the usual z-test, and how do you fix it?</summary><div class="ans">
       <p><strong>It treats page views as independent when they're clustered within users, so the SE is too small and false positives soar. Fix it with the delta method on per-user totals, clustered standard errors, or a user-level bootstrap.</strong></p>
       <ul>
         <li><strong>Why:</strong> some users click a lot and some never, so one user's page views are correlated. The effective sample is closer to the number of users.</li>
@@ -1460,10 +1655,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>The design effect:</strong> \(1 + (m-1)\,\text{ICC} = 1 + 9 \times 0.09 \approx 1.82\), and \(\sqrt{1.82} = 1.35\); uneven page views per user push it to the simulated 1.38.</li>
         <li><strong>Delta method:</strong> \(\operatorname{Var}(\bar Y/\bar X) \approx \frac{1}{n\mu_X^2}(\sigma_Y^2 - 2R\sigma_{XY} + R^2\sigma_X^2)\), with per-user clicks \(Y\) and views \(X\).</li>
       </ul>
-      <p><strong>Follow-up:</strong> an A/A test would have exposed it: 16% significant instead of 5%. (<a href="#units">06</a>)</p>
+      <p><strong>Follow-up:</strong> an A/A test would have exposed it: 16% significant instead of 5%. (<a href="#units">07</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">20</span>How do you assign users to arms? Why a salted hash, and why not user ID mod 2?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">24</span>How do you assign users to arms? Why a salted hash, and why not user ID mod 2?</summary><div class="ans">
       <p><strong>bucket = hash(experiment salt + user id) mod 1000, with ranges of buckets mapped to arms. It's random-looking, stable for each user, needs no storage, and is independent across experiments.</strong></p>
       <ul>
         <li><strong>The hash</strong> scrambles IDs so buckets are uniform and unrelated to user traits.</li>
@@ -1471,20 +1666,20 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>ID mod 2 or a phone number's last digit:</strong> IDs and numbers are often assigned by signup time, region, carrier or shard, so they can correlate with behaviour; the split is the same in every experiment, so carry-over and fatigue pile onto one half; and it can be predicted or gamed.</li>
         <li><strong>Verify:</strong> SRM test on the split; pre-period metrics balanced.</li>
       </ul>
-      <p>(<a href="#hashing">06</a>)</p>
+      <p>(<a href="#hashing">07</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">21</span>What is an A/A test, and what does it catch?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">25</span>What is an A/A test, and what does it catch?</summary><div class="ans">
       <p><strong>An experiment where both arms get the same experience. Since nothing differs, about 5% of A/A tests should be significant at 5% and their p-values should be uniform; anything else exposes a broken pipeline.</strong></p>
       <ul>
         <li><strong>Catches:</strong> wrong standard errors (page views treated as independent: 16% significant instead of 5%), broken or biased assignment, sample ratio mismatch, logging that differs by arm, bot filtering applied unevenly, metric bugs.</li>
         <li><strong>How:</strong> run many, or replay historical data over many random splits, and look at the p-value histogram: flat is good, a pile-up near 0 means the variance is underestimated.</li>
         <li><strong>Can't catch:</strong> problems that need a real treatment, such as interference or a treatment that changes who gets logged.</li>
       </ul>
-      <p>(<a href="#aa">06</a>)</p>
+      <p>(<a href="#aa">07</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">22</span>Drill: a 50/50 test has 100,800 users in control and 99,200 in treatment. Is that a problem? What do you do?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">26</span>Drill: a 50/50 test has 100,800 users in control and 99,200 in treatment. Is that a problem? What do you do?</summary><div class="ans">
       <p><strong>Yes: χ² = 12.8, p = 0.00035. That's a sample ratio mismatch; don't trust the result until the cause is found.</strong></p>
       <ul>
         <li><strong>Calculation:</strong> expected 100,000 each; \(\chi^2 = 800^2/100{,}000 + 800^2/100{,}000 = 6.4 + 6.4 = 12.8\) on 1 degree of freedom, \(p = 0.00035\). Usual alert threshold \(p \lt 0.001\).</li>
@@ -1492,10 +1687,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>Why it matters:</strong> something removed users unevenly, and the removed users aren't random, so the arms are no longer comparable.</li>
         <li><strong>Usual causes:</strong> treatment crashes or loads slower before logging; bot filtering reacting to the treatment; redirects; eligibility checked after assignment; a mid-test ramp change; hashing bugs.</li>
       </ul>
-      <p><strong>Follow-up:</strong> for a 90/10 design, test against 90/10: 90,500 vs 9,500 gives \(\chi^2 = 27.8\). (<a href="#srm">06</a>)</p>
+      <p><strong>Follow-up:</strong> for a 90/10 design, test against 90/10: 90,500 vs 9,500 gives \(\chi^2 = 27.8\). (<a href="#srm">07</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">23</span>Explain CUPED. Derive θ and the variance reduction. What if ρ = 0.6?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">27</span>Explain CUPED. Derive θ and the variance reduction. What if ρ = 0.6?</summary><div class="ans">
       <p><strong>Subtract the part of the metric that pre-experiment behaviour predicts: \(Y^{\text{cv}} = Y - \theta(X - \bar X)\) with \(\theta = \operatorname{Cov}(Y, X)/\operatorname{Var}(X)\). Variance falls by the factor \(1 - \rho^2\); the effect estimate stays unbiased.</strong></p>
       <ul>
         <li><strong>Derivation:</strong> \(\operatorname{Var}(Y^{\text{cv}}) = \operatorname{Var}(Y) - 2\theta\operatorname{Cov}(Y,X) + \theta^2\operatorname{Var}(X)\). Set the derivative \(-2\operatorname{Cov} + 2\theta\operatorname{Var}(X)\) to 0: \(\theta^* = \operatorname{Cov}/\operatorname{Var}(X)\). Plug in: \(\operatorname{Var}(Y)(1 - \rho^2)\).</li>
@@ -1503,10 +1698,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>\(\rho = 0.6\):</strong> variance × 0.64, SE × 0.80, 36% fewer users for the same power. In a simulation: SE 0.424 → 0.340, power 48% → 66%, estimate unchanged.</li>
         <li><strong>Rules:</strong> one \(\theta\) from pooled data; the covariate must be unaffected by treatment (pre-period only); new users get \(X = 0\) plus an indicator.</li>
       </ul>
-      <p><strong>Follow-up:</strong> it's essentially regression adjustment: \(Y\) on treatment and centred \(X\). (<a href="#cuped">06</a>)</p>
+      <p><strong>Follow-up:</strong> it's essentially regression adjustment: \(Y\) on treatment and centred \(X\). (<a href="#cuped">07</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">24</span>How long should a test run? What are novelty and primacy effects?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">28</span>How long should a test run? What are novelty and primacy effects?</summary><div class="ans">
       <p><strong>As long as the sample size needs, rounded up to whole weeks (often at least two), and longer if the effect is still drifting.</strong></p>
       <ul>
         <li><strong>Weeks:</strong> behaviour differs by weekday; a partial week estimates a different effect.</li>
@@ -1515,10 +1710,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>Detecting them:</strong> plot the daily treatment effect, or compare cohorts by first exposure date; analyse new users, who have no old habit.</li>
         <li><strong>Long-term:</strong> keep a long-running holdout for effects that take months.</li>
       </ul>
-      <p><strong>Follow-up:</strong> don't stop early just because it's significant (question 26), and don't extend it just because it isn't: both bias the result. (<a href="#duration">06</a>)</p>
+      <p><strong>Follow-up:</strong> don't stop early just because it's significant (question 30), and don't extend it just because it isn't: both bias the result. (<a href="#duration">07</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">25</span>You're testing a ranking change in a two-sided marketplace. Why is a user-level A/B biased, and what would you do?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">29</span>You're testing a ranking change in a two-sided marketplace. Why is a user-level A/B biased, and what would you do?</summary><div class="ans">
       <p><strong>Treatment and control buyers compete for the same supply, so one arm's outcome depends on the other's treatment (SUTVA fails). Randomize at a level where they don't interact: switchbacks or clusters.</strong></p>
       <ul>
         <li><strong>The bias:</strong> treatment buyers grab the best listings, control buyers get what's left. Treatment looks better partly because control got worse; at full launch nobody gets that head start, so the test overestimates.</li>
@@ -1526,10 +1721,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>Cluster (geo) randomization:</strong> whole cities per arm. Fewer units: with clusters of 100 and ICC 0.01, the design effect is 1.99, so the effective sample halves.</li>
         <li><strong>Social products</strong> have the opposite bias: control users are partly treated by their treated friends, so the test underestimates.</li>
       </ul>
-      <p>(<a href="#interference">06</a>)</p>
+      <p>(<a href="#interference">07</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">26</span>Your PM checks the dashboard daily and wants to stop as soon as it's significant. What's the problem, and what do you propose?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">30</span>Your PM checks the dashboard daily and wants to stop as soon as it's significant. What's the problem, and what do you propose?</summary><div class="ans">
       <p><strong>Each look is another chance for noise to cross 1.96. Daily looks for 14 days turn a 5% false-positive rate into about 22%. Propose a fixed horizon, or a sequential design built for looking.</strong></p>
       <ul>
         <li><strong>Why:</strong> z wanders like a random walk; it's standard normal at any one pre-chosen time, but the chance it crosses the line <em>somewhere</em> grows with every look: 14% for 5 looks, 19% for 10, 25% for 20, 37% for 100.</li>
@@ -1537,10 +1732,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>Always-valid tests</strong> (mSPRT, confidence sequences): look any time, at the cost of wider intervals.</li>
         <li><strong>Allowed:</strong> daily monitoring of guardrails and SRM, and stopping for harm.</li>
       </ul>
-      <p><strong>Follow-up:</strong> “Bayesian tests let you peek” isn't true for decisions: “ship when \(P(B \gt A) \gt 0.95\)” checked daily ships 19% of A/A tests. (<a href="#peeking">07</a>)</p>
+      <p><strong>Follow-up:</strong> “Bayesian tests let you peek” isn't true for decisions: “ship when \(P(B \gt A) \gt 0.95\)” checked daily ships 19% of A/A tests. (<a href="#peeking">08</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">27</span>Drill: ten metrics with sorted p-values 0.001, 0.0054, 0.012, 0.019, 0.030, 0.041, 0.10, 0.25, 0.60, 0.90. What survives Bonferroni, Holm and Benjamini–Hochberg at 0.05?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">31</span>Drill: ten metrics with sorted p-values 0.001, 0.0054, 0.012, 0.019, 0.030, 0.041, 0.10, 0.25, 0.60, 0.90. What survives Bonferroni, Holm and Benjamini–Hochberg at 0.05?</summary><div class="ans">
       <p><strong>Bonferroni 1, Holm 2, BH 4 (unadjusted: 6).</strong></p>
       <ul>
         <li><strong>Bonferroni:</strong> \(p \le 0.05/10 = 0.005\): only 0.001.</li>
@@ -1549,10 +1744,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>Why it matters:</strong> 10 independent tests at 5% with no real effects give at least one false positive 40% of the time.</li>
         <li><strong>Which to use:</strong> Holm (family-wise error) when any false claim is costly (variants, guardrails); BH (false discovery rate) for screening many metrics. In a simulation with 100 tests and 10 real effects, BH found 51% of them with 4.6% false discoveries; Holm 32% with 1.5%.</li>
       </ul>
-      <p>(<a href="#multiple">07</a>)</p>
+      <p>(<a href="#multiple">08</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">28</span>The overall effect isn't significant, but it is for Android users (p = 0.03) and not for iOS (p = 0.20). What do you conclude?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">32</span>The overall effect isn't significant, but it is for Android users (p = 0.03) and not for iOS (p = 0.20). What do you conclude?</summary><div class="ans">
       <p><strong>Not much yet. Slicing creates multiple tests, and “significant here, not there” isn't a test of whether the effects differ.</strong></p>
       <ul>
         <li><strong>Multiple testing:</strong> with 20 segments and no real effect anywhere, the chance at least one shows \(p \lt 0.05\) is \(1 - 0.95^{20} = 64\%\).</li>
@@ -1560,10 +1755,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>Power:</strong> each segment has a fraction of the users, so segment estimates are noisier and significant ones exaggerated.</li>
         <li><strong>What to do:</strong> treat it as a hypothesis; was the segment pre-registered with a reason? Correct for the number of segments; confirm with a new test targeted at Android.</li>
       </ul>
-      <p>(<a href="#hte">06</a>)</p>
+      <p>(<a href="#hte">07</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">29</span>The result is significant but the lift is tiny. Or it isn't significant but the interval is wide. Do you ship?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">33</span>The result is significant but the lift is tiny. Or it isn't significant but the interval is wide. Do you ship?</summary><div class="ans">
       <p><strong>Decide from the confidence interval against the smallest effect worth having (and the cost and risk of the change), not from the p-value alone.</strong></p>
       <ul>
         <li><strong>Significant, tiny:</strong> with enough users any non-zero effect is significant. If the whole interval is below the practical threshold, the change isn't worth it on this metric; ship only if it's cheap and has other reasons.</li>
@@ -1571,10 +1766,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>Not significant, narrow around 0:</strong> a real negative result; the test was informative.</li>
         <li><strong>Significant and above the threshold, guardrails fine:</strong> ship. A significantly worse guardrail is a trade-off to escalate.</li>
       </ul>
-      <p><strong>Follow-up:</strong> reversibility, maintenance cost and strategy also enter, and the test doesn't measure them. (<a href="#ship">06</a>)</p>
+      <p><strong>Follow-up:</strong> reversibility, maintenance cost and strategy also enter, and the test doesn't measure them. (<a href="#ship">07</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">30</span>The feature won its A/B test, but after launch the metric barely moved. Why might that be?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">34</span>The feature won its A/B test, but after launch the metric barely moved. Why might that be?</summary><div class="ans">
       <p><strong>Usually some mix of an exaggerated test estimate, an effect that faded, dilution, interference and a changed world; occasionally a bug.</strong></p>
       <ul>
         <li><strong>Winner's curse:</strong> significant results from modestly powered tests overstate the effect (4.1× at 9% power), and among many tests some winners are false positives.</li>
@@ -1584,10 +1779,10 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>The world changed:</strong> seasonality, a different traffic mix, other launches, a test window that wasn't representative.</li>
         <li><strong>Twyman's law:</strong> if the test lift looked too good, a sample-ratio, logging or metric bug may have produced it.</li>
       </ul>
-      <p><strong>Follow-up:</strong> a long-running holdout measures the launched effect directly, and shrinking test estimates towards historical lifts makes forecasts honest. (<a href="#typem">02</a>, <a href="#traps">06</a>)</p>
+      <p><strong>Follow-up:</strong> a long-running holdout measures the launched effect directly, and shrinking test estimates towards historical lifts makes forecasts honest. (<a href="#typem">03</a>, <a href="#traps">07</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">31</span>How does a Bayesian A/B test work? What is P(B > A), and does it let you peek?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">35</span>How does a Bayesian A/B test work? What is P(B > A), and does it let you peek?</summary><div class="ans">
       <p><strong>Beta priors on each arm's rate, updated with the counts to Beta posteriors; P(B > A) and the expected loss come from comparing draws. It answers the natural question, but peeking still inflates wrong decisions.</strong></p>
       <ul>
         <li><strong>Conjugacy:</strong> \(\text{Beta}(a, b)\) prior + \(x\) of \(n\) converting → \(\text{Beta}(a + x, b + n - x)\).</li>
@@ -1596,22 +1791,25 @@ def ratio_delta_var(y, x):   <span class="cm"># per-user clicks, views</span>
         <li><strong>Priors matter:</strong> a prior centred on 10% for both arms worth 10,000 users drops \(P(B \gt A)\) to 0.907 and halves the estimated lift; defensible if built from past experiments.</li>
         <li><strong>Peeking:</strong> “ship when \(P(B \gt A) \gt 0.95\)” ships 5% of A/A tests checked once, 19% checked daily for 14 days.</li>
       </ul>
-      <p>(<a href="#bayes">08</a>)</p>
+      <p>(<a href="#bayes">09</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">32</span>A feature launched in one city without an experiment. How do you estimate its effect?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">36</span>A feature launched in one city without an experiment. How do you estimate its effect?</summary><div class="ans">
       <p><strong>Build a credible counterfactual: difference-in-differences against similar cities, or a synthetic control; check the key assumption with pre-period data and placebos.</strong></p>
       <ul>
         <li><strong>DiD:</strong> treated city 100 → 120, control 80 → 90: effect \(20 - 10 = 10\). Assumes parallel trends; check that pre-period trends match, and that a fake earlier launch date finds nothing.</li>
         <li><strong>Synthetic control:</strong> a weighted mix of untreated cities matching the treated one's pre-period path; placebo runs on donor cities.</li>
         <li><strong>Other designs by situation:</strong> regression discontinuity if a score cut-off decided who got it; interrupted time series with only one series (weakest: anything else that changed at the same time is confounded); propensity matching or weighting if users opted in (assumes no unmeasured confounding, which motivated opt-in users usually violate).</li>
       </ul>
-      <p><strong>Follow-up:</strong> next time, keep a randomized holdout, even a small one. (<a href="#causal">09</a>)</p>
+      <p><strong>Follow-up:</strong> next time, keep a randomized holdout, even a small one. (<a href="#causal">10</a>)</p>
     </div></details>
 
     <!-- sheet -->
-    <h2 id="sheet"><span class="pn">12</span>Cheat sheet</h2>
+    <h2 id="sheet"><span class="pn">13</span>Cheat sheet</h2>
     <div class="sheet">
+      <h3>Building blocks</h3>
+      <div class="mj">\[ \begin{aligned} s^2 &amp;= \frac{1}{n-1}\sum (x_i - \bar x)^2 \\ \text{SE}(\bar x) &amp;= \sigma/\sqrt n \\ \text{SE}(\hat p_B - \hat p_A) &amp;= \sqrt{\text{SE}_A^2 + \text{SE}_B^2} \\ z &amp;= (\text{estimate} - \text{value under } H_0)/\text{SE} \\ \text{CI} &amp;= \text{estimate} \pm z \times \text{SE} \end{aligned} \]</div>
+      <p>The SD describes users and doesn't shrink as you add users; the SE describes the average and falls like \(1/\sqrt n\). Variances add for sums and differences of independent things: add variances, not SEs. A bell holds 68%, 95% and 99.7% within ±1, ±2 and ±3 SDs; cut-offs 1.645, 1.96 and 2.576 for 90%, 95% and 99%. Running example: \(\text{SE}_A = 0.003\), SE of the gap 0.00432, z 1.85.</p>
       <h3>The test</h3>
       <p>Pooled two-proportion z, p-value, interval (unpooled SE):</p>
       <div class="mj">\[ \begin{aligned} z &amp;= \frac{\hat p_B - \hat p_A}{\sqrt{\hat p(1-\hat p)(1/n_A + 1/n_B)}} \\ p &amp;= 2\big(1 - \Phi(\lvert z \rvert)\big) \\ \text{CI} &amp;= (\hat p_B - \hat p_A) \pm 1.96\sqrt{\frac{\hat p_A(1-\hat p_A)}{n_A} + \frac{\hat p_B(1-\hat p_B)}{n_B}} \end{aligned} \]</div>
