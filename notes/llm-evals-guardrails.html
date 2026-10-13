@@ -544,7 +544,7 @@ footer .site-nav { display: block; margin-top: 10px; }
 
     <!-- metrics -->
     <h2 id="metrics"><span class="pn">04</span>Metric types</h2>
-    <p>Three families, in order of preference: checks in code, comparisons with a reference answer, and reference-free judgments (usually a judge model). When the output is really a label (intent, route, escalate or not), it's a classifier and the usual tools apply: a confusion matrix, precision and recall.</p>
+    <p>Three families, in order of preference: checks in code, comparisons with a reference answer, and reference-free judgments (usually a judge model). When the output is really a label (intent, route, escalate or not), it's a classifier and the usual tools apply: a <a href="./evaluation.html#confusion">confusion matrix</a>, precision and recall.</p>
 
     <h3 id="programmatic">Programmatic checks</h3>
     <div class="tbl"><table>
@@ -654,7 +654,7 @@ REPLY: {reply}</code></pre>
     <ol>
       <li><strong>Label traces by hand</strong> for the criterion (pass/fail), by the person who owns quality. Include plenty of failures; oversample them if failures are rare, because a judge's value is mostly in catching them. Include enough passes too: when most outputs pass, the corrected pass rate below is most sensitive to how often the judge passes good outputs. Fifty to a hundred of each class is a sensible start.</li>
       <li><strong>Split the labels:</strong> a few for the judge's few-shot examples, a dev split to iterate the judge prompt on, and a test split scored once. Tuning the judge prompt on the same labels you measure it on overstates its accuracy.</li>
-      <li><strong>Score the judge as a classifier</strong> on the test split: its confusion matrix against the human labels, its TPR and TNR, and Cohen's \(\kappa\).</li>
+      <li><strong>Score the judge as a classifier</strong> on the test split: its <a href="./evaluation.html#confusion">confusion matrix</a> against the human labels, its TPR and TNR, and Cohen's \(\kappa\).</li>
     </ol>
     <p>Treat PASS as the positive class. The <strong>TPR</strong> (true positive rate) is the share of truly good outputs the judge passes; the <strong>TNR</strong> (true negative rate) is the share of truly bad outputs it fails, i.e. its recall on failures. <strong>Worked:</strong> 100 test labels.</p>
     <div class="tbl"><table>
@@ -730,7 +730,7 @@ REPLY: {reply}</code></pre>
     <h3 id="halluc-detect">Detecting it</h3>
     <ol>
       <li><strong>Claim extraction, then verification.</strong> An LLM splits the answer into atomic, self-contained claims (resolving “it” to “the item”), and each claim is checked against the context, either by a natural language inference (NLI) model that labels each claim entailed, contradicted or neutral (a <a href="./embeddings-vector-search.html#bi-cross">cross-encoder</a> reading context and claim together) or by a judge. Score: supported claims over all claims. This is the recipe behind FActScore, which checks each claim against a knowledge source such as Wikipedia and so measures factuality; RAG evaluation libraries apply the same recipe against the retrieved context, which measures faithfulness. Cost: one extraction call plus one check per claim (or one batched call). Failure points: extraction dropping or merging claims; claims that need two passages combined; NLI models trained on short sentences struggling with long contexts (check the claim against each chunk and take the best).</li>
-      <li><strong>Self-consistency (SelfCheckGPT).</strong> With no context to check against, sample several more answers to the same question at a non-zero temperature, and for each sentence of the main answer measure how many samples support it. Facts the model actually knows come back every time; invented details vary. Say the bot answered the returns question from memory, and five extra samples are drawn. The 30-day window appears in 5 of them, the 5–7 days in 4, free shipping in 2 and the coupon in none: inconsistency scores (one minus the support share) of 0, 0.2, 0.6 and 1.0, so the last two are flagged (pick the cut-off on labelled data, as in threshold choice). Cost: five extra generations make six in all. <strong>Limit:</strong> it measures the model's uncertainty, not truth. A confidently held false belief appears in every sample and passes.</li>
+      <li><strong>Self-consistency (SelfCheckGPT).</strong> With no context to check against, sample several more answers to the same question at a non-zero temperature, and for each sentence of the main answer measure how many samples support it. Facts the model actually knows come back every time; invented details vary. Say the bot answered the returns question from memory, and five extra samples are drawn. The 30-day window appears in 5 of them, the 5–7 days in 4, free shipping in 2 and the coupon in none: inconsistency scores (one minus the support share) of 0, 0.2, 0.6 and 1.0, so the last two are flagged (pick the cut-off on labelled data, as in <a href="./evaluation.html#threshold-choice">threshold choice</a>). Cost: five extra generations make six in all. <strong>Limit:</strong> it measures the model's uncertainty, not truth. A confidently held false belief appears in every sample and passes.</li>
       <li><strong>Citation checking.</strong> Make the answer cite article ids per sentence. Code checks that each cited id was actually retrieved (fabricated citations fail instantly, for free); then NLI or a judge checks that the cited passage supports its sentence.</li>
       <li><strong>Token probabilities</strong> (low-probability or high-entropy spans) are a weak signal, and need an API that returns log-probabilities. A stronger version, <strong>semantic entropy</strong>, samples several answers, groups them by meaning (two answers are in one group if each entails the other) and measures the entropy over the groups: many different meanings, high uncertainty.</li>
     </ol>
@@ -860,7 +860,7 @@ REPLY: {reply}</code></pre>
     </ul>
 
     <h3 id="guard-fp">False positives, and why they dominate</h3>
-    <p>Every guardrail is a classifier with a threshold, chosen like any other on labelled data, by what each mistake costs (threshold choice). Two pieces of arithmetic decide how they behave in production. First, false positives stack:</p>
+    <p>Every guardrail is a classifier with a threshold, chosen like any other on labelled data, by what each mistake costs (<a href="./evaluation.html#threshold-choice">threshold choice</a>). Two pieces of arithmetic decide how they behave in production. First, false positives stack:</p>
     <div class="mj">\[ P(\text{a good request is blocked}) = 1 - (1 - f)^k \]</div>
     <p>In words: a legitimate request survives only if every one of \(k\) independent checks lets it through, each wrongly blocking a share \(f\). Four checks at 1% block 3.94% of good traffic: about 790 of 20,000 conversations a day. That assumes the checks err independently; checks that flag the same messages block fewer, and the total can never exceed the sum, 4%.</p>
     <p>Second, rare attacks mean most blocks are mistakes. Say 0.1% of traffic is injection attempts, and the detector catches 95% of them (its TPR; here the positive class is “attack”, unlike the judge section, where it was PASS) while wrongly flagging 1% of normal messages:</p>
@@ -1249,7 +1249,7 @@ def pass_at_k(n, c, k):
         <li><strong>BLEU</strong> is n-gram precision with a brevity penalty (from translation); <strong>ROUGE</strong> is n-gram recall (from summarization). Both assume a reference close to the only right answer.</li>
         <li><strong>Embedding similarity and BERTScore</strong> handle paraphrase but stay blind to a changed number or an added “not”.</li>
         <li><strong>For meaning:</strong> required-facts checks, a reference-guided judge, and reference-free judges (faithfulness) where no reference exists.</li>
-        <li><strong>Without any model:</strong> schema and length; tool calls, arguments and order (lookup before refund; whole trajectories in <a href="./agents-tool-use.html#agent-evals">agent evals</a>); regexes for card numbers and banned phrases; cited ids actually retrieved; the hand-off flag; exact match on label-like outputs (then a confusion matrix); unit tests for code; latency and cost budgets. Usually most of the failure taxonomy, and exact, free and instant.</li>
+        <li><strong>Without any model:</strong> schema and length; tool calls, arguments and order (lookup before refund; whole trajectories in <a href="./agents-tool-use.html#agent-evals">agent evals</a>); regexes for card numbers and banned phrases; cited ids actually retrieved; the hand-off flag; exact match on label-like outputs (then a <a href="./evaluation.html#confusion">confusion matrix</a>); unit tests for code; latency and cost budgets. Usually most of the failure taxonomy, and exact, free and instant.</li>
         <li><strong>Where n-gram metrics are fine:</strong> translation and summarization benchmarks with several references; smoke tests on near-deterministic outputs.</li>
       </ul>
       <p>(<a href="#programmatic">04</a>, <a href="#reference-based">04</a>)</p>
@@ -1453,7 +1453,7 @@ def pass_at_k(n, c, k):
         <li><strong>Precision:</strong> \(0.00095/(0.00095 + 0.00999) = 0.087\): about 200 customers blocked to stop 19 attacks.</li>
         <li><strong>To reach 50% precision</strong> the false-positive rate must fall to 0.095%. At a 1% attack rate precision is 49%; at 5%, 83%.</li>
         <li><strong>Stacking:</strong> \(1 - 0.99^4 = 0.0394\), about 790 legitimate conversations a day.</li>
-        <li><strong>So:</strong> soft actions, thresholds set by cost (threshold choice), weekly review of blocked samples, and rely on permissions rather than detection.</li>
+        <li><strong>So:</strong> soft actions, thresholds set by cost (<a href="./evaluation.html#threshold-choice">threshold choice</a>), weekly review of blocked samples, and rely on permissions rather than detection.</li>
       </ul>
       <p>(<a href="#guard-fp">09</a>)</p>
     </div></details>

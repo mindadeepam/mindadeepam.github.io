@@ -451,7 +451,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p><strong>Designing the intent list is half the work.</strong> An intent should correspond to a different <em>next action</em>, not just a different topic. “What's my EMI?” and “EMI kitna hai?” are one intent. “I can't pay this month” and “I'll pay on Friday” may be one intent (<code>promise_to_pay</code>) if the flow is the same, or two if one of them routes to a hardship team. Intents that lead to the same action but are kept separate only create confusions that cost nothing to merge. Real users also send two intents in one turn (“pay my EMI and tell me the closure amount”), so either allow multi-label output or handle one and queue the other.</p>
 
     <h3 id="oos">Out-of-scope detection</h3>
-    <p>A classifier trained on six intents will assign every utterance to one of the six, including “what's the weather in Pune”. Its softmax probabilities sum to 1 over the known intents, so “none of these” isn't an option unless you build it in. And a high softmax score isn't evidence that the input is in scope: calibration is measured on data like the training data, and on inputs unlike it models are often confidently wrong. The ways to build it in:</p>
+    <p>A classifier trained on six intents will assign every utterance to one of the six, including “what's the weather in Pune”. Its softmax probabilities sum to 1 over the known intents, so “none of these” isn't an option unless you build it in. And a high softmax score isn't evidence that the input is in scope: <a href="./evaluation.html#calibration">calibration</a> is measured on data like the training data, and on inputs unlike it models are often confidently wrong. The ways to build it in:</p>
     <ul>
       <li><strong>Threshold the top probability:</strong> act only if the highest intent probability is at least \(t\); otherwise treat the turn as out of scope (or ask again).</li>
       <li><strong>Train an explicit out-of-scope class</strong> on real out-of-scope utterances from logs. Works for the kinds of out-of-scope you've seen, not for new ones.</li>
@@ -490,7 +490,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     </table></div>
     <p>In words: raising \(t\) trades in-scope accuracy for out-of-scope recall. Without a threshold the bot would treat “increase my credit card limit” as a loan closure, which is the expensive mistake. At 0.65 it catches all three out-of-scope requests and gives up two in-scope ones; above that it only loses more good turns.</p>
     <ul>
-      <li><strong>Pick \(t\) from what each mistake costs,</strong> on a validation set that contains real out-of-scope traffic from logs, not invented examples: acting on a wrong intent (a wrong backend action, a confused user) against saying “sorry, I didn't get that” to a user the bot could have served. That's the general recipe for choosing a threshold; <a href="./ds-project-lifecycle.html#threshold">from business costs</a> is the applied version.</li>
+      <li><strong>Pick \(t\) from what each mistake costs,</strong> on a validation set that contains real out-of-scope traffic from logs, not invented examples: acting on a wrong intent (a wrong backend action, a confused user) against saying “sorry, I didn't get that” to a user the bot could have served. That's the general recipe for <a href="./evaluation.html#threshold-choice">choosing a threshold</a>; <a href="./ds-project-lifecycle.html#threshold">from business costs</a> is the applied version.</li>
       <li><strong>Rejection isn't the end of the turn.</strong> A rejected turn gets a reprompt or a menu of what the bot can do (section <a href="#recovery">04</a>), so a false reject costs a turn, not the conversation.</li>
       <li><strong>The benchmark result to quote:</strong> on CLINC150 (150 intents plus out-of-scope queries), classifiers did well in scope but struggled to recognise out-of-scope queries. Out-of-scope recall is the number to watch.</li>
     </ul>
@@ -567,7 +567,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <tr><td><strong>Overall</strong></td><td colspan="3">Accuracy 0.90; macro F1 0.644; weighted F1 0.853</td></tr>
       </tbody>
     </table></div>
-    <p>In words: 90% accuracy, and every fraud report goes to the wrong place. Macro F1 (the plain average over intents) exposes it; weighted F1 mostly doesn't. Report macro F1 and the recall of each high-stakes intent, and read the confusion matrix to see which intents get mixed up (precision, recall and the confusion matrix).</p>
+    <p>In words: 90% accuracy, and every fraud report goes to the wrong place. Macro F1 (the plain average over intents) exposes it; weighted F1 mostly doesn't. Report macro F1 and the recall of each high-stakes intent, and read the confusion matrix to see which intents get mixed up (<a href="./evaluation.html#confusion">precision, recall and the confusion matrix</a>).</p>
     <p><strong>Slots: score spans, not tokens.</strong> A predicted slot counts as correct only if its type and both boundaries match a gold slot exactly (the CoNLL convention). Four test utterances:</p>
     <div class="tbl"><table>
       <thead><tr><th>Utterance</th><th>Gold slots</th><th>Predicted</th><th>Result</th></tr></thead>

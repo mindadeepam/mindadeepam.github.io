@@ -752,7 +752,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       <figcaption>The funnel, not to scale. Each stage spends more per item on fewer items, and each optimizes something different. The ranker can only reorder what retrieval found, so retrieval is judged on recall.</figcaption>
     </figure>
     <ul>
-      <li><strong>Each stage has its own job and metric.</strong> Retrieval must not lose good items: recall@K, the share of items the user later engaged with that made the candidate set (metric definitions are in the evaluation note). Ranking orders the top: nDCG, AUC and log loss per head. Re-ranking shapes the page as a whole.</li>
+      <li><strong>Each stage has its own job and metric.</strong> Retrieval must not lose good items: recall@K, the share of items the user later engaged with that made the candidate set (metric definitions are in the <a href="./evaluation.html#ranking-metrics">evaluation note</a>). Ranking orders the top: nDCG, AUC and log loss per head. Re-ranking shapes the page as a whole.</li>
       <li><strong>Retrieval sets the ceiling.</strong> If recall@1,500 is 60%, 40% of what the user would have engaged with never reaches the ranker, and no ranking model can recover it. Measure each stage on its own.</li>
     </ul>
 
@@ -841,7 +841,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ul>
       <li><em>Business:</em> total cost, meaning fraud losses plus the cost of friction for good customers (declines, extra verification).</li>
       <li><em>Online:</em> fraud losses in basis points of payment volume; decline rate; step-up rate and how many good customers complete it; complaints about wrongly declined payments.</li>
-      <li><em>Offline:</em> value-weighted recall (rupees of fraud caught) at a fixed false-positive rate or step-up capacity, and PR-AUC rather than ROC-AUC, which looks flattering when negatives outnumber positives 2,000 to 1. Calibration too, because the thresholds below use the score as a probability.</li>
+      <li><em>Offline:</em> value-weighted recall (rupees of fraud caught) at a fixed false-positive rate or step-up capacity, and <a href="./evaluation.html#pr-auc">PR-AUC</a> rather than ROC-AUC, which looks flattering when negatives outnumber positives 2,000 to 1. Calibration too, because the thresholds below use the score as a probability.</li>
     </ul>
     <p><strong>Labels.</strong> Confirmed fraud comes from chargebacks and customer reports, arriving over weeks to months. Faster proxies: the customer's “this wasn't me” report within days, a failed step-up. Train only on windows whose labels have matured (<a href="./ds-project-lifecycle.html#label-delay">label delay</a>). Declined payments never get a label; payments sent to step-up do (did the customer pass?), though noisily: some good customers abandon the check and some fraudsters pass it. That still keeps labels flowing in the grey zone, the part of the <a href="./ds-project-lifecycle.html#feedback">feedback loop</a> that matters most here.</p>
     <p><strong>Features, by tier.</strong></p>
@@ -925,7 +925,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ul>
       <li><strong>Over-predicting one ad</strong> hands it the slot: revenue on this slot falls 37.5%, users see an ad they're less than half as likely to click, and advertiser A pays ₹12.50 per click.</li>
       <li><strong>Over-predicting every ad equally</strong> changes neither the winner nor the price, because the ratio cancels. It still breaks everything that uses the number itself: reserve prices (an eCPM floor lets weak ads through), blending ads with organic posts in one feed, budget pacing and forecasts, and bids for conversions (a bid of “₹500 per purchase” becomes a per-impression value through the predicted rates).</li>
-      <li><strong>So calibration is checked per ad, per advertiser and per segment,</strong> not only on average (calibration). The usual metrics: log loss, often normalized by the log loss of always predicting the average CTR; the calibration ratio, predicted clicks ÷ actual clicks, which should sit near 1.0 overall and in every segment; and AUC for the ordering.</li>
+      <li><strong>So calibration is checked per ad, per advertiser and per segment,</strong> not only on average (<a href="./evaluation.html#calibration">calibration</a>). The usual metrics: log loss, often normalized by the log loss of always predicting the average CTR; the calibration ratio, predicted clicks ÷ actual clicks, which should sit near 1.0 overall and in every segment; and AUC for the ordering.</li>
     </ul>
     <p><strong>Model and data.</strong></p>
     <ul>
