@@ -938,7 +938,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p><strong>Search ranking, briefly.</strong> The same skeleton with a query: understand the query (spelling, intent), retrieve with lexical and embedding search together, rank with a learning-to-rank model (often LambdaMART) on query–document features, then re-rank for freshness and diversity. Labels come from graded human judgements, scored with nDCG, and from debiased clicks.</p>
 
     <h3 id="support-design">An LLM-powered customer-support assistant</h3>
-    <p><strong>Requirements.</strong> Chat in the app and on the web: 50,000 conversations a day, about six user turns each. It should answer policy and how-to questions from a knowledge base, handle account questions (order status, refunds within limits) through tools, and hand over to people when it should. The first token should arrive within about 1.5 seconds; a voice version would need a far tighter budget (voice latency). Personal data is in every conversation.</p>
+    <p><strong>Requirements.</strong> Chat in the app and on the web: 50,000 conversations a day, about six user turns each. It should answer policy and how-to questions from a knowledge base, handle account questions (order status, refunds within limits) through tools, and hand over to people when it should. The first token should arrive within about 1.5 seconds; a voice version would need a far tighter budget (<a href="./voice-agents.html#latency">voice latency</a>). Personal data is in every conversation.</p>
     <p><strong>Goal and metrics.</strong></p>
     <ul>
       <li><em>Business:</em> cost per resolved contact, at equal or better satisfaction.</li>

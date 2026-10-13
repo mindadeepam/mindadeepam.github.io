@@ -404,7 +404,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       <figcaption>The modular pipeline. Chat bots skip ASR and TTS. Each arrow carries a structured message: text, an intent with slots and a confidence, the state, a system action (“dialogue act”), text again. An LLM agent collapses the dashed box into one model that reads the conversation and calls tools; a hybrid keeps the policy box in code.</figcaption>
     </figure>
     <ul>
-      <li><strong>ASR</strong> turns speech into text, and <strong>TTS</strong> turns text back into speech. Both live in the voice agents note.</li>
+      <li><strong>ASR</strong> turns speech into text, and <strong>TTS</strong> turns text back into speech. Both live in the <a href="./voice-agents.html#asr">voice agents note</a>.</li>
       <li><strong>NLU</strong> (natural language understanding) reads one user turn and outputs an <strong>intent</strong> (what the user wants done), <strong>slots</strong> (the details: date, amount, mode) and a confidence. Section <a href="#nlu">02</a>.</li>
       <li><strong>DST</strong> (dialogue state tracking) merges that turn into the <strong>state</strong>: everything the user has asked for so far, as slot–value pairs. Section <a href="#dst">03</a>.</li>
       <li><strong>The policy</strong> looks at the state and picks the next <strong>system action</strong>: ask for a missing slot, confirm a value, call a backend, answer, hand off. Section <a href="#policy">04</a>.</li>
@@ -543,7 +543,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <tr><td>“5k”, “paanch hazaar”, “five thousand”</td><td>5,000</td><td>Three languages for one number</td></tr>
         <tr><td>“dedh lakh”, “1.5 lakh”, “₹1,50,000”</td><td>1,50,000 (150,000)</td><td>“dedh” = one and a half; lakh = 100,000; Indian digit grouping</td></tr>
         <tr><td>“dhai hazaar”, “do hazaar”</td><td>2,500, 2,000</td><td>“dhai” = two and a half; “do” = two, not the English verb</td></tr>
-        <tr><td>“nine eight double four five triple zero one two”</td><td>9844500012</td><td>“double”, “triple”; then check 10 digits starting 6–9. On voice the ASR may already have turned the words into digits (ASR)</td></tr>
+        <tr><td>“nine eight double four five triple zero one two”</td><td>9844500012</td><td>“double”, “triple”; then check 10 digits starting 6–9. On voice the ASR may already have turned the words into digits (<a href="./voice-agents.html#asr">ASR</a>)</td></tr>
         <tr><td>“+91 98445 00012”, “098445 00012”</td><td>9844500012</td><td>Strip the country code or trunk 0 before validating</td></tr>
       </tbody>
     </table></div>
@@ -590,7 +590,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li><strong>Normalize the surface first:</strong> transliterate or standardize spellings, map number words in every language to digits, strip fillers. It shrinks the vocabulary the model must learn.</li>
       <li><strong>Use models that have seen the languages:</strong> multilingual encoders pretrained on Indian languages (MuRIL, which also saw transliterated text; IndicBERT), or an LLM, which handles code-switching far better than a classifier trained on a few hundred examples.</li>
       <li><strong>Use the ASR's uncertainty:</strong> pass the confidence of the slot words, or the n-best list, to the policy, so a low-confidence amount gets confirmed (section <a href="#confirm">04</a>).</li>
-      <li><strong>Measure the errors that matter:</strong> overall word error rate weights “uh” and “₹5,000” equally. Track the error rate on the key slots (amounts, dates, names) and the intent accuracy on ASR output, end to end.</li>
+      <li><strong>Measure the errors that matter:</strong> overall <a href="./voice-agents.html#wer">word error rate</a> weights “uh” and “₹5,000” equally. Track the error rate on the key slots (amounts, dates, names) and the intent accuracy on ASR output, end to end.</li>
     </ul>
     <p><strong>Say it in an interview:</strong> “NLU is intent classification plus slot filling. I'd tag slots with BIO, normalize them in code against a reference date, and validate them against business rules. For out-of-scope I'd threshold the confidence, picking the threshold on real out-of-scope traffic by what a wrong action costs against a reprompt. I'd report macro F1 with recall on high-stakes intents, and strict span F1 for slots, measured on ASR transcripts of code-switched speech rather than clean text.”</p>
 
@@ -753,7 +753,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <h3 id="style">Persona, brand and compliance</h3>
     <ul>
       <li><strong>Persona and tone:</strong> a name, a register (the respectful “aap” form in Hindi), how much warmth, what it never says (no blame, no shaming, no jokes about money owed).</li>
-      <li><strong>Voice is different from chat:</strong> one or two short sentences per turn, the question at the end, no lists or links, numbers written the way they should be spoken (“twelve thousand four hundred rupees”), since a long turn invites interruptions (see TTS and turn-taking).</li>
+      <li><strong>Voice is different from chat:</strong> one or two short sentences per turn, the question at the end, no lists or links, numbers written the way they should be spoken (“twelve thousand four hundred rupees”), since a long turn invites interruptions (see <a href="./voice-agents.html#tts">TTS</a> and <a href="./voice-agents.html#turn-taking">turn-taking</a>).</li>
       <li><strong>Compliance phrases are templates, never paraphrased:</strong> that this is an automated call, that it's recorded, who is calling and why. Some rules constrain the conversation itself: in India, regulator instructions since 2022 bar recovery calls before 8 a.m. and after 7 p.m. and prohibit threatening or humiliating language, and a healthcare bot must not diagnose and must route emergencies at once. Check transcripts for the mandatory phrases and for banned ones automatically.</li>
     </ul>
 
@@ -1016,7 +1016,7 @@ short sentences. One question per turn, at the end.</code></pre>
     <ul>
       <li><strong>Leading</strong> (same day, per turn, plenty of data): fallback rate, the confidence distribution, the out-of-scope rate, drop-off at each step of a flow, handoff reasons, sentiment, and on voice latency and barge-ins. Good for monitoring and alerts (<a href="./llm-evals-guardrails.html#monitoring">online monitoring</a>), and the first to move after a release.</li>
       <li><strong>Lagging</strong> (days to weeks, sparse): repeat contacts (needs the 7-day window to close), CSAT, promises kept and amounts collected, complaints, churn. These are what the business cares about, so they make the decisions; leading indicators tell you early that something is off.</li>
-      <li><strong>For a voice bot</strong> add the telephony layer: whether calls connect, whether the right person answered (right-party contact), call drops, response latency and interruptions (latency, turn-taking), and key-slot recognition errors. Then the same outcome metrics as chat.</li>
+      <li><strong>For a voice bot</strong> add the telephony layer: whether calls connect, whether the right person answered (right-party contact), call drops, response latency and interruptions (<a href="./voice-agents.html#latency">latency</a>, <a href="./voice-agents.html#turn-taking">turn-taking</a>), and key-slot recognition errors. Then the same outcome metrics as chat.</li>
     </ul>
 
     <h3 id="other-domains">Beyond support: sales and healthcare bots</h3>
@@ -1163,7 +1163,7 @@ short sentences. One question per turn, at the end.</code></pre>
     <ul>
       <li><strong>Code-switching and script:</strong> Hindi–English mixing within sentences, Romanized Hindi with free spelling, Devanagari from some users, and other languages (Tamil, Telugu, Bengali, Marathi, Kannada) mixed with English the same way. Test sets need all of these in their real proportions.</li>
       <li><strong>Numbers:</strong> lakh and crore, Indian digit grouping, number words in several languages, “dedh” and “dhai”, and amounts spoken partly in each language. They need their own parser and their own tests.</li>
-      <li><strong>Speech recognition:</strong> accents, background noise and low-bandwidth phone lines raise error rates, most of all on names and numbers (ASR).</li>
+      <li><strong>Speech recognition:</strong> accents, background noise and low-bandwidth phone lines raise error rates, most of all on names and numbers (<a href="./voice-agents.html#asr">ASR</a>).</li>
       <li><strong>Lower-resource languages</strong> get noticeably worse NLU and ASR than Hindi or English; an English test score says nothing about them, so report each language separately.</li>
       <li><strong>Token cost:</strong> many general-purpose LLM tokenizers split Indic scripts into far more tokens per word than English, which raises cost and latency per turn. Measure it on your own traffic before choosing a model or a script for prompts.</li>
       <li><strong>Register:</strong> respectful forms of address (“aap”, “ji”), and a tone that fits the region and the situation; a collections bot that sounds rude in Hindi does more damage than one that sounds stiff.</li>

@@ -773,7 +773,7 @@ contractors get?</code></pre>
     <p>Models lean towards answering. Two layers push back: the retrieval gate (section <a href="#no-context">06</a>) and the prompt's instruction, ideally with an example of a good refusal. Partial coverage gets a partial answer: answer what the sources support and say what's missing (“the policy covers employees; it doesn't say anything about contractors”). Conflicting sources get surfaced, not silently resolved, with the current version preferred by metadata. Measure both directions: the refusal rate on unanswerable questions and the false-refusal rate on answerable ones.</p>
 
     <h3 id="streaming">Streaming</h3>
-    <p>Stream tokens as they're generated, so the user waits for the first token rather than the whole answer: about 1 second instead of 5 in the latency budget of section <a href="#latency">11</a>. The tension is that checks need whole sentences: verify citations sentence by sentence as each completes (buffering one sentence), and run output <a href="./llm-evals-guardrails.html#guardrails">guardrails</a> at the same granularity. Retracting text already shown is a bad experience, so decide which checks may lag and which must block. Show a “searching the policies…” status during retrieval. For voice, speech synthesis can start on the first verified sentence (voice latency budget).</p>
+    <p>Stream tokens as they're generated, so the user waits for the first token rather than the whole answer: about 1 second instead of 5 in the latency budget of section <a href="#latency">11</a>. The tension is that checks need whole sentences: verify citations sentence by sentence as each completes (buffering one sentence), and run output <a href="./llm-evals-guardrails.html#guardrails">guardrails</a> at the same granularity. Retracting text already shown is a bad experience, so decide which checks may lag and which must block. Show a “searching the policies…” status during retrieval. For voice, speech synthesis can start on the first verified sentence (<a href="./voice-agents.html#latency">voice latency budget</a>).</p>
     <p><strong>Say it in an interview:</strong> “I pass few, strong passages with ids and headers, best at the edges because of lost-in-the-middle, under a cacheable static prompt that says to answer only from the sources, cite every sentence and refuse when they don't cover it. After generation I check that every citation exists and entails its sentence, and I stream sentence by sentence so the checks don't cost the user much wait.”</p>
 
     <!-- evaluation -->
@@ -981,7 +981,7 @@ contractors get?</code></pre>
       <li><strong>Fewer prompt tokens</strong> (prefill grows with length) and prefix caching.</li>
       <li><strong>A smaller reranker or fewer candidates.</strong></li>
     </ul>
-    <p>Voice agents have a much tighter budget for the whole turn, which squeezes retrieval further (voice latency budget).</p>
+    <p>Voice agents have a much tighter budget for the whole turn, which squeezes retrieval further (<a href="./voice-agents.html#latency">voice latency budget</a>).</p>
 
     <h3 id="cost">Cost per query</h3>
     <p>Same illustrative prices, 20,000 questions a day: the answering model at $3 and $15 per million input and output tokens; the rewriter at $0.15 and $0.60; embeddings at $0.02; search infrastructure at $500 a month; one reranker GPU at $1.20 an hour, all day.</p>
