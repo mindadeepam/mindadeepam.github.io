@@ -349,7 +349,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       <tbody>
         <tr><td>Output</td><td>One label from a fixed set</td><td>Free text; many different answers are all correct</td><td>No single reference to match; exact match fails</td></tr>
         <tr><td>What “correct” means</td><td>Right or wrong</td><td>Several things at once: correct, faithful to the docs, complete, right tool calls, safe, polite, valid format</td><td>Separate criteria, each checked on its own</td></tr>
-        <tr><td>Determinism</td><td>Same input, same output</td><td>Sampling; outputs often differ even at temperature 0 (batched GPU arithmetic isn't exactly reproducible); the provider may update the model</td><td>Repeat runs, pin model versions (decoding settings)</td></tr>
+        <tr><td>Determinism</td><td>Same input, same output</td><td>Sampling; outputs often differ even at temperature 0 (batched GPU arithmetic isn't exactly reproducible); the provider may update the model</td><td>Repeat runs, pin model versions (<a href="./agents-tool-use.html#decoding">decoding settings</a>)</td></tr>
         <tr><td>Inputs</td><td>A fixed feature schema</td><td>Any text, a long tail of intents, and users who change behaviour once the bot exists</td><td>The eval set goes stale; inputs must be monitored</td></tr>
         <tr><td>The system</td><td>One model</td><td>Retrieval, prompt, model, tools and post-processing</td><td>Find which stage failed; evaluate stages separately (retrieval: RAG evaluation)</td></tr>
         <tr><td>Labels</td><td>Often cheap or logged</td><td>Need a person who knows the policy, and the criteria sharpen as people read outputs</td><td>Few labels; criteria written after looking, not before</td></tr>
@@ -465,7 +465,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     </table></div>
     <ul>
       <li><strong>Each case carries:</strong> the input (with conversation history), what passing means (a reference answer, a list of facts the answer must contain, the expected tool calls, or a rubric), tags (intent, source, difficulty) and the set version.</li>
-      <li><strong>Freeze what you aren't testing.</strong> To test generation alone, store the retrieved chunks and tool results with the case and replay them; to test the whole pipeline, run it live. Keep both kinds, labelled. Frozen history tests only the next turn; to test whole conversations, an LLM plays the customer with a hidden goal (a user simulator, as in agent evals), and how realistic that simulated customer is becomes the weak point.</li>
+      <li><strong>Freeze what you aren't testing.</strong> To test generation alone, store the retrieved chunks and tool results with the case and replay them; to test the whole pipeline, run it live. Keep both kinds, labelled. Frozen history tests only the next turn; to test whole conversations, an LLM plays the customer with a hidden goal (a user simulator, as in <a href="./agents-tool-use.html#agent-evals">agent evals</a>), and how realistic that simulated customer is becomes the weak point.</li>
       <li><strong>Report slices separately.</strong> The traffic sample's pass rate estimates production quality. The adversarial slice's pass rate measures defences. Pooling them gives a number that mostly reflects how many adversarial cases you happened to add.</li>
     </ul>
 
@@ -551,8 +551,8 @@ footer .site-nav { display: block; margin-top: 10px; }
       <thead><tr><th>Check</th><th>Support-bot example</th><th>Catches</th></tr></thead>
       <tbody>
         <tr><td>Exact match after normalizing</td><td>Extracted order id, intent label, yes/no fields</td><td>Wrong value</td></tr>
-        <tr><td>Schema validation</td><td>Response JSON has <code>answer</code>, <code>citations</code>, <code>escalate</code> with the right types (structured output)</td><td>Broken or truncated format</td></tr>
-        <tr><td>Tool-call correctness</td><td>Right tool, arguments taken from the conversation, order lookup before any refund (agent evals cover whole trajectories)</td><td>Wrong tool, bad arguments, wrong order</td></tr>
+        <tr><td>Schema validation</td><td>Response JSON has <code>answer</code>, <code>citations</code>, <code>escalate</code> with the right types (<a href="./agents-tool-use.html#structured-output">structured output</a>)</td><td>Broken or truncated format</td></tr>
+        <tr><td>Tool-call correctness</td><td>Right tool, arguments taken from the conversation, order lookup before any refund (<a href="./agents-tool-use.html#agent-evals">agent evals</a> cover whole trajectories)</td><td>Wrong tool, bad arguments, wrong order</td></tr>
         <tr><td>String and regex rules</td><td>No card numbers; every cited article id was actually retrieved; hand-off flag set when the customer asked for a person</td><td>Leaks, invented citations, missed instructions</td></tr>
         <tr><td>Unit tests (code-writing features)</td><td>Run the generated code against tests</td><td>Code that looks right and doesn't run</td></tr>
         <tr><td>Budgets</td><td>Length, latency, tokens, cost per conversation</td><td>Slow, verbose or expensive changes</td></tr>
@@ -992,7 +992,7 @@ REPLY: {reply}</code></pre>
     </table></div>
     <p><strong>pass@k</strong> is the probability that at least one of \(k\) sampled programs passes the tests. Estimate it by drawing \(n \ge k\) samples per problem and counting the \(c\) that pass:</p>
     <div class="mj">\[ \text{pass@}k = 1 - \frac{\binom{n - c}{k}}{\binom{n}{k}} \]</div>
-    <p>In words: one minus the chance that a random set of \(k\) of the \(n\) samples contains only failures. <strong>Worked:</strong> 10 samples, 3 pass. pass@1 = 0.30; pass@5 = \(1 - \binom{7}{5}/\binom{10}{5} = 1 - 21/252 = 0.917\). Plugging the observed rate into \(1 - (1 - 0.3)^5\) gives 0.832 here, but that shortcut is biased low on average: if the true per-sample pass rate is 30%, it averages 0.76 over repeated draws of 10 samples, against a true 0.832; the formula above averages to the truth. For agents the opposite question matters, <strong>pass^k</strong>: the chance that <em>all</em> \(k\) runs succeed, a reliability measure (agent evals).</p>
+    <p>In words: one minus the chance that a random set of \(k\) of the \(n\) samples contains only failures. <strong>Worked:</strong> 10 samples, 3 pass. pass@1 = 0.30; pass@5 = \(1 - \binom{7}{5}/\binom{10}{5} = 1 - 21/252 = 0.917\). Plugging the observed rate into \(1 - (1 - 0.3)^5\) gives 0.832 here, but that shortcut is biased low on average: if the true per-sample pass rate is 30%, it averages 0.76 over repeated draws of 10 samples, against a true 0.832; the formula above averages to the truth. For agents the opposite question matters, <strong>pass^k</strong>: the chance that <em>all</em> \(k\) runs succeed, a reliability measure (<a href="./agents-tool-use.html#agent-evals">agent evals</a>).</p>
     <p><strong>What benchmarks tell you:</strong> roughly how capable a model is in general, which is useful for shortlisting. <strong>Why they aren't enough:</strong></p>
     <ul>
       <li><strong>Not your task:</strong> a knowledge quiz says nothing about following your refund policy, calling your tools correctly or refusing what your policy forbids.</li>
@@ -1249,7 +1249,7 @@ def pass_at_k(n, c, k):
         <li><strong>BLEU</strong> is n-gram precision with a brevity penalty (from translation); <strong>ROUGE</strong> is n-gram recall (from summarization). Both assume a reference close to the only right answer.</li>
         <li><strong>Embedding similarity and BERTScore</strong> handle paraphrase but stay blind to a changed number or an added “not”.</li>
         <li><strong>For meaning:</strong> required-facts checks, a reference-guided judge, and reference-free judges (faithfulness) where no reference exists.</li>
-        <li><strong>Without any model:</strong> schema and length; tool calls, arguments and order (lookup before refund; whole trajectories in agent evals); regexes for card numbers and banned phrases; cited ids actually retrieved; the hand-off flag; exact match on label-like outputs (then a confusion matrix); unit tests for code; latency and cost budgets. Usually most of the failure taxonomy, and exact, free and instant.</li>
+        <li><strong>Without any model:</strong> schema and length; tool calls, arguments and order (lookup before refund; whole trajectories in <a href="./agents-tool-use.html#agent-evals">agent evals</a>); regexes for card numbers and banned phrases; cited ids actually retrieved; the hand-off flag; exact match on label-like outputs (then a confusion matrix); unit tests for code; latency and cost budgets. Usually most of the failure taxonomy, and exact, free and instant.</li>
         <li><strong>Where n-gram metrics are fine:</strong> translation and summarization benchmarks with several references; smoke tests on near-deterministic outputs.</li>
       </ul>
       <p>(<a href="#programmatic">04</a>, <a href="#reference-based">04</a>)</p>
