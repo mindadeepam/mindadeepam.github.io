@@ -351,7 +351,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <tr><td>What “correct” means</td><td>Right or wrong</td><td>Several things at once: correct, faithful to the docs, complete, right tool calls, safe, polite, valid format</td><td>Separate criteria, each checked on its own</td></tr>
         <tr><td>Determinism</td><td>Same input, same output</td><td>Sampling; outputs often differ even at temperature 0 (batched GPU arithmetic isn't exactly reproducible); the provider may update the model</td><td>Repeat runs, pin model versions (<a href="./agents-tool-use.html#decoding">decoding settings</a>)</td></tr>
         <tr><td>Inputs</td><td>A fixed feature schema</td><td>Any text, a long tail of intents, and users who change behaviour once the bot exists</td><td>The eval set goes stale; inputs must be monitored</td></tr>
-        <tr><td>The system</td><td>One model</td><td>Retrieval, prompt, model, tools and post-processing</td><td>Find which stage failed; evaluate stages separately (retrieval: RAG evaluation)</td></tr>
+        <tr><td>The system</td><td>One model</td><td>Retrieval, prompt, model, tools and post-processing</td><td>Find which stage failed; evaluate stages separately (retrieval: <a href="./rag.html#rag-eval">RAG evaluation</a>)</td></tr>
         <tr><td>Labels</td><td>Often cheap or logged</td><td>Need a person who knows the policy, and the criteria sharpen as people read outputs</td><td>Few labels; criteria written after looking, not before</td></tr>
       </tbody>
     </table></div>
@@ -430,7 +430,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <div class="tbl"><table>
       <thead><tr><th>Failure mode (first failure)</th><th>Traces</th><th>Stage</th><th>How to measure it</th></tr></thead>
       <tbody>
-        <tr><td>Retrieved the wrong article, or none</td><td>9</td><td>Retrieval</td><td>Retrieval recall on labelled queries (RAG evaluation)</td></tr>
+        <tr><td>Retrieved the wrong article, or none</td><td>9</td><td>Retrieval</td><td>Retrieval recall on labelled queries (<a href="./rag.html#rag-eval">RAG evaluation</a>)</td></tr>
         <tr><td>States a policy detail the article doesn't contain</td><td>7</td><td>Generation</td><td>Faithfulness judge (section <a href="#hallucination">06</a>)</td></tr>
         <tr><td>Didn't hand off when asked for a human</td><td>5</td><td>Instructions</td><td>Code check on the escalate flag</td></tr>
         <tr><td>Wrong order-id format in the tool call</td><td>4</td><td>Tool use</td><td>Code check on tool arguments</td></tr>
@@ -737,7 +737,7 @@ REPLY: {reply}</code></pre>
 
     <h3 id="halluc-mitigate">Reducing it</h3>
     <ul>
-      <li><strong>Ground it, and fix retrieval first.</strong> In RAG, many hallucinations start as retrieval misses: with no relevant passage, the model fills the gap (RAG failure modes). Instruct it to answer only from the provided articles.</li>
+      <li><strong>Ground it, and fix retrieval first.</strong> In RAG, many hallucinations start as retrieval misses: with no relevant passage, the model fills the gap (<a href="./rag.html#failure-modes">RAG failure modes</a>). Instruct it to answer only from the provided articles.</li>
       <li><strong>Allow abstention.</strong> Make “I can't find that; let me connect you to an agent” an acceptable, even rewarded, answer (<a href="./dialogue-systems.html#handoff">human handoff</a>). Then track the abstention rate alongside the hallucination rate: a bot that refuses everything never hallucinates.</li>
       <li><strong>Constrain the output.</strong> Structured fields; values from lookups instead of generated text (the refund window comes from the policy table); identifiers only from tool results, enforced by code that rejects any order id no tool returned.</li>
       <li><strong>Quote, then answer.</strong> Have the model extract the relevant sentences first and answer from those.</li>
@@ -1164,7 +1164,7 @@ def pass_at_k(n, c, k):
         <li><strong>Golden set by slice:</strong> traffic-like sample for the headline rate, failure-mode cases, edge cases, adversarial cases, each reported separately with intervals.</li>
         <li><strong>Checks:</strong> schema, tool calls and arguments, hand-off flag, no PII, citation ids exist (code); faithfulness and “resolves the request” (judges validated against the support lead's labels).</li>
         <li><strong>Safety:</strong> red-team injection, PII extraction, refund abuse; permissions in code; approval for refunds.</li>
-        <li><strong>Separate stages:</strong> retrieval recall on labelled queries (RAG evaluation), generation with frozen context, and end to end.</li>
+        <li><strong>Separate stages:</strong> retrieval recall on labelled queries (<a href="./rag.html#rag-eval">RAG evaluation</a>), generation with frozen context, and end to end.</li>
         <li><strong>Launch:</strong> shadow with tools stubbed, canary with rollback, A/B on containment and repeat contact, with escalations, cost and latency as guardrails.</li>
       </ul>
       <p>(<a href="#golden-set">03</a>, <a href="#online">08</a>)</p>
@@ -1357,7 +1357,7 @@ def pass_at_k(n, c, k):
         <li><strong>Score:</strong> supported claims / total; the answer fails if any important claim is unsupported. The worked answer scores 3/5.</li>
         <li><strong>Citations:</strong> code verifies cited ids were retrieved (catches invented sources for free); NLI checks the cited passage supports its sentence.</li>
         <li><strong>Failure points:</strong> extraction dropping claims, claims that need two passages, NLI weak on long text.</li>
-        <li><strong>Separate retrieval from generation:</strong> if the right passage wasn't retrieved, it's a retrieval failure (RAG evaluation).</li>
+        <li><strong>Separate retrieval from generation:</strong> if the right passage wasn't retrieved, it's a retrieval failure (<a href="./rag.html#rag-eval">RAG evaluation</a>).</li>
       </ul>
       <p>(<a href="#halluc-detect">06</a>)</p>
     </div></details>
@@ -1376,7 +1376,7 @@ def pass_at_k(n, c, k):
     <details class="qa"><summary><span class="qn">20</span>How do you reduce hallucinations?</summary><div class="ans">
       <p><strong>Ground the model in good context, let it abstain, constrain what it can generate, and verify high-stakes statements before sending.</strong></p>
       <ul>
-        <li><strong>Retrieval first:</strong> many RAG hallucinations are retrieval misses the model papers over (RAG failure modes).</li>
+        <li><strong>Retrieval first:</strong> many RAG hallucinations are retrieval misses the model papers over (<a href="./rag.html#failure-modes">RAG failure modes</a>).</li>
         <li><strong>Instructions:</strong> answer only from the provided articles; quote, then answer.</li>
         <li><strong>Abstention:</strong> make “I can't find that; connecting you to an agent” acceptable; track its rate, or the bot can trade hallucinations for refusals.</li>
         <li><strong>Constraints:</strong> structured output; values from lookups; ids only from tool results, enforced in code.</li>

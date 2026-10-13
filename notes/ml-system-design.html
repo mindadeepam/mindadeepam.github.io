@@ -944,13 +944,13 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li><em>Business:</em> cost per resolved contact, at equal or better satisfaction.</li>
       <li><em>Online:</em> resolution without a human (containment) and task success (<a href="./dialogue-systems.html#conversation-metrics">conversation metrics</a>); CSAT (the post-chat satisfaction score); repeat contact on the same issue within 7 days, which catches false resolutions; escalation rate; abandonment.</li>
       <li><em>Guardrails:</em> wrong refunds, policy violations, invented policies, personal data leaking into answers or logs.</li>
-      <li><em>Offline:</em> correctness and faithfulness on a <a href="./llm-evals-guardrails.html#golden-set">golden set</a> (<a href="./llm-evals-guardrails.html#hallucination">hallucination and faithfulness</a>); retrieval recall@k and the rest of RAG evaluation; tool-call accuracy.</li>
+      <li><em>Offline:</em> correctness and faithfulness on a <a href="./llm-evals-guardrails.html#golden-set">golden set</a> (<a href="./llm-evals-guardrails.html#hallucination">hallucination and faithfulness</a>); retrieval recall@k and the rest of <a href="./rag.html#rag-eval">RAG evaluation</a>; tool-call accuracy.</li>
     </ul>
     <p><strong>The request path.</strong></p>
     <ol>
       <li><strong>Input checks:</strong> detect and mask personal data before anything is logged; screen for <a href="./llm-evals-guardrails.html#prompt-injection">prompt injection</a> and abuse.</li>
       <li><strong>Routing:</strong> a cheap intent classifier or small model (<a href="./dialogue-systems.html#nlu">intents and slots</a>). How-to questions go to retrieval; account questions go to a tool flow after the user is authenticated; sensitive cases (legal threats, safety, bereavement) go straight to a person.</li>
-      <li><strong>Retrieval:</strong> the knowledge base chunked, searched with hybrid search, reranked, with the query rewritten from the conversation so far (“what about the blue one?” needs the history).</li>
+      <li><strong>Retrieval:</strong> the knowledge base <a href="./rag.html#chunking">chunked</a>, searched with hybrid search, <a href="./rag.html#rerank">reranked</a>, with the query <a href="./rag.html#query-rewrite">rewritten</a> from the conversation so far (“what about the blue one?” needs the history).</li>
       <li><strong>Generation:</strong> a grounded prompt with the retrieved passages and the relevant policy; instructions to cite, and to say it isn't sure rather than guess.</li>
       <li><strong>Tools:</strong> order lookup, refunds within limits, called through <a href="./agents-tool-use.html#structured-output">structured output</a>. Authorization lives in the tool service, not in the prompt: the model can't grant itself a refund the user isn't entitled to, and amounts above a limit need a person's approval.</li>
       <li><strong>Output checks:</strong> policy compliance, no promises the policy doesn't allow, no personal data of anyone else (<a href="./llm-evals-guardrails.html#guardrails">guardrails</a>).</li>
@@ -974,7 +974,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li><em>After launch:</em> an A/B test by user on containment, CSAT and repeat contacts together; the judge run on a sample of live conversations; a human review queue for low scores (<a href="./llm-evals-guardrails.html#monitoring">online monitoring</a>).</li>
       <li><em>The flywheel:</em> escalated and low-rated conversations become labelled failures, which become new golden cases and knowledge-base fixes.</li>
     </ul>
-    <p><strong>How it fails</strong> (more in RAG failure modes):</p>
+    <p><strong>How it fails</strong> (more in <a href="./rag.html#failure-modes">RAG failure modes</a>):</p>
     <ul>
       <li>a stale knowledge base: the policy changed and the assistant confidently quotes the old one. Version documents and record which version each answer used;</li>
       <li>a retrieval miss that the model papers over with a plausible answer;</li>

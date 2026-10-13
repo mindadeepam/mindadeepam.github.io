@@ -416,7 +416,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>An LLM agent replaces the dashed box with one model, a system prompt and a set of tools. Each turn it reads the conversation so far, decides whether to call a tool (<code>get_dues</code>, <code>schedule_promise</code>) and writes the reply. The mechanics of <a href="./agents-tool-use.html#tool-calling">tool calling</a> and the <a href="./agents-tool-use.html#react">reason-then-act loop</a> live in the agents note. The parts haven't disappeared: the model still has to classify the intent, track the state and choose an action. They're now implicit, which makes them harder to test one by one.</p>
 
     <h3 id="hybrid">Hybrids: flows with LLM steps</h3>
-    <p>A <strong>flow</strong> (or state machine) is a graph of steps written by the team: verify identity, read the disclosure, collect date, amount and mode, confirm, call the backend. A hybrid keeps that graph and lets an LLM do the language-heavy steps inside it: extract slots from a messy code-switched sentence, classify a free-text complaint, answer a policy question from documents with retrieval, phrase a reply, write the handoff summary. The other way round also counts as a hybrid: an LLM agent in charge, whose tools refuse to run unless code-checked preconditions hold.</p>
+    <p>A <strong>flow</strong> (or state machine) is a graph of steps written by the team: verify identity, read the disclosure, collect date, amount and mode, confirm, call the backend. A hybrid keeps that graph and lets an LLM do the language-heavy steps inside it: extract slots from a messy code-switched sentence, classify a free-text complaint, answer a policy question from documents with <a href="./rag.html">retrieval</a>, phrase a reply, write the handoff summary. The other way round also counts as a hybrid: an LLM agent in charge, whose tools refuse to run unless code-checked preconditions hold.</p>
     <div class="tbl"><table>
       <thead><tr><th></th><th>Modular / flows</th><th>LLM agent</th><th>Hybrid</th></tr></thead>
       <tbody>
@@ -747,7 +747,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ul>
       <li><strong>Facts come from tools, never from the model.</strong> The amount due, dates and charges are fetched and passed in; the model only phrases them.</li>
       <li><strong>Check the output against the facts.</strong> A cheap deterministic check: every number and date in the reply must appear in the act or tool result. If “₹5,000” went in and “₹5,500” came out, fall back to the template. This catches the most damaging generation error in money conversations.</li>
-      <li><strong>Knowledge answers</strong> (“what are the foreclosure charges?”) come from retrieved documents (retrieval-augmented generation, with its failure modes). When retrieval finds nothing relevant, the bot should say it doesn't know and offer a person, not improvise a policy.</li>
+      <li><strong>Knowledge answers</strong> (“what are the foreclosure charges?”) come from retrieved documents (<a href="./rag.html">retrieval-augmented generation</a>, with its <a href="./rag.html#failure-modes">failure modes</a>). When retrieval finds nothing relevant, the bot should say it doesn't know and offer a person, not improvise a policy.</li>
     </ul>
 
     <h3 id="style">Persona, brand and compliance</h3>
