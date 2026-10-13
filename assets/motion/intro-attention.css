@@ -1,0 +1,51 @@
+/* The home page's intro sentence as an attention animation. The sentence is real
+   text the whole time: each word is a span, so it stays selectable and screen readers read it
+   as one plain sentence. intro-attention.js only toggles classes and one custom property.
+
+   .is-decoding   words not yet "generated" are ghosted; .on brings a word up to full strength
+   .q             the word doing the attending (the query)
+   .key           a word it attends to; --w (0..1) is how strongly: amber tint and underline */
+
+.intro-attn .tok {
+  text-decoration-line: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.3em;
+  text-decoration-color: transparent;
+  transition:
+    opacity 260ms ease,
+    color 420ms ease,
+    text-decoration-color 420ms ease;
+}
+
+.intro-attn.is-decoding .tok {
+  opacity: 0.26;
+}
+
+.intro-attn.is-decoding .tok.on {
+  opacity: 1;
+}
+
+.intro-attn .tok.q {
+  color: var(--text);
+  text-decoration-color: var(--line-strong);
+}
+
+.intro-attn .tok.key {
+  color: color-mix(in srgb, var(--amber) calc(var(--w, 0) * 100%), var(--soft));
+  text-decoration-color: color-mix(in srgb, var(--amber) calc(var(--w, 0) * 85%), transparent);
+}
+
+/* the generation caret: a thin amber bar after the newest word; zero width, so nothing reflows */
+.intro-caret {
+  position: relative;
+}
+
+.intro-caret::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 0.12em;
+  width: 2px;
+  height: 1.05em;
+  background: var(--amber);
+}

@@ -64,7 +64,10 @@ Dark is the default; `html[data-theme="light"]` switches. Each page sets `data-t
 - **Reader notes** (`notes/reader-notes.js`): select text or tap an equation, then `note`. Notes are highlights saved in the reader's own browser only, listed under "Your notes" at the end of the contents, with copy all, edit and delete. Nothing is sent anywhere.
 - **Tag**: a green dot and a short lowercase mono label (`.tag`). It names a section: "learning", "writing". Amber by default; `.tag-muted` for status lines like "applied ML engineer".
 - **List row**: title at `--fs-row`, an optional one-line description in `--muted`, and the date in mono on the right. No borders or cards.
-- **Graph paper** (`.graph-paper`): faint 20px and 100px grid behind reading pages, i.e. note pages and blog posts. Never behind the home page or list pages.
+- **Notes index**: notes grouped into sections (ml, dl, ai, stats & prob, research papers) named once, in a sticky bar that lights the section you're in; clicking one scrolls to it. Each row is a number (`2.3`), the title in mono like the nav, and the reading time on the right. The groups live in the notes build (`GROUPS` in `build_public.py`), along with planned notes, shown dimmed as "soon".
+- **Background** (`assets/motion/site-bg.js`, home, notes list and blog list only): a loss landscape. Faint contours, and three unlabelled optimizer trails in amber that settle into the basin, run after run. It fades out behind text (`data-bg-clear`; lists clear per line, so the contours still run between rows), sits in the margin on wide screens, pauses while the tab is hidden, and is a still frame under reduced motion. Reading pages never get it.
+- **Intro sentence** (`assets/motion/intro-attention.js`, home): the sentence is generated word by word, with the earlier words each one attends to lit in amber; then it settles as plain text. Hovering (or tapping) a word shows its attention. No caption; reduced motion skips the animation.
+- **Graph paper** (`.graph-paper`): faint 20px and 100px grid behind reading pages, i.e. note pages and blog posts. Never behind the home page or list pages, which have the background instead.
 - **Reading components** (blog posts and notes look the same):
   - **Body text:** `--fs-body`, colour `--text`.
   - **Links:** `--link`, underlined on hover.

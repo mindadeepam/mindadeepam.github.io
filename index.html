@@ -25,9 +25,11 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./assets/design/tokens.css?v=2" />
     <link rel="stylesheet" href="./assets/design/components.css?v=2" />
-    <link rel="stylesheet" href="./styles.css?v=26" />
+    <link rel="stylesheet" href="./styles.css?v=27" />
+    <link rel="stylesheet" href="./assets/motion/site-bg.css?v=1" />
+    <link rel="stylesheet" href="./assets/motion/intro-attention.css?v=1" />
   </head>
-  <body>
+  <body data-site-bg="descent" data-site-bg-focus="0.76 0.6" data-site-bg-focus-sm="0.62 0.86" data-site-bg-delay="9">
     <header class="site-header">
       <a class="mark" href="./">deepam</a>
       <nav aria-label="Primary navigation">
@@ -44,13 +46,21 @@
     <main>
       <section class="home home-minimal" aria-labelledby="home-title">
         <div class="hero-shell">
-          <p class="small tag tag-muted">applied ML engineer</p>
-          <div class="name-frame">
+          <p class="small tag tag-muted" data-bg-clear>applied ML engineer</p>
+          <div class="name-frame" data-bg-clear>
             <h1 id="home-title">Deepam Minda</h1>
           </div>
-          <p class="intro">I build practical AI systems - agents, applied ML workflows, and the backend that makes them useful.</p>
-          <p class="place">delhi ncr, india</p>
-          <div class="hero-links" aria-label="Connect">
+          <p class="intro intro-attn" data-intro-attn data-bg-clear><span class="tok">I</span> <span class="tok">build</span> <span class="tok">practical</span> <span class="tok">AI</span> <span class="tok">systems</span> <span class="tok">-</span> <span class="tok">agents</span><span class="tok">,</span> <span class="tok">applied</span> <span class="tok">ML</span> <span class="tok">workflows</span><span class="tok">,</span> <span class="tok">and</span> <span class="tok">the</span> <span class="tok">backend</span> <span class="tok">that</span> <span class="tok">makes</span> <span class="tok">them</span> <span class="tok">useful</span><span class="tok">.</span></p>
+          <script>
+            /* ghost the sentence before first paint; intro-attention.js then generates it word by word */
+            (function (p) {
+              if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+              p.classList.add("is-decoding");
+              setTimeout(function () { if (!window.IntroAttention) p.classList.remove("is-decoding"); }, 4000);
+            })(document.currentScript.previousElementSibling);
+          </script>
+          <p class="place" data-bg-clear>delhi ncr, india</p>
+          <div class="hero-links" aria-label="Connect" data-bg-clear>
             <a href="mailto:deepamminda99@gmail.com">email</a>
             <a href="https://www.linkedin.com/in/mindadeepam/">linkedin</a>
             <a href="https://github.com/mindadeepam">github</a>
@@ -64,6 +74,8 @@
       <p>© Deepam Minda</p>
     </footer>
     <script src="./script.js?v=17"></script>
-      <script src="notes/palette.js?v=bd7ca56118" defer></script>
+    <script src="./assets/motion/site-bg.js?v=1" defer></script>
+    <script src="./assets/motion/intro-attention.js?v=1" defer></script>
+      <script src="notes/palette.js?v=86dbe50016" defer></script>
   </body>
 </html>

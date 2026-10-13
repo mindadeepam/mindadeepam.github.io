@@ -22,9 +22,10 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../assets/design/tokens.css?v=2" />
     <link rel="stylesheet" href="../assets/design/components.css?v=2" />
-    <link rel="stylesheet" href="../styles.css?v=26" />
+    <link rel="stylesheet" href="../styles.css?v=27" />
+    <link rel="stylesheet" href="../assets/motion/site-bg.css?v=1" />
   </head>
-  <body>
+  <body data-site-bg="descent" data-site-bg-focus="0.74 0.64" data-site-bg-focus-sm="0.6 0.8" data-site-bg-delay="4">
     <header class="site-header">
       <a class="mark" href="../">deepam</a>
       <nav aria-label="Primary navigation">
@@ -40,15 +41,16 @@
 
     <main>
       <section class="page-head">
-        <h1 class="tag">writing</h1>
+        <h1 class="tag" data-bg-clear="0.1">writing</h1>
       </section>
-      <section class="blog-list" data-blog-list></section>
+      <section class="blog-list" data-blog-list data-bg-clear="lines 0.25"></section>
     </main>
 
     <footer>
       <p>© Deepam Minda</p>
     </footer>
     <script src="../script.js?v=17"></script>
-      <script src="../notes/palette.js?v=bd7ca56118" defer></script>
+    <script src="../assets/motion/site-bg.js?v=1" defer></script>
+      <script src="../notes/palette.js?v=86dbe50016" defer></script>
   </body>
 </html>

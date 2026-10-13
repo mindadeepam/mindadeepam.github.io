@@ -1,0 +1,16 @@
+/* Site background: the canvas that site-bg.js puts behind a page.
+   It sits under all content, never takes pointer events, and fades itself out behind every
+   element marked data-bg-clear (plus the header and footer), so text always sits on plain page
+   colour. Tokens only; the canvas reads its colours from the same tokens at runtime. */
+
+.site-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100vh;
+  /* the large viewport, so a phone's collapsing toolbar doesn't resize (and redraw) the layer */
+  height: 100lvh;
+  pointer-events: none;
+}

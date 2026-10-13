@@ -13,13 +13,14 @@ script.js                  Theme toggle, Markdown renderer, blog rendering
 blog/index.html            Blog index
 blog/post.html             Blog post shell
 posts/                     Markdown sources and post index
-notes/index.html           Study notes index (rows between notes:start/end markers)
+notes/index.html           Notes index: grouped rows between notes:start/end markers (generated)
 notes/*.html               Study notes, prebuilt standalone pages
 notes/palette.js           ⌘K search and the T theme shortcut, loaded by every page (generated)
 notes/reader-notes.js      Reader notes: highlights saved in the reader's browser (generated)
 notes/search.json          Search index of every note (generated)
 resume/build_resume.py     Generates the resume PDF
 output/pdf/                Generated resume linked from the home page
+assets/motion/             Loss-landscape background (home and list pages) and the home intro animation
 api/github-activity.js     Optional Vercel serverless endpoint
 agents.md                  Working preferences for coding agents
 design.md                  Visual and interaction direction
@@ -107,7 +108,7 @@ The lightweight renderer supports headings, links, images, lists, blockquotes, t
 
 ## Study notes
 
-Study notes are long-form standalone HTML pages in [`notes/`](./notes), each with its own styling (diagrams, MathJax maths, a light/dark toggle that shares the site's `deepam-theme` setting). They are built outside this repository from private sources: the build strips private content, writes `notes/<slug>.html`, and adds or updates the note's row in [`notes/index.html`](./notes/index.html) between the `<!-- notes:start -->` and `<!-- notes:end -->` markers.
+Study notes are long-form standalone HTML pages in [`notes/`](./notes), each with its own styling (diagrams, MathJax maths, a light/dark toggle that shares the site's `deepam-theme` setting). They are built outside this repository from private sources: the build strips private content, writes `notes/<slug>.html`, and rewrites the grouped rows in [`notes/index.html`](./notes/index.html) between the `<!-- notes:start -->` and `<!-- notes:end -->` markers (the groups are set in the build, not here).
 
 - To add a hand-written note, put the full HTML page in `notes/` and add a row between the markers, newest first, copying an existing row's markup.
 - Preview `/notes/` and the note itself, including MathJax rendering and phone width.

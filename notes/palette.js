@@ -202,16 +202,23 @@
     if (id && document.getElementById(id)) document.getElementById(id).scrollIntoView({ block: "start" });
     return false;
   }
+  /* a real link click: browsers treat it as a new-tab request (window.open with features can be
+     blocked or ignored), and embedded browsers without tabs just open it in place */
+  function openTab(url) {
+    var a = document.createElement("a");
+    a.href = url; a.target = "_blank"; a.rel = "noopener";
+    document.body.appendChild(a); a.click(); a.remove();
+  }
   function go(it, newTab) {
     if (it.kind === "cmd") {
       close();
-      if (it.run) it.run(); else if (it.url) { if (newTab) window.open(it.url, "_blank", "noopener"); else location.href = it.url; }
+      if (it.run) it.run(); else if (it.url) { if (newTab) openTab(it.url); else location.href = it.url; }
       return;
     }
     var url = BASE + it.slug + ".html" + (it.id ? "#" + it.id : "");
     if (it.kind === "text" && it.phrase) url += (it.id ? "" : "#") + ":~:text=" + encodeURIComponent(it.phrase);
-    if (newTab) { window.open(url, "_blank", "noopener"); return; }
     close();
+    if (newTab) { openTab(url); return; }
     if (it.slug === HERE) {
       if (it.kind === "text") flash(it.phrase, it.id);
       else if (it.id && document.getElementById(it.id)) { history.replaceState(null, "", "#" + it.id); document.getElementById(it.id).scrollIntoView({ block: "start" }); }
