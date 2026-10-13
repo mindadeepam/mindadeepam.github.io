@@ -942,19 +942,19 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p><strong>Goal and metrics.</strong></p>
     <ul>
       <li><em>Business:</em> cost per resolved contact, at equal or better satisfaction.</li>
-      <li><em>Online:</em> resolution without a human (containment) and task success (conversation metrics); CSAT (the post-chat satisfaction score); repeat contact on the same issue within 7 days, which catches false resolutions; escalation rate; abandonment.</li>
+      <li><em>Online:</em> resolution without a human (containment) and task success (<a href="./dialogue-systems.html#conversation-metrics">conversation metrics</a>); CSAT (the post-chat satisfaction score); repeat contact on the same issue within 7 days, which catches false resolutions; escalation rate; abandonment.</li>
       <li><em>Guardrails:</em> wrong refunds, policy violations, invented policies, personal data leaking into answers or logs.</li>
-      <li><em>Offline:</em> correctness and faithfulness on a golden set (hallucination and faithfulness); retrieval recall@k and the rest of RAG evaluation; tool-call accuracy.</li>
+      <li><em>Offline:</em> correctness and faithfulness on a <a href="./llm-evals-guardrails.html#golden-set">golden set</a> (<a href="./llm-evals-guardrails.html#hallucination">hallucination and faithfulness</a>); retrieval recall@k and the rest of RAG evaluation; tool-call accuracy.</li>
     </ul>
     <p><strong>The request path.</strong></p>
     <ol>
-      <li><strong>Input checks:</strong> detect and mask personal data before anything is logged; screen for prompt injection and abuse.</li>
-      <li><strong>Routing:</strong> a cheap intent classifier or small model (intents and slots). How-to questions go to retrieval; account questions go to a tool flow after the user is authenticated; sensitive cases (legal threats, safety, bereavement) go straight to a person.</li>
+      <li><strong>Input checks:</strong> detect and mask personal data before anything is logged; screen for <a href="./llm-evals-guardrails.html#prompt-injection">prompt injection</a> and abuse.</li>
+      <li><strong>Routing:</strong> a cheap intent classifier or small model (<a href="./dialogue-systems.html#nlu">intents and slots</a>). How-to questions go to retrieval; account questions go to a tool flow after the user is authenticated; sensitive cases (legal threats, safety, bereavement) go straight to a person.</li>
       <li><strong>Retrieval:</strong> the knowledge base chunked, searched with hybrid search, reranked, with the query rewritten from the conversation so far (“what about the blue one?” needs the history).</li>
       <li><strong>Generation:</strong> a grounded prompt with the retrieved passages and the relevant policy; instructions to cite, and to say it isn't sure rather than guess.</li>
       <li><strong>Tools:</strong> order lookup, refunds within limits, called through structured output. Authorization lives in the tool service, not in the prompt: the model can't grant itself a refund the user isn't entitled to, and amounts above a limit need a person's approval.</li>
-      <li><strong>Output checks:</strong> policy compliance, no promises the policy doesn't allow, no personal data of anyone else (guardrails).</li>
-      <li><strong>Handoff:</strong> when the user asks, when retrieval confidence is low, after repeated failure, on negative sentiment, a sensitive intent or a tool error; with a summary so the agent doesn't start over (human handoff).</li>
+      <li><strong>Output checks:</strong> policy compliance, no promises the policy doesn't allow, no personal data of anyone else (<a href="./llm-evals-guardrails.html#guardrails">guardrails</a>).</li>
+      <li><strong>Handoff:</strong> when the user asks, when retrieval confidence is low, after repeated failure, on negative sentiment, a sensitive intent or a tool error; with a summary so the agent doesn't start over (<a href="./dialogue-systems.html#handoff">human handoff</a>).</li>
     </ol>
     <p><strong>Cost, with assumed prices.</strong> Say input tokens cost $3 per million and output $15 per million (check current price sheets). A turn carries a 1,500-token system prompt with tool definitions, 1,500 tokens of retrieved passages and on average 500 tokens of history, and produces 150 tokens:</p>
     <div class="tbl"><table>
@@ -970,8 +970,8 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p><strong>Latency.</strong> Stream the tokens. Retrieval and reranking take a few hundred milliseconds; the time to the first token is mostly the model's. Tool calls add a round trip each, so fetch the order record once per conversation, not per turn.</p>
     <p><strong>Evaluation.</strong></p>
     <ul>
-      <li><em>Before launch and before every change</em> (prompt, model, knowledge base): a golden set built from real resolved conversations, covering each intent plus hard and adversarial cases, scored against a rubric by an LLM judge that has been checked against human labels. Score retrieval separately from generation, so a failure points to its stage.</li>
-      <li><em>After launch:</em> an A/B test by user on containment, CSAT and repeat contacts together; the judge run on a sample of live conversations; a human review queue for low scores (online monitoring).</li>
+      <li><em>Before launch and before every change</em> (prompt, model, knowledge base): a golden set built from real resolved conversations, covering each intent plus hard and adversarial cases, scored against a rubric by an <a href="./llm-evals-guardrails.html#llm-judge">LLM judge</a> that has been checked against human labels. Score retrieval separately from generation, so a failure points to its stage.</li>
+      <li><em>After launch:</em> an A/B test by user on containment, CSAT and repeat contacts together; the judge run on a sample of live conversations; a human review queue for low scores (<a href="./llm-evals-guardrails.html#monitoring">online monitoring</a>).</li>
       <li><em>The flywheel:</em> escalated and low-rated conversations become labelled failures, which become new golden cases and knowledge-base fixes.</li>
     </ul>
     <p><strong>How it fails</strong> (more in RAG failure modes):</p>
