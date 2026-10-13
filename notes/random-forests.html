@@ -364,14 +364,14 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>One fixed split keeps 3,500 rows for training (304 defaulters) and 1,500 for testing (130 defaulters). A second target, for regression, is the credit limit granted: \(2 \times \text{income} \times (1 - \text{emi})\), plus noise with a standard deviation of 10 (₹ thousand).</p>
     <p>Every model is scored three ways on the test set:</p>
     <ul>
-      <li><strong>AUC:</strong> how well it ranks defaulters above non-defaulters. Higher is better.</li>
-      <li><strong>Log loss:</strong> how much probability went to what actually happened. Lower is better.</li>
+      <li><strong>AUC:</strong> how well it ranks defaulters above non-defaulters. Higher is better (<a href="./evaluation.html#roc-auc">ROC and AUC</a>).</li>
+      <li><strong>Log loss:</strong> how much probability went to what actually happened. Lower is better (<a href="./evaluation.html#logloss">log loss</a>).</li>
       <li><strong>Gap:</strong> the mean squared difference between the predicted and the true chance, \(\frac1n \sum_i (\hat p_i - p_i)^2\). 0 is perfect. It can only be measured because the truth is known, and it ignores the noisy 0/1 labels, so it's the cleanest check here.</li>
     </ul>
     <p>Results are written as (AUC, log loss, gap). The truth itself scores (0.817, 0.212, 0). With only 130 test defaulters, a test AUC wobbles by about ±0.02, so a model can edge past the truth's AUC by luck. When AUC and the gap disagree, trust the gap.</p>
 
     <h3>One tree memorizes; many trees disagree</h3>
-    <p>A decision tree (CART, the standard algorithm) splits the rows with yes/no questions such as <code>late &lt;= 1.5</code>. At each node it picks the question that most reduces <strong>impurity</strong>, how mixed the node's classes are. For a node where a share \(q\) of the rows defaulted, the <strong>Gini impurity</strong> is \(2q(1-q)\): 0 when the node is pure, largest at a 50/50 mix.</p>
+    <p>A decision tree (CART, the standard algorithm) splits the rows with yes/no questions such as <code>late &lt;= 1.5</code>. At each node it picks the question that most reduces <strong>impurity</strong>, how mixed the node's classes are. For a node where a share \(q\) of the rows defaulted, the <strong>Gini impurity</strong> is \(2q(1-q)\): 0 when the node is pure, largest at a 50/50 mix (<a href="./decision-trees.html#impurity">impurity, in the trees note</a>).</p>
     <p>Grown to full depth, a tree keeps splitting until every leaf is pure, so each leaf holds one or a few applicants and answers a flat 0 or 1. Grow 100 such trees, each on a random half of the training rows, and ask eight of them about one applicant from each risk level:</p>
     <div class="tbl"><table>
       <thead><tr><th>True chance</th><th>Eight trees' answers</th><th>Average of all 100</th></tr></thead>
@@ -390,7 +390,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <tr><td>Average of 100 trees</td><td>0.833</td><td>0.371</td><td>0.0058</td></tr>
       </tbody>
     </table></div>
-    <p>The gap shrinks more than tenfold. In bias–variance terms, a full-depth tree has <strong>low bias</strong>: it isn't wrong in any systematic way, since it can carve out any shape. But it has <strong>high variance</strong>: its answer swings with the exact rows it saw. Averaging keeps the low bias and cancels much of the swing, the way the average of 100 people's guesses of a cow's weight beats most single guesses.</p>
+    <p>The gap shrinks more than tenfold. In bias–variance terms (<a href="./linear-logistic-regression.html#bias-variance">the decomposition</a>), a full-depth tree has <strong>low bias</strong>: it isn't wrong in any systematic way, since it can carve out any shape. But it has <strong>high variance</strong>: its answer swings with the exact rows it saw. Averaging keeps the low bias and cancels much of the swing, the way the average of 100 people's guesses of a cow's weight beats most single guesses.</p>
     <p>The middle two applicants are still off by about 0.17. All 100 trees learned from the same 3,500 rows, so any quirk those rows have near an applicant is shared by every tree, and averaging can't remove it. <a href="#correlation">Section 04</a> measures that shared part.</p>
     <p><strong>Only different data helps.</strong> Ten full-depth trees on the <em>same</em> rows, differing only in their random seed, disagree on just 4% of test applicants: the seed only breaks ties between equally good splits. Their misses correlate about 0.84, and their average scores AUC 0.637 against 0.623 for one tree.</p>
 
@@ -832,9 +832,9 @@ oob = tot / cnt          <span class="cm"># = rf.oob_decision_function_[:, 1]</s
       <li><strong>Repeated rows.</strong> If each applicant appears three times (three loans, one profile), a row can be out of bag while its copies are in, so the tree has effectively seen it. OOB AUC 0.993; real test AUC 0.828.</li>
       <li><strong>Time order and drift.</strong> A bootstrap mixes months, so March's OOB prediction comes from trees that saw April. In a simulation where the late-payment effect grows every month, a forest trained on months 0–17 looks perfectly calibrated out of bag (7.6% predicted, 7.5% actual). On months 18–23 it predicts 7.3%, and 11.3% default. OOB measures how well the forest fills gaps inside the training period, not how well it forecasts.</li>
       <li><strong>Too few trees.</strong> With 10 trees, about 1% of rows (\(0.632^{10}\)) are in every bag. sklearn warns and fills them with zeros, which corrupts the score.</li>
-      <li><strong>Tuning on OOB, then reporting it.</strong> Out of many settings you picked the one whose OOB rows happened to suit it, so its OOB score is optimistic. Keep a final test set, or use nested cross-validation.</li>
+      <li><strong>Tuning on OOB, then reporting it.</strong> Out of many settings you picked the one whose OOB rows happened to suit it, so its OOB score is optimistic. Keep a final test set, or use <a href="./evaluation.html#nested-cv">nested cross-validation</a>.</li>
     </ul>
-    <p>When customers repeat or the world drifts, validate the way you'll deploy: grouped folds for repeated customers, past-to-future splits for time.</p>
+    <p>When customers repeat or the world drifts, validate the way you'll deploy: <a href="./evaluation.html#grouped">grouped folds</a> for repeated customers, <a href="./evaluation.html#time-cv">past-to-future splits</a> for time.</p>
 
     <h3 id="oob-importance">OOB permutation importance</h3>
     <p>Breiman's original importance measure reuses the OOB rows. For each tree, shuffle feature \(j\) among that tree's OOB rows and measure how much the tree's error rises; then average over the trees:</p>
@@ -845,7 +845,7 @@ oob = tot / cnt          <span class="cm"># = rf.oob_decision_function_[:, 1]</s
     <h2 id="knobs"><span class="pn">08</span>Hyperparameters, knob by knob</h2>
     <p>Read every knob through the forest's expected error at a point:</p>
     <div class="mj">\[ \begin{aligned} \text{error} &amp;= \text{bias}^2 + \text{forest variance} + \text{noise} \\ \text{forest variance} &amp;= \rho\sigma^2 + \frac{1-\rho}{B}\,\sigma^2 \end{aligned} \]</div>
-    <p>In words: the forest's bias is one tree's bias (<a href="#bagging">section 03</a>), \(\sigma^2\) is one tree's variance, and \(\rho\) is how alike two trees are. Each knob moves some of them:</p>
+    <p>In words: the forest's bias is one tree's bias (<a href="#bagging">section 03</a>), \(\sigma^2\) is one tree's variance, and \(\rho\) is how alike two trees are (the bias–variance–noise split itself is derived in <a href="./linear-logistic-regression.html#bv-derive">linear and logistic regression</a>). Each knob moves some of them:</p>
     <div class="tbl"><table>
       <thead><tr><th>Knob (default), move</th><th>Bias</th><th>Tree variance \(\sigma^2\)</th><th>Correlation \(\rho\)</th><th>Worth tuning?</th></tr></thead>
       <tbody>
@@ -1110,7 +1110,7 @@ for j in range(p):
     </ul>
     <p>In this data, 0.73 isn't that close to 1, so the top group's shortfall likely comes mostly from the second cause. The 0.03 group stays on the line: most of its leaves are pure, so many trees agree on a near-zero answer.</p>
     <p>Two exceptions run the other way. In a region with no training positives, every tree can say exactly 0 (the 5 defaulters of <a href="#bagging">section 03</a>). And on its own <em>training</em> rows a forest is overconfident, since each row sits in about 63% of the trees.</p>
-    <p><strong>The fix is to calibrate on held-out data:</strong> Platt scaling (a sigmoid fitted to the scores) or isotonic regression (a monotone step fit, which needs more data), for example with <code>CalibratedClassifierCV</code>. OOB predictions can serve as the held-out scores, with the caveat that each comes from only about 37% of the trees. Boosters trained on log loss usually start out closer to calibrated.</p>
+    <p><strong>The fix is to calibrate on held-out data:</strong> Platt scaling (a sigmoid fitted to the scores) or isotonic regression (a monotone step fit, which needs more data), for example with <code>CalibratedClassifierCV</code> (both worked in <a href="./evaluation.html#recalibrate">evaluation</a>). OOB predictions can serve as the held-out scores, with the caveat that each comes from only about 37% of the trees. Boosters trained on log loss usually start out closer to calibrated.</p>
 
     <h3 id="imbalance">Class imbalance</h3>
     <p>A forest has no built-in handling of imbalance; it just sees few positives. Scale the true chance down so that about 1% default: 37 training defaulters, so each tree sees about 23 distinct ones and most leaves hold none. Four in ten test applicants get exactly 0 from every tree, and with 10 test defaulters, the test AUC wobbles by about ±0.09. The options, roughly in order:</p>

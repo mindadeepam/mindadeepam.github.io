@@ -559,7 +559,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>Cosine compares directions (the mix of terms) and ignores magnitude. That's what you want: a long document has bigger counts for everything, so a raw dot product favours long documents whatever their topic. Paste a document after itself and its topic hasn't changed, but its raw vector has doubled; its normalized vector is identical.</p>
     <p>Once vectors are L2-normalized, cosine is a plain dot product (fast on sparse matrices and inverted indexes), and Euclidean distance gives the same ranking:</p>
     <div class="mj">\[ \begin{aligned} \lVert \hat x - \hat y \rVert^2 &amp;= \lVert \hat x \rVert^2 + \lVert \hat y \rVert^2 - 2\, \hat x^\top \hat y \\ &amp;= 2 - 2 \cos(x, y) \end{aligned} \]</div>
-    <p>TF-IDF entries are non-negative, so the cosine between two documents lies in \([0, 1]\). For classifiers, normalizing puts documents of every length on one scale, so a single regularization strength suits all of them.</p>
+    <p>TF-IDF entries are non-negative, so the cosine between two documents lies in \([0, 1]\). For classifiers, normalizing puts documents of every length on one scale, so a single regularization strength suits all of them. For dense embeddings, and when dot product, cosine and L2 disagree, see <a href="./embeddings-vector-search.html#similarity">similarity in vector search</a>.</p>
 
     <h3>Pruning: min_df and max_df</h3>
     <ul>
@@ -626,8 +626,8 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li><strong>It comes from a model.</strong> The formula approximates the log-odds of relevance in the probabilistic relevance framework, and its two knobs can be tuned per collection.</li>
       <li><strong>It's built for scoring a query against documents:</strong> a sum over the query's terms only, which an inverted index computes quickly, with no query vector to normalize.</li>
     </ul>
-    <p>BM25 is still lexical: no synonyms, no paraphrase. Dense retrievers handle those but can miss exact identifiers, rare names and codes, and often generalize worse to new domains. So modern retrieval, RAG included, often runs both and merges the rankings, for example with reciprocal rank fusion, \(\sum_r 1 / (\kappa + \text{rank}_r(D))\) over the rankers \(r\), with a constant \(\kappa\) (60 in the original paper). Dense retrieval at scale uses approximate nearest-neighbour indexes (HNSW, IVF with product quantization).</p>
-    <p><strong>Tuning and evaluation.</strong> Tune \(k_1\) and \(b\) (and the fusion weights) on a set of labelled queries, and measure ranking quality with nDCG@10, MRR or recall@\(k\), not accuracy.</p>
+    <p>BM25 is still lexical: no synonyms, no paraphrase. Dense retrievers handle those but can miss exact identifiers, rare names and codes, and often generalize worse to new domains. So modern retrieval, RAG included, often runs both and merges the rankings, for example with reciprocal rank fusion, \(\sum_r 1 / (\kappa + \text{rank}_r(D))\) over the rankers \(r\), with a constant \(\kappa\) (60 in the original paper); why fusion helps, and how RRF works, are in <a href="./embeddings-vector-search.html#hybrid">hybrid search</a>. Dense retrieval at scale uses approximate nearest-neighbour indexes (<a href="./embeddings-vector-search.html#hnsw">HNSW</a>, <a href="./embeddings-vector-search.html#ivf-pq">IVF with product quantization</a>).</p>
+    <p><strong>Tuning and evaluation.</strong> Tune \(k_1\) and \(b\) (and the fusion weights) on a set of labelled queries, and measure ranking quality with nDCG@10, MRR or recall@\(k\), not accuracy (<a href="./evaluation.html#ranking-metrics">ranking metrics</a>).</p>
 
     <!-- classifiers -->
     <h2 id="classifiers"><span class="pn">06</span>Classical text classifiers</h2>
@@ -644,7 +644,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>Each \(\theta_{y,t}\) is the term's share of all the class's tokens, and the prior \(\hat\pi_y\) is the class's share of training documents.</p>
     <p><strong>Additive (Laplace) smoothing.</strong> If a term never appeared in class \(y\), then \(\hat\theta_{y,t} = 0\), its log is \(-\infty\), and one unseen word vetoes the class whatever the other words say. Add \(\alpha\) to every count:</p>
     <div class="mj">\[ \hat\theta_{y,t} = \frac{N_{y,t} + \alpha}{\sum_{t'} N_{y,t'} + \alpha V} \]</div>
-    <p>\(\alpha = 1\) is Laplace smoothing; smaller values, tuned by cross-validation, often work better for text. The Bayesian reading: \(\hat\theta\) is the posterior mean under a symmetric Dirichlet(\(\alpha\)) prior, as if every word had been seen \(\alpha\) extra times. Too large an \(\alpha\) pushes every \(\theta_{y,t}\) toward \(1/V\), and the model falls back on the prior.</p>
+    <p>\(\alpha = 1\) is Laplace smoothing; smaller values, tuned by cross-validation, often work better for text. The Bayesian reading: \(\hat\theta\) is the posterior mean under a symmetric Dirichlet(\(\alpha\)) prior, as if every word had been seen \(\alpha\) extra times (<a href="./likelihood-mle-map.html#in-ml">add-α smoothing as a posterior mean</a>). Too large an \(\alpha\) pushes every \(\theta_{y,t}\) toward \(1/V\), and the model falls back on the prior.</p>
     <p><strong>Log space.</strong> A document multiplies hundreds of probabilities, each far below 1, and the product underflows to 0 in floating point. Sum logs instead. To turn the class scores \(s_y = \log \pi_y + \sum_t \text{tf}_{t,D} \log \hat\theta_{y,t}\) into probabilities, use log-sum-exp with the largest score \(m = \max_{y'} s_{y'}\) subtracted. The largest term becomes \(e^{0} = 1\), so nothing overflows and the sum can't underflow to 0:</p>
     <div class="mj">\[ \log P(y \mid D) = s_y - m - \log \sum_{y'} e^{\,s_{y'} - m} \]</div>
     <p><strong>It's a linear classifier.</strong> With two classes, the log-odds is</p>
@@ -659,11 +659,11 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li><strong>Low variance.</strong> Each weight comes from smoothed counts, with no joint optimization. With few examples and many features, that bias costs less than a discriminative model's variance. Naive Bayes approaches its best error with far fewer examples, roughly logarithmic in the number of features, against linear for logistic regression (Ng and Jordan, 2002). With lots of data, logistic regression overtakes it.</li>
       <li><strong>Dependencies often cancel.</strong> When correlated words push both classes equally, or pull in opposite directions, the distortion largely cancels in the log-odds.</li>
     </ol>
-    <p>What does break: <strong>calibration</strong> (calibrate if the probabilities matter), and ranking, when many weak, correlated features outvote one strong one. Long documents get more extreme posteriors. Two variants worth naming: <strong>Bernoulli NB</strong> models presence and absence, so it also penalizes missing words (good for short texts); <strong>Complement NB</strong> estimates each class's weights from all the <em>other</em> classes' text, which is steadier on imbalanced data.</p>
+    <p>What does break: <strong>calibration</strong> (calibrate if the probabilities matter; <a href="./evaluation.html#who-miscalibrated">which models come out miscalibrated</a>), and ranking, when many weak, correlated features outvote one strong one. Long documents get more extreme posteriors. Two variants worth naming: <strong>Bernoulli NB</strong> models presence and absence, so it also penalizes missing words (good for short texts); <strong>Complement NB</strong> estimates each class's weights from all the <em>other</em> classes' text, which is steadier on imbalanced data.</p>
 
     <h3>Logistic regression and linear SVMs on TF-IDF</h3>
     <div class="mj">\[ \min_{w,\, w_0}\ \sum_{i=1}^{N} \ell\big(y_i,\ w^\top \hat x_i + w_0\big) + \lambda \lVert w \rVert_2^2 \]</div>
-    <p>\(\hat x_i\) is the L2-normalized TF-IDF vector of unigrams and bigrams. \(\ell\) is log loss for logistic regression, which gives probabilities, or the hinge loss \(\max(0,\ 1 - y\,(w^\top \hat x + w_0))\) with \(y \in \{-1, +1\}\) for a linear SVM, which gives a margin (calibrate it, with Platt scaling for example, if you need probabilities). Multi-class runs one-vs-rest or a softmax.</p>
+    <p>\(\hat x_i\) is the L2-normalized TF-IDF vector of unigrams and bigrams. \(\ell\) is log loss for logistic regression, which gives probabilities, or the hinge loss \(\max(0,\ 1 - y\,(w^\top \hat x + w_0))\) with \(y \in \{-1, +1\}\) for a linear SVM, which gives a margin (calibrate it, with <a href="./evaluation.html#recalibrate">Platt scaling</a> for example, if you need probabilities). Multi-class runs one-vs-rest or a softmax.</p>
     <p><strong>Why it's the baseline to beat:</strong></p>
     <ul>
       <li>In a sparse space with \(V \gg N\), text classes are usually close to linearly separable, and most labels hinge on a set of indicative words and phrases (Joachims, 1998).</li>
@@ -752,7 +752,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     </ul>
 
     <h3>LSA: truncated SVD</h3>
-    <p><strong>Latent semantic analysis</strong> (Deerwester et al., 1990) takes a weighted term-document matrix \(A\) (the TF-IDF matrix transposed, \(V \times N\); or a PPMI word-context matrix) and keeps only its top \(r\) singular directions:</p>
+    <p><strong>Latent semantic analysis</strong> (Deerwester et al., 1990) takes a weighted term-document matrix \(A\) (the TF-IDF matrix transposed, \(V \times N\); or a PPMI word-context matrix) and keeps only its top \(r\) singular directions. What the SVD is, worked by hand on a small matrix, is in <a href="./unsupervised-learning.html#svd">the unsupervised-learning note</a>. Here is what LSA does with it:</p>
     <div class="mj">\[ A \approx U_r\, \Sigma_r\, Q_r^\top \]</div>
     <div class="tbl"><table>
       <thead><tr><th>Matrix</th><th>Shape</th><th>Meaning</th></tr></thead>
@@ -764,10 +764,10 @@ footer .site-nav { display: block; margin-top: 10px; }
       </tbody>
     </table></div>
     <ul>
-      <li><strong>Best rank-\(r\) approximation:</strong> by the Eckart–Young theorem, no rank-\(r\) matrix is closer to \(A\) in squared error.</li>
+      <li><strong>Best rank-\(r\) approximation:</strong> by the Eckart–Young theorem, no rank-\(r\) matrix is closer to \(A\) in squared error, and that squared error is the sum of the dropped singular values squared (<a href="./unsupervised-learning.html#low-rank">low-rank approximation</a>).</li>
       <li><strong>What it buys:</strong> terms that occur in the same documents, or with the same neighbours, get nearby vectors even if they never co-occur directly. "car" and "automobile" rarely share a document but share "engine" and "drive", so they land close together. Synonymy is handled, and noise is discarded with the dropped directions.</li>
       <li><strong>Folding in a new document or query:</strong> project its TF-IDF vector \(a\) (length \(V\)) to \(U_r^\top a\). For a training document this gives exactly its row of \(Q_r \Sigma_r\), because \(U_r^\top U_r = I\), so new and old documents land in the same space. (sklearn's <code>TruncatedSVD</code> works on the \(N \times V\) orientation and does the same.)</li>
-      <li><strong>Truncated SVD, not PCA:</strong> PCA centers the columns first, which makes the sparse matrix dense. Truncated SVD (randomized or Lanczos) works on the sparse matrix directly.</li>
+      <li><strong>Truncated SVD, not PCA:</strong> PCA centers the columns first, which makes the sparse matrix dense. Truncated SVD (randomized or Lanczos) works on the sparse matrix directly (<a href="./unsupervised-learning.html#svd-numerics">why compute with the SVD</a>).</li>
       <li><strong>Limits:</strong> one vector per word blends all its senses; it's linear and still a bag of words; new vocabulary needs a refit.</li>
     </ul>
     <p>With PPMI and word2vec's own tricks (context smoothing, subsampling), SVD vectors are competitive with word2vec's (Levy, Goldberg and Dagan, 2015).</p>
@@ -1043,7 +1043,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li><strong>SIF</strong> (smooth inverse frequency; Arora, Liang and Ma, 2017): weight each word by \(a / (a + p(w))\), with \(p(w)\) its corpus frequency and \(a\) a small constant. Then remove the component along \(u\), the first singular vector of the matrix of all sentence vectors (no centering):</li>
     </ul>
     <div class="mj">\[ s = \frac{1}{\lvert S \rvert} \sum_{w \in S} \frac{a}{a + p(w)}\, v_w, \qquad s \leftarrow s - u u^\top s \]</div>
-    <p>The weight is an idf-like discount for frequent words. The removed direction is shared by almost every sentence (it tracks frequency and syntax rather than content), so subtracting it sharpens similarities. Contextual sentence encoders have replaced these methods, but they remain the baseline for unsupervised similarity.</p>
+    <p>The weight is an idf-like discount for frequent words. The removed direction is shared by almost every sentence (it tracks frequency and syntax rather than content), so subtracting it sharpens similarities. Contextual sentence encoders have replaced these methods (<a href="./embeddings-vector-search.html#sentence-embeddings">sentence embeddings</a>), but they remain the baseline for unsupervised similarity.</p>
     <p><strong>doc2vec</strong> (paragraph vectors) learns a vector per document alongside the word vectors: PV-DM adds a document vector to the context when predicting a word, and PV-DBOW predicts the document's words from its vector alone, like skip-gram. A new document needs a few gradient steps at inference to get its vector.</p>
 
     <h3>Pretrained vectors in a neural model: freeze or fine-tune?</h3>

@@ -728,10 +728,10 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ul>
       <li><strong>\(T \to 0\):</strong> differences between logits are magnified, and \(p\) becomes one-hot on the largest logit (split evenly among ties): the hard argmax.</li>
       <li><strong>\(T \to \infty\):</strong> differences vanish, and \(p\) becomes uniform, \(1/K\) each.</li>
-      <li><strong>The ranking never changes.</strong> \(T\) changes confidence, not the argmax. That's why temperature scaling, fitting one \(T\) on validation data, calibrates a classifier without touching its accuracy.</li>
+      <li><strong>The ranking never changes.</strong> \(T\) changes confidence, not the argmax. That's why temperature scaling, fitting one \(T\) on validation data, calibrates a classifier without touching its accuracy (<a href="./evaluation.html#recalibrate">recalibration</a>).</li>
       <li><strong>Gradient:</strong> with a temperature, the cross-entropy gradient at the logits is \((p - y)/T\), and a small \(T\) also saturates \(p\), so very low temperatures make training brittle.</li>
       <li><strong>Distillation</strong> trains a student on the teacher's softmax at \(T &gt; 1\), which exposes the relative sizes of the wrong-class probabilities. The soft loss is multiplied by \(T^2\), because its gradients shrink like \(1/T^2\) (Hinton et al. 2015).</li>
-      <li><strong>Sampling</strong> from a language model at \(T &lt; 1\) is more conservative; at \(T &gt; 1\), more diverse.</li>
+      <li><strong>Sampling</strong> from a language model at \(T &lt; 1\) is more conservative; at \(T &gt; 1\), more diverse (<a href="./agents-tool-use.html#temperature">decoding settings</a>).</li>
     </ul>
     <p><strong>Why “softmax”:</strong> log-sum-exp is a smooth maximum, and the softmax is its gradient. The bounds below squeeze it onto the max as \(T \to 0\), so its gradient becomes the one-hot argmax. A more accurate name would be “soft argmax”.</p>
     <div class="mj">\[ \begin{aligned} T \log \textstyle\sum_k e^{z_k / T} &amp;\ge \max_k z_k \\ T \log \textstyle\sum_k e^{z_k / T} &amp;\le \max_k z_k + T \log K \end{aligned} \]</div>

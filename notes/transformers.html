@@ -698,7 +698,7 @@ def generate(prompt, steps, temperature=1.0):
     <ul>
       <li><strong>Greedy:</strong> take the most likely token at each step. Fast, but short-sighted: the best whole sequence may start with a token that wasn't the single best first step, and greedy can't go back.</li>
       <li><strong>Beam search:</strong> keep the \(w\) best partial sequences by total log-probability (\(w\) is the beam width). Each step, extend each by every token and keep the best \(w\) again, at about \(w\) times the cost of greedy. Log-probabilities are negative and add up, so each extra token lowers the score and the search is biased toward ending early; dividing by a length penalty such as \(t^\alpha\) corrects for that.</li>
-      <li><strong>Sampling:</strong> draw from the distribution. A temperature \(\tau\) divides the logits first (below 1 sharpens, above 1 flattens); top-\(k\) keeps only the \(k\) likeliest tokens; top-\(p\) (nucleus) keeps the smallest set whose probabilities add up to at least \(p\).</li>
+      <li><strong>Sampling:</strong> draw from the distribution. A temperature \(\tau\) divides the logits first (below 1 sharpens, above 1 flattens); top-\(k\) keeps only the \(k\) likeliest tokens; top-\(p\) (nucleus) keeps the smallest set whose probabilities add up to at least \(p\). These settings are worked through on one example in <a href="./agents-tool-use.html#decoding">decoding settings</a>.</li>
     </ul>
     <p>Beam search suits tasks with one right answer: translation, summarization, speech recognition. For open-ended text the single most probable continuation is often bland and repetitive (Holtzman et al., 2019), so chat models sample instead.</p>
 
@@ -851,7 +851,7 @@ for tokens, y in labelled_batches:                <span class="cm"># "[CLS] text
         <tr><td>Sentence pair (similarity, entailment)</td><td><code>[CLS] A [SEP] B [SEP]</code>, with segment embeddings</td><td>\(h_{\text{[CLS]}}\) → classifier</td></tr>
         <tr><td>Token tagging (NER, codon per amino acid)</td><td><code>[CLS] text [SEP]</code></td><td>Each \(h_i\) → linear → a label per token</td></tr>
         <tr><td>Extractive QA</td><td><code>[CLS] question [SEP] passage [SEP]</code></td><td>Start and end scores per token → the best span</td></tr>
-        <tr><td>Embeddings / search</td><td>Text</td><td>Mean of the \(h_i\) (or \(h_{\text{[CLS]}}\)), compared by cosine similarity</td></tr>
+        <tr><td>Embeddings / search</td><td>Text</td><td>Mean of the \(h_i\) (or \(h_{\text{[CLS]}}\)), compared by cosine similarity (<a href="./embeddings-vector-search.html#sentence-embeddings">pooling, and retrieval-trained encoders</a>)</td></tr>
       </tbody>
     </table></div>
     <pre class="code"><code><span class="cm"># ---- 3. inference: one forward pass, then read off what the task needs ----</span>
@@ -1033,7 +1033,7 @@ for batch in corpus_batches:                      <span class="cm"># (B, n + 1) 
         <li><strong>Greedy</strong> is fast but short-sighted: the best whole sequence may start with a token that wasn't the single best first step, and greedy can't go back.</li>
         <li><strong>Beam search</strong> extends each of the \(w\) kept prefixes by every token, then keeps the best \(w\) again, at about \(w\) times the cost. Log-probabilities are negative and add up, so each extra token lowers the score; without the length penalty the search is biased toward ending early.</li>
         <li><strong>Why beam fails on open-ended text.</strong> The most probable continuation is often bland and repetitive (Holtzman et al., 2019), so chat models sample.</li>
-        <li><strong>Sampling controls:</strong> a temperature \(\tau\) divides the logits first (below 1 sharpens, above 1 flattens); top-\(k\) keeps the \(k\) likeliest tokens; top-\(p\) (nucleus) keeps the smallest set whose probabilities add up to at least \(p\).</li>
+        <li><strong>Sampling controls:</strong> a temperature \(\tau\) divides the logits first (below 1 sharpens, above 1 flattens); top-\(k\) keeps the \(k\) likeliest tokens; top-\(p\) (nucleus) keeps the smallest set whose probabilities add up to at least \(p\) (<a href="./agents-tool-use.html#decoding">decoding settings</a>).</li>
       </ul>
       <p><strong>Use:</strong> beam search for translation, summarization and speech recognition; sampling with a temperature and top-\(p\) for dialogue and creative text.</p></div></details>
 

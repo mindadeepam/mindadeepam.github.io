@@ -379,7 +379,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <tr><td>Gamma</td><td>\(\exp\)</td><td>Gamma deviance</td><td>Positive, skewed amounts</td></tr>
       </tbody>
     </table></div>
-    <p>For logistic regression, \(p_i = \sigma(w^\top x_i)\) and the Bernoulli negative log-likelihood is the BCE, \(\sum_i -y_i\log p_i - (1 - y_i)\log(1 - p_i)\), with gradient \(X^\top(p - y)\). Unlike linear regression there's no closed form, because \(p\) is a non-linear function of \(w\). But the loss is convex, so gradient descent or Newton's method (IRLS) finds the one optimum. If the classes are perfectly separable the likelihood keeps rising as \(\lVert w\rVert \to \infty\), and only regularization gives a finite answer.</p>
+    <p>For logistic regression, \(p_i = \sigma(w^\top x_i)\) and the Bernoulli negative log-likelihood is the BCE, \(\sum_i -y_i\log p_i - (1 - y_i)\log(1 - p_i)\), with gradient \(X^\top(p - y)\). Unlike linear regression there's no closed form, because \(p\) is a non-linear function of \(w\). But the loss is convex, so gradient descent or Newton's method (IRLS) finds the one optimum. If the classes are perfectly separable the likelihood keeps rising as \(\lVert w\rVert \to \infty\), and only regularization gives a finite answer. (Both are worked in the regression note: <a href="./linear-logistic-regression.html#newton">a Newton step by hand</a> and <a href="./linear-logistic-regression.html#separation">perfect separation</a>.)</p>
 
     <h3 id="dl-mle">Training a neural network is maximum likelihood</h3>
     <p>A network's last layer outputs the parameters of a distribution over the target, the loss is that distribution's negative log-likelihood, and SGD minimizes its average over mini-batches. So “which loss?” is really “which distribution?”, and the output activation is the link that keeps those parameters valid (a probability in \([0, 1]\), a positive variance).</p>
@@ -414,7 +414,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     </ul>
     <p><strong>Where MLE shows its limits in deep nets:</strong> the NLL keeps rewarding larger logits on training data, so big networks become overconfident (label smoothing and temperature scaling, section 08); it memorizes noisy labels (also section 08); and forward KL is mode-covering, so a language model spreads some probability onto poor continuations, which is one reason decoding uses top-\(k\) or top-\(p\) truncation.</p>
     <aside class="note say"><p class="nl">Where the central limit theorem fits</p>
-      <p>The CLT doesn't derive any loss; maximum likelihood under an assumed distribution does. The CLT does two other jobs:</p>
+      <p>The CLT (<a href="./hypothesis-testing.html#clt-basics">explained in the hypothesis-testing note</a>) doesn't derive any loss; maximum likelihood under an assumed distribution does. The CLT does two other jobs:</p>
       <ul>
         <li><strong>It motivates Gaussian noise.</strong> If a target's noise is the sum of many small, independent effects, the CLT says that sum is roughly Gaussian, which is the case for MSE. (The Gaussian is also the maximum-entropy distribution for a given mean and variance: the least-committal choice.)</li>
         <li><strong>It describes mini-batch gradients.</strong> A mini-batch gradient is an average of \(B\) per-example gradients, so by the CLT it is roughly Gaussian around the full-data gradient, with covariance shrinking as \(1/B\). That is the “gradient noise” behind the linear learning-rate scaling rule and arguments about SGD finding flat minima.</li>
@@ -455,13 +455,8 @@ footer .site-nav { display: block; margin-top: 10px; }
     <aside class="note trap"><p class="nl">Trap: log-transformed targets</p><p>Train MSE on \(\log y\), exponentiate, and you predict \(\exp(\mathbb E[\log y])\), the geometric mean. By Jensen's inequality that's below \(\mathbb E[y]\) (under lognormal noise it's the median). If the business sums predictions (revenue, demand), correct it (multiply by \(e^{\sigma^2/2}\) for lognormal noise, or use a smearing estimate), or train a log-link loss such as Poisson, Gamma or Tweedie on the raw target.</p></aside>
 
     <h3>Regularization is a prior</h3>
-    <p>Maximum a posteriori (MAP) estimation multiplies the likelihood by a prior over the weights, and the prior's negative log becomes a penalty term:</p>
-    <div class="mj">\[ \begin{aligned} \hat\theta_{\text{MAP}} &amp;= \arg\max_\theta\; p(\theta)\prod_i p(y_i \mid x_i; \theta) \\ &amp;= \arg\min_\theta\; \sum_i -\log p(y_i \mid x_i; \theta) - \log p(\theta) \end{aligned} \]</div>
-    <ul>
-      <li><strong>Gaussian prior</strong> \(\theta_j \sim \mathcal N(0, \sigma_\theta^2)\) gives \(-\log p(\theta) = \lVert\theta\rVert_2^2 / 2\sigma_\theta^2 + \text{const}\): L2 regularization (weight decay). A tighter prior, smaller \(\sigma_\theta\), is a larger \(\lambda\).</li>
-      <li><strong>Laplace prior</strong> \(\theta_j \sim \text{Laplace}(0, b_\theta)\) gives \(-\log p(\theta) = \lVert\theta\rVert_1 / b_\theta + \text{const}\): L1. Its sharp peak at zero is why L1 sets weights exactly to zero.</li>
-      <li>"Loss plus \(\lambda\) times a penalty" is still a negative log-probability, of the weights and data together. \(\lambda\) is relative to the data term's scale, so it must change if you switch between mean and sum reduction (section 12).</li>
-    </ul>
+    <p>A penalty added to the loss is minus the log of a prior on the weights. So “loss plus \(\lambda\) times a penalty” is a negative log posterior, and training becomes maximum a posteriori (MAP) estimation instead of MLE. A Gaussian prior gives L2 (weight decay), and a tighter prior means a larger \(\lambda\); a Laplace prior gives L1, whose sharp peak at zero is why L1 sets weights exactly to zero. The derivation, with worked numbers, is in <a href="./likelihood-mle-map.html#priors-as-regularizers">priors as regularizers</a>.</p>
+    <p>One point specific to losses: \(\lambda\) is relative to the data term's scale, so it must change if you switch between mean and sum reduction (section 12).</p>
 
     <!-- regression -->
     <h2 id="regression"><span class="pn">02</span>Regression losses</h2>
@@ -777,7 +772,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li>a neural network can settle early on predicting the prior for everything;</li>
       <li>the default 0.5 threshold is wrong for the decision you actually need.</li>
     </ul>
-    <p>Many "imbalance problems" are threshold problems. Predict positive when the expected cost of a miss exceeds that of a false alarm, which with calibrated probabilities means \(p &gt; C_{FP}/(C_{FP} + C_{FN})\).</p>
+    <p>Many "imbalance problems" are threshold problems. Predict positive when the expected cost of a miss exceeds that of a false alarm, which with calibrated probabilities means \(p &gt; C_{FP}/(C_{FP} + C_{FN})\) (<a href="./evaluation.html#threshold-choice">choosing a threshold</a>).</p>
 
     <h3>Class weights and <code>pos_weight</code></h3>
     <p>Each example's loss, averaged over the batch as usual:</p>
@@ -793,7 +788,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <h3>Resampling</h3>
     <ul>
       <li><strong>Oversampling</strong> the minority \(k\) times matches weight \(k\) in expectation, but exact copies are easy to memorize for high-capacity models. Augmentation, or SMOTE-style interpolation, adds variety (SMOTE rarely beats simple weights with boosted trees on tabular data).</li>
-      <li><strong>Undersampling</strong> the majority, keeping a fraction \(\rho\) of the negatives and every positive, is cheaper and throws information away. Negatives become \(\rho\) times rarer in training, so the odds the model learns are multiplied by \(1/\rho\).</li>
+      <li><strong>Undersampling</strong> the majority, keeping a fraction \(\rho\) of the negatives and every positive, is cheaper and throws information away. Negatives become \(\rho\) times rarer in training, so the odds the model learns are multiplied by \(1/\rho\). (Resampling and SMOTE, at the data level: <a href="./data-preparation.html#imbalance">class imbalance</a>.)</li>
       <li><strong>Undoing the shift</strong> (the prior correction): the learned log-odds are too high by \(\log(1/\rho)\), so add \(\log\rho\) back. With \(p_s\) the model's output, and \(\rho = 1/w\) for class weights:
         <div class="mj">\[ \operatorname{logit} p = \operatorname{logit} p_s + \log\rho \]</div></li>
       <li><strong>Weights vs resampling under SGD:</strong> the same expected gradient, with different variance. A few rare examples carrying large weights make the gradient spiky (a batch that happens to contain one positive takes a huge step). Balanced sampling shows the minority more often with normal-sized steps, which is usually steadier for neural networks. For trees and full-batch models, weights are simplest.</li>
@@ -879,12 +874,10 @@ footer .site-nav { display: block; margin-top: 10px; }
     </ul>
 
     <h3>Calibration</h3>
-    <p>A model is calibrated when \(P(y = 1 \mid \hat p = p) = p\): of the cases it scores at 0.8, 80% are positive. A <strong>reliability diagram</strong> bins predictions by confidence and plots each bin's accuracy against its mean confidence; perfect calibration is the diagonal. The <strong>expected calibration error</strong> is the weighted average gap:</p>
-    <div class="mj">\[ \mathrm{ECE} = \sum_{b=1}^{M} \frac{|B_b|}{N}\,\Big|\operatorname{acc}(B_b) - \operatorname{conf}(B_b)\Big| \]</div>
+    <p>A model is calibrated when \(P(y = 1 \mid \hat p = p) = p\): of the cases it scores at 0.8, 80% are positive. How to measure it (reliability diagrams, ECE and why not to trust it alone, log loss and Brier) is in <a href="./evaluation.html#calibration">evaluation</a>. What belongs to the loss is why networks end up over-confident, and which losses reward honest probabilities:</p>
     <ul>
-      <li>For multi-class it's usually computed on the top-1 confidence. It depends on the binning (equal-width or equal-count), is biased when bins are small, and can be gamed: always predicting the base rate is perfectly calibrated and useless. Report it next to log loss or the Brier score, which measure calibration and sharpness together.</li>
       <li><strong>Why modern networks are over-confident:</strong> once the training set is classified correctly, cross-entropy keeps falling by growing the logits. The validation NLL starts overfitting before the accuracy does. Depth, width, BatchNorm and less weight decay all made it worse (Guo et al., 2017).</li>
-      <li><strong>Proper scoring rules</strong> (log loss, Brier) are minimized in expectation only by the true probability, so they reward honest probabilities. Accuracy, hinge and focal loss are not proper.</li>
+      <li><strong>Proper scoring rules</strong> (log loss, Brier) are minimized in expectation only by the true probability, so they reward honest probabilities. Hinge and focal loss are not proper, and accuracy is only weakly proper: every report on the right side of 0.5 scores the same (<a href="./evaluation.html#proper">proper scoring rules, by numbers</a>).</li>
     </ul>
 
     <h3>Temperature scaling</h3>
@@ -893,7 +886,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ul>
       <li>Every logit is divided by the same \(T\), so the argmax, and hence accuracy, is unchanged. \(T &gt; 1\) softens an over-confident model.</li>
       <li>One parameter can barely overfit the validation set, and it works remarkably well for neural networks.</li>
-      <li>Relatives: Platt scaling (binary, \(\sigma(a z + b)\)); vector and matrix scaling (per-class, more parameters); isotonic regression (non-parametric and monotone, needs more data, can create ties).</li>
+      <li>Relatives: Platt scaling (binary, \(\sigma(a z + b)\)); vector and matrix scaling (per-class, more parameters); isotonic regression (non-parametric and monotone, needs more data). Platt, temperature and isotonic are fitted and compared on one model in <a href="./evaluation.html#recalibrate">evaluation</a>.</li>
       <li>Calibration is fitted to one distribution; recheck it after any shift. And if the model was trained with weights or resampling, apply the prior correction first (or let the calibrator absorb it).</li>
     </ul>
 
@@ -928,15 +921,14 @@ footer .site-nav { display: block; margin-top: 10px; }
     <h3>Hinge loss</h3>
     <ul>
       <li>Once a point is beyond the margin (\(m \ge 1\)) its loss and gradient are exactly zero, so it stops influencing the model. The SVM solution depends only on the points on or inside the margin, the support vectors. The logistic loss keeps pushing every point a little.</li>
-      <li>Its population minimizer is \(\operatorname{sign}(2p - 1)\): it estimates the best decision, not the probability. That's why SVM scores aren't probabilities and need Platt scaling.</li>
+      <li>Its population minimizer is \(\operatorname{sign}(2p - 1)\): it estimates the best decision, not the probability. That's why SVM scores aren't probabilities and need <a href="./evaluation.html#recalibrate">Platt scaling</a>.</li>
       <li>Hinge plus \(\lambda\lVert w\rVert^2\) is the soft-margin SVM; the margin width is \(2/\lVert w\rVert\).</li>
       <li>Multi-class version (Weston–Watkins): the true class must beat every other class by a margin \(\Delta\):
         <div class="mj">\[ L = \sum_{j \ne c} \max\big(0,\ \Delta + z_j - z_c\big) \]</div></li>
     </ul>
 
     <h3>Ranking: pointwise, pairwise, listwise</h3>
-    <p>Ranking is usually judged by NDCG: a gain for each item, discounted by the log of its rank and normalized by the best possible ordering's score (IDCG), so it lies in \([0, 1]\). With \(\text{rel}_i\) the relevance of the item at rank \(i\):</p>
-    <div class="mj">\[ \begin{aligned} \mathrm{DCG@}k &amp;= \sum_{i=1}^{k} \frac{2^{\text{rel}_i} - 1}{\log_2(1 + i)} \\ \mathrm{NDCG@}k &amp;= \frac{\mathrm{DCG@}k}{\mathrm{IDCG@}k} \end{aligned} \]</div>
+    <p>Ranking is usually judged by NDCG: a gain for each item, discounted by the log of its rank and normalized by the best possible ordering's score (IDCG), so it lies in \([0, 1]\) and mistakes near the top cost most. Its formula and a worked example are in <a href="./evaluation.html#ndcg">evaluation</a>. The losses that target it:</p>
     <ul>
       <li><strong>Pointwise:</strong> predict each item's relevance on its own, with MSE or BCE. Simple, but it ignores that only the order within a query matters.</li>
       <li><strong>Pairwise (RankNet):</strong> for a pair where item \(i\) should rank above \(j\), model \(P(i \succ j) = \sigma(s_i - s_j)\) and train with BCE:
@@ -1123,7 +1115,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li><strong>Per-token average</strong> (above): every token counts equally, so long sequences dominate. It's the standard language-modelling objective and matches perplexity.</li>
       <li><strong>Per-sequence average:</strong> average within each sequence, then across sequences. Every sequence counts equally, so the tokens of short sequences weigh more.</li>
       <li><strong>The accumulation trap:</strong> averaging per micro-batch and then over micro-batches isn't the per-token mean when micro-batches hold different numbers of tokens. Divide the summed loss by the total token count across all micro-batches. This bug has shipped in popular training libraries.</li>
-      <li>Supervised fine-tuning masks the prompt so only response tokens are trained. Seq2seq with teacher forcing feeds the gold previous token and applies cross-entropy at every target position. When the alignment between input and output is unknown (speech, handwriting), CTC sums the probability of every valid alignment with dynamic programming.</li>
+      <li>Supervised fine-tuning masks the prompt so only response tokens are trained. Seq2seq with teacher forcing feeds the gold previous token and applies cross-entropy at every target position. When the alignment between input and output is unknown (speech, handwriting), CTC sums the probability of every valid alignment with dynamic programming (<a href="./voice-agents.html#ctc">CTC in speech recognition</a>).</li>
     </ul>
     <pre class="code"><code><span class="cm"># logits: (B, T, V); targets: (B, T), pad and prompt positions = -100</span>
 logits, targets = logits[:, :-1], targets[:, 1:]  <span class="cm"># predict the next token</span>
@@ -1162,7 +1154,7 @@ per_seq = ((nll * mask).sum(1)[keep] / n_seq[keep]).mean()</code></pre>
     <h2 id="metrics"><span class="pn">13</span>Losses vs metrics</h2>
     <h3>Two different jobs</h3>
     <ul>
-      <li>The <strong>loss</strong> is what the optimizer minimizes: differentiable, ideally proper, matched to the noise. The <strong>metric</strong> is what you report and decide on: accuracy, F1, AUC, NDCG, cost. They're often different, and that's fine.</li>
+      <li>The <strong>loss</strong> is what the optimizer minimizes: differentiable, ideally proper, matched to the noise. The <strong>metric</strong> is what you report and decide on: accuracy, F1, AUC, NDCG, cost (each one, and how to choose, in <a href="./evaluation.html">model evaluation</a>). They're often different, and that's fine.</li>
       <li><strong>They can disagree.</strong> Validation loss rising while validation accuracy still rises is common: the model flips more borderline cases to correct while becoming very confident on the ones it still gets wrong, whose \(-\log p\) explodes. Early-stop on the metric that matters, and recalibrate if you need probabilities.</li>
       <li><strong>Match the loss to the metric where you can:</strong> an MAE metric wants an MAE or Huber loss (MSE predicts the mean, not the median); a quantile metric wants pinball loss; a ranking metric wants a pairwise or listwise loss; probability quality wants log loss.</li>
     </ul>
@@ -1318,7 +1310,7 @@ loss = cross_entropy(S, labels)               <span class="cm"># 2B - 2 negative
     <details class="qa"><summary><span class="qn">12</span>Label smoothing vs focal loss?</summary><div class="ans">
       <p>Label smoothing changes the <em>target</em> to \((1 - \varepsilon)y + \varepsilon/K\) for every example. It caps the logit gap at \(\log\big(1 + K(1 - \varepsilon)/\varepsilon\big)\), stops logits growing forever, reduces over-confidence and tightens class clusters. Focal loss changes each example's <em>weight</em> by difficulty, so easy examples nearly vanish; it's for an easy majority swamping the gradient. Smoothing hurts distillation and anything needing real confidence; focal loss pulls probabilities towards 0.5. Both lower confidence, and neither replaces measuring calibration. (<a href="#calibration">08</a>)</p></div></details>
     <details class="qa"><summary><span class="qn">13</span>What is calibration, how do you measure it, and how does temperature scaling fix it without changing accuracy?</summary><div class="ans">
-      <p>Calibrated means that of the cases scored \(p\), a fraction \(p\) are positive. Measure it with a reliability diagram and ECE, the count-weighted gap between accuracy and confidence across confidence bins, alongside log loss or Brier. Deep networks are often over-confident because cross-entropy keeps rewarding larger logits. Temperature scaling fits one scalar \(T\) on held-out data to minimize the NLL of \(\operatorname{softmax}(z/T)\). Dividing every logit by the same positive number never changes the argmax, so accuracy is identical while confidence is softened. (<a href="#calibration">08</a>)</p></div></details>
+      <p>Calibrated means that of the cases scored \(p\), a fraction \(p\) are positive. Measure it with a reliability diagram and ECE, the count-weighted gap between accuracy and confidence across confidence bins, alongside log loss or Brier. Deep networks are often over-confident because cross-entropy keeps rewarding larger logits. Temperature scaling fits one scalar \(T\) on held-out data to minimize the NLL of \(\operatorname{softmax}(z/T)\). Dividing every logit by the same positive number never changes the argmax, so accuracy is identical while confidence is softened. (<a href="#calibration">08</a>; measuring calibration and the other fixes: <a href="./evaluation.html#calibration">evaluation</a>)</p></div></details>
     <details class="qa"><summary><span class="qn">14</span>In knowledge distillation, why use a temperature, and why multiply the soft loss by \(T^2\)?</summary><div class="ans">
       <p>At \(T = 1\) the teacher's probabilities are nearly one-hot, so the information about which wrong classes resemble the right one sits in tiny probabilities that carry no gradient. Softening with \(T &gt; 1\) exposes it. The soft term's gradient, and its high-temperature limit, are:</p>
       <div class="mj">\[ \begin{aligned} \frac{\partial\,\mathrm{KL}}{\partial z} &amp;= \frac{q^{T} - p^{T}}{T} \\ &amp;\approx \frac{z - v}{K T^2} \end{aligned} \]</div>
@@ -1369,7 +1361,7 @@ loss = cross_entropy(S, labels)               <span class="cm"># 2B - 2 negative
         <li><strong>Counts:</strong> Poisson with a log link, loss \(\mu - y\log\mu\); predictions stay positive and the variance grows with the mean.</li>
         <li><strong>Positive, skewed amounts</strong> (spend, claim size): Gamma or Tweedie with a log link.</li>
       </ul>
-      <p><strong>Why this matters:</strong> the distribution decides what the optimum predicts (mean, median, probability), how hard outliers pull, and whether predictions respect the target's range. A mismatched loss still trains, but it estimates the wrong quantity, for example a mean when the business needs a quantile. Regularization fits the same frame: a Gaussian prior on the weights adds L2, a Laplace prior adds L1. (<a href="#glm">01</a>)</p></div></details>
+      <p><strong>Why this matters:</strong> the distribution decides what the optimum predicts (mean, median, probability), how hard outliers pull, and whether predictions respect the target's range. A mismatched loss still trains, but it estimates the wrong quantity, for example a mean when the business needs a quantile. Regularization fits the same frame: a Gaussian prior on the weights adds L2, a Laplace prior adds L1 (<a href="./likelihood-mle-map.html#priors-as-regularizers">priors as regularizers</a>). (<a href="#glm">01</a>)</p></div></details>
 
     <!-- sheet -->
     <h2 id="sheet"><span class="pn">16</span>Cheat sheet</h2>

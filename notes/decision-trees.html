@@ -364,7 +364,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       </tbody>
     </table></div>
     <p>8.7% of applicants default. Models train on 3,500 rows and are scored on the other 1,500 by two numbers.</p>
-    <p><strong>AUC</strong> is the chance that a random defaulter scores above a random payer (0.5 is a coin flip, 1 is perfect): it judges the ranking. <strong>Log loss</strong> averages \(-\log\) of the probability given to what actually happened (lower is better; confident mistakes cost a lot): it judges the probabilities.</p>
+    <p><strong>AUC</strong> is the chance that a random defaulter scores above a random payer (0.5 is a coin flip, 1 is perfect): it judges the ranking. <strong>Log loss</strong> averages \(-\log\) of the probability given to what actually happened (lower is better; confident mistakes cost a lot): it judges the probabilities. Both are worked by hand in <a href="./evaluation.html#auc-pairs">AUC as pairs won</a> and <a href="./evaluation.html#logloss">log loss</a>.</p>
     <p>Predicting the true chances gets an AUC of 0.817 and a log loss of 0.212, the best any model can do on average, since defaults are random (on one test set a model can edge past it by luck; see <a href="#when">section 17</a>). A second target, the <strong>credit limit</strong>, is \(2 \times \text{income} \times (1 - \text{emi})\) plus noise with spread 10; it's used for regression.</p>
 
     <h3>Questions, nodes and leaves</h3>
@@ -485,7 +485,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li><strong>Where they differ:</strong> nodes where one class is rare. \(-\ln p\) blows up as \(p \to 0\), so entropy is steeper near the ends. A node with 2% defaults sits at 14% of entropy's peak (0.141 of 1) but only 8% of Gini's (0.039 of 0.5), so entropy gives more credit for cleaning up a nearly pure node, such as a small fraud pocket.</li>
       <li><strong>Why Gini is the default:</strong> it was CART's original choice and skips the logarithm (a small speed gain). In practice depth and leaf size matter far more than this choice.</li>
       <li>sklearn's <code>criterion="log_loss"</code> is entropy: a leaf's entropy is its log loss when it predicts its own share.</li>
-      <li>A credit team asking “what's the model's Gini?” means the <strong>Gini coefficient</strong>, \(2\,\text{AUC} - 1\) (0.617 for this tree), a ranking score unrelated to Gini impurity.</li>
+      <li>A credit team asking “what's the model's Gini?” means the <strong>Gini coefficient</strong>, \(2\,\text{AUC} - 1\) (0.617 for this tree), a ranking score unrelated to Gini impurity (<a href="./evaluation.html#gini">Gini and KS</a>).</li>
     </ul>
 
     <h3 id="gain-ratio">Gain ratio (C4.5)</h3>
@@ -767,7 +767,7 @@ leaves: late 0 → 0 of 3    late 1 → 1 of 3
 
     <!-- calibration -->
     <h2 id="calibration"><span class="pn">09</span>Are the probabilities calibrated?</h2>
-    <p>A probability is <strong>calibrated</strong> if, among all applicants given 20%, about 20% default. A leaf's probability is its training share, \(\hat p = k/n\), and three things make it rough:</p>
+    <p>A probability is <strong>calibrated</strong> if, among all applicants given 20%, about 20% default (how to measure it in general: <a href="./evaluation.html#calibration">calibration</a>). A leaf's probability is its training share, \(\hat p = k/n\), and three things make it rough:</p>
     <ul>
       <li><strong>Small leaves are noisy.</strong> A share from \(n\) rows typically misses the truth by its standard error, \(\sqrt{\hat p(1 - \hat p)/n}\). The 20-row leaf says 90%; one standard error is \(\sqrt{0.9 \times 0.1/20} = 0.067\), so two (roughly a 95% range) give 77% to 100%.</li>
       <li><strong>Small leaves are pushed towards the extremes.</strong> That leaf's truth, 73%, sits outside even that range. It isn't bad luck: the tree chose this leaf <em>because</em> its share looked extreme, out of many candidate cuts, so selected leaves are biased towards 0 and 1, not just noisy.</li>
@@ -796,14 +796,14 @@ leaves: late 0 → 0 of 3    late 1 → 1 of 3
         <div class="mj">\[ \hat p = \frac{k + m\,\bar p}{n + m} \]</div>
         With \(m = 10\), a pure leaf of 30 says 2.2% instead of 0%, and the <code>min_samples_leaf=30</code> tree's log loss falls from 0.731 to 0.241 with the same leaves. Choose \(m\) by cross-validation; too large pulls every leaf to 8.7% and loses the spread.</li>
       <li><strong>Honest leaves:</strong> the shares lean to the extremes because the same rows chose the leaves and then filled them. Grow the tree on one half of the training rows and fill the leaf shares from the other half. For a <code>min_samples_leaf=30</code> tree grown on half the training rows, filling the leaves from the other half and smoothing gives a log loss of 0.227, against 0.725 when it uses its own shares.</li>
-      <li><strong>Calibrate on held-out data</strong> with Platt scaling (a logistic fit on the score) or isotonic regression (a monotone step fit). Isotonic can merge neighbouring leaves into one score but can never split one, so the tree still has at most as many scores as leaves.</li>
+      <li><strong>Calibrate on held-out data</strong> with Platt scaling (a logistic fit on the score) or isotonic regression (a monotone step fit), both worked in <a href="./evaluation.html#recalibrate">evaluation</a>. Isotonic can merge neighbouring leaves into one score but can never split one, so the tree still has at most as many scores as leaves.</li>
       <li><strong>Average many trees,</strong> as a random forest does: leaves that disagree average into smoother, less extreme probabilities.</li>
     </ul>
 
     <h3 id="class-weight">Class weights inflate the probabilities</h3>
     <p><code>class_weight="balanced"</code> makes each class count equally in total: the training set has 3,196 payers and 304 defaulters, so each defaulter counts \(r = 3196/304 \approx 10.5\) times as much as a payer. That changes which splits win, and it multiplies every leaf's odds of default by \(r\): a leaf with \(k\) defaulters among \(n\) rows reports \(p_w = rk/(rk + n - k)\). The depth-3 tree's average prediction becomes 32.7% against a real 8.7%, and its log loss 0.466. Solving for \(k/n\) undoes it exactly:</p>
     <div class="mj">\[ p = \frac{p_w}{p_w + r\,(1 - p_w)} \]</div>
-    <p>That brings the log loss back to 0.236 (not 0.216, because the splits stay as the weighted tree chose them). The ranking barely moves: multiplying every leaf's odds by the same \(r\) keeps the leaves in order, so only the changed splits move the AUC (0.823 here, against 0.808). Oversampling the rare class \(r\) times does the same and is undone the same way.</p>
+    <p>That brings the log loss back to 0.236 (not 0.216, because the splits stay as the weighted tree chose them). The ranking barely moves: multiplying every leaf's odds by the same \(r\) keeps the leaves in order, so only the changed splits move the AUC (0.823 here, against 0.808). Oversampling the rare class \(r\) times does the same and is undone the same way (<a href="./evaluation.html#prior-shift">the prior-shift correction</a>, for any model).</p>
     <p><strong>Three separate questions:</strong> does the model rank well (AUC), do its probabilities mean what they say (calibration, log loss), and where do you cut to approve? A tree can pass the first and fail the second.</p>
 
     <!-- prepruning -->
@@ -827,7 +827,7 @@ leaves: late 0 → 0 of 3    late 1 → 1 of 3
         <tr><td>None</td><td>327</td><td>1.000</td><td>0.623</td><td>3.965</td></tr>
       </tbody>
     </table></div>
-    <p>Training AUC rises with every level; test AUC peaks at depth 3, the depth of the true rule. Depths 1–2 are too simple to express the rule: that's <strong>bias</strong>. Deep trees change a lot from one training sample to the next (<a href="#variance">section 13</a>): that's <strong>variance</strong>. (Comparing on the test set is for teaching only; choose settings by cross-validation.)</p>
+    <p>Training AUC rises with every level; test AUC peaks at depth 3, the depth of the true rule. Depths 1–2 are too simple to express the rule: that's <strong>bias</strong>. Deep trees change a lot from one training sample to the next (<a href="#variance">section 13</a>): that's <strong>variance</strong>. (The decomposition itself: <a href="./linear-logistic-regression.html#bias-variance">bias and variance</a>. Comparing on the test set is for teaching only; choose settings by cross-validation.)</p>
 
     <h3>Pre-pruning: the knobs</h3>
     <p>Rules that stop growth early are <strong>pre-pruning</strong>. Each refuses a split under some condition:</p>
@@ -864,7 +864,7 @@ leaves: late 0 → 0 of 3    late 1 → 1 of 3
       <li><strong><code>min_impurity_decrease</code></strong> last: it trips on XOR-like patterns.</li>
       <li>Set together, every limit applies and whichever binds first stops that branch.</li>
     </ul>
-    <p>Tuning depth and leaf size together by 5-fold cross-validation on log loss picks <code>max_depth=3</code>, <code>min_samples_leaf=30</code> (test AUC 0.809, log loss 0.218): it found the true depth. When the model will score future applicants, use folds split by time: train on earlier months, validate on later ones.</p>
+    <p>Tuning depth and leaf size together by 5-fold cross-validation on log loss picks <code>max_depth=3</code>, <code>min_samples_leaf=30</code> (test AUC 0.809, log loss 0.218): it found the true depth. When the model will score future applicants, use folds split by time: train on earlier months, validate on later ones (<a href="./evaluation.html#time-cv">time-series splits</a>).</p>
     <p><strong>Monotonic constraints.</strong> <code>monotonic_cst</code> forces predictions to only rise (or only fall) with a feature, for example “more late payments never lowers the risk”, which credit models often need. sklearn enforces it bluntly: at each split on a constrained feature it caps every leaf on the low side, and floors every leaf on the high side, at the midpoint of the two children's values.</p>
     <p>Constraining <code>late</code> here caps the whole late ≤ 1 side at 18.2%, so the stressed applicant from <a href="#leaves">section 08</a> drops from 49.3% to 18.2%, though late payments were never their problem, and test AUC falls to 0.791.</p>
 

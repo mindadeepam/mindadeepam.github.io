@@ -478,9 +478,9 @@ footer .site-nav { display: block; margin-top: 10px; }
     <h3 id="offline-metric">Choosing an offline metric that tracks the business one</h3>
     <p>The business metric is slow (defaults take a year) or can't be computed offline (you never see what declined applicants would have done). So you need an offline stand-in, and it has to pass four tests:</p>
     <ol>
-      <li><strong>It measures where the decision is made.</strong> The lender will approve about 40%, so what matters is the ordering around that cut-off. AUC averages over every possible cut-off, including ones nobody will use. Report the bad rate among the 40% the model would approve, next to AUC. Some of those 40% were declined in the past and have no outcome, so they must be filled in (<a href="#selection">04</a>), which is why the live test has the final word.</li>
+      <li><strong>It measures where the decision is made.</strong> The lender will approve about 40%, so what matters is the ordering around that cut-off. AUC averages over every possible cut-off, including ones nobody will use (<a href="./evaluation.html#partial-auc">the slice that matters</a>). Report the bad rate among the 40% the model would approve, next to AUC. Some of those 40% were declined in the past and have no outcome, so they must be filled in (<a href="#selection">04</a>), which is why the live test has the final word.</li>
       <li><strong>It's weighted by money when amounts vary.</strong> A model that catches many small defaults and misses the large ones wins on counts and loses on rupees. Count each default by its rupee loss (exposure × loss given default), not as 1.</li>
-      <li><strong>It matches how the score is used.</strong> If only the order matters (a fixed approval rate, a review queue), ranking metrics are enough: AUC; Gini \(= 2\,\text{AUC} - 1\), which rescales it so random ordering scores 0 and perfect ordering 1; and KS, the largest gap between the score distributions of goods and bads. If the number itself is used (expected loss, pricing, a cut-off from the economics), add calibration.</li>
+      <li><strong>It matches how the score is used.</strong> If only the order matters (a fixed approval rate, a review queue), ranking metrics are enough: AUC; Gini \(= 2\,\text{AUC} - 1\), which rescales it so random ordering scores 0 and perfect ordering 1; and KS, the largest gap between the score distributions of goods and bads (<a href="./evaluation.html#gini">Gini and KS</a>). If the number itself is used (expected loss, pricing, a cut-off from the economics), add calibration.</li>
       <li><strong>It has predicted online results before.</strong> Across past model changes, did offline gains turn into live gains? If not, fix the offline metric before trusting it.</li>
     </ol>
     <p>The most faithful offline metric is a simulation of the decision itself: run the new policy over past applications and add up the profit. Its blind spot is that past outcomes exist only for approved applicants (<a href="#selection">04</a>).</p>
@@ -488,7 +488,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <h3 id="threshold">Thresholds come from costs</h3>
     <p>Approve when the expected gain beats the expected loss. With PD \(p\), gain \(G\) if the loan is repaid and loss \(L\) if it isn't:</p>
     <div class="mj">\[ (1 - p)\,G &gt; p\,L \quad\Longleftrightarrow\quad p &lt; p^* = \frac{G}{G + L} \]</div>
-    <p>In words: approve while the chance of default is below the break-even point, where the margin on good loans exactly pays for the bad ones. Here \(p^* = 5{,}000 / 33{,}000 \approx 15\%\). It's the general rule \(t^* = C_{FP}/(C_{FP} + C_{FN})\) with \(C_{FP} = G\) and \(C_{FN} = L\).</p>
+    <p>In words: approve while the chance of default is below the break-even point, where the margin on good loans exactly pays for the bad ones. Here \(p^* = 5{,}000 / 33{,}000 \approx 15\%\). It's the general rule \(t^* = C_{FP}/(C_{FP} + C_{FN})\) with \(C_{FP} = G\) and \(C_{FN} = L\); that rule's derivation, and how it compares with F1, Youden and capacity cut-offs, is in <a href="./evaluation.html#threshold-choice">choosing a threshold</a>.</p>
     <p>With 1,000 applicants in each risk band, approving from the safest band down:</p>
     <div class="tbl"><table>
       <thead><tr><th>Band</th><th>PD</th><th>Profit per loan</th><th>Cumulative profit</th></tr></thead>
@@ -505,12 +505,10 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p><strong>The limit follows the same logic.</strong> A bigger limit raises the margin on a good loan and the exposure on a bad one, and can raise the PD itself if the repayment strains the borrower's income. Offer the largest limit at which \((1 - p)\,G\) still beats \(p\,L\), with \(p\), \(G\) and \(L\) all evaluated at that limit.</p>
 
     <h3 id="calibration">Calibration, when the score is used as a probability</h3>
-    <p>A model is calibrated if, among applicants given a PD of 10%, about 10% default:</p>
-    <div class="mj">\[ \Pr(y = 1 \mid \hat p = q) = q \quad \text{for every } q \]</div>
-    <p>The break-even rule uses the PD as a probability, so it needs calibration. Suppose every PD came out at half its true value. Band D would show 9%, below the 15% break-even, and be approved at a loss. AUC, Gini and KS wouldn't move, because the order is unchanged.</p>
+    <p>A model is calibrated if, among applicants given a PD of 10%, about 10% default (the general definition, and how to measure it, is in <a href="./evaluation.html#calibration">evaluation</a>). The break-even rule uses the PD as a probability, so it needs calibration. Suppose every PD came out at half its true value. Band D would show 9%, below the 15% break-even, and be approved at a loss. AUC, Gini and KS wouldn't move, because the order is unchanged.</p>
     <ul>
-      <li><strong>Check it</strong> on out-of-time data: the predicted against the observed bad rate in each score band, the average predicted PD against the observed rate, and a proper score such as the Brier score or log loss.</li>
-      <li><strong>Fix it</strong> with Platt scaling (a two-parameter logistic fit to the scores) or isotonic regression (any monotone correction; needs more data), fitted on recent held-out data. Both are monotone, so the ranking barely changes (isotonic's flat steps create a few ties). If you reweighted or undersampled the classes, the probabilities are inflated by design and must be corrected before use.</li>
+      <li><strong>Check it</strong> on out-of-time data: the predicted against the observed bad rate in each score band, the average predicted PD against the observed rate, and a proper score such as the Brier score or log loss (<a href="./evaluation.html#reliability">reliability diagrams</a>; <a href="./evaluation.html#proper">proper scores</a>).</li>
+      <li><strong>Fix it</strong> with Platt scaling or isotonic regression, fitted on recent held-out data. Both are monotone, so the ranking barely moves (how each works and which to choose: <a href="./evaluation.html#recalibrate">recalibration methods</a>). If you reweighted or undersampled the classes, the probabilities are inflated by design: rescale the odds before use (<a href="./evaluation.html#prior-shift">the prior-shift correction</a>).</li>
       <li><strong>It breaks before the ranking does.</strong> A recession raises every applicant's risk: the order may hold while every PD is too low. So recalibration is a cheaper, more frequent fix than retraining.</li>
     </ul>
 
@@ -645,7 +643,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     </ul>
 
     <h3>Group splits</h3>
-    <p>One person can apply many times. If their applications land on both sides, the model is graded partly on memory. Within the training period, split folds by customer (group k-fold), and on the test set report returning and new applicants separately.</p>
+    <p>One person can apply many times. If their applications land on both sides, the model is graded partly on memory. Within the training period, split folds by customer (<a href="./evaluation.html#grouped">group k-fold</a>), and on the test set report returning and new applicants separately.</p>
 
     <h3>Leakage, the short checklist</h3>
     <ul>
@@ -658,7 +656,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     </ul>
 
     <h3 id="holdout">The untouched holdout, and how big it must be</h3>
-    <p>Every decision made while looking at a dataset uses it up: its score becomes optimistic. The test set is looked at once, at the end, after every choice is frozen. Its size is set by the number of <em>bads</em>, not rows. With 300 bads in the test set (three months of this lender's loans hold about 700), AUC has a standard error of about 0.016, so a 95% interval is about ±0.03 (±0.06 in Gini). A 0.005 AUC gain is noise. To compare two models, use a paired bootstrap on the same rows, which is much tighter than two separate intervals because the models' errors are correlated.</p>
+    <p>Every decision made while looking at a dataset uses it up: its score becomes optimistic. The test set is looked at once, at the end, after every choice is frozen. Its size is set by the number of <em>bads</em>, not rows. With 300 bads in the test set (three months of this lender's loans hold about 700), AUC has a standard error of about 0.016, so a 95% interval is about ±0.03 (±0.06 in Gini). A 0.005 AUC gain is noise. To compare two models, use a paired bootstrap on the same rows, which is much tighter than two separate intervals because the models' errors are correlated (<a href="./evaluation.html#boot-metric">bootstrap intervals for a metric</a>).</p>
 
     <p><strong>Where it goes wrong:</strong> random splits on time-ordered data; tuning on the test set (“just one more look”); too few bads in the test to tell models apart; a validation period that's unusual, such as a festive season or a policy change.</p>
     <p><strong>What a senior person checks</strong></p>
@@ -707,7 +705,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>Constraints shape the choice as much as accuracy: latency, explanation requirements, how often it must be retrained, and what the team can maintain.</p>
 
     <h3>Hyperparameter search</h3>
-    <p>For boosting, a handful of settings matter:</p>
+    <p>For boosting, a handful of settings matter (what each one does: <a href="./gradient-boosting.html#tuning">tuning gradient boosting</a>):</p>
     <ul>
       <li>the learning rate and number of trees, set together through early stopping;</li>
       <li>tree size: depth or number of leaves, and the minimum data in a leaf;</li>
@@ -756,7 +754,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ul>
       <li><strong>Global: what drives the model.</strong> SHAP importance, the average absolute contribution of each feature, is more reliable than the trees' built-in split-gain importance, which favours features with many distinct values.</li>
       <li><strong>Shape: how a feature acts.</strong> A partial dependence plot shows the average predicted PD as one feature varies. Check that it moves the way the domain expects (risk rises with credit utilization). With correlated features it averages over impossible combinations, so read it with care; accumulated local effects (ALE) plots avoid this.</li>
-      <li><strong>Local: why this applicant.</strong> SHAP splits one prediction into per-feature contributions, in log-odds for a boosted classifier, that add up to this applicant's prediction minus the average prediction.</li>
+      <li><strong>Local: why this applicant.</strong> SHAP splits one prediction into per-feature contributions, in log-odds for a boosted classifier, that add up to this applicant's prediction minus the average prediction (<a href="./decision-trees.html#shap">how SHAP values are computed</a>).</li>
     </ul>
 
     <h3 id="reason-codes">Reason codes for a declined applicant</h3>
@@ -809,16 +807,16 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li><strong>Protection:</strong> hard policy rules apply in both arms; the challenger gets loss caps (smaller first limits for its swap-ins, a ceiling on total exposure) and a kill switch tied to the guardrails.</li>
       <li><strong>Primary metric:</strong> profit per applicant, or the bad rate compared at the same approval rate, never the raw bad rate.</li>
       <li><strong>Guardrails:</strong> approvals for thin-file applicants, fairness gaps, first-payment default, latency, complaints.</li>
-      <li><strong>Duration and power:</strong> each group needs about \(n \approx 16\,p(1-p)/\delta^2\) loans (80% power, 5% significance). Comparing whole arms, seeing 30+ DPD at 3 months on book fall from 3.0% to 2.5% needs about 18,000 loans per arm: four years for a 10% challenger making 400 loans a month.</li>
+      <li><strong>Duration and power:</strong> each group needs about \(n \approx 16\,p(1-p)/\delta^2\) loans (80% power, 5% significance; <a href="./hypothesis-testing.html#derive-n">where the 16 comes from</a>). Comparing whole arms, seeing 30+ DPD at 3 months on book fall from 3.0% to 2.5% needs about 18,000 loans per arm: four years for a 10% challenger making 400 loans a month.</li>
       <li><strong>So read the swap sets, where the gap is large.</strong> If about 15% of approvals swap, the 6.0% → 5.0% gain means swap-outs default at roughly 12% and swap-ins at roughly 5%. On the full label, about 300 swap-ins then suffice: five months of the challenger's lending at about 60 a month. Early-delinquency proxies give a first read a quarter after that; the full label takes a year.</li>
     </ul>
     <aside class="note trap"><p class="nl">Trap</p><p>“The challenger's bad rate is lower, so it's better.” A model that approves fewer people almost always has a lower bad rate. Compare at the same approval rate, on profit per applicant, or on the swap sets directly: the challenger's swap-ins against the champion's swap-outs.</p></aside>
 
     <h3 id="real">Is the result real?</h3>
     <ul>
-      <li><strong>Check the split first.</strong> The arms' sizes must match the design (a chi-square test for sample ratio mismatch). A mismatch means assignment or logging is broken, and nothing downstream can be trusted.</li>
+      <li><strong>Check the split first.</strong> The arms' sizes must match the design (a chi-square test for sample ratio mismatch). A mismatch means assignment or logging is broken, and nothing downstream can be trusted (<a href="./hypothesis-testing.html#srm">sample ratio mismatch</a>).</li>
       <li><strong>Pre-register</strong> one primary metric, the guardrails with their margins, the duration and the analysis.</li>
-      <li><strong>Don't peek.</strong> Stopping the first time \(p &lt; 0.05\) inflates false positives, unless a sequential test was planned.</li>
+      <li><strong>Don't peek.</strong> Stopping the first time \(p &lt; 0.05\) inflates false positives, unless a sequential test was planned (<a href="./hypothesis-testing.html#peeking">why peeking breaks the 5%</a>).</li>
       <li><strong>Read an interval, not just a p-value:</strong> does its low end still beat the cost of the change?</li>
       <li><strong>Check consistency</strong> across months and the pre-registered segments, without hunting through dozens of segments for a winner.</li>
       <li><strong>Read only matured cohorts</strong>, on a proxy that has been validated against the full label.</li>
@@ -834,18 +832,11 @@ footer .site-nav { display: block; margin-top: 10px; }
     <!-- deploy -->
     <h2 id="deploy"><span class="pn">11</span>Deployment</h2>
     <h3>Batch or real time</h3>
-    <div class="tbl"><table>
-      <thead><tr><th></th><th>Batch</th><th>Real time</th></tr></thead>
-      <tbody>
-        <tr><td>When</td><td>The decision can wait: pre-approved offers, collections lists, nightly limit reviews</td><td>Someone is waiting: a loan application, a payment</td></tr>
-        <tr><td>Gains</td><td>Simple, cheap, easy to rerun and audit</td><td>Uses the freshest data</td></tr>
-        <tr><td>Costs</td><td>Scores go stale between runs</td><td>Needs online features, low latency, high availability and a fallback</td></tr>
-      </tbody>
-    </table></div>
-    <p>The application decision is real time. Pre-approved limits for existing customers could be batch, refreshed nightly.</p>
+    <p>Score in batch when the decision can wait (pre-approved offers, collections lists, nightly limit reviews): it's simple, cheap, and easy to rerun and audit, but scores go stale between runs. Score in real time when someone is waiting (a loan application, a payment): it uses the freshest data, but needs online features, low latency, high availability and a fallback. The full comparison, with streaming, is in <a href="./ml-system-design.html#serving">serving in ML system design</a>.</p>
+    <p>Here the application decision is real time. Pre-approved limits for existing customers could be batch, refreshed nightly.</p>
 
     <h3>Latency budget</h3>
-    <p>Split the time the applicant waits into parts, and give each an owner. An example for a 3-second decision:</p>
+    <p>Split the time the applicant waits into parts, each with an owner. Budget for the slowest 1% of requests, not the average (why, and how fan-out makes the tail worse: <a href="./ml-system-design.html#latency">latency budgets</a>). An example for a 3-second decision:</p>
     <div class="tbl"><table>
       <thead><tr><th>Step</th><th>Budget</th></tr></thead>
       <tbody>
@@ -855,7 +846,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <tr><td>Rules, logging, response</td><td>50 ms</td></tr>
       </tbody>
     </table></div>
-    <p>Budget for the slowest 1% of requests, not the average. Decide the fallback in advance: if the bureau times out, refer the application or decide on rules alone. A timeout must never turn into a silent approval.</p>
+    <p>Decide the fallback in advance: if the bureau times out, refer the application or decide on rules alone. A timeout must never turn into a silent approval (<a href="./ml-system-design.html#fallbacks">fallbacks and timeouts</a>).</p>
 
     <h3 id="skew">Training–serving skew</h3>
     <p>The model sees different numbers live than it saw in training, even though nothing is “wrong” in either place. Typical causes:</p>
@@ -868,7 +859,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>The fixes: one feature definition used by both paths; <strong>log the features at serving time and train on the logged values</strong>; parity tests in shadow mode.</p>
 
     <h3>Feature stores</h3>
-    <p>A feature store keeps each feature's definition once and serves it twice: an offline store with full history and point-in-time joins for training, and an online store with the latest values at low latency for serving. It prevents skew and lets models share features. It's also infrastructure with a running cost: for a single batch model, a well-tested feature pipeline is enough.</p>
+    <p>A feature store defines each feature once and serves it to both paths: history for training, the latest values for serving. That prevents most skew. How its offline and online stores and point-in-time joins work is in <a href="./ml-system-design.html#feature-store">ML system design</a>. It's infrastructure with a running cost: for a single batch model, a well-tested feature pipeline is enough.</p>
 
     <h3>Versioning, reproducibility and rollback</h3>
     <ul>
@@ -1080,7 +1071,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       <ul>
         <li><strong>Why it bites:</strong> if every PD is half its true value, a band whose true PD is 18% shows 9%, falls under a 15% break-even, and is approved at a loss. AUC, Gini and KS don't change, because the order is the same.</li>
         <li><strong>Check:</strong> a reliability table by decile (predicted against observed bad rate), the average PD against the observed rate, and the Brier score or log loss against a constant-rate baseline.</li>
-        <li><strong>Fix:</strong> Platt scaling fits two parameters (good for small data and S-shaped distortion); isotonic regression fits any monotone correction (needs more data). Both keep the order. After resampling the classes, correct the probabilities for the true base rate.</li>
+        <li><strong>Fix:</strong> Platt scaling fits two parameters (good for small data and S-shaped distortion); isotonic regression fits any monotone correction (needs more data). Both keep the order. After resampling the classes, correct the probabilities for the true base rate (<a href="./evaluation.html#recalibrate">Platt and isotonic, compared</a>; <a href="./evaluation.html#prior-shift">the base-rate correction</a>).</li>
         <li><strong>What breaks it:</strong> class reweighting or resampling, a change in the overall default rate (a recession), a change in the applicant mix (a new channel), and raw boosting scores in some setups.</li>
       </ul>
       <p><strong>Trade-off:</strong> isotonic regression is flexible but can overfit small data; Platt is stable but assumes the distortion has a sigmoid shape.</p>

@@ -521,10 +521,10 @@ y_test = head(predictor(rows, mask)[N:])            <span class="cm"># 24 layers
     <details class="qa"><summary><span class="qn">7</span>How would you evaluate it against XGBoost on a credit dataset?</summary><div class="ans">
       <p><strong>Compare them the way the model would be used: an out-of-time split, a properly tuned XGBoost, credit metrics plus calibration, confidence intervals, and a learning curve over training-set size, with latency and cost alongside.</strong></p>
       <ul>
-        <li><strong>Out-of-time split:</strong> train on older applications and test on later ones. Credit data drifts (the economy, policy, the applicant mix), and a random split lets the model see the future, which flatters both models.</li>
+        <li><strong>Out-of-time split:</strong> train on older applications and test on later ones. Credit data drifts (the economy, policy, the applicant mix), and a random split lets the model see the future, which flatters both models (<a href="./ds-project-lifecycle.html#oot">out of time, with a gap</a>).</li>
         <li><strong>A fair baseline:</strong> tune XGBoost (depth, learning rate, rounds with early stopping) and add monotonic constraints if production uses them; an untuned tree flatters any challenger. Give TabFM the same training rows, and note when its context forces subsampling.</li>
         <li><strong>Metrics:</strong> AUC and KS (the biggest gap between the score distributions of good and bad borrowers) for how well each ranks good from bad; calibration, because predicted default probabilities feed pricing and expected loss; and the bad rate at a fixed approval rate, the number the business acts on.</li>
-        <li><strong>Is the gap real:</strong> bootstrap the test set for a confidence interval on the difference, since small AUC gaps are often noise.</li>
+        <li><strong>Is the gap real:</strong> bootstrap the test set for a confidence interval on the difference, since small AUC gaps are often noise (<a href="./evaluation.html#boot-metric">paired bootstrap intervals</a>).</li>
         <li><strong>Learning curves:</strong> repeat at several training-set sizes. TabFM's pretrained prior should help most when data is small; as data grows, trees catch up, because they learn from all of it while TabFM stays capped by its context.</li>
         <li><strong>Operations:</strong> latency and cost per prediction, reason codes for declined applicants, and the licence.</li>
       </ul>
