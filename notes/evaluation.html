@@ -378,7 +378,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ul>
       <li><strong>Shuffle, then split</strong> into \(k\) equal folds, unless order carries meaning (time; see below).</li>
       <li><strong>\(k\) = 5 or 10</strong> is the usual compromise. Smaller \(k\) trains each model on less data (more pessimistic) and is cheaper; larger \(k\) costs more fits.</li>
-      <li><strong>Leave-one-out</strong> (\(k = n\)) is nearly unbiased but needs \(n\) fits, can't be stratified, and its estimate can be highly variable because the \(n\) training sets are almost identical. A metric like AUC can't be computed on a one-row fold; you'd have to pool the predictions.</li>
+      <li><strong>Leave-one-out</strong> (\(k = n\)) is nearly unbiased but needs \(n\) fits, can't be stratified, and its estimate can be highly variable: the \(n\) training sets are almost identical, so the \(n\) fold errors are highly correlated and averaging them cancels little of the noise. A metric like AUC can't be computed on a one-row fold; you'd have to pool the predictions.</li>
       <li><strong>Pooling vs averaging.</strong> AUC computed on the pooled out-of-fold predictions mixes scores from \(k\) different models, whose scales can differ; averaging the per-fold AUCs doesn't. They usually agree closely; when they don't, the fold models disagree about the score scale, which also matters if you'll pick one threshold.</li>
       <li><strong>Repeated k-fold</strong> reruns CV with different shuffles and averages, which removes the luck of one particular partition (<a href="#cv-variance">how noisy a CV estimate is</a>, below).</li>
       <li><strong>Bagged models</strong> get a nearly free validation estimate from the rows each tree didn't see (<a href="./random-forests.html#oob">out-of-bag, in the random-forests note</a>).</li>
@@ -444,8 +444,10 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ul>
       <li><strong>What its score means:</strong> the expected performance of the whole procedure, “search this grid with inner CV, then fit”. It does not pick a hyperparameter setting; different outer folds may choose different ones (and if they disagree wildly, the choice is unstable).</li>
       <li><strong>The final model:</strong> run the inner search once on all the data, and report the nested score as its expected performance.</li>
-      <li><strong>Cost:</strong> \(k_{\text{out}} \times k_{\text{in}} \times\) (grid size) fits: 5 × 4 × 60 = 1,200 for the design in the figure with a 60-setting grid. With plenty of data, a single train / validation / test split does the same job far more cheaply: the test set plays the outer loop.</li>
+      <li><strong>Cost:</strong> \(k_{\text{out}} \times k_{\text{in}} \times\) (grid size) fits: 5 × 4 × 60 = 1,200 inner fits plus 5 outer refits for the design in the figure with a 60-setting grid, and one more search (4 × 60 + 1 = 241 fits) for the final model. With plenty of data, a single train / validation / test split does the same job far more cheaply: the test set plays the outer loop.</li>
     </ul>
+
+    <p><strong>Without refitting:</strong> for likelihood models, AIC and BIC estimate out-of-sample fit from one fit by charging for the number of parameters (<a href="./likelihood-mle-map.html#fisher">likelihood note</a>); CV assumes less and works for any metric.</p>
 
     <h3 id="which-cv">Which scheme when</h3>
     <div class="tbl"><table>
@@ -469,7 +471,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <div class="tbl"><table>
       <thead><tr><th>What is judged</th><th>Metrics</th><th>Needs a threshold?</th><th>Section</th></tr></thead>
       <tbody>
-        <tr><td>The <strong>ranking</strong>: are positives scored above negatives?</td><td>ROC-AUC, average precision, precision@k</td><td>No</td><td><a href="#roc-auc">04</a>, <a href="#pr-auc">05</a></td></tr>
+        <tr><td>The <strong>ranking</strong>: are positives scored above negatives?</td><td>ROC-AUC, average precision, precision@k</td><td>No (precision@k cuts at a count \(k\), not a score)</td><td><a href="#roc-auc">04</a>, <a href="#pr-auc">05</a></td></tr>
         <tr><td>The <strong>decisions</strong> at one cut-off</td><td>Precision, recall, F1, cost</td><td>Yes</td><td>this one</td></tr>
         <tr><td>The <strong>probabilities</strong>: does 0.3 mean 30%?</td><td>Log loss, Brier, calibration</td><td>No</td><td><a href="#proper-scores">06</a>, <a href="#calibration">07</a></td></tr>
       </tbody>
@@ -573,7 +575,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     </table></div>
     <p>Precision zigzags as you go down (1.00, 0.50, 0.67…) because each negative knocks it down and each positive lifts it. On these balanced rows the F1 and Youden criteria agree. On imbalanced data they don't, and neither is what a business usually wants. The candidates:</p>
     <ul>
-      <li><strong>F1-optimal:</strong> the cut with the highest F1. A neat fact: with calibrated probabilities, the F1-optimal threshold is half the best achievable F1 (exactly in the population, approximately on a finite sample; Lipton and colleagues, 2014). The fraud screen below confirms it: best F1 0.348, threshold 0.174.</li>
+      <li><strong>F1-optimal:</strong> the cut with the highest F1. A neat fact: with calibrated probabilities, the F1-optimal threshold is half the best achievable F1 (exactly in the population, approximately on a finite sample; Lipton and colleagues, 2014). Why: \(F_1 = 2TP/(\#\text{flagged} + \#\text{positives})\). Flagging one more case with probability \(t\) adds \(2t\) to the expected numerator and 1 to the denominator, which raises the ratio only if \(2t\) exceeds the current F1. So keep flagging while \(t \gt F_1/2\); at the best cut, \(t^* = F_1^*/2\). The fraud screen below confirms it: best F1 0.348, threshold 0.174.</li>
       <li><strong>Youden's J</strong> = TPR − FPR, the height of the ROC curve above the diagonal. It treats a missed positive and a false alarm as equally bad <em>per class</em>, which ignores how many of each there are.</li>
       <li><strong>Cost-based:</strong> minimize the expected cost. This is the principled one.</li>
       <li><strong>A constraint:</strong> recall at least 95% (medical screening), precision at least 90% (automatic actions), or capacity: the review team can check 1,000 cases a day, so flag the top 1,000. That last one is precision@k (section <a href="#ranking-metrics">08</a>).</li>
@@ -589,7 +591,8 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>The formula needs calibrated probabilities (section <a href="#calibration">07</a>). With uncalibrated scores, sweep thresholds on validation data and pick the lowest total cost, \(C_{FP}\cdot FP + C_{FN}\cdot FN\).</p>
     <p><strong>The same answer on the ROC curve.</strong> Moving the threshold slightly trades a little TPR for a little FPR. The expected cost is flat where those trades balance, which happens where the ROC curve's slope is</p>
     <div class="mj">\[ \text{slope}^* = \frac{1 - \pi}{\pi}\cdot\frac{C_{FP}}{C_{FN}} \]</div>
-    <p>In words: the cost-optimal point is where one more unit of FPR buys exactly enough TPR to pay for it, and both the base rate and the cost ratio set that exchange rate. Youden's J picks the point of slope 1, so it is cost-optimal only if a miss costs \((1 - \pi)/\pi\) times a false alarm: 1 times at 50% prevalence, 199 times at 0.5%. That's why Youden flags far too much on rare-event problems.</p>
+    <p>In words: the cost-optimal point is where one more unit of FPR buys exactly enough TPR to pay for it, and both the base rate and the cost ratio set that exchange rate. Youden's J picks the point of slope 1, so it is cost-optimal only if a miss costs \((1 - \pi)/\pi\) times a false alarm: 1 times at 50% prevalence, 199 times at 0.5%. That's why, on rare-event problems, Youden flags far too much unless a miss really costs hundreds of false alarms.</p>
+    <p>Why the slope: the ROC curve's slope at a threshold is the likelihood ratio \(f_+(s)/f_-(s)\), the density of positive scores over the density of negative scores there, and posterior odds = prior odds × likelihood ratio. So this is the rule \(p \gt t^*\) restated in ROC terms. In the fraud screen below, the cost-optimal cut sits where the slope is \(199/50 = 3.98\).</p>
     <p><strong>The fraud screen.</strong> The rest of the note uses one imbalanced problem: 100,000 transactions a day, 0.5% fraud (500 frauds, 99,500 legitimate), a model with AUC 0.95 (scores: legitimate \(\mathcal N(0, 1)\), fraud \(\mathcal N(2.326, 1)\), and probabilities that are the exact posteriors, so perfectly calibrated; counts below are exact expectations), and a review team that can check 1,000 cases a day. A miss costs 50, a false alarm 1 (a review that finds fraud pays for itself). Five ways to set the threshold:</p>
     <div class="tbl"><table>
       <thead><tr><th>Rule</th><th>Flagged a day</th><th>Frauds caught (of 500)</th><th>Precision</th><th>Recall</th><th>Cost (50:1)</th></tr></thead>
@@ -627,7 +630,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>Look at what the columns measure. Each column is \(1/n_-\) wide and as tall as the share of positives above that negative, so its area is (positives above it) / \((n_+ n_-)\). Adding the columns counts every (positive, negative) pair in which the positive is ranked higher:</p>
     <div class="mj">\[ \begin{aligned} \text{AUC} &amp;= P(s_+ \gt s_-) + \tfrac12\,P(s_+ = s_-) \\ &amp;= \frac{\#\{\text{pairs the positive wins}\} + \tfrac12\,\#\{\text{ties}\}}{n_+\,n_-} \end{aligned} \]</div>
     <p>In words: pick one positive and one negative at random; AUC is the chance the positive gets the higher score, with ties counting half. On the eight rows: A beats all four negatives (4); C, D and E each beat F, G and H but lose to B (3 each). That's 13 of 16 pairs, 0.8125, the same as the area.</p>
-    <p><strong>It's the Mann–Whitney U statistic.</strong> \(U\), the number of pairs the positives win, is the statistic of the rank-sum test (<a href="./hypothesis-testing.html#mwu">Mann–Whitney</a>), so \(\text{AUC} = U/(n_+ n_-)\). That gives a way to compute it from ranks alone, without building the curve. Rank all scores from smallest (1) to largest, giving tied scores their average rank, and add up the positives' ranks \(W_+\):</p>
+    <p><strong>It's the Mann–Whitney U statistic.</strong> \(U\), the number of pairs the positives win (ties counting half), is the statistic of the rank-sum test (<a href="./hypothesis-testing.html#mwu">Mann–Whitney</a>), so \(\text{AUC} = U/(n_+ n_-)\). That gives a way to compute it from ranks alone, without building the curve. Rank all scores from smallest (1) to largest, giving tied scores their average rank, and add up the positives' ranks \(W_+\):</p>
     <div class="mj">\[ \text{AUC} = \frac{W_+ - n_+(n_+ + 1)/2}{n_+\,n_-} \]</div>
     <p>In words: a positive with overall rank \(r\) that is the \(j\)-th smallest positive has \(r - 1\) cases below it, \(j - 1\) of them positives, so it beats \(r - j\) negatives. Summing \(r - j\) over positives gives \(W_+ - (1 + 2 + \dots + n_+)\). Here the ranks are H 1, G 2, F 3, E 4, D 5, C 6, B 7, A 8, so \(W_+ = 8 + 6 + 5 + 4 = 23\) and \(\text{AUC} = (23 - 10)/16 = 0.8125\). This is the \(O(n \log n)\) way to compute AUC: one sort.</p>
 
@@ -644,17 +647,17 @@ footer .site-nav { display: block; margin-top: 10px; }
     </ul>
 
     <h3 id="auc-imbalance">Why AUC looks fine when precision is terrible</h3>
-    <p>The fraud screen's model has AUC 0.95, which sounds excellent. Yet at Youden's threshold it flags 12,617 cases a day for 439 frauds, a precision of 3.5%, and even the top 1,000 are 77% false alarms. Two reasons the ROC view hides this:</p>
+    <p>The fraud screen's model (model A from here on) has AUC 0.95, which sounds excellent. Yet at Youden's threshold it flags 12,617 cases a day for 439 frauds, a precision of 3.5%, and even the top 1,000 are 77% false alarms. Two reasons the ROC view hides this:</p>
     <ul>
       <li><strong>FPR divides by the huge negative count.</strong> 769 false alarms in the top 1,000 is an FPR of only \(769/99{,}500 = 0.77\%\). On a ROC plot that point sits a hair from the left edge and looks superb.</li>
-      <li><strong>Most pairs are easy.</strong> AUC counts all \(500 \times 99{,}500 \approx 50\) million (fraud, legitimate) pairs equally. Almost all of the legitimate transactions are obviously legitimate and sit far below every fraud; those pairs are won for free and fill up the AUC. The operational question, whether frauds beat the few hundred most suspicious-looking legitimate transactions, is decided by a tiny fraction of the pairs.</li>
+      <li><strong>Most pairs are easy.</strong> AUC counts all \(500 \times 99{,}500 \approx 50\) million (fraud, legitimate) pairs equally. Most legitimate transactions are obviously legitimate and sit below almost every fraud; those pairs are won for free and fill up the AUC. The operational question, whether frauds beat the roughly 770 most suspicious-looking legitimate transactions, is decided by \(770 \times 500 \approx 385{,}000\) pairs, under 1% of the 50 million.</li>
     </ul>
 
     <h3 id="partial-auc">The tiny slice that matters: partial AUC</h3>
     <p><strong>The setting.</strong> 100,000 transactions a day, 500 of them fraud, and a team that can review 1,000. Whatever threshold you pick, you can't flag more than 1,000 cases, so you can't produce more than 1,000 false positives. Out of 99,500 legitimate transactions, that caps the false positive rate at</p>
     <div class="mj">\[ \text{FPR}_{\max} = \frac{1{,}000}{99{,}500} \approx 1.0\% \]</div>
     <p>In words: every threshold you could ever use lives in the leftmost 1% of the ROC plot's width. The other 99% of the curve describes thresholds that would flag more cases than the team can touch. That strip from FPR 0 to 1% is the <strong>tiny slice</strong>.</p>
-    <p>Two different 1%s meet here. The team reviews 1% of all transactions (1,000 of 100,000), and that caps the false positive rate, which counts only the legitimate ones, at 1,000/99,500. The real operating point sits a little further left, because some of the 1,000 flags are frauds: model A's top 1,000 hold 769 false alarms, an FPR of 0.77% (the circles in the figure below).</p>
+    <p>Two different 1%s meet here. The team reviews 1% of all transactions (1,000 of 100,000), and that caps the false positive rate, which counts only the legitimate ones, at 1,000/99,500. The real operating point sits a little further left, because some of the 1,000 flags are frauds: model A's top 1,000 hold 769 false alarms, an FPR of 0.77% (the circles in the figure below). Operating at an FPR of exactly 1% would mean 995 false alarms plus about 250 frauds, about 1,245 flags, more than the team can review; that's why A's TPR at 1%, 0.50, is above its recall at 1,000 flags, 0.46.</p>
     <p><strong>How little of the AUC lives there.</strong> The slice is 0.01 wide and at most 1 tall, so at most 0.01 of area can come from it. Model A's curve gives 0.00375 there: 0.4% of its AUC of 0.95. The other 0.946 is earned at false positive rates you will never operate at. So AUC is almost entirely a measure of how frauds rank against legitimate transactions the team will never look at.</p>
     <p><strong>Two models, same AUC, different slice.</strong> Model B also has AUC 0.95, but its fraud scores are more spread out (\(\mathcal N(3.678, 2^2)\)): some frauds are blatant, some subtle. The true positive rate each model reaches at a given false positive rate:</p>
     <div class="tbl"><table>
@@ -698,7 +701,7 @@ footer .site-nav { display: block; margin-top: 10px; }
 
     <!-- pr -->
     <h2 id="pr-auc"><span class="pn">05</span>Precision–recall curves and average precision</h2>
-    <p>The <strong>precision–recall (PR) curve</strong> plots precision against recall as the threshold slides. Where ROC asks “what share of negatives did I disturb?”, PR asks “what share of my flags were real?”, which is the question a reviewer, a user or an alert queue experiences. The eight rows' points come straight from the sweep table: (0.25, 1.00), (0.25, 0.50), (0.50, 0.67), (0.75, 0.75), (1.00, 0.80), then down to (1.00, 0.50).</p>
+    <p>The <strong>precision–recall (PR) curve</strong> plots precision against recall as the threshold slides. Where ROC asks “what share of negatives did I disturb?”, PR asks “what share of my flags were real?”, which is the question a reviewer, a user or an alert queue experiences. The eight rows' (recall, precision) points come straight from the sweep table: (0.25, 1.00), (0.25, 0.50), (0.50, 0.67), (0.75, 0.75), (1.00, 0.80), then down to (1.00, 0.50).</p>
     <ul>
       <li><strong>The baseline is the prevalence, not 0.5.</strong> A random ranking has precision \(\pi\) at every recall, a flat line. Here that's 0.5; in the fraud screen it's 0.005. So an AP of 0.30 is worse than random at \(\pi = 0.5\) and strong (60 times random) at \(\pi = 0.005\). Always quote AP next to the prevalence.</li>
       <li><strong>It isn't monotone.</strong> Precision rises with each positive and falls with each negative, so the curve zigzags.</li>
@@ -707,9 +710,9 @@ footer .site-nav { display: block; margin-top: 10px; }
     <h3 id="ap">Average precision</h3>
     <p>The usual summary is <strong>average precision (AP)</strong>, a step sum: each rise in recall is weighted by the precision at that point.</p>
     <div class="mj">\[ \begin{aligned} \text{AP} &amp;= \sum_k (R_k - R_{k-1})\,P_k \\ &amp;= \frac{1}{n_+}\sum_{\text{positives } i} \text{precision at the rank of } i \end{aligned} \]</div>
-    <p>In words: recall only rises when you pass a positive, by \(1/n_+\) each time, so AP is the average, over the positives, of the precision you have when you reach each one. Eight rows: the positives sit at ranks 1, 3, 4 and 5, where precision is 1, 2/3, 3/4 and 4/5, so \(\text{AP} = (1 + 0.667 + 0.75 + 0.8)/4 = 0.804\). Compare AUC 0.8125: B's position at rank 2 costs AP more, because AP cares most about the top.</p>
+    <p>In words: recall only rises when you pass a positive, by \(1/n_+\) each time, so AP is the average, over the positives, of the precision you have when you reach each one. Eight rows: the positives sit at ranks 1, 3, 4 and 5, where precision is 1, 2/3, 3/4 and 4/5, so \(\text{AP} = (1 + 0.667 + 0.75 + 0.8)/4 = 0.804\). AP cares most about the top: move B up to rank 1 and AP falls by 0.125 (to 0.679), while AUC falls by only 0.0625 (to 0.75).</p>
     <ul>
-      <li><strong>AP is not the trapezoid under the PR curve.</strong> Joining PR points with straight lines invents operating points no threshold can achieve: between two real points, precision doesn't change linearly with recall (Davis and Goadrich, 2006). On the eight rows the trapezoid gives 0.767, the step sum 0.804. Which one is larger depends on the zigzag; here the trapezoid is lower because it averages each step's precision with the dip before it. When someone quotes “PR-AUC”, ask which one; scikit-learn's <code>average_precision_score</code> is the step sum.</li>
+      <li><strong>AP is not the trapezoid under the PR curve.</strong> Joining PR points with straight lines invents operating points no threshold can achieve: between two real points, precision doesn't change linearly with recall (Davis and Goadrich, 2006). In ROC space a straight line is fine, because flipping a coin between two thresholds mixes their TPRs and FPRs linearly; precision is a ratio of counts, so the same mixture traces a curve, not a line. On the eight rows the trapezoid gives 0.767, the step sum 0.804. Which one is larger depends on the zigzag; here the trapezoid is lower because it averages each step's precision with the dip before it. When someone quotes “PR-AUC”, ask which one; scikit-learn's <code>average_precision_score</code> is the step sum.</li>
       <li><strong>Interpolated AP</strong> (older information-retrieval and object-detection benchmarks) first replaces each precision by the best precision at any recall at least as high, which smooths the zigzag and gives slightly higher numbers.</li>
     </ul>
 
@@ -778,7 +781,7 @@ footer .site-nav { display: block; margin-top: 10px; }
 
     <h3 id="brier">Brier score</h3>
     <div class="mj">\[ \text{Brier} = \frac1n\sum_i (\hat p_i - y_i)^2 \]</div>
-    <p>In words: the mean squared error of the probabilities against the 0/1 outcomes, between 0 and 1. Eight rows: 0.176. The base-rate predictor scores \(\pi(1 - \pi)\): 0.25 here, 0.005 at 0.5% prevalence. The <strong>Brier skill score</strong> \(1 - \text{Brier}/\pi(1 - \pi)\) is the share of that baseline's error removed: 0.295 here. On rare events, quote the skill score; a raw Brier of 0.0045 at 0.5% fraud removes only 10% of the do-nothing error.</p>
+    <p>In words: the mean squared error of the probabilities against the 0/1 outcomes, between 0 and 1. Eight rows: 0.176. The base-rate predictor scores \(\pi(1 - \pi)\): 0.25 here, 0.005 at 0.5% prevalence. The <strong>Brier skill score</strong> \(1 - \text{Brier}/[\pi(1 - \pi)]\) is the share of that baseline's error removed: 0.295 here. On rare events, quote the skill score; a raw Brier of 0.0045 at 0.5% fraud removes only 10% of the do-nothing error.</p>
     <p><strong>Log loss or Brier?</strong> Both reward the right things. Log loss punishes confident mistakes without limit (B: 1.90 against Brier's 0.72) and is more sensitive among tiny probabilities, which matters for rare events. Brier is bounded and more forgiving of label noise. Report one of them, with its baseline.</p>
 
     <h3 id="proper">Why these two: proper scoring rules</h3>
@@ -791,7 +794,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <tr><td>Expected absolute error</td><td><strong>0.300</strong></td><td>0.340</td><td>0.380</td><td>0.420</td><td>0.460</td><td>0.500</td><td>0.700</td></tr>
       </tbody>
     </table></div>
-    <p>Brier and log loss are both lowest at the truth: they are <strong>strictly proper</strong>. Absolute error \(\lvert \hat p - y\rvert\) is lowest at \(q = 0\): it rewards rounding every probability to 0 or 1, so it's <strong>improper</strong> and never a probability metric. Accuracy and F1 only see which side of a threshold a probability falls (improper at best), and AUC isn't a per-case score at all: it sees only the order.</p>
+    <p>Brier and log loss are both lowest at the truth: they are <strong>strictly proper</strong>. Absolute error \(\lvert \hat p - y\rvert\) is lowest at \(q = 0\): it rewards rounding every probability to 0 or 1, so it's <strong>improper</strong> and never a probability metric. Accuracy at a 0.5 cut is proper but not strictly proper: every report on the right side of 0.5 scores the same, so it can't tell 0.6 from 0.99. F1 and AUC aren't per-case scores at all: F1 sees only the decisions, AUC only the order.</p>
 
     <h3 id="brier-decomp">The Brier decomposition: reliability, resolution, uncertainty</h3>
     <p>Group the cases by their forecast value (bins \(k\), \(n_k\) cases each, forecast \(f_k\), observed rate \(\bar o_k\), overall rate \(\bar o\)). The Brier score splits into three parts:</p>
@@ -812,7 +815,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <h2 id="calibration"><span class="pn">07</span>Calibration</h2>
     <p>A model is <strong>calibrated</strong> if, among the cases it gives probability \(q\), a share \(q\) turn out positive, for every \(q\):</p>
     <div class="mj">\[ P(y = 1 \mid \hat p = q) = q \]</div>
-    <p>In words: “30%” means 30%. Calibration and ranking are separate properties: the base-rate predictor is perfectly calibrated and ranks nothing (AUC 0.5); a model with AUC 0.95 can have every probability off by a factor of two. Calibration matters whenever the number is used: expected-cost thresholds (section <a href="#threshold-choice">03</a>), pricing, expected loss (a lender's version is in <a href="./ds-project-lifecycle.html#calibration">the lifecycle note</a>), combining models, comparing scores across segments, and deciding when a model's own confidence is high enough to act without a human.</p>
+    <p>In words: “30%” means 30%. Calibration and ranking are separate properties: the base-rate predictor is perfectly calibrated and ranks nothing (AUC 0.5); a model with AUC 0.95 can have every probability off by a factor of two. Calibration matters whenever the number is used: expected-cost thresholds (section <a href="#threshold-choice">03</a>), pricing, expected loss, <a href="./ds-project-lifecycle.html#calibration">a lender's break-even rule (in the lifecycle note)</a>, combining models, comparing scores across segments, and deciding when a model's own confidence is high enough to act without a human.</p>
 
     <h3 id="reliability">The reliability diagram</h3>
     <p>Bin the predictions, and in each bin plot the mean predicted probability against the observed positive rate. A calibrated model lies on the diagonal. The example: a simulated model on 20,000 held-out cases whose log-odds are exactly twice the true log-odds, the classic overconfident shape (base rate 15.5%):</p>
@@ -859,15 +862,16 @@ footer .site-nav { display: block; margin-top: 10px; }
         <tr><td>Isotonic</td><td>73 steps</td><td>0.373</td><td>0.007</td><td>0.7556</td></tr>
       </tbody>
     </table></div>
-    <p>Platt and temperature recover the factor of two almost exactly, because the distortion was a pure scaling of the log-odds, which is the shape they assume. They're strictly increasing, so AUC is untouched. Isotonic assumes no shape, so it can fix any monotone distortion, but it needs more data and its flat steps create ties, which nudge AUC (here down by 0.0015). With only 200 calibration cases, isotonic overfits: test log loss 0.425 against Platt's 0.379.</p>
+    <p>Platt and temperature recover the factor of two almost exactly, because the distortion was a pure scaling of the log-odds, which is the shape they assume. They're strictly increasing, so AUC is untouched (with two classes; see the table for multi-class temperature). Isotonic assumes no shape, so it can fix any monotone distortion, but it needs more data and its flat steps create ties, which nudge AUC (here down by 0.0015). With only 200 calibration cases, isotonic overfits: test log loss 0.425 against Platt's 0.379.</p>
     <div class="tbl"><table>
       <thead><tr><th>Method</th><th>Parameters</th><th>Data needed</th><th>Best for</th></tr></thead>
       <tbody>
         <tr><td>Platt scaling</td><td>2</td><td>Small (hundreds)</td><td>Sigmoid-shaped distortion: SVMs, boosted trees, over- or under-confident models</td></tr>
-        <tr><td>Temperature scaling</td><td>1</td><td>Small</td><td>Neural networks, multi-class; keeps the argmax and the ranking</td></tr>
+        <tr><td>Temperature scaling</td><td>1</td><td>Small</td><td>Neural networks, multi-class; keeps each row's argmax (and, with two classes, the ranking)</td></tr>
         <tr><td>Isotonic regression</td><td>Up to one step per case</td><td>Large (roughly a thousand or more)</td><td>Any monotone distortion, when there's enough data</td></tr>
       </tbody>
     </table></div>
+    <p>For two classes, temperature scaling is Platt with \(b\) fixed at 0 and \(a = 1/T\), which is why the two fits agree here (\(a = 0.495\), \(1/T = 0.50\)). With several classes one \(T\) rescales every logit, so each row's top class stays the top class, but a class's probabilities can reorder across rows: logits (3, 0, 0) and (1, 0.9, −10) give class 0 probabilities 0.909 and 0.525 at \(T = 1\), but 0.403 and 0.430 at \(T = 10\), so one-vs-rest AUC can shift slightly. <strong>Multi-class calibration</strong> is checked per class (classwise ECE) or with the multi-class Brier score, the squared error summed over the probability vector.</p>
     <p><strong>Isotonic by hand: pool adjacent violators (PAV).</strong> Sort the eight cases by score, lowest first, and read their labels: H 0, G 0, F 0, E 1, D 1, C 1, B 0, A 1. The fitted values must never decrease. Go left to right, and whenever a new value is below the block before it, merge them into one block holding their average; keep merging backwards while the order is still violated.</p>
     <ol>
       <li>H, G, F: 0, 0, 0. E, D, C: 1, 1, 1. Fine so far.</li>
@@ -881,7 +885,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <div class="tbl"><table>
       <thead><tr><th>Model</th><th>Typical distortion</th><th>Why</th></tr></thead>
       <tbody>
-        <tr><td>Logistic regression</td><td>Close, if the model is roughly right</td><td>Its loss is log loss, and with an intercept its average prediction on the training data equals the base rate. Strong regularization shrinks it towards underconfidence.</td></tr>
+        <tr><td>Logistic regression</td><td>Close, if the model is roughly right</td><td>Its loss is log loss, and with an unpenalized intercept its average prediction on the training data equals the base rate. Strong regularization shrinks it towards underconfidence.</td></tr>
         <tr><td>Naive Bayes</td><td>Pushed towards 0 and 1</td><td>It multiplies evidence from correlated features as if independent, counting the same signal several times.</td></tr>
         <tr><td>Deep decision tree</td><td>Overconfident</td><td>Small and pure leaves say 0% or 100%, and leaves are chosen because they look extreme (<a href="./decision-trees.html#calibration">details</a>).</td></tr>
         <tr><td>Random forest</td><td>Squeezed towards the middle</td><td>Averaging many trees' votes rarely reaches unanimity, so cases whose true chance is near 0 or 1 get predictions pulled towards the middle (<a href="./random-forests.html#calibration">details</a>).</td></tr>
@@ -896,7 +900,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <h3 id="prior-shift">Class weights, undersampling and the prior-shift correction</h3>
     <p>Train on data whose positive share \(\pi_s\) differs from the real one \(\pi\) (by undersampling negatives, oversampling positives, or weighting them), and the model learns the training odds. If only the base rate differs (each class's features look the same), the fix is to rescale the odds:</p>
     <div class="mj">\[ \begin{aligned} \text{odds}_{\text{true}} &amp;= \text{odds}_{\text{model}} \times \frac{\pi/(1 - \pi)}{\pi_s/(1 - \pi_s)} \\ \hat p &amp;= \frac{\text{odds}_{\text{true}}}{1 + \text{odds}_{\text{true}}} \end{aligned} \]</div>
-    <p>In words: multiply the model's odds by the ratio of the real base-rate odds to the training base-rate odds. A model trained on a 50/50 sample and deployed where 1% are positive: its 0.5 means 1%, its 0.9 means 8.3%, and it takes 0.99 to mean 50%. Undersampling negatives at rate \(q\) is the special case \(\operatorname{logit} \hat p = \operatorname{logit} \hat p_s + \log q\) in <a href="./data-preparation.html#imbalance">the data-preparation note</a>; class weight \(w\) on positives acts like \(q = 1/w\).</p>
+    <p>In words: multiply the model's odds by the ratio of the real base-rate odds to the training base-rate odds. A model trained on a 50/50 sample and deployed where 1% are positive: its 0.5 means 1%, its 0.9 means 8.3%, and it takes 0.99 to mean 50%. Undersampling negatives at rate \(q\) is the special case \(\operatorname{logit} \hat p = \operatorname{logit} \hat p_s + \log q\) in <a href="./data-preparation.html#imbalance">the data-preparation note</a>; class weight \(w\) on positives acts like \(q = 1/w\). The same correction is derived by Bayes' rule in <a href="./linear-logistic-regression.html#prior-shift">the regression note</a>.</p>
     <ul>
       <li><strong>The same formula handles a deployment shift</strong> in the base rate (fraud rises from 0.5% to 1%), with \(\pi_s\) the training rate and \(\pi\) the new one, under the same assumption that only the mix changed.</li>
       <li><strong>It changes no ranking</strong>, so AUC is untouched; precision, log loss and every cost threshold do change.</li>
@@ -960,7 +964,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <tr><td>Review queue (fraud, moderation)</td><td>Precision@k at the team's capacity</td><td>That's the decision (section <a href="#partial-auc">04</a>)</td></tr>
       </tbody>
     </table></div>
-    <p><strong>Pitfalls:</strong> average per query, not over pooled items, or heavy queries dominate; decide what to do with queries that have no relevant item (drop, or score 0) and say so; offline labels exist only for items someone judged or was shown, so unjudged items count as irrelevant and a new system that surfaces different good items looks worse than it is; click labels carry position bias (top items get clicked because they're on top). Match \(k\) to the product: how many results fit on a phone screen, how many passages fit the prompt.</p>
+    <p><strong>Pitfalls:</strong> average per query, not over pooled items, or heavy queries dominate; decide what to do with queries that have no relevant item (drop, or score 0) and say so; offline labels exist only for items someone judged or was shown, so unjudged items count as irrelevant and a new system that surfaces different good items looks worse than it is; click labels carry position bias (top items get clicked because they're on top). Logs only show what the old ranker chose; propensity-weighted replay corrects for that, and interleaving compares two rankers online with far fewer users than an A/B test (<a href="./ml-system-design.html#position-bias">system-design note</a>). Recommenders also track beyond-accuracy metrics: catalogue coverage, diversity within a list, and novelty. Match \(k\) to the product: how many results fit on a phone screen, how many passages fit the prompt.</p>
     <p><strong>Say it in an interview:</strong> “For retrieval feeding an LLM I'd track recall@k at the k actually put in the prompt, because a passage that isn't retrieved can't be used, and MRR if one passage answers the question. For graded search results, nDCG@10, computed per query with the ideal ordering over all known relevant documents. Here a grade-3 document at position 3 instead of 1 gives nDCG@3 of 0.52.”</p>
 
     <!-- regression -->
@@ -1023,12 +1027,12 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ul>
       <li><strong>It can be negative on test data</strong>: worse than predicting the test mean. In training, with an intercept, it can't.</li>
       <li><strong>It depends on the test set's spread.</strong> The same model and the same errors give a higher R² on a more varied test set, so don't compare R² across datasets.</li>
-      <li><strong>Adjusted R² is an in-sample correction</strong> for linear models. For held-out data, just report test R² or RMSE: the held-out score is already honest.</li>
+      <li><strong>Adjusted R² is an in-sample correction</strong> for linear models (<a href="./linear-logistic-regression.html#r2">regression note</a>: training R² never falls when a feature is added). For held-out data, just report test R² or RMSE: the held-out score is already honest.</li>
     </ul>
 
     <h3 id="pinball">Pinball loss and prediction intervals</h3>
     <div class="mj">\[ \rho_\tau(e) = \max\big(\tau\,e,\ (\tau - 1)\,e\big), \quad e = y - \hat y \]</div>
-    <p>In words: an under-forecast (\(e \gt 0\)) costs \(\tau\) per unit and an over-forecast \(1 - \tau\) per unit. At \(\tau = 0.9\), an actual of 100: forecasting 80 costs \(0.9 \times 20 = 18\), forecasting 120 costs \(0.1 \times 20 = 2\). Running out is nine times as costly as overstocking, so the forecast settles at the 90th percentile. At \(\tau = 0.5\) it's half the absolute error. A pair of quantile forecasts (0.05 and 0.95) makes a 90% prediction interval; check it by <strong>coverage</strong>: about 90% of actuals should fall inside, and the interval should be as narrow as possible while they do. Conformal prediction is the standard way to get intervals with a guaranteed coverage from any model's held-out errors.</p>
+    <p>In words: an under-forecast (\(e \gt 0\)) costs \(\tau\) per unit and an over-forecast \(1 - \tau\) per unit. At \(\tau = 0.9\), an actual of 100: forecasting 80 costs \(0.9 \times 20 = 18\), forecasting 120 costs \(0.1 \times 20 = 2\). Running out is nine times as costly as overstocking, so the forecast settles at the 90th percentile. At \(\tau = 0.5\) it's half the absolute error. A pair of quantile forecasts (0.05 and 0.95) makes a 90% prediction interval; check it by <strong>coverage</strong>: about 90% of actuals should fall inside, and the interval should be as narrow as possible while they do. <strong>Split conformal prediction</strong> turns any model into intervals: on held-out calibration rows compute the absolute errors, take the \(\lceil (n + 1)(1 - \alpha) \rceil\)-th smallest as \(q\), and predict \(\hat y \pm q\). With 19 calibration errors and \(\alpha = 0.1\), \(q\) is the 18th smallest. Coverage is at least \(1 - \alpha\) on average over cases, provided new data are exchangeable with the calibration rows (no drift); conformalized quantile regression applies the same correction to the 0.05 and 0.95 quantile forecasts, so intervals stay wider where the data are noisier.</p>
 
     <h3 id="forecast-eval">Evaluating forecasts</h3>
     <ul>
@@ -1068,7 +1072,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>For metrics with no simple formula (AUC, AP, F1, WAPE), resample the test rows with replacement, recompute the metric each time, and take the 2.5th and 97.5th percentiles. How the bootstrap works and where it fails is in <a href="./hypothesis-testing.html#boot">the hypothesis-testing note</a>; what's specific to model evaluation:</p>
     <ul>
       <li><strong>Stratify</strong> by class (resample positives and negatives separately) when positives are rare, or some resamples have none and AUC is undefined.</li>
-      <li><strong>Resample the independent unit:</strong> whole customers or documents (a cluster bootstrap), whole weeks for time series (a block bootstrap).</li>
+      <li><strong>Resample the independent unit:</strong> whole customers or documents (a cluster bootstrap), whole weeks for time series (a block bootstrap), whole queries for ranking metrics.</li>
       <li><strong>Pair the comparison.</strong> To compare two models, resample the same row indices for both and record the <em>difference</em> each time.</li>
     </ul>
     <p><strong>Why pairing matters, in numbers.</strong> Two models scored on one test set of 10,000 rows (300 positives). They share most of their inputs, so their scores correlate at 0.87 and they tend to get the same rows wrong.</p>
@@ -1081,7 +1085,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <tr><td><strong>B − A, paired</strong></td><td>+0.017</td><td><strong>[0.003, 0.033]</strong></td><td><strong>0.0075</strong></td></tr>
       </tbody>
     </table></div>
-    <p>The separate intervals overlap heavily, which tempts a “no difference” verdict. But most of each model's uncertainty comes from which rows happened to be in the test set, and that luck is shared: a resample full of hard cases hurts both. Pairing cancels the shared part, and the gap's standard error drops from 0.018 to 0.0075. B wins in 99% of the resamples.</p>
+    <p>The separate intervals overlap heavily, which tempts a “no difference” verdict. (Even for independent estimates, overlapping intervals aren't a test: <a href="./hypothesis-testing.html#overlap">hypothesis-testing note</a>.) But most of each model's uncertainty comes from which rows happened to be in the test set, and that luck is shared: a resample full of hard cases hurts both. Pairing cancels the shared part, and the gap's standard error drops from 0.018 to 0.0075. B wins in 99% of the resamples.</p>
     <p><strong>DeLong's test</strong> is the classical closed-form alternative for two correlated AUCs on the same rows; the paired bootstrap does the same job for any metric.</p>
 
     <h3 id="mcnemar">McNemar's test: two classifiers, one test set</h3>
@@ -1098,7 +1102,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>In words: how far the split of disagreements is from 50/50, in chi-square units with one degree of freedom (the −1 is a continuity correction). \(p = 0.057\): a 2-point accuracy gap that is not quite significant at 5%. The exact version is a binomial test of 40 out of 100 against ½ (\(p = 0.057\) too); use it when \(b + c\) is below about 25.</p>
 
     <h3 id="cv-compare">Comparing on cross-validation folds</h3>
-    <p>The tempting test: run 10-fold CV for both models, take the 10 per-fold differences, and do a paired t-test. The problem is that <strong>fold scores aren't independent</strong>: any two training sets share 8/9 of their rows, and every fold comes from the same dataset, so the folds' differences move together. The t-test's \(S^2/J\) then understates the variance of the mean difference. Nadeau and Bengio's <strong>corrected resampled t-test</strong> inflates it:</p>
+    <p>The tempting test: run 10-fold CV for both models, take the 10 per-fold differences, and do a paired t-test. The problem is that <strong>fold scores aren't independent</strong>: any two training sets share 8/9 of their rows, and every fold comes from the same dataset, so the folds' differences move together. With \(J\) fold differences whose variance is \(S^2\), the t-test estimates the variance of their mean as \(S^2/J\), which understates it. Nadeau and Bengio's <strong>corrected resampled t-test</strong> inflates it:</p>
     <div class="mj">\[ \begin{aligned} \operatorname{Var}(\bar d) &amp;\approx S^2\Big(\frac1J + \frac{n_{\text{test}}}{n_{\text{train}}}\Big) \\ t &amp;= \frac{\bar d}{\sqrt{\operatorname{Var}(\bar d)}}, \quad J - 1 \text{ degrees of freedom} \end{aligned} \]</div>
     <p>In words: \(J\) is the number of train/test results, \(S^2\) the variance of the \(J\) differences, and the extra term accounts for the overlap between training sets. For one run of 10-fold, \(1/10 + 1/9 = 0.211\) instead of 0.1: the variance doubles and \(t\) shrinks by 1.45.</p>
     <p><strong>Worked:</strong> B beats A by 0.6 points on average over 10 folds, with a standard deviation of 0.8 points across folds. Naive: \(t = 2.37\), \(p = 0.042\), “significant”. Corrected: \(t = 1.63\), \(p = 0.137\), not.</p>
@@ -1119,7 +1123,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li><strong>Slices and fairness:</strong> report the key metric per segment with its interval; an average can hide a segment where the model fails. Fairness checks compare error rates across groups: equal opportunity asks for equal TPR, equalized odds for equal TPR and FPR, demographic parity for equal flag rates. When base rates differ between groups, calibration within each group and equal error rates can't all hold at once (unless the model is perfect).</li>
       <li><strong>Practical significance:</strong> a real 0.003 AUC gain may not be worth a more complex model. Translate the gain into the business unit (frauds caught at capacity, rupees) before deciding.</li>
     </ul>
-    <p><strong>Say it in an interview:</strong> “I'd compare on the same rows, paired. A paired bootstrap of the AUC difference cut the standard error from 0.018 to 0.0075 in one example, because both models share the test set's luck. For accuracy, McNemar on the disagreements. For CV, fold scores are correlated, so a naive t-test on 10-by-10 CV called 57% of equal models different; the Nadeau–Bengio correction adds \(n_{\text{test}}/n_{\text{train}}\) to the variance factor.”</p>
+    <p><strong>Say it in an interview:</strong> “I'd compare on the same rows, paired. A paired bootstrap of the AUC difference cut the standard error from 0.018 to 0.0075 in one example, because both models share the test set's luck. For accuracy, McNemar on the disagreements. For CV, fold scores are correlated, so a naive t-test on 10-by-10 CV called about half of equal models different (57% in this simulation); the Nadeau–Bengio correction adds \(n_{\text{test}}/n_{\text{train}}\) to the variance factor.”</p>
 
     <!-- curves -->
     <h2 id="curves"><span class="pn">11</span>Learning curves and validation curves</h2>
@@ -1164,7 +1168,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ul>
       <li><strong>Left of the peak</strong> both scores are low: underfitting. <strong>Right of it</strong> training keeps rising while validation falls: overfitting. The widening gap is variance growing.</li>
       <li><strong>The one-standard-error rule:</strong> take the simplest setting whose validation score is within one standard error of the best. Here the best is 0.7165 with a standard error of 0.0133 (fold spread / \(\sqrt 5\)), so anything above 0.7032 qualifies; depth 5 (0.693) doesn't, so depth 6 stays. On flatter curves the rule picks a noticeably simpler model, which is usually more robust.</li>
-      <li><strong>Early stopping is a validation curve</strong> over training rounds or epochs, read as it's drawn.</li>
+      <li><strong>Early stopping is a validation curve</strong> over training rounds or epochs, read as it's drawn; the validation score it stops on is optimistic too, for the same reason a tuned CV score is.</li>
     </ul>
     <p><strong>Pitfalls:</strong> plot the metric you'll decide on, not a convenient one; show fold spread, since small differences between neighbouring settings are often noise; for time-ordered data, grow the training window forward in time. And a training–validation gap isn't always variance: a feature that leaks only in training rows, or a validation period unlike the training period, opens a gap that regularization won't close (<a href="./data-preparation.html#fit">checks in the data-preparation note</a>).</p>
     <p><strong>Say it in an interview:</strong> “A learning curve tells me whether more data will help: if training and validation meet early and low, it's bias, so I need features or capacity, not rows; if there's a big gap that's still closing, it's variance, and more data or regularization helps. A validation curve over one setting picks the complexity; I take the simplest setting within one standard error of the best.”</p>
@@ -1349,7 +1353,7 @@ def ndcg_at_k(ranked_grades, all_relevant_grades, k):
     </div></details>
 
     <details class="qa"><summary><span class="qn">5</span>How noisy is a 5-fold CV estimate, and how would you report it?</summary><div class="ans">
-      <p><strong>Noisier than the fold spread suggests: report the mean with the spread across repeated CV runs, and compare models with paired fold differences.</strong></p>
+      <p><strong>Noisier than the fold spread suggests: report the repeated-CV mean with the fold standard error as a rough, optimistic guide (the reshuffle spread, 0.011 here, measures only partition luck; the real uncertainty was 0.029), and compare models with paired fold differences.</strong></p>
       <ul>
         <li><strong>Folds vary:</strong> on 300 rows, five fold accuracies ranged from 0.633 to 0.783.</li>
         <li><strong>The partition alone matters:</strong> 50 reshuffles of the same rows gave CV means from 0.687 to 0.743. Repeated CV averages that away.</li>
@@ -1473,10 +1477,10 @@ def ndcg_at_k(ranked_grades, all_relevant_grades, k):
       <p><strong>AUC depends only on the order of the scores, and a strictly increasing transform doesn't change the order; so AUC can't see calibration.</strong></p>
       <ul>
         <li><strong>Example:</strong> halving the eight rows' probabilities leaves AUC at 0.8125 while log loss goes from 0.540 to 0.656 and Brier from 0.176 to 0.244.</li>
-        <li><strong>Consequences:</strong> a great AUC says nothing about whether 0.3 means 30%; Platt and temperature scaling never change AUC; isotonic can, slightly, because its flat steps create ties.</li>
+        <li><strong>Consequences:</strong> a great AUC says nothing about whether 0.3 means 30%; Platt and binary temperature scaling never change AUC; isotonic can, slightly, because its flat steps create ties.</li>
         <li><strong>Use:</strong> compare rankings with AUC; judge probabilities with log loss, Brier and a reliability diagram.</li>
       </ul>
-      <p><strong>Follow-up:</strong> model A has the higher AUC, model B the lower log loss. If you rank or threshold, A; if probabilities feed decisions, B, or recalibrate A and compare again. (<a href="#auc-ignores">04</a>)</p>
+      <p><strong>Follow-up:</strong> model A has the higher AUC, model B the lower log loss. If only the order is used (a top-k queue, a fixed approval rate), A; if the numbers feed decisions (a cost threshold, pricing), B, or recalibrate A on held-out data, which keeps its AUC, and compare log loss again. (<a href="#auc-ignores">04</a>)</p>
     </div></details>
 
     <details class="qa"><summary><span class="qn">17</span>AUC is 0.95, but the fraud team says the model is useless. What could be going on?</summary><div class="ans">
@@ -1515,7 +1519,7 @@ def ndcg_at_k(ranked_grades, all_relevant_grades, k):
       <p><strong>AP is a step sum, \(\sum_k (R_k - R_{k-1})P_k\): the mean of the precision at the rank of each positive. The trapezoid joins PR points with straight lines that no threshold can achieve.</strong></p>
       <ul>
         <li><strong>Eight rows:</strong> positives at ranks 1, 3, 4, 5 with precision 1, 2/3, 3/4, 4/5: AP = 0.804. The trapezoid gives 0.767.</li>
-        <li><strong>Why lines are wrong:</strong> between two achievable points, precision doesn't change linearly with recall (Davis and Goadrich), so linear interpolation invents operating points.</li>
+        <li><strong>Why lines are wrong:</strong> between two achievable points, precision doesn't change linearly with recall (Davis and Goadrich), so linear interpolation invents operating points. (In ROC space a line between two points is achievable by randomizing between the thresholds.)</li>
         <li><strong>Variants:</strong> interpolated AP (precision replaced by the best at any recall at least as high), 11-point AP, COCO mAP over IoU thresholds. Ask which one a quoted number is.</li>
       </ul>
       <p>(<a href="#ap">05</a>)</p>
@@ -1562,7 +1566,7 @@ def ndcg_at_k(ranked_grades, all_relevant_grades, k):
     </div></details>
 
     <details class="qa"><summary><span class="qn">25</span>Platt, isotonic or temperature scaling? Does calibration change AUC?</summary><div class="ans">
-      <p><strong>Platt (two parameters) or temperature (one) when the distortion is a smooth scaling and data is limited; isotonic for any monotone distortion when data is plentiful. Platt and temperature never change AUC; isotonic can, slightly, through ties.</strong></p>
+      <p><strong>Platt (two parameters) or temperature (one) when the distortion is a smooth scaling and data is limited; isotonic for any monotone distortion when data is plentiful. Platt and temperature (binary) never change AUC; multi-class temperature keeps the argmax but can shift one-vs-rest AUC slightly; isotonic can, slightly, through ties.</strong></p>
       <ul>
         <li><strong>Platt:</strong> \(\sigma(a s + b)\) fitted on held-out scores. On a model whose log-odds were doubled it found \(a = 0.495\): log loss 0.464 → 0.372, ECE 0.089 → 0.006.</li>
         <li><strong>Temperature:</strong> logits / \(T\), one \(T\) for all classes (found 2.00); the standard fix for neural networks.</li>
@@ -1632,7 +1636,7 @@ def ndcg_at_k(ranked_grades, all_relevant_grades, k):
       <p><strong>Not established yet: fold scores are correlated, so test the paired differences with a correction, and confirm on held-out data with a paired test.</strong></p>
       <ul>
         <li><strong>Per-fold differences:</strong> does B win on 10 of 10 folds, or 6?</li>
-        <li><strong>Corrected resampled t-test</strong> (Nadeau–Bengio): variance factor \(1/J + n_{\text{test}}/n_{\text{train}}\) = 0.211 instead of 0.1 for 10-fold. Mean 0.6, sd 0.8: naive \(p = 0.042\), corrected \(p = 0.137\). In simulation, a naive test on 10×10 CV called 57% of equal models different.</li>
+        <li><strong>Corrected resampled t-test</strong> (Nadeau–Bengio): variance factor \(1/J + n_{\text{test}}/n_{\text{train}}\) = 0.211 instead of 0.1 for 10-fold. Mean 0.6, sd 0.8: naive \(p = 0.042\), corrected \(p = 0.137\). In simulation, a naive test on 10×10 CV called about half of equal models different (57% in this design).</li>
         <li><strong>On a test set:</strong> paired bootstrap of the metric difference (resample the same rows for both), or McNemar on the rows where they disagree: \(b = 40\), \(c = 60\) gives \(\chi^2 = 3.61\), \(p = 0.057\).</li>
         <li><strong>Why pairing:</strong> both models share the test set's luck; pairing cut an AUC gap's standard error from 0.018 to 0.0075.</li>
       </ul>
@@ -1681,7 +1685,7 @@ def ndcg_at_k(ranked_grades, all_relevant_grades, k):
       <p>RMSE → mean, MAE → median, pinball → quantile, MAPE → biased low (symmetric 20–100: best constant 40, mean 60). MAPE breaks at 0; sMAPE 200% at a zero; WAPE and MASE for demand.</p>
       <h3>Comparing models</h3>
       <div class="mj">\[ \begin{aligned} \text{SE}(\hat a) &amp;= \sqrt{a(1 - a)/n} \\ \text{McNemar: } \chi^2 &amp;= \frac{(\lvert b - c\rvert - 1)^2}{b + c} \\ \operatorname{Var}(\bar d) &amp;\approx S^2\Big(\frac1J + \frac{n_{\text{test}}}{n_{\text{train}}}\Big) \end{aligned} \]</div>
-      <p>Accuracy 0.9 on 1,000 rows: ±1.9 points. Wilson for small counts (20/20 → [0.84, 1]). Paired bootstrap on the same rows (SE of an AUC gap 0.018 → 0.0075). McNemar 40 vs 60 → p 0.057. Naive t on 10×10 CV: 57% false positives. Learning curve: low and meeting = bias; gap closing = variance, more data helps. Validation curve: simplest within one SE of the best.</p>
+      <p>Accuracy 0.9 on 1,000 rows: ±1.9 points. Wilson for small counts (20/20 → [0.84, 1]). Paired bootstrap on the same rows (SE of an AUC gap 0.018 → 0.0075). McNemar 40 vs 60 → p 0.057. Naive t on 10×10 CV: about half false positives (57% here). Learning curve: low and meeting = bias; gap closing = variance, more data helps. Validation curve: simplest within one SE of the best.</p>
     </div>
 
     <footer><a href="./">More notes</a> · <a href="../">Deepam Minda</a></footer>
