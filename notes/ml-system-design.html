@@ -1,0 +1,1646 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070707">
+<title>ML system design · Deepam Minda</title>
+<meta name="description" content="The open-ended ML system design question: a 45-minute framework, batch, online and streaming serving with latency and sizing arithmetic, feature stores and point-in-time joins, two-stage retrieval and ranking, worked designs for fraud, feeds, ads and an LLM support assistant, and the failure modes interviewers probe.">
+<meta property="og:title" content="ML system design">
+<meta property="og:description" content="The open-ended ML system design question: a 45-minute framework, batch, online and streaming serving with latency and sizing arithmetic, feature stores and point-in-time joins, two-stage retrieval and ranking, worked designs for fraud, feeds, ads and an LLM support assistant, and the failure modes interviewers probe.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem("deepam-theme"); } catch (e) {}
+  if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<link rel="stylesheet" href="../assets/design/tokens.css?v=2">
+<link rel="stylesheet" href="../assets/design/components.css?v=2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<style>
+/* Green graph-paper theme for the recurrent-notebook content.
+   Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
+   One sans for text, one mono for labels; MathJax draws the maths. Green = the cell / notebook,
+   slate = the hidden state, orange only for gradients. */
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
+body {
+  margin: 0; color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: 50% 0;
+  font: 16.5px/1.7 var(--sans); letter-spacing: -.003em;
+  padding-inline: 20px; padding-block: 44px 88px;
+  -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 640px) { body { font-size: 16px; padding-inline: 16px; padding-block: 24px 80px; } }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+table, button { font: inherit; }
+code { font: .86em var(--mono); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; }
+
+.page { max-width: 1200px; margin: 0 auto; display: grid; gap: 52px; grid-template-columns: 220px minmax(0, 860px); justify-content: center; }
+@media (max-width: 1080px) { .page { grid-template-columns: minmax(0, 860px); gap: 0; } }
+
+/* contents */
+.toc { position: sticky; top: 28px; align-self: start; font: 13.5px/1.4 var(--sans); max-height: calc(100vh - 56px); overflow-y: auto; }
+.toc summary { display: none; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--ink-2); text-decoration: none; }
+.toc a:hover { background: var(--surface); color: var(--ink); }
+.toc a.on { color: var(--ink); background: var(--surface); box-shadow: inset 2px 0 0 var(--cell); }
+.toc .n { font: 500 11px var(--mono); color: var(--ink-3); margin-right: 8px; }
+.toc .label { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 10px 10px; }
+.toc li.part { font: 500 10.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 14px 10px 4px; }
+@media (max-width: 1080px) {
+  .toc { position: static; margin-bottom: 26px; max-height: none; }
+  .toc .label { display: none; }
+  .toc details { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  .toc summary { display: block; cursor: pointer; padding: 12px 14px; font: 500 14px var(--sans); list-style: none; }
+  .toc summary::-webkit-details-marker { display: none; }
+  .toc summary::after { content: "+"; float: right; color: var(--ink-3); }
+  .toc details[open] summary::after { content: "–"; }
+  .toc details ol { padding: 0 6px 10px; }
+}
+.jump {
+  display: none; position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+  font: 500 13px var(--sans); color: var(--ink); background: var(--surface); text-decoration: none;
+  border: 1px solid var(--rule); border-radius: 999px; padding: 9px 14px;
+}
+@media (max-width: 1080px) { .jump { display: block; } }
+
+/* article */
+article { min-width: 0; }
+header.hero { display: grid; gap: 10px; margin-bottom: 26px; }
+.kicker { font: 500 12px/1 var(--mono); color: var(--ink-3); letter-spacing: .02em; }
+h1 { margin: 0; font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.6rem); line-height: 1.1; font-weight: 600; letter-spacing: -.028em; text-wrap: balance; }
+.dek { margin: 0; font-size: 1.1rem; line-height: 1.55; color: var(--ink-2); max-width: 40em; }
+.meta { font: 12px/1.5 var(--mono); color: var(--ink-3); }
+.key { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.key span::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--c); margin-right: 6px; vertical-align: middle; }
+
+h2 { font-size: 1.36rem; line-height: 1.25; font-weight: 600; letter-spacing: -.018em; margin: 56px 0 12px; text-wrap: balance; scroll-margin-top: 16px; }
+h2 .pn { font: 500 .74em/1 var(--mono); color: var(--ink-3); margin-right: .7em; letter-spacing: 0; }
+h3 { font-size: 1.04rem; font-weight: 600; letter-spacing: -.01em; margin: 30px 0 6px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 1.25em; }
+li { margin-bottom: 5px; }
+li::marker { color: var(--ink-3); }
+strong { font-weight: 600; }
+.mj { overflow-x: auto; overflow-y: hidden; margin: 4px 0 16px; padding: 2px 0; }
+mjx-container[display="true"] { margin: 0 !important; }
+
+/* plan and summary panels */
+.tldr { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 22px 6px; margin-bottom: 14px; }
+.tldr h2 { margin: 0 0 10px; font: 500 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.tldr ol { padding-left: 1.3em; }
+.tldr li { margin-bottom: 8px; }
+.tldr p { margin: 0 0 12px; font-size: 15.5px; }
+.tldr .tbl { margin: 4px 0 12px; }
+
+/* notes: quote-style, coloured by kind */
+.note { margin: 16px 0 20px; padding: 2px 0 2px 16px; border-left: 2px solid var(--c); color: var(--ink-2); font-size: .97em; }
+.note > .nl { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); margin: 4px 0 8px; }
+.note strong { color: var(--ink); }
+.note.ask { --c: var(--cell); }
+.note.say { --c: var(--hid); }
+.note.trap { --c: var(--grad); }
+.note.lab { --c: var(--cell); }
+.note .q { font-style: italic; color: var(--ink); }
+.note ul { margin: 0 0 10px; }
+.note li { margin-bottom: 5px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 6px 0 20px; }
+table { border-collapse: collapse; width: 100%; font-size: .93em; line-height: 1.5; }
+th { text-align: left; vertical-align: bottom; font: 500 11px/1.4 var(--mono); color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; padding: 0 14px 8px 0; border-bottom: 1px solid var(--ink-3); }
+td { padding: 8px 14px 8px 0; vertical-align: top; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+td .src { display: block; font: 11.5px/1.4 var(--mono); color: var(--ink-3); margin-top: 2px; }
+
+/* gate cards */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0 20px; }
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.gc { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 4px; font-size: 15.5px; line-height: 1.6; }
+.gc h4 { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.gc h4 .tag { font: 500 11px var(--mono); color: var(--c); }
+.gc.g1 { --c: var(--cell); }
+.gc.g2 { --c: var(--ink-3); }
+.gc p { margin-bottom: 10px; }
+
+/* figures */
+figure { margin: 18px 0 24px; }
+.plate { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 10px; overflow-x: auto; }
+.plate svg { display: block; width: 100%; height: auto; min-width: 460px; max-width: 700px; margin: 0 auto; }
+@media (max-width: 500px) { .plate svg { max-width: none; } }
+figcaption { font-size: .86rem; line-height: 1.5; color: var(--ink-3); margin-top: 10px; }
+.dg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink-2); }
+.dg .v { font-family: var(--serif); font-style: italic; font-size: 19px; fill: var(--ink); }
+.dg .v .s { font-size: 12.5px; }
+.dg .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; fill: var(--ink-3); }
+.dg .gl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--gate); }
+.dg .gs { font-family: var(--serif); font-style: normal; font-size: 12px; fill: var(--ink-3); }
+.dg .cl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--ink); }
+.dg .cs { font-family: var(--sans); font-size: 12px; fill: var(--ink-2); }
+.dg .optx { font: 500 17px var(--sans); fill: var(--ink); }
+.dg .cell { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.dg .hid { stroke: var(--hid); stroke-width: 2.4; fill: none; }
+.dg .hid.thick { stroke-width: 3.6; }
+.dg .in { stroke: var(--ink-3); stroke-width: 1.5; fill: none; }
+.dg .gw { stroke: var(--gate); stroke-width: 1.6; fill: none; }
+.dg .cw { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+.dg .grad { stroke: var(--grad); fill: none; stroke-linecap: round; }
+.dg .gbox { fill: var(--gate-wash); stroke: var(--gate); stroke-width: 1.3; }
+.dg .box { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .op { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.3; }
+.dg .dot { fill: var(--ink-2); }
+.dg .cellon { fill: var(--cell-wash); stroke: var(--cell); stroke-width: 1; }
+.dg .celloff { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.dg .stream { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.mk-cell { fill: var(--cell); } .mk-hid { fill: var(--hid); } .mk-in { fill: var(--ink-3); }
+.mk-gate { fill: var(--gate); } .mk-cw { fill: var(--ink-2); } .mk-grad { fill: var(--grad); }
+
+/* questions */
+details.qa { border-bottom: 1px solid var(--rule); }
+details.qa:first-of-type { border-top: 1px solid var(--rule); }
+details.qa summary { cursor: pointer; padding: 11px 2px; font-weight: 500; font-size: 15.5px; line-height: 1.45; list-style: none; display: flex; gap: 12px; }
+details.qa summary::-webkit-details-marker { display: none; }
+details.qa summary .qn { font: 500 11.5px/1.9 var(--mono); color: var(--ink-3); flex: none; min-width: 1.9em; }
+details.qa summary::after { content: "+"; margin-left: auto; color: var(--ink-3); flex: none; }
+details.qa[open] summary::after { content: "–"; }
+details.qa .ans { padding: 0 4px 12px 32px; font-size: 15.5px; color: var(--ink-2); }
+summary:focus-visible, a:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+
+.sheet { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 6px; }
+.sheet h3 { margin: 4px 0 6px; font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: .9rem; color: var(--ink-3); }
+
+/* code blocks */
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; margin: 8px 0 20px; overflow-x: auto; font: 12.8px/1.6 var(--mono); color: var(--ink); white-space: pre; }
+pre.code code { font: inherit; background: none; border: 0; padding: 0; }
+pre.code .cm { color: var(--ink-3); }
+@media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
+
+/* deep dive: a detail kept out of the reading flow. Without JS (or with ?dive=inline) it is a plain
+   collapsible; with JS the summary opens the content in a side panel (full screen on phones). */
+details.dive { margin: 14px 0 20px; }
+details.dive > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px; padding: 4px 0; }
+details.dive > summary::-webkit-details-marker { display: none; }
+.dive-tag { font: 500 12px/1.6 var(--mono); color: var(--accent, var(--link)); flex: none; }
+.dive-tag::before { content: "+ "; }
+details.dive[open] > summary .dive-tag::before { content: "– "; }
+.dive-title { font-weight: 500; color: var(--ink); }
+details.dive > summary:hover .dive-title { text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; }
+.dive-body { border-left: 2px solid var(--rule); padding: 2px 0 2px 18px; margin: 8px 0 4px 2px; }
+.dive-panel-mode details.dive > summary .dive-tag::before { content: ""; }
+.dive-panel-mode details.dive > summary .dive-title::after { content: " \2192"; color: var(--accent, var(--link)); }
+.dive-scrim { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, .45); opacity: 0; transition: opacity .2s ease; }
+.dive-scrim.open { opacity: 1; }
+.dive-sheet { position: fixed; top: 0; right: 0; bottom: 0; z-index: 91; width: min(680px, 100vw); overflow-y: auto; overscroll-behavior: contain;
+  background: var(--paper); border-left: 1px solid var(--rule); padding: 0 30px 56px; transform: translateX(100%); transition: transform .22s ease; }
+.dive-sheet.open { transform: none; }
+.dive-sheet .dive-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  background: var(--paper); padding: 20px 0 12px; margin-bottom: 14px; border-bottom: 1px solid var(--rule); }
+.dive-sheet .dive-head .dive-tag::before { content: ""; }
+.dive-sheet .dive-head h2 { margin: 2px 0 0; font-size: 18px; line-height: 1.35; font-weight: 600; }
+.dive-sheet .dive-close { flex: none; background: none; border: 0; padding: 4px 2px; cursor: pointer; color: var(--ink-3); font: 500 12px/1.6 var(--mono); }
+.dive-sheet .dive-close:hover { color: var(--ink); }
+.dive-sheet .dive-body { border-left: 0; padding: 0; margin: 0; }
+body.dive-lock { overflow: hidden; }
+@media (max-width: 720px) { .dive-sheet { width: 100vw; border-left: 0; padding: 0 18px 44px; } }
+@media (prefers-reduced-motion: reduce) { .dive-sheet, .dive-scrim { transition: none; } }
+
+/* reader notes (site_js/reader-notes.js): highlights, the note popover and the list; saved per browser */
+mark.nh { color: inherit; background: color-mix(in srgb, var(--accent, var(--link)) 18%, transparent); border-bottom: 1px solid var(--accent, var(--link)); border-radius: 2px; cursor: pointer; }
+mark.nh:focus-visible { outline: 2px solid var(--accent, var(--link)); outline-offset: 1px; }
+.nh-ask { position: absolute; z-index: 95; padding: 5px 11px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface); color: var(--accent, var(--link)); font: 500 12px/1.4 var(--mono); cursor: pointer; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+.nh-pop { position: absolute; z-index: 95; width: min(360px, calc(100vw - 24px)); padding: 12px 14px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); box-shadow: 0 10px 30px rgba(0, 0, 0, .25); }
+.nh-pop .nh-quote { margin: 0 0 8px; padding-left: 10px; border-left: 2px solid var(--accent, var(--link)); color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+.nh-pop textarea { box-sizing: border-box; width: 100%; min-height: 70px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--sans); resize: vertical; }
+.nh-pop textarea:focus { outline: 2px solid var(--accent, var(--link)); outline-offset: 0; }
+.nh-row { display: flex; gap: 14px; margin-top: 8px; }
+.nh-btn { padding: 2px 0; border: 0; background: none; cursor: pointer; color: var(--ink-3); font: 500 12px/1.6 var(--mono); }
+.nh-btn:hover { color: var(--ink); }
+.nh-save, .nh-go { color: var(--accent, var(--link)); }
+.nh-meta { margin: 0 0 4px; color: var(--ink-3); font: 500 12px/1.5 var(--mono); }
+.nh-text { margin: 0; color: var(--ink); font-size: 15px; line-height: 1.55; }
+.nh-sheet .nh-head-btns { display: flex; gap: 16px; flex: none; }
+.nh-sheet .nh-copy { color: var(--accent, var(--link)); }
+.nh-item { padding: 14px 0 16px; border-bottom: 1px solid var(--rule); }
+.nh-item blockquote { margin: 6px 0 8px; padding-left: 12px; border-left: 2px solid var(--accent, var(--link)); color: var(--ink-2); font-size: 15px; line-height: 1.55; }
+.nh-empty { color: var(--ink-2); }
+.nh-toc .n { color: var(--accent, var(--link)); }
+mjx-container.nh-eq { background: color-mix(in srgb, var(--accent, var(--link)) 14%, transparent); border-bottom: 1px solid var(--accent, var(--link)); border-radius: 3px; cursor: pointer; }
+mjx-container.nh-pick { outline: 1px dashed var(--accent, var(--link)); outline-offset: 3px; border-radius: 3px; }
+article mjx-container { cursor: pointer; }
+.nh-quote mjx-container.nh-eqcopy, .nh-item mjx-container.nh-eqcopy { cursor: default; font-size: 92%; margin: 2px 0 !important; overflow-x: auto; max-width: 100%; }
+.nh-hint { margin: -6px 0 4px; color: var(--ink-3); font-size: 13.5px; }
+.nav-search kbd { font: inherit; opacity: .6; margin-left: 6px; }
+.nh-editbox { margin-top: 6px; }
+.nh-editbox textarea { box-sizing: border-box; width: 100%; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--sans); resize: vertical; }
+.nh-editbox textarea:focus { outline: 2px solid var(--accent, var(--link)); outline-offset: 0; }
+.nh-sheet .nh-clear:hover { color: var(--grad, #c75a1a); }
+.nh-item [hidden], .nh-pop [hidden] { display: none !important; }
+
+/* public copy: colours, fonts and sizes come from the site's tokens.css; this maps the notebook's
+   token names onto them (green_theme.css's own token block is left out of public pages). */
+:root {
+  --paper: var(--void); --ink: var(--text); --ink-2: var(--soft); --ink-3: var(--muted);
+  --accent: var(--amber);
+  --cell: var(--green); --cell-wash: var(--green-wash); --hid: var(--blue); --hid-wash: var(--blue-wash);
+  --gate: var(--neutral); --gate-wash: var(--neutral-wash); --grad: var(--orange); --grad-wash: var(--orange-wash);
+  --sans: var(--font-sans); --mono: var(--font-mono);
+  --serif: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
+}
+body { padding-block-start: 0; letter-spacing: 0; }
+/* the shared header sits inside the notebook's side padding */
+.site-header { width: min(100%, 1260px); margin-bottom: 40px; }
+.site-header a:hover { text-decoration: none; }
+@media (max-width: 720px) { .site-header { width: 100%; margin-bottom: 26px; } }
+/* the site's type scale */
+h1 { font-weight: 600; font-size: var(--fs-title); line-height: 1.12; letter-spacing: -.02em; }
+h2 { font-size: var(--fs-h2); letter-spacing: -.01em; }
+h3 { font-size: var(--fs-h3); }
+.dek { font-size: 18px; }
+.toc a.on { box-shadow: inset 2px 0 0 var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline-color: var(--accent); }
+footer .site-nav { display: block; margin-top: 10px; }
+.next { margin-top: 36px; font-weight: 500; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="a-cell" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path class="mk-cell" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-hid" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto"><path class="mk-hid" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-in" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-in" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-gate" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-cw" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-cw" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-grad" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path class="mk-grad" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">notes</a><button class="nav-search" type="button" data-search title="Search notes">search<kbd></kbd></button><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
+<div class="page">
+  <nav class="toc" aria-label="Contents">
+    <details id="tocd" open>
+      <summary>Contents</summary>
+      <div class="label">Contents</div>
+      <ol>
+        <li><a href="#tldr"><span class="n">00</span>In short</a></li>
+        <li><a href="#framework"><span class="n">01</span>The design question, and a framework</a></li>
+        <li><a href="#serving"><span class="n">02</span>Serving: batch, online and streaming</a></li>
+        <li><a href="#feature-store"><span class="n">03</span>Features: stores, time and freshness</a></li>
+        <li><a href="#two-stage"><span class="n">04</span>Two-stage retrieval and ranking</a></li>
+        <li><a href="#designs"><span class="n">05</span>Four worked designs</a></li>
+        <li><a href="#cross-cutting"><span class="n">06</span>Cross-cutting concerns</a></li>
+        <li><a href="#pitfalls"><span class="n">07</span>Failure modes, and what interviewers push on</a></li>
+        <li><a href="#code"><span class="n">08</span>Pseudocode</a></li>
+        <li><a href="#reading"><span class="n">09</span>Further reading</a></li>
+        <li><a href="#questions"><span class="n">10</span>Interview questions</a></li>
+        <li><a href="#sheet"><span class="n">11</span>Cheat sheet</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <article>
+    <header class="hero">
+      <div class="tag">Notes · ML systems</div>
+      <h1>ML system design</h1>
+      <p class="dek">The open-ended “design an ML system for X” question, and the architecture behind a good answer: a framework for 45 minutes, batch, online and streaming serving with latency and sizing arithmetic, feature stores and point-in-time joins, two-stage retrieval and ranking, four worked designs (payment fraud, a feed, ad click prediction, an LLM support assistant), cross-cutting concerns, and the failure modes interviewers probe.</p>
+      <div class="meta">About 65 minutes, plus 28 questions · running scale: a feed with 50 million daily users, and a card processor with 20 million payments a day · every number checked by script</div>
+    </header>
+
+    <section class="tldr" id="tldr" aria-labelledby="tldr-h">
+      <h2 id="tldr-h">In short</h2>
+      <ol>
+        <li><strong>A design question is scored on how you navigate it, not on one right answer.</strong> Clarify the decision, scale, latency, freshness and cost; turn the business goal into an online metric and an offline metric that tracks it; then cover data and labels, features, model and baseline, serving, evaluation and monitoring, with numbers on the board, in about 45 minutes.</li>
+        <li><strong>Serve each piece at the cheapest freshness that keeps its value.</strong> Batch for what can wait, streaming for what changes within minutes, online only for what depends on the request. Size it by arithmetic: 50 million users × 10 requests a day is about 17,400 requests a second at peak; 500 candidates × 2 MFLOP is 1 GFLOP a request, about 350 busy CPU cores at peak.</li>
+        <li><strong>Budget latency at the 99th percentile, and respect fan-out.</strong> With 100 parallel calls, 63% of requests wait on at least one call's slowest 1%. Every dependency gets a timeout and a fallback. A cache fixes the mean, not the tail.</li>
+        <li><strong>A feature store is one definition with two stores:</strong> offline history for training, online latest values for serving. Join each training row to the latest value that was <em>available</em> before it, not just timestamped before it, or the future leaks in. Fast features need streaming windows, and must be as stale in training as they are when served.</li>
+        <li><strong>Retrieve, then rank, because the heavy model can afford about 500 candidates a request, not 10 million.</strong> Cheap high-recall retrieval (approximate nearest neighbours over embeddings, co-engagement, heuristics), a precise ranker, then re-ranking for rules and diversity. Logged clicks are biased by position and exposure, and sampled negatives and downsampling distort probabilities; correct for each.</li>
+        <li><strong>The worked designs reuse the same parts:</strong> cost-based actions on calibrated fraud scores, multi-task feed ranking, ad click prediction where calibration sets the price, and an LLM support assistant whose risk is quality rather than token cost. Run all of them with data contracts, a model registry, fast rollback and a clear picture of how they fail.</li>
+      </ol>
+    </section>
+
+    <!-- framework -->
+    <h2 id="framework"><span class="pn">01</span>The design question, and a framework</h2>
+    <p>An ML system design question is an open prompt: “design a feed”, “detect fraud in card payments”, “build a support assistant”. You get 45 to 60 minutes and a whiteboard. There is no single right answer, so what's being judged is how you turn a vague goal into a system that learns from data, answers within its constraints, and keeps working after launch.</p>
+    <p>It differs from a classic software design question because the hard parts are ML-shaped: what exactly to predict, where the labels come from and how late, which features exist at decision time, how to evaluate before and after launch, and how the system's own decisions bias its future data. It differs from the project lifecycle (<a href="./ds-project-lifecycle.html#framing">framing</a> to <a href="./ds-project-lifecycle.html#retrain">retraining</a>, covered in its own note) in its emphasis: scale, serving architecture and the request path.</p>
+
+    <h3 id="rubric">What interviewers score</h3>
+    <p>Rubrics vary between companies, but they usually cover the same six areas:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Area</th><th>What good looks like</th><th>Red flags</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Problem navigation</strong></td><td>Asks the questions that change the design; states assumptions as numbers; picks an ML formulation and says why</td><td>“I'd use a transformer” in minute two; no scale, no latency</td></tr>
+        <tr><td><strong>ML depth</strong></td><td>Label definition, loss, baseline, an offline metric that tracks the online one, an evaluation plan</td><td>Accuracy on 0.05% positives; a random split on time-ordered data; no baseline</td></tr>
+        <tr><td><strong>Systems depth</strong></td><td>Serving mode, latency budget, feature freshness, sizing, fallbacks</td><td>One box labelled “model”; features that can't be computed in time</td></tr>
+        <tr><td><strong>Trade-offs</strong></td><td>Names the alternatives, picks one, says what it costs and what breaks</td><td>Lists five options and picks none; one option with no reason</td></tr>
+        <tr><td><strong>Operations</strong></td><td>Monitoring before labels arrive, retraining, rollback, feedback loops</td><td>The design ends at “deploy”</td></tr>
+        <tr><td><strong>Communication</strong></td><td>Signposts, draws, checks in, manages the clock</td><td>A monologue; 30 minutes on data cleaning</td></tr>
+      </tbody>
+    </table></div>
+    <p>More senior levels are expected to go deep on two or three areas of their choosing, back claims with numbers, and prioritise: say what they'd build first and what they'd leave for version two.</p>
+
+    <h3 id="steps">The framework, step by step</h3>
+    <p>Nine steps, in the order you'd say them. Each ends with something written on the board.</p>
+    <ol>
+      <li><strong>Clarify requirements.</strong> Five kinds:
+        <ul>
+          <li><em>Functional:</em> what decision does the prediction drive, what is the output (a score, a ranked list, a text answer), who consumes it?</li>
+          <li><em>Scale:</em> users, items, requests a second, data volume.</li>
+          <li><em>Latency:</em> is someone waiting? What's the budget at the 99th percentile (p99)?</li>
+          <li><em>Freshness:</em> how soon must new behaviour, new items and new labels affect predictions?</li>
+          <li><em>Cost and constraints:</em> hardware or money budget, privacy, regulation, explainability.</li>
+        </ul>
+        Then state assumptions out loud: “I'll assume 50 million daily users, 10 feed loads each, and 200 ms at p99.”</li>
+      <li><strong>Goal → online metric → offline metric.</strong> The business goal is slow and broad (retention, fraud losses). The online metric is what a two-week experiment can move (sessions per user, fraud losses in basis points of payment volume), with guardrails. The offline metric is what you can compute on logged data, chosen because it tracks the online one at the operating point. The lifecycle note covers choosing <a href="./ds-project-lifecycle.html#metrics">metrics in layers</a> and an <a href="./ds-project-lifecycle.html#offline-metric">offline metric that tracks the business one</a>.</li>
+      <li><strong>The ML formulation.</strong> Input, output and label: classification, regression or ranking; one label or several. Predicting clicks alone rewards clickbait, so feeds predict several engagement types and combine them (section <a href="#two-stage">04</a>).</li>
+      <li><strong>Data and labels.</strong> Sources, the exact <a href="./ds-project-lifecycle.html#label-def">label definition</a>, its <a href="./ds-project-lifecycle.html#label-delay">delay</a>, and the bias the current system put into the logs: it chose what users saw, so it chose which labels exist.</li>
+      <li><strong>Features.</strong> By entity (user, item, context, user × item) and by freshness tier (batch, streaming, request-time); each must exist at decision time (section <a href="#feature-store">03</a>).</li>
+      <li><strong>Model and baseline.</strong> A heuristic first (popularity, today's rules), then a simple learned model (logistic regression, gradient-boosted trees), then a bigger one if scale and latency allow. Name the baseline before the fancy model.</li>
+      <li><strong>Serving.</strong> Batch, online or streaming; the request path; a latency budget; sizing (sections <a href="#serving">02</a> and <a href="#two-stage">04</a>).</li>
+      <li><strong>Evaluation.</strong> Offline on an <a href="./ds-project-lifecycle.html#oot">out-of-time split</a> and by slice, then <a href="./ds-project-lifecycle.html#shadow">shadow mode</a>, then an <a href="./hypothesis-testing.html#ab">A/B test</a> with guardrails.</li>
+      <li><strong>Monitoring and iteration.</strong> Data quality, <a href="./ds-project-lifecycle.html#drift">drift</a>, early outcomes, <a href="./ds-project-lifecycle.html#retrain">retraining</a>, <a href="./ds-project-lifecycle.html#feedback">feedback loops</a>, and what version two would add.</li>
+    </ol>
+
+    <h3 id="clarify">Clarifying questions that change the design</h3>
+    <p>Ask only questions whose answers change something. Four to six is plenty; assume the rest and say so.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Question</th><th>What the answer changes</th></tr></thead>
+      <tbody>
+        <tr><td>Is someone waiting for the prediction?</td><td>Online vs batch serving; the latency budget</td></tr>
+        <tr><td>How many items or candidates are there?</td><td>Whether you need a retrieval stage before ranking</td></tr>
+        <tr><td>How fast does the world change: new items an hour, adversaries?</td><td>Streaming features, retraining cadence, online learning</td></tr>
+        <tr><td>Where do labels come from, and how late?</td><td>Proxy labels, monitoring before labels, training windows</td></tr>
+        <tr><td>What does each kind of mistake cost?</td><td>Thresholds, the metric, whether calibration matters</td></tr>
+        <tr><td>Is there a system today?</td><td>The baseline, and shadow mode for the migration</td></tr>
+        <tr><td>Privacy, regulation, explainability?</td><td>Allowed features, model class, logging</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3 id="clock">Managing 45 minutes</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Minutes</th><th>Step</th><th>On the board</th></tr></thead>
+      <tbody>
+        <tr><td>0–5</td><td>Clarify; state assumptions</td><td>Scale, latency, freshness as numbers</td></tr>
+        <tr><td>5–10</td><td>Goal → online → offline metric; guardrails</td><td>The metric chain</td></tr>
+        <tr><td>10–15</td><td>ML formulation; data and labels</td><td>Label definition and delay</td></tr>
+        <tr><td>15–20</td><td>Features</td><td>Feature groups by tier</td></tr>
+        <tr><td>20–25</td><td>Baseline and model</td><td>Baseline → model, with the loss</td></tr>
+        <tr><td>25–33</td><td>Serving architecture</td><td>The diagram, latency budget, sizing</td></tr>
+        <tr><td>33–38</td><td>Evaluation offline and online</td><td>Split, shadow, A/B plan</td></tr>
+        <tr><td>38–42</td><td>Monitoring, retraining, failure modes</td><td>What's watched, by whom</td></tr>
+        <tr><td>42–45</td><td>Summary, trade-offs, version two</td><td>Two or three next steps</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Reach serving by about minute 25,</strong> so evaluation and monitoring aren't squeezed out; if a step overruns, sketch the remaining steps in a sentence each, then go deep where the interviewer pulls. An answer that's complete at low resolution beats one that's perfect on data and never reaches serving.</li>
+      <li><strong>Hand over the steering:</strong> “I can go deeper on retrieval or on the label delay; which is more useful?” Most interviewers have a part they want to probe.</li>
+      <li><strong>Park things explicitly:</strong> “cold start matters here, I'll come back to it” shows you saw it without derailing the clock.</li>
+    </ul>
+    <aside class="note trap"><p class="nl">Trap</p><p>Starting with the model. “I'd use a two-tower network with a transformer over the history” before knowing the latency, the label or the number of items is the most common red flag. The model is step six of nine for a reason: its choice depends on the five before it.</p></aside>
+    <p><strong>Say it in an interview:</strong> “Before designing, I'd pin down what decision this drives, the scale, the latency budget and how fresh things need to be. Then I'll go from the business goal to an online metric and an offline one that tracks it, then data, features, a baseline and the model, the serving path, evaluation and monitoring, and I'll put numbers on each step.”</p>
+
+    <!-- serving -->
+    <h2 id="serving"><span class="pn">02</span>Serving: batch, online and streaming</h2>
+    <p>The running scale for this section and the next two: a feed app with 50 million daily users (100 million monthly), 10 feed loads per user a day, 10 million eligible posts, 20 posts shown per load and 200 ms at p99 on the server.</p>
+
+    <h3 id="modes">Three ways to serve a prediction</h3>
+    <ul>
+      <li><strong>Batch inference:</strong> a scheduled job scores a fixed population and writes the predictions to a store. The request path only looks them up.</li>
+      <li><strong>Online (request-time) inference:</strong> the model runs inside the request, on features fetched or computed at that moment, while someone waits.</li>
+      <li><strong>Streaming inference:</strong> the model runs on each event as it flows through a stream, asynchronously. The result is written to a store or triggers an action, and later requests read it.</li>
+    </ul>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Batch</th><th>Online</th><th>Streaming</th></tr></thead>
+      <tbody>
+        <tr><td>Runs</td><td>On a schedule</td><td>Per request, synchronously</td><td>Per event, asynchronously</td></tr>
+        <tr><td>Freshness</td><td>Hours to a day stale</td><td>Newest features at request time</td><td>Seconds to minutes behind the event</td></tr>
+        <tr><td>Latency limit on the model</td><td>None (the lookup is milliseconds)</td><td>The request's budget</td><td>None on a request; lag matters</td></tr>
+        <tr><td>Cost grows with</td><td>Population × frequency</td><td>Requests × model cost</td><td>Events × model cost</td></tr>
+        <tr><td>Fails as</td><td>Stale or missing predictions, nothing for new users</td><td>Timeouts, tail latency</td><td>Growing lag, out-of-order events</td></tr>
+        <tr><td>Examples</td><td>Nightly churn scores, recommendation emails, pre-approved limits</td><td>Search ranking, feed ranking, payment authorization</td><td>Flagging an account after a burst of logins; refreshing a session embedding</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Most real systems are hybrids.</strong> Precompute what doesn't depend on the request (item embeddings, the nearest-neighbour index, long-term user embeddings, candidate lists); stream what changes within minutes (counters, session state); compute online only what depends on the request itself (the query, the context, user × item features, the final ranking).</p>
+    <p><strong>Batch or online, in numbers.</strong> Scoring 500 candidates for each of 100 million monthly users nightly is \(5 \times 10^{10}\) scorings a day. Scoring them per request is 500 million requests × 500 = \(2.5 \times 10^{11}\), five times more. Batch is cheaper, but half of the users it scores won't open the app that day, its lists are up to a day old, it can't react to what the user did a minute ago, new users have no list, and storing 100 recommendations per user at 12 bytes each takes 120 GB. The usual answer is both: batch or cached candidate lists, ranked online.</p>
+
+    <h3 id="sizing">Back-of-envelope sizing</h3>
+    <p>Sizing turns “it's big” into machines and gigabytes. Start from users and work down to requests per second (QPS), then compute, memory and storage:</p>
+    <div class="mj">\[ \begin{aligned} \text{QPS}_{\text{avg}} &amp;= \frac{\text{daily users} \times \text{requests per user}}{86{,}400} = \frac{50\text{M} \times 10}{86{,}400} \approx 5{,}800 \\ \text{QPS}_{\text{peak}} &amp;\approx 3 \times \text{QPS}_{\text{avg}} \approx 17{,}400 \\ \text{in flight} &amp;= \text{QPS} \times \text{latency} = 17{,}361 \times 0.2\ \text{s} \approx 3{,}500 \end{aligned} \]</div>
+    <p>In words: a day has 86,400 seconds, but traffic isn't flat, so plan for the peak; a peak of two to three times the average is a common rule of thumb for consumer apps (check the real daily curve). The last line is <strong>Little's law</strong>: the average number of requests in the system equals the arrival rate times the average time each one spends there. Using the 200 ms p99 budget instead of the mean gives a safe upper estimate. It sizes thread pools, connection pools and per-request memory.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Quantity</th><th>Arithmetic</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>Ranker work per request</td><td>500 candidates × 2 MFLOP (an MLP with about a million weights; each weight costs one multiply and one add per candidate, 2 floating-point operations or FLOP)</td><td>1 GFLOP</td></tr>
+        <tr><td>Time on one CPU core</td><td>1 GFLOP ÷ 50 GFLOP/s (an assumed effective rate)</td><td>20 ms</td></tr>
+        <tr><td>Compute at peak</td><td>17,361 × 1 GFLOP</td><td>17.4 TFLOP/s ≈ 350 busy cores; about 700 at 50% utilization</td></tr>
+        <tr><td>Item embeddings</td><td>10M × 128 dims × 4 bytes</td><td>5.1 GB (2.6 GB in float16): fits in one machine's memory</td></tr>
+        <tr><td>User embeddings</td><td>100M × 128 × 4 bytes</td><td>51 GB: a key-value store, fetched per request</td></tr>
+        <tr><td>Online feature store</td><td>100M users × 200 features × 8 bytes</td><td>160 GB raw, 480 GB with 3 replicas, before per-key overhead: sharded</td></tr>
+        <tr><td>Impression logs</td><td>500M requests × 20 impressions × 500 bytes</td><td>5 TB a day; 450 TB for 90 days</td></tr>
+      </tbody>
+    </table></div>
+    <p>What the numbers decide: the item index fits on one machine, so each retrieval server can hold a full replica instead of sharding it; user state and features don't, so they live in a sharded store; and the impression log is the future training set, so what gets logged per impression (features, position, model version) is a design decision with a storage bill.</p>
+    <aside class="note trap"><p class="nl">Trap</p><p>Sizing per request when the cost is per candidate. A 20 ms model looks fine until you notice it runs 500 times per request. Always multiply through: requests × candidates × cost per candidate.</p></aside>
+
+    <h3 id="latency">Where the time goes: latency budgets</h3>
+    <p>Users feel the slow requests, not the average one, so budgets are set at p99 (or p99.9 for systems that fan out a lot). Split the end-to-end budget into stages and give each an owner. For the feed:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Stage</th><th>p99 budget</th></tr></thead>
+      <tbody>
+        <tr><td>Gateway, authentication, parsing</td><td>10 ms</td></tr>
+        <tr><td>User features and user embedding</td><td>15 ms</td></tr>
+        <tr><td>Candidate generation (sources in parallel)</td><td>30 ms</td></tr>
+        <tr><td>Merge, deduplicate, filter seen and blocked</td><td>5 ms</td></tr>
+        <tr><td>Candidate features (one batched fetch)</td><td>25 ms</td></tr>
+        <tr><td>Light ranker, 1,500 → 500</td><td>15 ms</td></tr>
+        <tr><td>Heavy ranker, 500 → 50</td><td>50 ms</td></tr>
+        <tr><td>Re-ranking: rules, diversity</td><td>10 ms</td></tr>
+        <tr><td>Fetch post content, serialize</td><td>15 ms</td></tr>
+        <tr><td>Slack: network, garbage collection, queueing</td><td>25 ms</td></tr>
+        <tr><td><strong>Total</strong></td><td><strong>200 ms</strong></td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Percentiles don't add.</strong> Summing each sequential stage's p99 overstates the total, since stages rarely all hit their tail on the same request. So the budget table above, which sums per-stage p99s, is deliberately conservative. Parallel fan-out works the other way: the request waits for the slowest of its calls. If each of \(N\) independent calls exceeds its own p99 with probability 1%:</p>
+    <div class="mj">\[ P(\text{at least one call is in its slowest } 1\%) = 1 - 0.99^{N} \]</div>
+    <p>In words: with 10 calls that's 9.6% of requests, with 50 it's 39.5%, with 100 it's 63.4%. A request that fans out to 100 feature shards spends most of its life waiting on somebody's tail. The fixes:</p>
+    <ul>
+      <li><strong>Fewer, bigger calls:</strong> one multi-key fetch per shard instead of one call per candidate.</li>
+      <li><strong>Hedged requests:</strong> if a call hasn't answered by its p95, send a copy to another replica and take whichever answers first. Only about 5% of calls pass their p95, so this adds at most about 5% load. Hedge only idempotent reads, never writes or payments.</li>
+      <li><strong>Partial results:</strong> rank what arrived; a missing retrieval source costs a little recall, not the whole request.</li>
+      <li><strong>Headroom:</strong> queueing delay climbs steeply as a server nears full utilization, which is why the sizing above plans for 50%.</li>
+    </ul>
+    <p>Where the time usually goes, roughly in order: feature fetches across many keys and shards, the heavy ranker on hundreds of candidates, network hops and serialization, then garbage-collection pauses and cold caches.</p>
+
+    <h3 id="caching">Precomputation and caching</h3>
+    <ul>
+      <li><strong>Precompute what doesn't depend on the request:</strong> item embeddings and the nearest-neighbour index (rebuilt hourly or daily, with new items inserted as they arrive), long-term user embeddings (nightly), co-engagement neighbour lists per item.</li>
+      <li><strong>Cache where requests repeat.</strong> Search traffic is heavily skewed. If query frequency falls off as 1/rank (a Zipf distribution), caching the top 1% of 10 million distinct queries covers about 72% of traffic, and the top 0.1% about 59%. That's a model; check it against real logs.</li>
+      <li><strong>A cache fixes the mean, not the tail.</strong> With an 80% hit rate, 1 ms hits and 40 ms misses, the mean is \(0.8 \times 1 + 0.2 \times 40 = 8.8\) ms, but the p99 is still about 40 ms: with 20% of requests missing, the slowest 1% of all requests are the slowest 5% of misses, so the overall p99 is the miss path's p95. The miss path sets the tail until the hit rate passes 99%.</li>
+      <li><strong>Staleness is the price.</strong> Set a time-to-live (TTL) per cached thing, and invalidate on update events where it matters (a deleted post must leave every cache).</li>
+      <li><strong>Personalization limits result caching:</strong> cache embeddings, features or per-segment results rather than per-user pages.</li>
+    </ul>
+    <aside class="note trap"><p class="nl">Trap</p><p>Caching a personalized response under a key that isn't personal. A result cache keyed only by the query string will happily serve one user's personalized results, or their private items, to the next user who types the same query.</p></aside>
+
+    <h3 id="model-size">Model size against latency</h3>
+    <p>Request cost is candidates × cost per candidate, so there are two kinds of lever:</p>
+    <ul>
+      <li><strong>Fewer candidates for the expensive model:</strong> a light ranker in between (section <a href="#two-stage">04</a>), or a cap that shrinks under load.</li>
+      <li><strong>Cheaper per candidate:</strong>
+        <ul>
+          <li><em>distillation:</em> train a small model to copy the big one's scores;</li>
+          <li><em>quantization:</em> int8 weights are a quarter the size of float32 and often faster on CPUs;</li>
+          <li><em>shared work:</em> compute the user-side part of the network once per request rather than once per candidate;</li>
+          <li><em>fewer features:</em> each one is also a fetch, so drop those that don't earn their latency.</li>
+        </ul>
+      </li>
+      <li><strong>Batching on a GPU</strong> raises throughput, and 500 candidates are a natural batch. Dynamic batching (waiting a few milliseconds to group requests) trades a little latency for utilization.</li>
+      <li><strong>Trees are cheap:</strong> a boosted model with 500 trees of depth 8 makes 4,000 comparisons per row, typically microseconds on a CPU. For tree models, fetching the features usually costs more than scoring.</li>
+    </ul>
+
+    <h3 id="fallbacks">Fallbacks and timeouts</h3>
+    <p>Every dependency gets a timeout below its stage budget and a decided fallback. A degraded answer beats an error page, and a timeout must never turn silently into a bad default.</p>
+    <ul>
+      <li><strong>A fallback ladder for the feed:</strong> the full pipeline → skip the slow retrieval source and rank what arrived → this user's last good feed from cache → popular posts in the region.</li>
+      <li><strong>For payments it depends on the stakes:</strong> if the model times out, approve small payments on rules alone and step up (ask for a one-time password or bank authentication) or refer large ones. Failing closed (declining everything) blocks good customers; failing open (approving everything) is what attackers wait for.</li>
+      <li><strong>Circuit breakers</strong> stop calling a dependency that keeps failing, for a cool-down period, so its failure doesn't consume every request's budget. <strong>Load shedding</strong> cuts work at peak: fewer candidates, skip the light ranker's extra sources.</li>
+      <li><strong>Monitor the fallback rate.</strong> A model that is “up” but times out on 10% of requests is serving the fallback to 10% of users. In an A/B test a heavier model times out more, so compare fallback rates per arm before believing the result.</li>
+    </ul>
+    <p><strong>Say it in an interview:</strong> “I'd precompute item embeddings and candidate lists, stream the fast counters, and rank online. At 50 million daily users that's about 17,000 requests a second at peak; ranking 500 candidates at 2 MFLOP each is about 1 GFLOP a request, a few hundred cores. I'd budget each stage at p99, batch the feature fetches to avoid fan-out tails, and give every dependency a timeout and a fallback, with the fallback rate on the dashboard.”</p>
+
+    <!-- features -->
+    <h2 id="feature-store"><span class="pn">03</span>Features: stores, time and freshness</h2>
+    <p>A model sees only the features it receives at decision time. For every feature, three questions: which entity is it keyed on (user, card, item, device), how fresh must it be, and what was its value at every past moment, so training can see exactly what serving would have seen?</p>
+
+    <h3 id="tiers">Three freshness tiers</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Tier</th><th>Computed by</th><th>Fresh to</th><th>Fraud examples</th><th>Feed examples</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Batch</strong></td><td>Daily or hourly jobs on the warehouse</td><td>Hours</td><td>The card's 90-day average amount; the merchant's 30-day chargeback rate</td><td>Topic affinities over 90 days; a post's lifetime engagement rate</td></tr>
+        <tr><td><strong>Streaming</strong></td><td>A stream processor updating aggregates per event</td><td>Seconds to minutes</td><td>Payments on this card in the last 10 minutes; distinct cards on this device in the last hour</td><td>Clicks in this session; a post's engagement in the last 15 minutes</td></tr>
+        <tr><td><strong>Request-time</strong></td><td>The request itself</td><td>Instant</td><td>Amount, merchant category, distance from the card's usual city, hour of day</td><td>Query text, device, time of day, slot on the page</td></tr>
+      </tbody>
+    </table></div>
+    <p>Compute each feature at the slowest tier that keeps its value. A 90-day average gains nothing from streaming; a velocity count from last night's batch is useless against an attack happening now.</p>
+
+    <h3 id="stores">Offline and online stores</h3>
+    <p>A <strong>feature store</strong> is a registry of feature definitions plus two stores filled from those same definitions:</p>
+    <ul>
+      <li><strong>The offline store</strong> keeps the full history of every feature value with its timestamps, in the warehouse or data lake. It builds training sets (with point-in-time joins, below) and feeds batch scoring. It's built for scanning billions of rows.</li>
+      <li><strong>The online store</strong> keeps only the latest value per entity key, in a low-latency key-value store, for serving. It's built for point lookups in a few milliseconds at high request rates.</li>
+      <li><strong>Materialization</strong> keeps them in step: batch jobs push the newest values from offline to online, and the stream processor writes both.</li>
+    </ul>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 660 262" role="img" aria-label="Feature store architecture. Top row, the online path: event stream, stream processor, online store holding the latest value per key, serving. Bottom row, the offline path: warehouse, batch jobs, offline store holding full history with timestamps, training. The stream processor also writes history to the offline store; batch jobs also push latest values to the online store. Events land in the warehouse. Serving logs the features it used, which flow to training.">
+          <rect x="178" y="10" width="303" height="28" rx="8" style="fill:none;stroke:var(--ink-3);stroke-width:1.2;stroke-dasharray:4 4"/>
+          <text x="329.5" y="29" text-anchor="middle" style="fill:var(--ink)">Registry: one definition per feature</text>
+          <text class="lbl" x="10" y="52">online path</text>
+          <text class="lbl" x="10" y="258">offline path</text>
+          <rect class="box" x="10" y="60" width="135" height="52" rx="8"/>
+          <text x="77.5" y="82" text-anchor="middle" style="fill:var(--ink)">Event stream</text>
+          <text x="77.5" y="99" text-anchor="middle" style="font-size:11.5px">payments, clicks</text>
+          <rect class="box" x="178" y="60" width="135" height="52" rx="8"/>
+          <text x="245.5" y="82" text-anchor="middle" style="fill:var(--ink)">Stream processor</text>
+          <text x="245.5" y="99" text-anchor="middle" style="font-size:11.5px">windows, counters</text>
+          <rect class="gbox" x="346" y="60" width="135" height="52" rx="8"/>
+          <text x="413.5" y="82" text-anchor="middle" style="fill:var(--ink)">Online store</text>
+          <text x="413.5" y="99" text-anchor="middle" style="font-size:11.5px">latest value per key</text>
+          <rect class="box" x="514" y="60" width="135" height="52" rx="8"/>
+          <text x="581.5" y="82" text-anchor="middle" style="fill:var(--ink)">Serving</text>
+          <text x="581.5" y="99" text-anchor="middle" style="font-size:11.5px">request → model</text>
+          <rect class="box" x="10" y="190" width="135" height="52" rx="8"/>
+          <text x="77.5" y="212" text-anchor="middle" style="fill:var(--ink)">Warehouse</text>
+          <text x="77.5" y="229" text-anchor="middle" style="font-size:11.5px">raw tables, event log</text>
+          <rect class="box" x="178" y="190" width="135" height="52" rx="8"/>
+          <text x="245.5" y="212" text-anchor="middle" style="fill:var(--ink)">Batch jobs</text>
+          <text x="245.5" y="229" text-anchor="middle" style="font-size:11.5px">daily aggregates</text>
+          <rect class="gbox" x="346" y="190" width="135" height="52" rx="8"/>
+          <text x="413.5" y="212" text-anchor="middle" style="fill:var(--ink)">Offline store</text>
+          <text x="413.5" y="229" text-anchor="middle" style="font-size:11.5px">history + timestamps</text>
+          <rect class="box" x="514" y="190" width="135" height="52" rx="8"/>
+          <text x="581.5" y="212" text-anchor="middle" style="fill:var(--ink)">Training</text>
+          <text x="581.5" y="229" text-anchor="middle" style="font-size:11.5px">point-in-time join</text>
+          <path class="cw" d="M145 86 H174" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M313 86 H342" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M481 86 H510" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M145 216 H174" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M313 216 H342" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M481 216 H510" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M77.5 112 V186" marker-end="url(#a-cw)"/>
+          <text class="lbl" x="84" y="154">landed</text>
+          <path class="cw" d="M290 112 L368 186" marker-end="url(#a-cw)"/>
+          <text class="lbl" x="372" y="176">history</text>
+          <path class="cw" d="M290 190 L368 116" marker-end="url(#a-cw)"/>
+          <text class="lbl" x="372" y="132">latest values</text>
+          <path class="cw" d="M581.5 112 V186" marker-end="url(#a-cw)" style="stroke-dasharray:5 4"/>
+          <text class="lbl" x="588" y="146">logged</text>
+          <text class="lbl" x="588" y="160">features</text>
+        </svg>
+      </div>
+      <figcaption>One definition, two stores. The top row answers requests with the latest values; the bottom row rebuilds the past for training. The two crossing arrows keep them in step, and the dashed arrow is the safest source of training features: the values serving actually used.</figcaption>
+    </figure>
+    <ul>
+      <li><strong>Why two stores:</strong> the access patterns are opposite. Training scans history across all keys; serving looks up one key, now. No single store does both cheaply.</li>
+      <li><strong>What it buys:</strong> one definition used by both paths, which prevents most training–serving skew; point-in-time training sets; features shared across models and teams, with owners; freshness and null-rate monitoring in one place.</li>
+      <li><strong>When it's overkill:</strong> one batch model with a handful of features needs a well-tested pipeline, not a platform. It earns its cost when several online models share features, or when streaming features must match between training and serving.</li>
+    </ul>
+
+    <h3 id="pit">Point-in-time correct joins</h3>
+    <p>A training row is an entity, a timestamp and a label: “card C1, a payment at 21:00 on 4 January, fraud”. Its features must be the values the system <em>could have seen</em> at that moment. Feature values change over time, so joining a training row to today's table, or to the row with the closest date, pulls in information from after the prediction: temporal leakage (one of the <a href="./data-preparation.html#leak-types">four kinds of leakage</a>).</p>
+    <p>Each feature row carries two times: the <strong>data time</strong> (the data it summarizes ends here) and the <strong>availability time</strong> (when it actually landed in the store). The second is later, because jobs take time and data arrives late. The rule:</p>
+    <div class="mj">\[ \text{feature}(k, t) = \text{value of the latest row for key } k \text{ with } t_{\text{available}} \le t, \text{ if } t - t_{\text{data}} \le \text{TTL} \]</div>
+    <p>In words: for a training row at time \(t\), among the rows already written by \(t\), use the one whose data is newest; if even that value describes data older than the time-to-live, treat it as missing, because the online store would have expired it.</p>
+    <p><strong>A tiny example.</strong> A daily job computes two features for card C1: payments in the last 30 days, and disputes filed in the last 90 days. Each run covers data up to midnight and lands at 02:00. It runs on 3, 4 and 5 January, then fails unnoticed until 9 January, so F3 is still the newest row on the 8th.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Row</th><th>Data up to</th><th>Written at</th><th>Payments 30 d</th><th>Disputes 90 d</th></tr></thead>
+      <tbody>
+        <tr><td>F1</td><td>03 Jan 00:00</td><td>03 Jan 02:00</td><td>12</td><td>0</td></tr>
+        <tr><td>F2</td><td>04 Jan 00:00</td><td>04 Jan 02:00</td><td>14</td><td>0</td></tr>
+        <tr><td>F3</td><td>05 Jan 00:00</td><td>05 Jan 02:00</td><td>31</td><td>1</td></tr>
+      </tbody>
+    </table></div>
+    <p>On 4 January a fraudster ran 17 payments on the card, and on the 4th the owner filed a dispute; F3 is the first row to show both. Four payments need features, with a 48-hour TTL:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Payment</th><th>Time, label</th><th>Naive: latest row</th><th>As-of on data time</th><th>As-of on availability, TTL 48 h</th></tr></thead>
+      <tbody>
+        <tr><td>T1</td><td>03 Jan 15:00, legit</td><td>31 · 1</td><td>12 · 0 (F1)</td><td>12 · 0 (F1)</td></tr>
+        <tr><td>T2</td><td>04 Jan 01:30, fraud</td><td>31 · 1</td><td>14 · 0 (F2)</td><td><strong>12 · 0 (F1)</strong></td></tr>
+        <tr><td>T3</td><td>04 Jan 21:00, fraud</td><td>31 · 1</td><td>14 · 0 (F2)</td><td>14 · 0 (F2)</td></tr>
+        <tr><td>T4</td><td>08 Jan 12:00, legit</td><td>31 · 1</td><td>31 · 1 (F3)</td><td><strong>missing</strong></td></tr>
+      </tbody>
+    </table></div>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 660 250" role="img" aria-label="A timeline. Upper lane: feature rows F1, F2, F3 at the times they were written. Lower lane: payments T1 to T4. Solid arrows point back in time from each payment to the row it joins: T1 and T2 to F1, T3 to F2. A dashed arrow from T4 to F3 is crossed out: the row is older than the 48-hour TTL, so the value is missing. An orange dashed arrow from T3 points forward in time to F3: the naive join, which uses a row written after the payment.">
+          <text class="lbl" x="20" y="16">feature rows, at the time written</text>
+          <text class="lbl" x="640" y="16" text-anchor="end">values: payments 30 d · disputes 90 d</text>
+          <path class="in" d="M20 80 H640"/>
+          <rect x="84" y="74" width="12" height="12" style="fill:var(--gate-wash);stroke:var(--gate);stroke-width:1.5"/>
+          <rect x="314" y="74" width="12" height="12" style="fill:var(--gate-wash);stroke:var(--gate);stroke-width:1.5"/>
+          <rect x="494" y="74" width="12" height="12" style="fill:var(--gate-wash);stroke:var(--gate);stroke-width:1.5"/>
+          <text x="90" y="44" text-anchor="middle">F1 · 03 Jan 02:00</text>
+          <text x="320" y="44" text-anchor="middle">F2 · 04 Jan 02:00</text>
+          <text x="500" y="44" text-anchor="middle">F3 · 05 Jan 02:00</text>
+          <text class="lbl" x="90" y="61" text-anchor="middle">12 · 0</text>
+          <text class="lbl" x="320" y="61" text-anchor="middle">14 · 0</text>
+          <text class="lbl" x="500" y="61" text-anchor="middle">31 · 1</text>
+          <text class="lbl" x="20" y="166">payments to score</text>
+          <path class="in" d="M20 180 H640"/>
+          <circle cx="155" cy="180" r="6" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.5"/>
+          <circle cx="275" cy="180" r="6" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.5"/>
+          <circle cx="420" cy="180" r="6" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.5"/>
+          <circle cx="610" cy="180" r="6" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.5"/>
+          <text x="155" y="204" text-anchor="middle">T1 · legit</text>
+          <text class="lbl" x="155" y="219" text-anchor="middle">03 Jan 15:00</text>
+          <text x="275" y="204" text-anchor="middle">T2 · fraud</text>
+          <text class="lbl" x="275" y="219" text-anchor="middle">04 Jan 01:30</text>
+          <text x="420" y="204" text-anchor="middle">T3 · fraud</text>
+          <text class="lbl" x="420" y="219" text-anchor="middle">04 Jan 21:00</text>
+          <text x="610" y="204" text-anchor="middle">T4 · legit</text>
+          <text class="lbl" x="610" y="219" text-anchor="middle">08 Jan 12:00</text>
+          <path class="cw" d="M151 173 L97 92" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M269 174 L101 92" marker-end="url(#a-cw)"/>
+          <text class="lbl" x="284" y="140">F2 not</text>
+          <text class="lbl" x="284" y="153">written yet</text>
+          <path class="cw" d="M415 173 L328 92" marker-end="url(#a-cw)"/>
+          <path d="M424 173 L492 92" style="stroke:var(--grad);stroke-width:1.8;stroke-dasharray:5 4;fill:none" marker-end="url(#a-grad)"/>
+          <text x="452" y="124" text-anchor="end" style="fill:var(--grad)">naive</text>
+          <path d="M604 174 L509 88" style="stroke:var(--ink-3);stroke-width:1.5;stroke-dasharray:3 4;fill:none"/>
+          <path d="M551 121 L565 135 M565 121 L551 135" style="stroke:var(--grad);stroke-width:2;fill:none"/>
+          <text class="lbl" x="546" y="150" text-anchor="end">older than</text>
+          <text class="lbl" x="546" y="163" text-anchor="end">TTL: missing</text>
+          <text class="lbl" x="640" y="244" text-anchor="end">time →</text>
+        </svg>
+      </div>
+      <figcaption>Correct joins point back in time to a row that already existed. The naive join (orange) points forward: T3's training row would carry F3, written the next morning, including the dispute T3 itself caused. T2 is the subtle case: F2's data ends before T2, but it wasn't written until half an hour after.</figcaption>
+    </figure>
+    <ul>
+      <li><strong>The naive join leaks the label.</strong> Every fraud row carries “1 dispute”, the dispute the fraud itself caused, and the burst of 17 fraudulent payments in its 30-day count. The model learns “a dispute means fraud” from rows where it couldn't have known, and at serving time a card's first fraud has 0 disputes. Offline scores look great; live ones don't.</li>
+      <li><strong>Joining on data time alone is a smaller leak.</strong> T2 at 01:30 gets F2, whose data ends at midnight but which landed at 02:00. Serving at 01:30 still held F1. Training then sees fresher values than serving ever does: a mild leak, and a source of skew.</li>
+      <li><strong>The TTL keeps T4 honest.</strong> With the job down, F3 is 84 hours old by T4. If serving would treat a value older than 48 hours as missing, training must too, or the model never learns what to do with “missing”.</li>
+      <li><strong>At scale</strong> this is an as-of join: sort both tables by time and, per key, match each label row to the last feature row at or before it (<code>merge_asof</code> in pandas, a window function in SQL or Spark, a built-in in feature-store libraries). Pseudocode in section <a href="#code">08</a>.</li>
+    </ul>
+    <p><strong>The other way to get it right: log and wait.</strong> Log the features exactly as served with every request, and join the labels when they arrive. There's no skew by construction, but a new feature has no history until it has been logged for weeks. Backfilling with a point-in-time join gives a new feature years of history on day one, at the risk of computing it slightly differently from serving. A common pattern: backfill to decide whether a new feature is worth shipping, then train on logged values once it's live.</p>
+    <aside class="note trap"><p class="nl">Trap</p><p>“The features are point-in-time because I filtered on event time before \(t\).” Late-arriving records break this: a record whose event time is before \(t\) but which reached the warehouse after \(t\) was invisible at serving. Filter on when each record was written as well as on when it happened.</p></aside>
+
+    <h3 id="streaming">Streaming features: windows and aggregations</h3>
+    <p>A streaming feature is an aggregate over a time window, per key, updated with each event: payments on this card in the last 10 minutes, clicks in this session. The window types:</p>
+    <ul>
+      <li><strong>Tumbling:</strong> fixed and non-overlapping, such as a count per clock hour.</li>
+      <li><strong>Hopping:</strong> fixed length, advancing in steps. A 1-hour window every 5 minutes puts each event in 12 windows.</li>
+      <li><strong>Sliding:</strong> the last 60 minutes ending now, read at any moment.</li>
+      <li><strong>Session:</strong> a burst of activity that ends after, say, 30 minutes of silence.</li>
+    </ul>
+    <p>The aggregations: count and sum; mean as sum ÷ count; minimum and maximum (these need per-bucket values, since you can't subtract an event out of a max); distinct counts (exact needs a set per key, while a HyperLogLog sketch gives an estimate within a couple of percent in a few kilobytes, worth it for large counts such as distinct cards per merchant; for the handful of merchants a card visits, an exact small set is cheaper); the last \(N\) events; time since the last event.</p>
+    <p><strong>Exact windows or buckets.</strong> An exact sliding window stores every event in it, so its memory grows with activity. A bucketed window keeps one count and one sum per minute in a ring of 60 slots: fixed memory, and the window edge is off by at most one bucket (1/60, under 2%). At 4 bytes each for the count and sum, 60 minute-buckets take 480 bytes per card (plus a few bytes to know which minute each slot holds), and a 24-hour window of hourly buckets adds 192. For 100 million cards that's 672 bytes × 100M = 67 GB of state.</p>
+    <p><strong>Exponentially decayed counters</strong> need even less. Keep one value and the time of the last update; on each event, decay the value for the time that has passed and add 1:</p>
+    <div class="mj">\[ \begin{aligned} c_{\text{new}} &amp;= c_{\text{old}}\, e^{-(t - t_{\text{last}})/\tau} + 1 \\ c(30) &amp;= e^{-30/60} + e^{-20/60} + e^{-10/60} \\ &amp;= 0.607 + 0.717 + 0.846 = 2.17 \end{aligned} \]</div>
+    <p>In words: every past event counts with a weight that shrinks smoothly with its age; \(\tau\) sets how fast (with \(\tau = 60\) minutes, a weight halves every \(60 \ln 2 \approx 42\) minutes). The second line is three events at minutes 0, 10 and 20, read at minute 30. Updating one event at a time gives the same answer: 1, then \(1 \times 0.846 + 1 = 1.846\), then \(1.846 \times 0.846 + 1 = 2.563\), and reading 10 minutes later \(2.563 \times 0.846 = 2.17\). A decayed count (4 bytes), a decayed sum of amounts (4 bytes) and the last-update time (8 bytes) make 16 bytes per feature, so three such features (say \(\tau\) of 10 minutes, 1 hour and 1 day) for 100 million cards take 4.8 GB. The price is a soft edge: an event two hours old still counts \(e^{-2} = 0.14\).</p>
+    <ul>
+      <li><strong>Event time, not arrival time.</strong> Aggregate by when the event happened. Events arrive out of order (retries, mobile clients coming back online).</li>
+      <li><strong>Watermarks</strong> decide when to stop waiting: “events more than 2 minutes older than the newest one seen are late”. Late events are dropped or sent to a correction path. Allowing more lateness buys completeness at the cost of freshness.</li>
+      <li><strong>Does the current event count?</strong> Decide whether “payments in the last 10 minutes” includes the payment being scored, and do the same in training and serving. It's a classic off-by-one skew.</li>
+      <li><strong>Training needs the same numbers for the past:</strong> replay the event log through the same aggregation code, or log the served values.</li>
+    </ul>
+
+    <h3 id="freshness">Feature freshness</h3>
+    <p>A feature's freshness is how far behind the present its value is: from the event, through the stream and the processor, to the write in the online store. It matters most for fast features. A card-testing attack can run 50 small payments in five minutes; a velocity counter lagging ten minutes sees none of them.</p>
+    <ul>
+      <li><strong>Train with the staleness you serve with.</strong> If served values lag 30 seconds, but the backfill computes them at the exact instant of each training row, training sees fresher, more predictive values than serving: the model leans on them and disappoints live. Add the typical lag to the availability time in the point-in-time join, or train on logged values.</li>
+      <li><strong>Monitor freshness per feature:</strong> the age of the newest value, and the stream consumer's lag. Alert before the TTL is reached.</li>
+      <li><strong>Decide what stale means:</strong> past the TTL, return missing rather than an old number, and make sure the model met “missing” in training so it degrades towards a sensible prior.</li>
+    </ul>
+    <aside class="note trap"><p class="nl">Trap</p><p>A stalled counter reads 0: “no recent payments”, the most innocent-looking value there is. When the streaming job dies, a fraud model reading zeros gets <em>more</em> lenient exactly when it's blind. Missing is safer than a wrong zero.</p></aside>
+    <p><strong>Training–serving skew</strong>, the model seeing different values live than in training, is covered in the <a href="./ds-project-lifecycle.html#skew">lifecycle note</a>. The feature-store view adds three defences: one definition for both paths, training on logged served values, and a parity check that recomputes the features offline for a sample of served requests and compares them value by value.</p>
+    <p><strong>Say it in an interview:</strong> “I'd split features by freshness: batch for long-term profiles, streaming windows for velocity, request-time for the payload. A feature store keeps one definition with an offline store for history and an online store for the latest values. Training sets come from a point-in-time join on when each value became available, with the same TTL as serving, or from logged features, so training sees exactly what serving saw.”</p>
+
+    <!-- two-stage -->
+    <h2 id="two-stage"><span class="pn">04</span>Two-stage retrieval and ranking</h2>
+    <p>The task: from 10 million eligible posts, choose the 20 best for this user, in about 200 ms, 17,400 times a second.</p>
+
+    <h3 id="why-two">Why two stages: the cost arithmetic</h3>
+    <p>Using the sizing from section <a href="#serving">02</a> (a heavy ranker at 2 MFLOP per candidate, 50 GFLOP/s per core, 128-dimensional embeddings):</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Plan</th><th>Work per request</th><th>At 17,400 requests a second</th></tr></thead>
+      <tbody>
+        <tr><td>Heavy ranker on all 10M items</td><td>20 TFLOP: 400 core-seconds</td><td>About 7 million cores. Impossible</td></tr>
+        <tr><td>Exact dot products with all 10M item embeddings</td><td>2.56 GFLOP, reading 5.1 GB</td><td>About 890 busy cores on compute alone (2.6 times the heavy ranker on 500), and 89 TB/s of memory reads: bandwidth-bound</td></tr>
+        <tr><td>Approximate search (about 10,000 vectors visited) → light ranker on 1,500 → heavy ranker on 500</td><td>2.6 MFLOP + 30 MFLOP + 1 GFLOP ≈ 1.03 GFLOP</td><td>About 360 busy cores</td></tr>
+      </tbody>
+    </table></div>
+    <p>In words: the heavy model can afford about 500 candidates per request, so a first stage has to cut 10 million down to a few thousand. Spread over all 10 million items, the same 1 GFLOP is 100 FLOP each (1 GFLOP ÷ 10 million), 20,000 times less than the heavy ranker's 2 MFLOP. Retrieval can be that cheap because the item side of its model is computed ahead of time (a dot product between a user vector and precomputed item vectors), and an approximate nearest-neighbour (ANN) index looks at a tiny fraction of the items; how the index does that is in the vector search note.</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 660 262" role="img" aria-label="A funnel of five bars narrowing from top to bottom. 10 million eligible items; candidate generation produces about 1,500; a light ranker keeps 500; a heavy ranker keeps 50; re-ranking produces the 20 shown. Each stage is labelled with what it optimizes: recall, a cheap cut, order, the page as a whole.">
+          <rect x="20" y="16" width="340" height="34" rx="6" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <text x="190" y="38" text-anchor="middle" style="fill:var(--ink)">10,000,000 eligible items</text>
+          <rect x="65" y="64" width="250" height="34" rx="6" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <text x="190" y="86" text-anchor="middle" style="fill:var(--ink)">~1,500 candidates</text>
+          <rect x="100" y="112" width="180" height="34" rx="6" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <text x="190" y="134" text-anchor="middle" style="fill:var(--ink)">500</text>
+          <rect x="135" y="160" width="110" height="34" rx="6" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:1.2"/>
+          <text x="190" y="182" text-anchor="middle" style="fill:var(--ink)">50</text>
+          <rect x="155" y="208" width="70" height="34" rx="6" style="fill:var(--cell-wash);stroke:var(--cell);stroke-width:1.2"/>
+          <text x="190" y="230" text-anchor="middle" style="fill:var(--ink)">20 shown</text>
+          <text x="384" y="81" style="fill:var(--ink)">Candidate generation</text>
+          <text class="lbl" x="384" y="96">ANN, co-engagement, follows · recall</text>
+          <text x="384" y="129" style="fill:var(--ink)">Light ranker</text>
+          <text class="lbl" x="384" y="144">~20 kFLOP each · a cheap cut</text>
+          <text x="384" y="177" style="fill:var(--ink)">Heavy ranker</text>
+          <text class="lbl" x="384" y="192">multi-task, ~2 MFLOP each · order</text>
+          <text x="384" y="225" style="fill:var(--ink)">Re-ranking</text>
+          <text class="lbl" x="384" y="240">rules, diversity · the page</text>
+          <path class="in" d="M366 81 H378 M366 129 H378 M366 177 H378 M366 225 H378"/>
+        </svg>
+      </div>
+      <figcaption>The funnel, not to scale. Each stage spends more per item on fewer items, and each optimizes something different. The ranker can only reorder what retrieval found, so retrieval is judged on recall.</figcaption>
+    </figure>
+    <ul>
+      <li><strong>Each stage has its own job and metric.</strong> Retrieval must not lose good items: recall@K, the share of items the user later engaged with that made the candidate set (metric definitions are in the evaluation note). Ranking orders the top: nDCG, AUC and log loss per head. Re-ranking shapes the page as a whole.</li>
+      <li><strong>Retrieval sets the ceiling.</strong> If recall@1,500 is 60%, 40% of what the user would have engaged with never reaches the ranker, and no ranking model can recover it. Measure each stage on its own.</li>
+    </ul>
+
+    <h3 id="retrieval">Candidate generation</h3>
+    <p>Several sources run in parallel, each with a quota; their results are merged, deduplicated and filtered.</p>
+    <ol>
+      <li><strong>Embedding retrieval with a two-tower model.</strong> A user tower maps the user's features and history to a vector \(u\); an item tower maps an item's features to a vector \(v\); the score is the dot product \(u^\top v\). Item vectors are computed offline and indexed for ANN search; the user vector is computed per request, or cached and refreshed by streaming. It's trained on (user, engaged item) pairs, with softmax over the other items in the batch as negatives: the in-batch setup in <a href="./loss-functions.html#contrastive">contrastive losses</a>, plus the logQ correction for popular items described under <a href="./loss-functions.html#margin">ranking losses</a>. Its limit is structural: the two towers meet only at the dot product, so it can't use user × item cross features. It's a recall model, not the final ranker; the same split as bi-encoders vs cross-encoders.</li>
+      <li><strong>Collaborative filtering.</strong> Item-to-item co-engagement (“people who engaged with X also engaged with Y”) is precomputed as the top neighbours of each item; at request time, look up the neighbours of the user's recent items. It's cheap, fresh and easy to explain. Matrix factorization learns user and item vectors from the interaction matrix itself (a low-rank approximation), which is a two-tower model whose only features are IDs.</li>
+      <li><strong>Graph and social sources:</strong> posts from accounts the user follows, posts friends engaged with.</li>
+      <li><strong>Heuristics:</strong> trending in the user's region and language, fresh posts (which no learned source knows yet), the user's own recent topics.</li>
+    </ol>
+    <p>The source mix and quotas are themselves tuned by experiment. For search the retrieval step pairs lexical matching (<a href="./classical-nlp.html#bm25">BM25</a>) with embedding retrieval, combined as hybrid search.</p>
+
+    <h3 id="ranker">The ranking model</h3>
+    <ul>
+      <li><strong>Inputs:</strong> user features, item features, context, and the cross features retrieval couldn't use: has the user engaged with this creator before, how well the user's topic affinities match the post's topic, how many friends engaged with it.</li>
+      <li><strong>Outputs: several heads, one per action.</strong> \(P(\text{click})\), \(P(\text{like})\), \(P(\text{share})\), \(P(\text{dwell} \gt 10\ \text{s})\), \(P(\text{hide})\). They're combined into one value per post:
+        <div class="mj">\[ \text{value}(i) = \sum_k w_k\, P(\text{action}_k \mid u, i) - w_{\text{hide}}\, P(\text{hide} \mid u, i) \]</div>
+        In words: the expected worth of showing post \(i\), adding up each action's probability times what that action is worth. The sum runs over the positive actions; hide enters once, with a minus sign (in the pseudocode, as a negative weight). The weights \(w_k\) are a product decision, tuned by A/B tests rather than learned by the loss. This is why the heads should be calibrated: the formula adds probabilities from different heads. Heads usually share lower layers; when tasks pull against each other (clicks against hides), a mixture-of-experts layer with one gate per task (MMoE) lets each head weight the shared parts differently. (Training several heads at once is covered with <a href="./loss-functions.html#practice">multi-task losses</a>.)</li>
+      <li><strong>Model families:</strong> gradient-boosted trees with a ranking loss (LambdaMART) for search-style ranking over hundreds of dense features; deep networks with embedding tables for IDs and explicit feature crosses at feed and ads scale. Pointwise, pairwise and listwise training are compared under <a href="./loss-functions.html#margin">ranking losses</a>; feeds lean pointwise because the value formula and auctions need probabilities, while search leans pairwise or listwise because only the order matters.</li>
+      <li><strong>The light ranker</strong> uses a subset of the features and a small model, often distilled from the heavy one, to cut 1,500 candidates to 500 cheaply.</li>
+    </ul>
+
+    <h3 id="rerank-rules">Re-ranking: rules and diversity</h3>
+    <ul>
+      <li><strong>Hard filters:</strong> already seen, blocked creators, policy violations, out of stock.</li>
+      <li><strong>Soft constraints:</strong> no more than two posts in a row from one creator; at least one fresh post in the top ten; ads in fixed slots.</li>
+      <li><strong>Exploration slots:</strong> a small share of positions for new or uncertain items, chosen <a href="./hypothesis-testing.html#bandits">bandit-style</a>, so the system keeps learning about items it would otherwise never show.</li>
+      <li><strong>Diversity.</strong> Ranking by score alone stacks near-duplicates: five highlights of the same match. Maximal marginal relevance (MMR) picks greedily, penalizing each candidate for resembling what's already on the page:
+        <div class="mj">\[ \text{MMR}(i) = \lambda\, \text{rel}(i) - (1 - \lambda) \max_{j \in S} \text{sim}(i, j) \]</div>
+        In words: the next pick is the candidate with the best relevance after subtracting how close it is to the closest item already chosen (\(S\)). \(\lambda = 1\) is pure relevance; smaller values buy more variety.</li>
+    </ul>
+    <p><strong>MMR by hand</strong>, with \(\lambda = 0.7\). P1 and P2 are near-duplicate cricket highlights (similarity 0.95), P3 is a recipe, P4 another cricket post (similarity 0.60 to P1, 0.55 to P2, 0.05 to P3; P3's similarity to P1 is 0.10 and to P2 is 0.12):</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Step</th><th>P1 (rel 0.90)</th><th>P2 (0.88)</th><th>P3 (0.80)</th><th>P4 (0.75)</th><th>Pick</th></tr></thead>
+      <tbody>
+        <tr><td>1 (nothing chosen)</td><td>0.630</td><td>0.616</td><td>0.560</td><td>0.525</td><td>P1</td></tr>
+        <tr><td>2</td><td>–</td><td>0.616 − 0.3 × 0.95 = 0.331</td><td>0.560 − 0.3 × 0.10 = 0.530</td><td>0.525 − 0.3 × 0.60 = 0.345</td><td>P3</td></tr>
+        <tr><td>3</td><td>–</td><td>0.331</td><td>–</td><td>0.345</td><td>P4</td></tr>
+      </tbody>
+    </table></div>
+    <p>The order becomes P1, P3, P4, P2 instead of P1, P2, P3, P4: the duplicate drops to the bottom, and the recipe moves up.</p>
+
+    <h3 id="position-bias">Position bias and exposure in logged data</h3>
+    <p>The training labels come from the system's own past decisions. An item can be clicked only if it was shown, and items shown higher get clicked more whatever their relevance, because more people look at them. The standard model splits a click into two steps, looking and liking:</p>
+    <div class="mj">\[ \begin{aligned} P(\text{click} \mid i, k) &amp;= \theta_k \, r_i \\ \hat r_i &amp;= \frac{1}{n_i} \sum_{\text{clicks on } i} \frac{1}{\theta_{k}} \end{aligned} \]</div>
+    <p>In words: the chance that item \(i\) shown at position \(k\) is clicked is the chance the position gets examined, \(\theta_k\), times the item's relevance \(r_i\), the chance of a click once seen. Divide each click by its position's examination probability and average over the item's \(n_i\) impressions to undo the bias: <strong>inverse propensity weighting</strong> (IPW). In practice, clip small \(\theta\) (say at 0.05): dividing by a tiny examination probability turns one lucky click into a huge weight.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Item</th><th>Position (\(\theta\))</th><th>Impressions</th><th>Clicks</th><th>Naive CTR</th><th>IPW relevance</th></tr></thead>
+      <tbody>
+        <tr><td>A</td><td>1 (1.0)</td><td>1,000</td><td>100</td><td>10%</td><td>100 / 1.0 / 1,000 = 10%</td></tr>
+        <tr><td>B</td><td>3 (0.4)</td><td>1,000</td><td>60</td><td>6%</td><td>60 / 0.4 / 1,000 = 15%</td></tr>
+      </tbody>
+    </table></div>
+    <p>A model trained on raw clicks learns that A beats B, and keeps putting A on top, which keeps generating evidence for A. Corrected for position, B is the better item.</p>
+    <ul>
+      <li><strong>Estimating \(\theta\):</strong> randomize a small slice of traffic, for example swapping the items at positions 1 and \(k\). The same items' click rates at the two positions give \(\theta_k / \theta_1\). It costs those users a slightly worse page, so keep the slice small.</li>
+      <li><strong>The position-feature alternative:</strong> train with the logged position as a feature, then serve with it fixed at 1 for every candidate. The position effect is absorbed by that feature and the rest of the model scores items as if each were shown at the top. It works when position enters separately, for example as a small side tower added to the logit, so fixing it shifts every candidate equally. If position is crossed with item features, fixing it is no longer a clean correction.</li>
+      <li><strong>Exposure bias:</strong> items never shown have no labels, and “not clicked” on an item the user never saw isn't a negative. Use impressions as negatives, and preferably only those likely examined (above the lowest click, or on screen long enough). The loop this creates, where the model decides what gets labelled, is the <a href="./ds-project-lifecycle.html#feedback">feedback loop</a> of the lifecycle note.</li>
+      <li><strong>Evaluating a new ranker on old logs</strong> favours the old ranker, whose choices made the logs. Propensity-weighted (off-policy) replay reduces the bias: weight each logged impression by how likely the new ranker is to show it divided by how likely the old one was. That only works if the old system had some randomness (exploration slots) and logged its propensities. Interleaving (section <a href="#exp-infra">06</a>) or an A/B test settles it.</li>
+    </ul>
+
+    <h3 id="negatives">Negative sampling</h3>
+    <p>Where negatives come from depends on the stage.</p>
+    <ul>
+      <li><strong>Retrieval</strong> has no labelled negatives among 10 million items. The options:
+        <ul>
+          <li><em>random catalogue items:</em> easy negatives that teach coarse separation;</li>
+          <li><em>in-batch negatives:</em> other users' positives in the same batch, free to compute but drawn in proportion to popularity, so popular items get pushed down unless the logQ correction is applied;</li>
+          <li><em>hard negatives:</em> items the current model ranks high that the user didn't engage with. They sharpen the boundary but include false negatives, items the user would have liked but never saw.</li>
+        </ul>
+        Mixing random and in-batch negatives, with a few hard ones, is common.</li>
+      <li><strong>Ranking</strong> uses impressions without engagement: real negatives from the same context. There's no need to sample unseen items.</li>
+      <li><strong>Downsampling negatives to save compute.</strong> With a 1% click rate, 99% of rows are non-clicks. Keeping 10% of them cuts the data almost tenfold with little loss of signal, but the model now learns a click rate of \(0.01 / (0.01 + 0.99 \times 0.1) = 9.17\%\). Before any use that needs a real probability (auction prices, the value formula, cost thresholds), undo it with the correction \(\operatorname{logit} p = \operatorname{logit} p_s + \log q\) from <a href="./data-preparation.html#imbalance">class imbalance</a>, where \(q\) is the share of negatives kept: \(\operatorname{logit}(0.0917) = -2.293\), plus \(\ln 0.1 = -2.303\), gives \(-4.595\), which is 1.0%.</li>
+    </ul>
+    <aside class="note trap"><p class="nl">Trap</p><p>Changing the sampling rate between retrains without changing the correction. Every score shifts at once, thresholds and auction prices with them, and nothing in the offline ranking metrics notices, because the order is unchanged.</p></aside>
+    <p><strong>Say it in an interview:</strong> “The heavy ranker can afford about a gigaflop a request, roughly 500 candidates, so a cheap high-recall stage has to cut 10 million items to a couple of thousand: two-tower embeddings with ANN search, co-engagement and follows, plus trending and fresh items. Then a multi-task ranker with cross features, then re-ranking for rules and diversity. Logged clicks are position-biased, so I'd train with position as a feature or with inverse propensity weights, and correct for negative downsampling before using the scores as probabilities.”</p>
+
+    <!-- designs -->
+    <h2 id="designs"><span class="pn">05</span>Four worked designs</h2>
+    <p>Each design follows the framework of section <a href="#framework">01</a>, compressed. The numbers are assumptions you would state out loud, chosen to show the arithmetic; real systems vary.</p>
+
+    <h3 id="fraud">Real-time payment fraud detection</h3>
+    <p><strong>Requirements.</strong> Online card payments at a processor: 20 million a day, which is 231 a second on average and about 1,160 at a five-times festive-sale peak. The decision sits inside the authorization, so the risk check gets 50 ms at p99. Fraud is about 0.05% of payments by count (an illustrative figure): 10,000 a day, one fraud per 1,999 good payments.</p>
+    <p><strong>Goal and metrics.</strong></p>
+    <ul>
+      <li><em>Business:</em> total cost, meaning fraud losses plus the cost of friction for good customers (declines, extra verification).</li>
+      <li><em>Online:</em> fraud losses in basis points of payment volume; decline rate; step-up rate and how many good customers complete it; complaints about wrongly declined payments.</li>
+      <li><em>Offline:</em> value-weighted recall (rupees of fraud caught) at a fixed false-positive rate or step-up capacity, and PR-AUC rather than ROC-AUC, which looks flattering when negatives outnumber positives 2,000 to 1. Calibration too, because the thresholds below use the score as a probability.</li>
+    </ul>
+    <p><strong>Labels.</strong> Confirmed fraud comes from chargebacks and customer reports, arriving over weeks to months. Faster proxies: the customer's “this wasn't me” report within days, a failed step-up. Train only on windows whose labels have matured (<a href="./ds-project-lifecycle.html#label-delay">label delay</a>). Declined payments never get a label; payments sent to step-up do (did the customer pass?), though noisily: some good customers abandon the check and some fraudsters pass it. That still keeps labels flowing in the grey zone, the part of the <a href="./ds-project-lifecycle.html#feedback">feedback loop</a> that matters most here.</p>
+    <p><strong>Features, by tier.</strong></p>
+    <ul>
+      <li><em>Request:</em> amount, merchant category, device fingerprint, IP location against the billing address, hour of day.</li>
+      <li><em>Streaming:</em> count and sum per card over 10 minutes, 1 hour and 24 hours; distinct merchants per card in an hour; distinct cards per device in an hour; failed attempts per card in 10 minutes. Card-testing attacks show up here first, so their freshness matters most.</li>
+      <li><em>Batch:</em> the card's 90-day spending profile (and how unusual this amount is against it), the merchant's 30-day chargeback rate, account age.</li>
+      <li><em>Graph:</em> devices, emails or addresses shared with known-fraud accounts.</li>
+    </ul>
+    <p><strong>Rules and a model, not one or the other.</strong> Rules handle hard policy (sanctions, blocklists, impossible velocity) and, above all, speed: when a new attack appears, a rule ships in minutes, a retrained model in days. Gradient-boosted trees on about 200 features handle the grey area: fast, fine with missing values, strong on tabular data. Two side effects to name: whatever a rule blocks has no outcome, so rules also shape the labels; and a rule set left alone grows into thousands of overlapping rules, so retire rules that the model already covers.</p>
+    <p><strong>Imbalance.</strong> Ninety days is 1.8 billion payments with 900,000 frauds. Keep every fraud and 2% of the good payments: 36.0 million good plus 0.9 million fraud, about 36.9 million rows, 2.44% fraud. Then correct the probabilities back to the real base rate before using them (<a href="./data-preparation.html#imbalance">class imbalance</a>).</p>
+    <p><strong>Decisions from costs.</strong> Three actions, not two: approve, step up (a one-time password or bank authentication), decline. With a calibrated fraud probability \(p\) and amount \(A\), the expected cost of each action is:</p>
+    <div class="mj">\[ \begin{aligned} \text{approve} &amp;= p\,A \\ \text{step up} &amp;= (1 - p)\,c_s + p\,\ell A \\ \text{decline} &amp;= (1 - p)\,c_d \end{aligned} \]</div>
+    <p>In words: approving loses the amount if it's fraud. Stepping up annoys a good customer (\(c_s\) = ₹20 of friction and drop-off) and still lets a share \(\ell\) = 10% of fraudsters through. Declining a good customer costs \(c_d\) = ₹200 (lost margin, a call to support, some risk of losing the customer). Setting the costs equal gives the two cut-offs:</p>
+    <div class="mj">\[ \begin{aligned} \text{approve while } p &amp;\lt p_1 = \frac{c_s}{(1 - \ell)A + c_s} \\ \text{decline once } p &amp;\gt p_2 = \frac{c_d - c_s}{\ell A + c_d - c_s} \end{aligned} \]</div>
+    <p>In words: step up in between. Both cut-offs fall as the amount grows, because the money at risk grows while the cost of annoying a good customer stays fixed.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Amount</th><th>Approve below</th><th>Step up between</th><th>Decline above</th><th>Two actions only: decline above</th></tr></thead>
+      <tbody>
+        <tr><td>₹500</td><td>4.26%</td><td>4.26% – 78.3%</td><td>78.3%</td><td>28.6%</td></tr>
+        <tr><td>₹5,000</td><td>0.44%</td><td>0.44% – 26.5%</td><td>26.5%</td><td>3.85%</td></tr>
+        <tr><td>₹50,000</td><td>0.044%</td><td>0.044% – 3.5%</td><td>3.5%</td><td>0.40%</td></tr>
+      </tbody>
+    </table></div>
+    <p>The last column is the two-action rule \(c_d / (c_d + A)\), the same break-even logic as the lender's <a href="./ds-project-lifecycle.html#threshold">cost-based threshold</a>. The middle action lets the system be strict on large payments without declining good customers outright.</p>
+    <p><strong>Why not simply decline everything the model flags?</strong> Suppose that at some threshold the model catches 60% of fraud with a 0.2% false-positive rate. Per day that's 6,000 frauds caught and 39,980 good payments flagged: a precision of 13%. Declining all of them would decline about 40,000 good payments a day; stepping them up costs each a few seconds.</p>
+    <p><strong>Serving.</strong> Online, inside the authorization:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Step</th><th>p99 budget</th></tr></thead>
+      <tbody>
+        <tr><td>Parse and validate</td><td>2 ms</td></tr>
+        <tr><td>Features: one batched read of profiles and streaming counters</td><td>10 ms</td></tr>
+        <tr><td>Rules</td><td>3 ms</td></tr>
+        <tr><td>Boosted-tree score</td><td>5 ms</td></tr>
+        <tr><td>Decision, logging, response</td><td>5 ms</td></tr>
+        <tr><td>Slack</td><td>25 ms</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Fallback:</strong> if features or the model time out, decide on rules alone: approve small amounts, step up larger ones. Fail closed only for blocklisted entities.</li>
+      <li><strong>Sizing:</strong> 1,160 payments a second is light work for a tree model. The state is the bigger cost: 67 GB of bucketed windows for 100 million cards, or 4.8 GB with decayed counters (section <a href="#streaming">03</a>).</li>
+      <li><strong>The streaming job updates counters after each payment,</strong> asynchronously. Whether a payment's own update is visible when it is scored must be the same in training and serving.</li>
+    </ul>
+    <p><strong>Monitoring.</strong> Score distribution, decline and step-up rates by merchant and card range, hourly: attacks appear as spikes. Feature freshness. Early labels from customer reports. Fraud is adversarial: fraudsters probe for limits (amounts just under a threshold, new merchants), so expect concept drift by design. Typical cadence: rules daily, retraining weekly to monthly (<a href="./ds-project-lifecycle.html#retrain">retraining</a>).</p>
+
+    <h3 id="feed-design">A feed ranking system</h3>
+    <p><strong>Requirements.</strong> The running scale: 50 million daily users, 10 loads a day, about 17,400 requests a second at peak; 10 million eligible posts from the last week; 200 ms at p99 on the server; 20 posts per load; a new post should be rankable within minutes.</p>
+    <p><strong>Goal and metrics.</strong></p>
+    <ul>
+      <li><em>Business:</em> long-term retention and satisfaction (daily over monthly users).</li>
+      <li><em>Online:</em> sessions per user per day; time spent, weighted towards quality; meaningful interactions (comments, shares).</li>
+      <li><em>Guardrails:</em> hides and reports; the share of creators getting any impressions; latency; crash rate.</li>
+      <li><em>Offline:</em> per-head AUC, log loss and calibration; nDCG@20 on logged sessions. Logged sessions favour the ranker that produced them, so offline numbers are a filter, not the decision.</li>
+    </ul>
+    <p><strong>Labels.</strong> Implicit, per impression: click, dwell over 10 seconds, like, comment, share, hide. Negatives are impressions without engagement, preferably those likely seen. Position bias is handled as in section <a href="#position-bias">04</a>.</p>
+    <p><strong>The pipeline</strong> is the funnel of section <a href="#two-stage">04</a>: retrieval sources (followed accounts, two-tower ANN, co-engagement, trending and fresh) give about 1,500 candidates; a light ranker keeps 500; the multi-task ranker keeps 50; re-ranking (filters, creator spacing, MMR, exploration slots) produces 20. The latency budget is the table in section <a href="#latency">02</a>.</p>
+    <p><strong>Features.</strong> User: long-term embedding, topic affinities, follow-graph statistics. Post: creator, topic, age, media type, a content embedding, engagement in the last 15 minutes (streaming). User × post: past engagement with this creator, affinity for the post's topic, friends who engaged. Context: time of day, device, network, how deep into the session.</p>
+    <p><strong>Cold start.</strong></p>
+    <ul>
+      <li><em>New users:</em> topics picked at sign-up, popular posts for their language and region, and fast in-session adaptation through streaming features.</li>
+      <li><em>New posts:</em> a content embedding from text and image encoders makes a post retrievable before anyone has engaged with it; a capped exploration budget gives it its first impressions, and an item-level bandit decides who keeps getting them.</li>
+    </ul>
+    <p><strong>Freshness of the model.</strong> Retrain the ranker daily (or update it continuously), refresh embeddings daily, rebuild the ANN index hourly and insert new posts as they arrive.</p>
+    <p><strong>Evaluation.</strong> Offline gates, then shadow, then an <a href="./hypothesis-testing.html#ab">A/B test</a> randomized by user. Creators are shared between arms, which is a form of <a href="./hypothesis-testing.html#interference">interference</a>: a ranker that boosts small creators in treatment gives them more audience, so they post more, and control users see those posts too. A long-term holdout catches slow effects that a two-week test misses.</p>
+    <p><strong>Feedback loops.</strong> Shown posts collect engagement, engagement earns more exposure, and the feed narrows to what was already popular. The counterweights: exploration slots, diversity in re-ranking, position debiasing, and a guardrail on creator exposure. (The logQ correction isn't one: it removes in-batch training's bias <em>against</em> popular items, so retrieval matches real engagement, popular items included; variety has to come from re-ranking and exploration.)</p>
+
+    <h3 id="ads-design">Ad click-through prediction, and why calibration rules</h3>
+    <p><strong>Requirements.</strong> For each page view, a few hundred eligible ads after targeting; tens of milliseconds to score them; billions of impressions a day; advertisers pay per click.</p>
+    <p><strong>The auction.</strong> Ads are ranked by expected revenue per thousand impressions, the eCPM. In a generalized second-price auction the winner pays, per click, the least it could have bid and still won:</p>
+    <div class="mj">\[ \begin{aligned} \text{eCPM}_i &amp;= 1000 \cdot b_i \cdot \widehat{\text{CTR}}_i \\ \text{price per click}_1 &amp;= \frac{b_2 \cdot \widehat{\text{CTR}}_2}{\widehat{\text{CTR}}_1} \end{aligned} \]</div>
+    <p>In words: \(b_i\) is the advertiser's bid per click and \(\widehat{\text{CTR}}_i\) the predicted click-through rate. The winner pays the runner-up's eCPM divided by its own predicted CTR. The predicted CTR sets both who wins and what they pay, so its absolute value matters, not just its order.</p>
+    <p><strong>A worked auction.</strong> Ad A bids ₹20 per click with a true CTR of 1%; ad B bids ₹10 with a true CTR of 2.5%.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Predictions</th><th>eCPM A, B</th><th>Winner</th><th>Price per click</th><th>Clicks per 1,000</th><th>Revenue per 1,000</th></tr></thead>
+      <tbody>
+        <tr><td>Calibrated</td><td>200, 250</td><td>B</td><td>₹8.00</td><td>25</td><td>₹200</td></tr>
+        <tr><td>A's CTR predicted 2× too high</td><td>400, 250</td><td>A</td><td>₹12.50</td><td>10</td><td>₹125</td></tr>
+        <tr><td>Every CTR 2× too high</td><td>400, 500</td><td>B</td><td>₹8.00</td><td>25</td><td>₹200</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Over-predicting one ad</strong> hands it the slot: revenue on this slot falls 37.5%, users see an ad they're less than half as likely to click, and advertiser A pays ₹12.50 per click.</li>
+      <li><strong>Over-predicting every ad equally</strong> changes neither the winner nor the price, because the ratio cancels. It still breaks everything that uses the number itself: reserve prices (an eCPM floor lets weak ads through), blending ads with organic posts in one feed, budget pacing and forecasts, and bids for conversions (a bid of “₹500 per purchase” becomes a per-impression value through the predicted rates).</li>
+      <li><strong>So calibration is checked per ad, per advertiser and per segment,</strong> not only on average (calibration). The usual metrics: log loss, often normalized by the log loss of always predicting the average CTR; the calibration ratio, predicted clicks ÷ actual clicks, which should sit near 1.0 overall and in every segment; and AUC for the ordering.</li>
+    </ul>
+    <p><strong>Model and data.</strong></p>
+    <ul>
+      <li><em>Model history in one line:</em> logistic regression on billions of sparse features, updated online (Google, 2013, with the FTRL-Proximal optimizer; it kept features unhashed after finding that aggressive hashing cost accuracy); boosted trees as feature transforms feeding a logistic regression (Facebook, 2014); deep networks with embedding tables for IDs and explicit feature crosses.</li>
+      <li><em>Freshness:</em> new ads and creatives arrive constantly and click rates decay as people tire of an ad, so models are retrained very often or updated continuously; the 2014 paper reported that fresher training data helps.</li>
+      <li><em>Negative downsampling</em> with the correction from section <a href="#negatives">04</a> is standard at this scale, and the correction is not optional here: the corrected probability is the price.</li>
+      <li><em>Delayed labels:</em> clicks arrive within seconds, but conversions (a purchase after the click) arrive over days. Train conversion models only once the attribution window has closed, or model the delay explicitly.</li>
+      <li><em>Position:</em> click rates depend on the slot, so the same position handling as the feed applies.</li>
+    </ul>
+    <p><strong>Search ranking, briefly.</strong> The same skeleton with a query: understand the query (spelling, intent), retrieve with lexical and embedding search together, rank with a learning-to-rank model (often LambdaMART) on query–document features, then re-rank for freshness and diversity. Labels come from graded human judgements, scored with nDCG, and from debiased clicks.</p>
+
+    <h3 id="support-design">An LLM-powered customer-support assistant</h3>
+    <p><strong>Requirements.</strong> Chat in the app and on the web: 50,000 conversations a day, about six user turns each. It should answer policy and how-to questions from a knowledge base, handle account questions (order status, refunds within limits) through tools, and hand over to people when it should. The first token should arrive within about 1.5 seconds; a voice version would need a far tighter budget (voice latency). Personal data is in every conversation.</p>
+    <p><strong>Goal and metrics.</strong></p>
+    <ul>
+      <li><em>Business:</em> cost per resolved contact, at equal or better satisfaction.</li>
+      <li><em>Online:</em> resolution without a human (containment) and task success (conversation metrics); CSAT (the post-chat satisfaction score); repeat contact on the same issue within 7 days, which catches false resolutions; escalation rate; abandonment.</li>
+      <li><em>Guardrails:</em> wrong refunds, policy violations, invented policies, personal data leaking into answers or logs.</li>
+      <li><em>Offline:</em> correctness and faithfulness on a golden set (hallucination and faithfulness); retrieval recall@k and the rest of RAG evaluation; tool-call accuracy.</li>
+    </ul>
+    <p><strong>The request path.</strong></p>
+    <ol>
+      <li><strong>Input checks:</strong> detect and mask personal data before anything is logged; screen for prompt injection and abuse.</li>
+      <li><strong>Routing:</strong> a cheap intent classifier or small model (intents and slots). How-to questions go to retrieval; account questions go to a tool flow after the user is authenticated; sensitive cases (legal threats, safety, bereavement) go straight to a person.</li>
+      <li><strong>Retrieval:</strong> the knowledge base chunked, searched with hybrid search, reranked, with the query rewritten from the conversation so far (“what about the blue one?” needs the history).</li>
+      <li><strong>Generation:</strong> a grounded prompt with the retrieved passages and the relevant policy; instructions to cite, and to say it isn't sure rather than guess.</li>
+      <li><strong>Tools:</strong> order lookup, refunds within limits, called through structured output. Authorization lives in the tool service, not in the prompt: the model can't grant itself a refund the user isn't entitled to, and amounts above a limit need a person's approval.</li>
+      <li><strong>Output checks:</strong> policy compliance, no promises the policy doesn't allow, no personal data of anyone else (guardrails).</li>
+      <li><strong>Handoff:</strong> when the user asks, when retrieval confidence is low, after repeated failure, on negative sentiment, a sensitive intent or a tool error; with a summary so the agent doesn't start over (human handoff).</li>
+    </ol>
+    <p><strong>Cost, with assumed prices.</strong> Say input tokens cost $3 per million and output $15 per million (check current price sheets). A turn carries a 1,500-token system prompt with tool definitions, 1,500 tokens of retrieved passages and on average 500 tokens of history, and produces 150 tokens:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Item</th><th>Arithmetic</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr><td>Per turn</td><td>3,500 × $3/M + 150 × $15/M</td><td>$0.0105 + $0.00225 = $0.01275</td></tr>
+        <tr><td>Per conversation</td><td>6 turns</td><td>$0.0765</td></tr>
+        <tr><td>Per day</td><td>50,000 conversations</td><td>$3,825</td></tr>
+        <tr><td>With the fixed prefix cached at a tenth of the price</td><td>1,500 tokens at $0.30/M</td><td>$0.0087 a turn, $2,610 a day (32% less)</td></tr>
+      </tbody>
+    </table></div>
+    <p>Against an assumed $1.50 per human-handled contact, resolving 60% of conversations without a person avoids $45,000 a day. The model bill is small next to that; the real risk is a wrong answer, a wrong refund or a false “resolved”. So the design spends its effort on evaluation and handoff, and only then on routing easy intents to a cheaper model.</p>
+    <p><strong>Latency.</strong> Stream the tokens. Retrieval and reranking take a few hundred milliseconds; the time to the first token is mostly the model's. Tool calls add a round trip each, so fetch the order record once per conversation, not per turn.</p>
+    <p><strong>Evaluation.</strong></p>
+    <ul>
+      <li><em>Before launch and before every change</em> (prompt, model, knowledge base): a golden set built from real resolved conversations, covering each intent plus hard and adversarial cases, scored against a rubric by an LLM judge that has been checked against human labels. Score retrieval separately from generation, so a failure points to its stage.</li>
+      <li><em>After launch:</em> an A/B test by user on containment, CSAT and repeat contacts together; the judge run on a sample of live conversations; a human review queue for low scores (online monitoring).</li>
+      <li><em>The flywheel:</em> escalated and low-rated conversations become labelled failures, which become new golden cases and knowledge-base fixes.</li>
+    </ul>
+    <p><strong>How it fails</strong> (more in RAG failure modes):</p>
+    <ul>
+      <li>a stale knowledge base: the policy changed and the assistant confidently quotes the old one. Version documents and record which version each answer used;</li>
+      <li>a retrieval miss that the model papers over with a plausible answer;</li>
+      <li>injected instructions in a user's message or a retrieved document;</li>
+      <li>tool abuse through social engineering (“I was promised a full refund”), stopped by limits in the tool layer, not by the prompt;</li>
+      <li>containment that is really abandonment: users who gave up look “resolved” unless repeat contacts are tracked;</li>
+      <li>personal data in logs or sent to a third-party model without an agreement covering it.</li>
+    </ul>
+    <p><strong>Say it in an interview:</strong> “Each design reuses the same parts. Fraud: streaming velocity features, rules plus boosted trees, and three actions with cut-offs from costs on calibrated scores. Feed: a retrieval funnel and a multi-task ranker with debiased labels. Ads: the same, but calibration is the price. Support: route, retrieve, generate with tools behind authorization, guard both ends and hand off well. Its cost is small next to the human contacts it replaces, so the effort goes into evaluation.”</p>
+
+    <!-- cross-cutting -->
+    <h2 id="cross-cutting"><span class="pn">06</span>Cross-cutting concerns</h2>
+    <p>The parts that every design needs and that interviewers use to separate “built a model” from “ran a system”.</p>
+
+    <h3 id="quality">Data quality and contracts</h3>
+    <p>A <a href="./ds-project-lifecycle.html#contracts">data contract</a> fixes a dataset's schema, meaning, freshness and change process between the team that produces it and the teams that use it. In a running system, check at three points:</p>
+    <ul>
+      <li><strong>Ingestion:</strong> schema, row counts against expected volume, freshness. A table that silently stops updating is the most common data failure.</li>
+      <li><strong>Feature computation:</strong> null rates, ranges and sentinel values, distributions against a reference window.</li>
+      <li><strong>Serving:</strong> the live feature distributions against training, and the share of requests with missing or defaulted features.</li>
+    </ul>
+    <p>A failed check stops a training run; on the serving side it alerts and falls back. Every table and feature has a named owner, or nobody fixes it at 3 a.m.</p>
+
+    <h3 id="privacy">Privacy and personal data</h3>
+    <ul>
+      <li><strong>Minimize:</strong> collect and keep only what earns its place; prefer aggregates (a 30-day count) to raw event histories.</li>
+      <li><strong>Pseudonymize IDs</strong> with a salted hash or a token service. That isn't anonymization: joining enough pseudonymous attributes can re-identify people.</li>
+      <li><strong>Retention and deletion:</strong> a deletion request must reach the feature stores, logs and training snapshots. Models already trained on the data are typically refreshed on the normal retraining schedule, since removing one person's influence exactly is hard.</li>
+      <li><strong>Access control and audit</strong> on raw personal data, kept apart from the feature tables most people use.</li>
+      <li><strong>Purpose:</strong> data collected for one purpose (processing a payment) may not be usable for another (marketing) under the user's consent or the law.</li>
+      <li><strong>LLM systems:</strong> mask personal data before logging and before sending text to an external model; keep secrets out of prompts; treat embeddings of sensitive text as sensitive.</li>
+      <li><strong>Stronger guarantees:</strong> differential privacy adds calibrated noise (in training or to released statistics) so no single person's data changes the output much. When data can't leave the device, federated learning trains there and sends back only model updates, often with differential privacy on top.</li>
+    </ul>
+
+    <h3 id="fairness">Fairness checks</h3>
+    <ul>
+      <li><strong>Start from the harm:</strong> who could be wrongly declined, shown less, or watched more? Choose the groups and the decision before choosing a metric.</li>
+      <li><strong>Measure by group</strong>, offline and live: the rate of the action (approvals, declines, impressions), the error rates (false positives and false negatives), and calibration.</li>
+      <li><strong>They can't all be equal at once.</strong> When groups have different base rates, a score can't be calibrated within each group and also give positives (and negatives) the same average score in every group, unless it predicts perfectly (Kleinberg et al., 2016). At a threshold, equal precision and equal false-positive and false-negative rates can't all hold (Chouldechova, 2017). Choose the one the decision needs, and say why.</li>
+      <li><strong>Dropping a protected attribute doesn't drop its signal:</strong> a postcode or a phone model can stand in for it. Test by predicting the attribute from the features.</li>
+      <li><strong>In recommendations,</strong> fairness also means exposure for creators, and feedback loops amplify whoever got exposure first.</li>
+    </ul>
+
+    <h3 id="cost">Cost</h3>
+    <ul>
+      <li><strong>At scale, serving costs more than training.</strong> Training runs once a day; the ranker runs 17,400 times a second.</li>
+      <li><strong>The levers, in order:</strong> don't compute (cache, precompute, batch what can wait); compute less (fewer candidates for the heavy model, a light ranker, early exits); compute cheaper (distilled or quantized models, batching for utilization, the right hardware, cheaper interruptible machines for training).</li>
+      <li><strong>Report cost next to lift.</strong> A model that adds 0.2% engagement and doubles serving cost may lose money. Track cost per thousand requests as a guardrail.</li>
+      <li><strong>For LLM systems</strong> the bill is tokens × price: cache the fixed prompt prefix, cap the context, route easy requests to a smaller model (section <a href="#support-design">05</a>).</li>
+    </ul>
+
+    <h3 id="exp-infra">Experimentation infrastructure</h3>
+    <ul>
+      <li><strong>The basics:</strong> assignment by a <a href="./hypothesis-testing.html#hashing">salted hash</a> of the randomization unit; logging of who was actually exposed; a metrics pipeline with guardrails and a <a href="./hypothesis-testing.html#srm">sample-ratio check</a>; automatic stopping when a guardrail breaks.</li>
+      <li><strong>Many tests at once:</strong> layers, each with its own hash salt, so experiments in different layers are independent and those in the same layer are mutually exclusive.</li>
+      <li><strong>Interleaving for rankers:</strong> merge two rankers' results into one list and credit each click to the ranker that contributed the item. It tells which ranker users prefer with far fewer users than an A/B test, but an A/B test is still needed for the business metric.</li>
+      <li><strong>A long-term holdout:</strong> a small share of users kept on the old system for months, to measure cumulative and novelty effects.</li>
+    </ul>
+
+    <h3 id="registry">Model registry, deployment and rollback</h3>
+    <ul>
+      <li><strong>A registry entry holds:</strong> the model file; the code commit; the training data snapshot and time range; the feature definitions and versions it expects; hyperparameters; offline metrics overall and by slice; the calibrator and the decision policy (thresholds) that go with it; the owner; and its stage (candidate, shadow, canary, production, archived).</li>
+      <li><strong>Promotion gates:</strong> beats the current model on the same out-of-time data with no slice worse beyond an agreed margin; passes feature parity in <a href="./ds-project-lifecycle.html#shadow">shadow mode</a>; survives a canary (1–5% of traffic) with automatic rollback if a guardrail breaks; then the A/B test.</li>
+      <li><strong>Rollback is a config switch,</strong> with the previous model kept warm. The traps: the old model needs the old feature definitions, so keep serving them until no live model references them; the calibrator and thresholds must roll back with the model; and decisions already made aren't undone (the lifecycle note's <a href="./ds-project-lifecycle.html#deploy">deployment section</a>).</li>
+    </ul>
+
+    <h3 id="online-learning">Online learning or periodic retraining</h3>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Periodic retraining</th><th>Online (incremental) learning</th></tr></thead>
+      <tbody>
+        <tr><td>How</td><td>Train from scratch or warm-start, daily to monthly</td><td>Update the weights continuously as labelled events stream in</td></tr>
+        <tr><td>Freshness</td><td>Stale between retrains</td><td>Minutes</td></tr>
+        <tr><td>Suits</td><td>Stable patterns; slow labels (credit, most fraud)</td><td>Fast-changing items and fast labels: ads, news, trending content</td></tr>
+        <tr><td>Risks</td><td>Misses sudden shifts</td><td>Drifts with bad data or attacks, amplifies feedback loops, harder to reproduce and audit</td></tr>
+        <tr><td>Needs</td><td>A scheduler and evaluation gates</td><td>A streaming label join, continuous evaluation, frequent snapshots to roll back to</td></tr>
+      </tbody>
+    </table></div>
+    <p>The common middle ground: a periodic full retrain, plus frequent cheap updates to the fast-moving parts (embeddings of new IDs, bias terms, or a recalibration layer). The trigger-or-schedule question for the full retrain is in the lifecycle note's <a href="./ds-project-lifecycle.html#retrain">retraining section</a>.</p>
+    <p><strong>Say it in an interview:</strong> “Around the model I'd put data checks at ingestion, features and serving with named owners; minimize and pseudonymize personal data and make deletion reach the feature stores; check action and error rates by group; report serving cost next to lift; and register every model with its data, feature versions, calibrator and thresholds, so rollback is a config switch that takes the policy with it.”</p>
+
+    <!-- failure modes -->
+    <h2 id="pitfalls"><span class="pn">07</span>Failure modes, and what interviewers push on</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td>Offline metric up, online metric flat</td><td>The offline metric doesn't track the online one; logs favour the old ranker; gains far from the operating point</td><td>Metric at the operating point; propensity-weighted replay or interleaving; trust the A/B test</td></tr>
+        <tr><td>Great offline, much worse live</td><td>Leakage from a non-point-in-time join; training–serving skew</td><td>Join on availability time with a TTL; train on logged features; parity checks in shadow</td></tr>
+        <tr><td>p99 latency blows up at peak</td><td>Fan-out to many shards; per-candidate feature calls; queueing near full utilization</td><td>Batched multi-key fetches; hedged requests; fewer candidates under load; headroom</td></tr>
+        <tr><td>Scores shift overnight, no deploy</td><td>An upstream schema or unit change</td><td>Data contracts; range and distribution checks that stop the pipeline</td></tr>
+        <tr><td>Fraud model suddenly lenient</td><td>A stalled streaming job: velocity counters read 0</td><td>Freshness monitoring; TTL to missing; train with missing values</td></tr>
+        <tr><td>Feed grows narrow, new creators starve</td><td>Feedback loop: exposure earns engagement, which earns more exposure; position bias in the logs</td><td>Exploration slots, diversity in re-ranking, position debiasing, creator-exposure guardrails</td></tr>
+        <tr><td>Calibration off after a retrain</td><td>Negative sampling rate changed; correction missing; distribution shift</td><td>Recalibrate on recent unsampled data; calibration ratio as a release gate</td></tr>
+        <tr><td>Ad revenue falls though AUC rose</td><td>Worse calibration on some advertisers or segments</td><td>Calibration ratio per segment; log loss next to AUC</td></tr>
+        <tr><td>Recent data looks unusually clean</td><td>Labels not yet matured</td><td>Train and evaluate only on matured windows; validated proxies</td></tr>
+        <tr><td>Fraud catch rate decays over weeks</td><td>Attackers adapting</td><td>Fast rules; frequent retraining; velocity and graph features</td></tr>
+        <tr><td>A/B winner disappoints at full launch</td><td>Novelty; interference through shared creators or supply; the test arm partly served fallbacks</td><td>Long-term holdout; cluster or <a href="./hypothesis-testing.html#interference">switchback</a> designs; compare fallback rates per arm</td></tr>
+        <tr><td>Retrieval recall drops right after a retrain</td><td>The new user tower queries an index built by the old item tower: two trainings, two unrelated vector spaces</td><td>Version the index with the towers; rebuild the full index and switch the user tower and index together</td></tr>
+        <tr><td>New items never get shown</td><td>Cold start: ID embeddings untrained, no engagement history</td><td>Content embeddings; capped exploration budget</td></tr>
+        <tr><td>Support bot's containment up, satisfaction down</td><td>Users giving up count as resolved</td><td>Repeat contacts within 7 days; abandonment; judge on sampled transcripts</td></tr>
+        <tr><td>LLM bill grows faster than traffic</td><td>Growing context, retries, no prefix caching</td><td>Token budgets; caching; routing to a smaller model</td></tr>
+        <tr><td>Rollback didn't fix it</td><td>Feature definitions or thresholds changed with the model</td><td>Version model, features and policy together in the registry</td></tr>
+      </tbody>
+    </table></div>
+    <h3 id="pushes">Pressure tests to expect</h3>
+    <ul>
+      <li><strong>Constraint changes:</strong> the latency budget halves; traffic grows tenfold; labels arrive 30 days late; a feature goes stale (questions <a href="#q-latency">25</a>, <a href="#q-traffic">27</a>, <a href="#q-labels">26</a>, <a href="#q-stale">12</a>).</li>
+      <li><strong>“How would you know it's broken before the labels arrive?”</strong> Service health, data quality, feature freshness, score drift, early proxy labels.</li>
+      <li><strong>“What's the baseline?”</strong> Today's rules or popularity, measured the same way.</li>
+      <li><strong>“What happens when this dependency is down?”</strong> The fallback ladder, and which way you fail.</li>
+      <li><strong>“Why not just use an LLM?”</strong> Latency, cost per request, calibration and auditability; an LLM can help offline (labelling, content embeddings) while a small model serves.</li>
+      <li><strong>Cold start, for users and items.</strong></li>
+    </ul>
+    <p><strong>Say it in an interview:</strong> “When an offline gain doesn't show up online, I check four things in order: whether the offline metric measures the decision the system makes, whether the logs favour the old model, whether training features match served ones, and whether the test arm hit more timeouts and fallbacks.”</p>
+
+    <!-- code -->
+    <h2 id="code"><span class="pn">08</span>Pseudocode</h2>
+    <p>Python-flavoured, short enough to write from memory. Each was run as real code on this note's examples; the results are in the → comments.</p>
+
+    <h3>Point-in-time join</h3>
+    <pre class="code"><code>def pit_join(labels, features, ttl):
+    <span class="cm"># features: (key, t_data, t_avail, values)</span>
+    rows = group_by_key(features)
+    for key in rows:
+        rows[key].sort(by=t_avail)
+    out = []
+    for key, t, y in labels:
+        <span class="cm"># last row written at or before t</span>
+        r = last(rows[key], t_avail &lt;= t)  <span class="cm"># bisect</span>
+        if r is None or t - r.t_data &gt; ttl:
+            vals = MISSING       <span class="cm"># as serving would</span>
+        else:
+            vals = r.values
+        out.append((key, t, vals, y))
+    return out
+
+<span class="cm"># section 03's card, ttl 48 h:</span>
+<span class="cm"># T1 → 12·0 (F1), T2 → 12·0 (F1),</span>
+<span class="cm"># T3 → 14·0 (F2), T4 → missing</span>
+<span class="cm"># naive latest-row join → 31·1 for all four</span></code></pre>
+
+    <h3>Streaming window and decayed counter</h3>
+    <pre class="code"><code>class WindowCount:     <span class="cm"># last 60 min, 1-min buckets</span>
+    def __init__(self, n=60, width=60, late=120):
+        self.n, self.width, self.late = n, width, late
+        self.slots = {}  <span class="cm"># key -> n x [minute, cnt, sum]</span>
+        self.watermark = 0
+
+    def add(self, key, ts, amount):
+        self.watermark = max(self.watermark,
+                             ts - self.late)
+        if ts &lt; self.watermark:
+            return False   <span class="cm"># late: drop or side-output</span>
+        m = ts // self.width
+        s = self.slots[key][m % self.n]  <span class="cm"># made on use</span>
+        if s.minute != m:           <span class="cm"># an old minute</span>
+            s.minute, s.cnt, s.sum = m, 0, 0
+        s.cnt += 1
+        s.sum += amount
+        return True
+
+    def read(self, key, now):
+        m_now = now // self.width
+        live = [s for s in self.slots[key]
+                if m_now - self.n &lt; s.minute &lt;= m_now]
+        return (sum(s.cnt for s in live),
+                sum(s.sum for s in live))
+
+def decayed_add(state, key, ts, tau):
+    v, last = state.get(key, (0.0, ts))
+    state[key] = (v * exp(-(ts - last) / tau) + 1, ts)
+
+def decayed_read(state, key, now, tau):
+    v, last = state.get(key, (0.0, now))
+    return v * exp(-(now - last) / tau)
+
+<span class="cm"># ₹500, ₹800, ₹2,000 at minutes 0, 10, 20:</span>
+<span class="cm"># read at 30 → (3, 3300); at 75 → (1, 2000)</span>
+<span class="cm"># decayed, tau 60 min, read at 30 → 2.17</span>
+<span class="cm"># an event from minute 5 arriving now → dropped</span></code></pre>
+
+    <h3>Two-stage serving request path</h3>
+    <pre class="code"><code>def handle_request(user, ctx, k=20):
+    fu = online_store.get(user.id, timeout=15)  <span class="cm"># ms</span>
+    u_vec = user_tower(fu, ctx)       <span class="cm"># or cached</span>
+    <span class="cm"># 1. candidate generation: sources in parallel</span>
+    calls = {name: submit(src, user, u_vec)
+             for name, src in SOURCES.items()}
+    done = wait(calls, timeout=30)    <span class="cm"># partial is ok</span>
+    cands = []
+    for name in done:
+        cands += calls[name].result()[:QUOTA[name]]
+    cands = [i for i in dedupe(cands)
+             if i not in user.seen and not blocked(i)]
+    if not cands:
+        return cache.last_feed(user) or popular(ctx)
+    <span class="cm"># 2. light ranker: few features, small model</span>
+    cands = top_n(cands, light_model(user, cands), 500)
+    <span class="cm"># 3. heavy ranker: one batched feature fetch</span>
+    f = online_store.multi_get(cands, timeout=25)
+    p = heavy_model(user, cands, f, ctx)  <span class="cm"># heads</span>
+    value = {i: sum(W[a] * p[i][a] for a in HEADS)
+             for i in cands}           <span class="cm"># W["hide"] &lt; 0</span>
+    top = top_n(cands, value, 50)
+    <span class="cm"># 4. re-rank: diversity, rules, exploration</span>
+    page = mmr(top, value, sim, k, lam=0.7)
+    page = apply_rules(page)     <span class="cm"># spacing, ad slots</span>
+    page = add_explore(page, share=0.05)
+    log(user, ctx, page, f, p, MODEL_VERSION)
+    return page
+
+def mmr(cands, rel, sim, k, lam=0.7):
+    chosen, left = [], list(cands)
+    while left and len(chosen) &lt; k:
+        def score(i):
+            pen = max([sim(i, j) for j in chosen],
+                      default=0.0)
+            return lam * rel[i] - (1 - lam) * pen
+        best = max(left, key=score)
+        chosen.append(best)
+        left.remove(best)
+    return chosen
+
+<span class="cm"># toy run with the ANN source past its deadline:</span>
+<span class="cm"># → 20 posts from the other two sources</span>
+<span class="cm"># mmr on section 04's P1..P4 → P1, P3, P4, P2</span></code></pre>
+
+    <!-- reading -->
+    <h2 id="reading"><span class="pn">09</span>Further reading</h2>
+    <ul>
+      <li><strong><a href="https://www.oreilly.com/library/view/designing-machine-learning/9781098107956/">Designing Machine Learning Systems</a></strong> (Chip Huyen, O'Reilly, 2022). The book-length version of this note's framework: data, features, deployment, monitoring and continual learning. Read the chapters on deployment and data distribution shifts first.</li>
+      <li><strong><a href="https://developers.google.com/machine-learning/guides/rules-of-ml">Rules of Machine Learning</a></strong> (Martin Zinkevich, Google). Short numbered rules for building a first pipeline, choosing objectives and handling skew. Good for quotable judgement calls; an hour's read.</li>
+      <li><strong><a href="https://papers.nips.cc/paper/2015/hash/86df7dcfd896fcaf2674f757a2463eba-Abstract.html">Hidden Technical Debt in Machine Learning Systems</a></strong> (Sculley et al., NeurIPS 2015). Why the model is a small box in a large system: entanglement, feedback loops, glue code, configuration debt. The vocabulary interviewers borrow when they ask about maintenance.</li>
+      <li><strong><a href="https://research.google/pubs/the-tail-at-scale/">The Tail at Scale</a></strong> (Dean and Barroso, Communications of the ACM, 2013). Where the fan-out arithmetic of section 02 comes from, and hedged and tied requests as fixes. Read before any question on latency.</li>
+      <li><strong><a href="https://research.google/pubs/deep-neural-networks-for-youtube-recommendations/">Deep Neural Networks for YouTube Recommendations</a></strong> (Covington, Adams and Sargin, RecSys 2016). The two-stage candidate generation and ranking design, with practical choices about labels and freshness. The classic citation for section 04.</li>
+      <li><strong><a href="https://research.facebook.com/publications/practical-lessons-from-predicting-clicks-on-ads-at-facebook/">Practical Lessons from Predicting Clicks on Ads at Facebook</a></strong> (He et al., ADKDD 2014). Click prediction at scale: boosted trees feeding logistic regression, data freshness, online learning and negative downsampling. Read with the ads design in section 05.</li>
+      <li><strong><a href="https://eugeneyan.com/writing/system-design-for-discovery/">System Design for Recommendations and Search</a></strong> (Eugene Yan, 2021). How several companies split offline and online work and retrieval and ranking, compared side by side. A quick tour of real architectures.</li>
+      <li><strong><a href="https://docs.feast.dev/getting-started/concepts/point-in-time-joins">Point-in-time joins</a></strong> (Feast documentation). How an open-source feature store implements the join of section 03, including TTLs and filtering out late-written values.</li>
+    </ul>
+
+    <!-- questions -->
+    <h2 id="questions"><span class="pn">10</span>Interview questions</h2>
+    <p>Answer out loud first, then open the answer. Each answer stands on its own: the short answer, the mechanism, the trade-off, the likely follow-up. Questions 6, 10, 11, 15, 16, 17, 19 and 22 are hand drills; do them with a pen. Questions 12 and 25 to 27 are the “what if” follow-ups that come after a design.</p>
+
+    <h3>The question and the framework</h3>
+
+    <details class="qa"><summary><span class="qn">1</span>How do you approach an ML system design question?</summary><div class="ans">
+      <p><strong>Clarify, then go from the goal to metrics, data, features, model, serving, evaluation and monitoring, with numbers at each step.</strong></p>
+      <ul>
+        <li><strong>Clarify:</strong> the decision the prediction drives, the output, the scale, the latency budget at p99, how fresh things must be, cost and constraints (privacy, regulation). State assumptions as numbers.</li>
+        <li><strong>Metrics:</strong> business goal → an online metric an experiment can move, plus guardrails → an offline metric that tracks it at the operating point.</li>
+        <li><strong>Formulation, data and labels:</strong> what exactly is predicted; where labels come from, how late, and how the current system biased them.</li>
+        <li><strong>Features</strong> by entity and freshness tier; <strong>a baseline</strong> before the model; <strong>serving</strong> with a latency budget and sizing; <strong>evaluation</strong> out of time, then shadow, then A/B; <strong>monitoring</strong> and retraining.</li>
+        <li><strong>Close</strong> with trade-offs and what version two would add.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> “why not start with the model?” Because the model depends on the latency, the label and the number of items, which come first. (<a href="#steps">01</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">2</span>Which clarifying questions do you ask first, and why each?</summary><div class="ans">
+      <p><strong>Only those whose answers change the design: about four to six, then assume the rest out loud.</strong></p>
+      <ul>
+        <li><strong>Is someone waiting?</strong> Decides online or batch, and the latency budget.</li>
+        <li><strong>How many items?</strong> Thousands can be scored directly; millions need a retrieval stage.</li>
+        <li><strong>How fast does the world change?</strong> New items an hour or adversaries mean streaming features and frequent retraining.</li>
+        <li><strong>Where do labels come from, and how late?</strong> Decides proxies, training windows and monitoring before labels.</li>
+        <li><strong>What does each mistake cost?</strong> Sets thresholds and whether calibration matters.</li>
+        <li><strong>Is there a system today?</strong> It's the baseline, and shadow mode is the migration path.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> privacy, regulation and explainability limit features and model class; ask when the domain suggests them (lending, health, payments). (<a href="#clarify">01</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">3</span>How do you go from a business goal to an offline metric? Use a feed.</summary><div class="ans">
+      <p><strong>A chain: a slow business goal, an online metric a two-week test can move, and an offline metric chosen because it tracks the online one.</strong></p>
+      <ul>
+        <li><strong>Business:</strong> long-term retention and satisfaction.</li>
+        <li><strong>Online:</strong> sessions per user per day, quality-weighted time spent, meaningful interactions; guardrails on hides and reports, creator exposure, latency.</li>
+        <li><strong>Offline:</strong> per-head AUC, log loss and calibration of the engagement predictions, nDCG@20 on logged sessions.</li>
+        <li><strong>Why these:</strong> the value formula adds the heads' probabilities, so they must be calibrated; nDCG weights the top positions users actually see.</li>
+        <li><strong>The check:</strong> across past launches, did offline gains predict online ones? If not, fix the offline metric before trusting it.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> logged sessions favour the ranker that made them, so offline metrics filter candidates and the A/B test decides. (<a href="#steps">01</a>, <a href="#feed-design">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">4</span>You have 45 minutes. How do you spend them, and what is being scored?</summary><div class="ans">
+      <p><strong>Every step covered, reaching serving by about minute 25, then depth where the interviewer pulls; scored on navigation, ML depth, systems depth, trade-offs, operations and communication.</strong></p>
+      <ul>
+        <li><strong>A plan:</strong> 5 minutes clarifying, 5 on metrics, 5 on formulation and labels, 5 on features, 5 on baseline and model, 8 on serving, 5 on evaluation, 4 on monitoring, 3 on summary and next steps.</li>
+        <li><strong>Hand over the steering:</strong> offer two areas to go deeper on and let the interviewer choose.</li>
+        <li><strong>Park explicitly:</strong> “cold start matters; I'll come back to it.”</li>
+        <li><strong>Red flags:</strong> starting with the architecture of the model; no numbers; no baseline; stopping at deploy; 30 minutes on one step.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> at senior levels, expect to be judged on prioritization: what you'd build first and what you'd defer. (<a href="#clock">01</a>, <a href="#rubric">01</a>)</p>
+    </div></details>
+
+    <h3>Serving</h3>
+
+    <details class="qa"><summary><span class="qn">5</span>Batch, online or streaming inference: when each? Give a hybrid.</summary><div class="ans">
+      <p><strong>Batch when the decision can wait, online when someone is waiting and the request matters, streaming when results must follow events within minutes without blocking a request.</strong></p>
+      <ul>
+        <li><strong>Batch:</strong> a scheduled job writes predictions to a store; cheap and easy to audit, but up to a day stale and blind to new users. Nightly churn scores, recommendation emails.</li>
+        <li><strong>Online:</strong> the model runs in the request on fresh features; costs latency and availability. Search, feed ranking, payment authorization.</li>
+        <li><strong>Streaming:</strong> runs per event, asynchronously, writing results for later requests. Flagging an account after a burst of logins.</li>
+        <li><strong>Hybrid feed:</strong> item embeddings and the ANN index precomputed, user long-term embeddings nightly, session features streamed, ranking online.</li>
+        <li><strong>Numbers:</strong> batch-scoring 100M monthly users × 500 candidates is \(5 \times 10^{10}\) a day; online is 500M requests × 500 = \(2.5 \times 10^{11}\), five times more, but fresh and aware of context.</li>
+      </ul>
+      <p>(<a href="#modes">02</a>)</p>
+    </div></details>
+
+    <details class="qa" id="q-sizing"><summary><span class="qn">6</span>Hand drill: size the feed. 50M daily users, 10 loads each, 3× peak, 200 ms, 500 candidates at 2 MFLOP, 10M items and 100M users with 128-dim embeddings.</summary><div class="ans">
+      <p><strong>About 17,400 requests a second at peak, 3,500 in flight, 350 busy cores for the ranker, 5 GB of item embeddings, 51 GB of user embeddings.</strong></p>
+      <ul>
+        <li><strong>Requests:</strong> \(50\text{M} \times 10 = 500\text{M}\) a day; ÷ 86,400 = 5,787 a second on average; × 3 = 17,361 at peak.</li>
+        <li><strong>In flight (Little's law):</strong> 17,361 × 0.2 s ≈ 3,472.</li>
+        <li><strong>Ranker:</strong> 500 × 2 MFLOP = 1 GFLOP a request; at an assumed 50 GFLOP/s per core that's 20 ms of one core; 17.4 TFLOP/s at peak ≈ 347 cores busy, about 700 at 50% utilization.</li>
+        <li><strong>Memory:</strong> items 10M × 128 × 4 B = 5.12 GB (fits on one machine, so replicate the index); users 100M × 128 × 4 B = 51.2 GB (a sharded store).</li>
+        <li><strong>Logs:</strong> 500M × 20 impressions × 500 B = 5 TB a day.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> “and with 10× traffic?” See question 27. (<a href="#sizing">02</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">7</span>p99 latency is over budget. Where do you look, and what do you change?</summary><div class="ans">
+      <p><strong>Trace per-stage p99s, then attack fan-out, feature fetches, candidate count and queueing, in roughly that order.</strong></p>
+      <ul>
+        <li><strong>Fan-out:</strong> with \(N\) parallel calls, \(1 - 0.99^N\) of requests hit some call's slowest 1%: 9.6% at 10 calls, 63% at 100. Batch per-candidate calls into one multi-key fetch per shard; hedge slow calls after their p95 (at most about 5% extra load); accept partial results.</li>
+        <li><strong>The ranker:</strong> fewer candidates, a light ranker in front, distillation or quantization, compute the user side once per request.</li>
+        <li><strong>Queueing:</strong> latency climbs steeply near full utilization; keep headroom, autoscale, shed load at peak.</li>
+        <li><strong>Caching</strong> helps the mean, not the tail: 80% hits at 1 ms and misses at 40 ms give a mean of 8.8 ms but a p99 of about 40 ms (the miss path's p95).</li>
+      </ul>
+      <p><strong>Follow-up:</strong> “percentiles of stages don't add”: summing sequential p99s overstates, while fan-out makes the max worse. (<a href="#latency">02</a>, <a href="#caching">02</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">8</span>What should happen when the model or a feature service times out?</summary><div class="ans">
+      <p><strong>A fallback decided in advance, never a silent default, and the fallback rate monitored like a metric.</strong></p>
+      <ul>
+        <li><strong>Timeouts</strong> per dependency, below the stage budget; circuit breakers stop calling a failing service for a while.</li>
+        <li><strong>A feed's ladder:</strong> rank what arrived → the user's last good feed from cache → popular in the region.</li>
+        <li><strong>Payments:</strong> rules alone; approve small amounts, step up or refer large ones. Failing closed blocks good customers; failing open is what attackers wait for.</li>
+        <li><strong>Train for it:</strong> if features can be missing at serving, the model must have seen missing values in training.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> in an A/B test, a heavier model times out more and its arm partly serves the fallback; compare fallback rates per arm before reading the result. (<a href="#fallbacks">02</a>)</p>
+    </div></details>
+
+    <h3>Features</h3>
+
+    <details class="qa"><summary><span class="qn">9</span>What is a feature store? Why two stores? When don't you need one?</summary><div class="ans">
+      <p><strong>A registry of feature definitions feeding an offline store (full history, for training) and an online store (latest values, for serving).</strong></p>
+      <ul>
+        <li><strong>Two stores because the access patterns are opposite:</strong> training scans history across all keys; serving looks up one key in milliseconds.</li>
+        <li><strong>Materialization</strong> pushes the latest batch values online; the stream processor writes both.</li>
+        <li><strong>What it buys:</strong> one definition for both paths (less skew), point-in-time training sets, features shared with owners, freshness monitoring.</li>
+        <li><strong>Not needed</strong> for a single batch model with a few features: a tested pipeline is enough. It pays off with several online models sharing features, or streaming features that must match between training and serving.</li>
+      </ul>
+      <p>(<a href="#stores">03</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">10</span>Hand drill: rows F1, F2, F3 are written at 02:00 on 3, 4 and 5 Jan, each covering data to the previous midnight (values 12·0, 14·0, 31·1). The job then fails until 9 Jan. Join payments at 03 Jan 15:00, 04 Jan 01:30, 04 Jan 21:00 and 08 Jan 12:00, with a 48-hour TTL.</summary><div class="ans">
+      <p><strong>F1, F1, F2, missing. Join on when each row became available, and drop values older than the TTL.</strong></p>
+      <ul>
+        <li><strong>T1, 03 Jan 15:00:</strong> F1 (12·0).</li>
+        <li><strong>T2, 04 Jan 01:30:</strong> F1, not F2. F2's data ends at midnight, but it wasn't written until 02:00; serving at 01:30 still held F1. Joining on data time gives training a value serving never had.</li>
+        <li><strong>T3, 04 Jan 21:00:</strong> F2 (14·0).</li>
+        <li><strong>T4, 08 Jan 12:00:</strong> the newest row, F3 (the job failed after it), covers data to 5 Jan 00:00, 84 hours earlier: past the TTL, so missing, as the online store would return.</li>
+        <li><strong>The naive latest-row join</strong> gives 31·1 to every payment, including the dispute the fraud itself caused: label leakage.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> late-arriving records also leak, so filter on when each record was written, not only on its event time. (<a href="#pit">03</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">11</span>How do you compute “payments on this card in the last hour” in real time? How much memory for 100 million cards?</summary><div class="ans">
+      <p><strong>A stream processor keeps per-card bucketed windows (or decayed counters) keyed by card, updated per event by event time, and writes them to the online store.</strong></p>
+      <ul>
+        <li><strong>Bucketed sliding window:</strong> 60 one-minute buckets, each a count and a sum (4 B each): 480 B per card; error at most one bucket (1/60 of the window). 100M cards: 48 GB for this window; with a 24-hour window of hourly buckets as well (192 B), 67.2 GB.</li>
+        <li><strong>Decayed counter:</strong> \(c \leftarrow c\,e^{-\Delta t/\tau} + 1\), 16 B per feature; events at minutes 0, 10, 20 read at 30 with \(\tau = 60\): 0.607 + 0.717 + 0.846 = 2.17. Three such features: 4.8 GB. Soft edge instead of a hard window.</li>
+        <li><strong>Event time and watermarks:</strong> aggregate by when payments happened; a watermark (say 2 minutes) decides what's too late.</li>
+        <li><strong>Parity:</strong> decide whether the current payment counts, and do the same in training (replay the log through the same code, or log the served values).</li>
+      </ul>
+      <p>(<a href="#streaming">03</a>)</p>
+    </div></details>
+
+    <details class="qa" id="q-stale"><summary><span class="qn">12</span>What if a feature goes stale: the streaming job lags two hours?</summary><div class="ans">
+      <p><strong>Detect it from freshness, not from the model; serve “missing” past the TTL to a model that learned what missing means; tighten the policy while blind; then backfill.</strong></p>
+      <ul>
+        <li><strong>What breaks:</strong> velocity counters freeze or read 0, and 0 looks innocent, so a fraud model gets more lenient exactly when it's blind. A feed loses session signals and gets generic.</li>
+        <li><strong>Detect:</strong> the age of the newest value per feature, the stream consumer's lag, jumps in zero or null rates, a shift in the score distribution.</li>
+        <li><strong>Handle:</strong> past the TTL the store returns missing; the model was trained with missing values, so it leans on other features. For critical features, switch to a fallback model trained without them, or tighten rules (more step-ups) until it recovers.</li>
+        <li><strong>Recover:</strong> replay the event log so the online store catches up, and mark that period in the training data (or exclude it) so training doesn't see fresh values where serving saw stale ones.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> alert before the TTL, with an owner and a runbook. (<a href="#freshness">03</a>)</p>
+    </div></details>
+
+    <h3>Retrieval and ranking</h3>
+
+    <details class="qa"><summary><span class="qn">13</span>Why separate retrieval and ranking? Show the arithmetic.</summary><div class="ans">
+      <p><strong>The precise model can afford a few hundred candidates per request, not millions, so a cheap high-recall stage must cut the catalogue first.</strong></p>
+      <ul>
+        <li><strong>Heavy ranker on 10M items:</strong> 10M × 2 MFLOP = 20 TFLOP a request, 400 core-seconds; about 7 million cores at 17,400 requests a second.</li>
+        <li><strong>Exact dot products over 10M 128-dim embeddings:</strong> 2.56 GFLOP and 5.1 GB read per request: already more than ranking 500 candidates.</li>
+        <li><strong>ANN (about 10,000 vectors) → light ranker on 1,500 → heavy ranker on 500:</strong> about 1.03 GFLOP a request, about 360 busy cores.</li>
+        <li><strong>Different jobs:</strong> retrieval optimizes recall@K, ranking orders the top with cross features, re-ranking shapes the page.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> retrieval recall caps the system: if it's 60%, the ranker never sees 40% of the good items. Measure each stage. (<a href="#why-two">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">14</span>How does a two-tower retrieval model work, how is it trained, and what can't it do?</summary><div class="ans">
+      <p><strong>Two networks embed users and items separately; the score is their dot product, so item vectors can be precomputed and searched with ANN.</strong></p>
+      <ul>
+        <li><strong>Serving:</strong> item vectors computed offline and indexed; the user vector computed per request (or cached); ANN returns the top few hundred.</li>
+        <li><strong>Training:</strong> (user, engaged item) pairs, softmax over in-batch negatives; popular items appear as negatives more often, so subtract the log of each item's sampling probability (logQ correction).</li>
+        <li><strong>Negatives:</strong> random catalogue items (easy), in-batch (free, popularity-biased), hard negatives (sharper, but include false negatives).</li>
+        <li><strong>Limit:</strong> the towers meet only at the dot product, so no user × item cross features. That's why it retrieves and a ranker orders.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> new items are retrievable on day one if the item tower uses content features (text and image embeddings), not just IDs. (<a href="#retrieval">04</a>, <a href="#negatives">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">15</span>Hand drill: item A shown at position 1 (examination 1.0) gets 100 clicks in 1,000 impressions; item B at position 3 (examination 0.4) gets 60 in 1,000. Which is more relevant?</summary><div class="ans">
+      <p><strong>B: 15% against A's 10%, once each click is weighted by the inverse of its position's examination probability.</strong></p>
+      <ul>
+        <li><strong>Model:</strong> \(P(\text{click}) = \theta_{\text{position}} \times r_{\text{item}}\).</li>
+        <li><strong>Naive click rates:</strong> A 10%, B 6%, so a model on raw clicks ranks A first and keeps generating evidence for A.</li>
+        <li><strong>IPW:</strong> A: 100 / 1.0 / 1,000 = 10%. B: 60 / 0.4 / 1,000 = 15%.</li>
+        <li><strong>Estimating \(\theta\):</strong> swap items between positions for a small random slice of traffic and compare the same items' click rates.</li>
+        <li><strong>Alternative:</strong> position as a training feature, fixed to 1 at serving.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> exposure bias: unseen items have no labels, and “not clicked” only counts as negative if it was likely seen. (<a href="#position-bias">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">16</span>Hand drill: the true click rate is 1% and you kept 10% of non-clicks for training. What does the model predict on average, and how do you fix it?</summary><div class="ans">
+      <p><strong>About 9.2%; correct it by adding the log of the kept share to the predicted log-odds.</strong></p>
+      <ul>
+        <li><strong>Trained-on rate:</strong> \(0.01 / (0.01 + 0.99 \times 0.1) = 0.0917\).</li>
+        <li><strong>Correction:</strong> \(\operatorname{logit} p = \operatorname{logit} p_s + \log q\): \(-2.293 + \ln 0.1 = -2.293 - 2.303 = -4.595\), so \(p = 1.0\%\).</li>
+        <li><strong>Why it matters:</strong> the order is unchanged, so AUC doesn't notice, but auction prices, value formulas and cost thresholds use the number itself.</li>
+        <li><strong>Why downsample at all:</strong> at billions of impressions, the non-clicks are mostly redundant; keeping 10% cuts training cost almost tenfold for little loss.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> change the sampling rate and forget the correction, and every score shifts overnight with no change in ranking metrics. (<a href="#negatives">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">17</span>How do you add diversity and business rules without wrecking relevance? Work MMR on four posts.</summary><div class="ans">
+      <p><strong>A re-ranking stage after the ranker: hard filters, soft constraints, exploration slots, and a greedy diversity rule such as MMR.</strong></p>
+      <ul>
+        <li><strong>MMR:</strong> \(\lambda\,\text{rel}(i) - (1 - \lambda)\max_{j \in S}\text{sim}(i, j)\), picking greedily.</li>
+        <li><strong>Drill, \(\lambda = 0.7\):</strong> relevances 0.90, 0.88, 0.80, 0.75 for P1 to P4; P2 is a near-duplicate of P1 (0.95). Step 1 picks P1 (0.630). Step 2: P2 0.616 − 0.285 = 0.331, P3 0.560 − 0.030 = 0.530, P4 0.525 − 0.180 = 0.345, so P3. Step 3: P4 (0.345) beats P2 (0.331). Order P1, P3, P4, P2.</li>
+        <li><strong>Rules:</strong> filters (seen, blocked, policy), spacing (no more than two from one creator in a row), fixed ad slots, a fresh post in the top ten.</li>
+        <li><strong>Tuning \(\lambda\)</strong> is an A/B question: diversity often costs a little short-term engagement and buys retention.</li>
+      </ul>
+      <p>(<a href="#rerank-rules">04</a>)</p>
+    </div></details>
+
+    <h3>Worked designs</h3>
+
+    <details class="qa"><summary><span class="qn">18</span>Design real-time payment fraud detection.</summary><div class="ans">
+      <p><strong>Online scoring inside the authorization: rules plus a boosted-tree model on request, streaming and batch features, three actions from costs, labels from chargebacks.</strong></p>
+      <ul>
+        <li><strong>Scale:</strong> 20M payments a day, 231 a second average, about 1,160 at peak; 50 ms at p99; fraud about 0.05%, 1 in 2,000.</li>
+        <li><strong>Metrics:</strong> total cost (fraud loss plus friction); online fraud basis points, decline and step-up rates; offline value-weighted recall at a fixed false-positive rate, PR-AUC, calibration.</li>
+        <li><strong>Labels:</strong> chargebacks and reports over weeks to months; train on matured windows; step-up outcomes label the grey zone.</li>
+        <li><strong>Features:</strong> velocity windows per card, device and IP; the card's spending profile; merchant risk; shared-device graph features.</li>
+        <li><strong>Model and rules:</strong> rules for policy and speed against new attacks; boosted trees for the grey area; keep all frauds and 2% of good payments, then correct the probabilities.</li>
+        <li><strong>Serving:</strong> one batched feature read (10 ms), rules, a 5 ms model; on timeout, rules decide, with small amounts approved and large ones stepped up.</li>
+        <li><strong>Monitoring:</strong> decline and step-up rates by merchant hourly, feature freshness, early reports; rules daily, retraining weekly to monthly.</li>
+      </ul>
+      <p>(<a href="#fraud">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">19</span>Hand drill: approving costs \(pA\); stepping up costs ₹20 of friction for a good customer and lets 10% of fraud through; declining a good customer costs ₹200. Where are the cut-offs for ₹500, ₹5,000 and ₹50,000?</summary><div class="ans">
+      <p><strong>Approve below \(c_s / ((1 - \ell)A + c_s)\), decline above \((c_d - c_s)/(\ell A + c_d - c_s)\), step up between.</strong></p>
+      <ul>
+        <li><strong>Costs:</strong> approve \(pA\); step up \((1 - p)20 + 0.1\,pA\); decline \((1 - p)200\).</li>
+        <li><strong>₹500:</strong> approve below 20/470 = 4.26%; decline above 180/230 = 78.3%.</li>
+        <li><strong>₹5,000:</strong> approve below 20/4,520 = 0.44%; decline above 180/680 = 26.5%.</li>
+        <li><strong>₹50,000:</strong> approve below 20/45,020 = 0.044%; decline above 180/5,180 = 3.5%.</li>
+        <li><strong>With only approve and decline:</strong> decline above 200/(200 + A): 28.6%, 3.85%, 0.40%.</li>
+        <li><strong>Needs calibrated probabilities</strong>, after undoing any downsampling.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> why not decline everything flagged? At 60% recall and 0.2% false positives that's 6,000 frauds against 39,980 good payments a day, 13% precision. (<a href="#fraud">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">20</span>Design a feed ranking system.</summary><div class="ans">
+      <p><strong>A funnel: multi-source retrieval, a light ranker, a multi-task heavy ranker, re-ranking; trained on debiased impression logs, evaluated by A/B with a long-term holdout.</strong></p>
+      <ul>
+        <li><strong>Scale:</strong> 50M daily users, 17,400 requests a second at peak, 10M posts, 200 ms at p99, 20 posts a load.</li>
+        <li><strong>Metrics:</strong> retention; sessions and quality time online; hides, reports and creator exposure as guardrails; per-head AUC, log loss and nDCG offline.</li>
+        <li><strong>Pipeline:</strong> follows, two-tower ANN, co-engagement, trending and fresh → about 1,500 → light ranker 500 → heavy ranker 50 → re-rank 20.</li>
+        <li><strong>Ranker:</strong> heads for click, dwell, like, share, hide, combined by product-chosen weights; cross features; position handled in training.</li>
+        <li><strong>Freshness:</strong> streaming engagement counts, hourly index rebuilds with inserts for new posts, daily retraining.</li>
+        <li><strong>Risks:</strong> feedback loops and popularity bias (exploration, diversity), interference through shared creators in tests.</li>
+      </ul>
+      <p>(<a href="#feed-design">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">21</span>How do you handle cold start for new users and new items?</summary><div class="ans">
+      <p><strong>Content and context features instead of IDs, plus a bounded budget of exploration.</strong></p>
+      <ul>
+        <li><strong>New users:</strong> onboarding choices, popular items for their language and region, device and context; streaming session features let the feed adapt within the first session.</li>
+        <li><strong>New items:</strong> content embeddings (text, image) make them retrievable and rankable before any engagement; ID embeddings learn later.</li>
+        <li><strong>Exploration:</strong> reserve a small share of impressions for new items, allocated bandit-style, so each gets enough impressions for its engagement rate to be estimated, then earns or loses exposure.</li>
+        <li><strong>Avoid the trap</strong> of a ranker that only trusts items with history: the loop starves new creators.</li>
+      </ul>
+      <p>(<a href="#feed-design">05</a>, <a href="#rerank-rules">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">22</span>Hand drill: ad A bids ₹20 with true CTR 1%; ad B bids ₹10 with CTR 2.5%. Run the second-price auction with calibrated predictions, then with A's CTR predicted twice too high.</summary><div class="ans">
+      <p><strong>Calibrated: B wins and earns ₹200 per 1,000 impressions. With A over-predicted, A wins and earns only ₹125.</strong></p>
+      <ul>
+        <li><strong>eCPM:</strong> \(1000 \times b \times \widehat{\text{CTR}}\): A 200, B 250.</li>
+        <li><strong>Calibrated:</strong> B wins, pays \(20 \times 0.01 / 0.025 = 8\), ₹8 per click; 25 clicks per 1,000 impressions, ₹200.</li>
+        <li><strong>A at 2%:</strong> A's eCPM 400 wins; pays \(10 \times 0.025 / 0.02 = 12.5\), ₹12.50 per click; its real CTR is 1%, so 10 clicks and ₹125 per 1,000. Revenue falls 37.5% and users get a worse ad.</li>
+        <li><strong>Every ad 2× too high:</strong> winner and price unchanged (the ratio cancels), but reserve prices, blending with organic content, budget pacing and conversion bids all use the absolute number.</li>
+        <li><strong>So:</strong> check the calibration ratio (predicted ÷ actual clicks) per ad, advertiser and segment, and log loss next to AUC.</li>
+      </ul>
+      <p>(<a href="#ads-design">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">23</span>Design an LLM-powered customer-support assistant.</summary><div class="ans">
+      <p><strong>Route, retrieve, generate grounded answers, act through authorized tools, guard input and output, and hand off with a summary; measure resolution, satisfaction and repeat contacts.</strong></p>
+      <ul>
+        <li><strong>Scale and latency:</strong> 50,000 conversations a day, six turns; first token within about 1.5 s for chat.</li>
+        <li><strong>Path:</strong> mask personal data and screen injections → intent routing (sensitive cases to people) → hybrid retrieval and reranking over the knowledge base, with query rewriting → a grounded, cited answer → tools (order status, refunds within limits) with authorization in the tool service → output policy checks → handoff on low confidence, repeated failure, user request or sensitive intent.</li>
+        <li><strong>Metrics:</strong> containment and task success, CSAT, repeat contact within 7 days, escalation; guardrails on wrong refunds and invented policies.</li>
+        <li><strong>Cost (assumed prices):</strong> about $0.013 a turn, $0.077 a conversation, $3,825 a day; $2,610 with prefix caching; small next to human contacts avoided.</li>
+        <li><strong>Failure modes:</strong> stale knowledge base, retrieval misses papered over, injection, tool abuse, abandonment counted as resolution, personal data in logs.</li>
+      </ul>
+      <p>(<a href="#support-design">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">24</span>How do you evaluate the support assistant before and after launch?</summary><div class="ans">
+      <p><strong>Offline: a golden set from real conversations, scored by a judge validated against humans, with retrieval and generation scored separately. Online: an A/B test on resolution, satisfaction and repeat contacts, plus sampled judging and human review.</strong></p>
+      <ul>
+        <li><strong>Golden set:</strong> real resolved conversations by intent, plus hard, adversarial and out-of-scope cases; the expected answer or action for each.</li>
+        <li><strong>Judging:</strong> a rubric (correct, grounded in the cited passage, policy-compliant, right action, right handoff) scored by an LLM judge whose agreement with human labels has been measured.</li>
+        <li><strong>Stages separately:</strong> retrieval recall@k, then answer faithfulness given the retrieved passages, then tool-call accuracy, so a failure points to its stage.</li>
+        <li><strong>Gate every change</strong> (prompt, model, knowledge base) on the regression suite.</li>
+        <li><strong>Online:</strong> randomize by user; read containment together with CSAT and 7-day repeat contacts, since containment alone rewards users giving up; judge a sample of live transcripts; send low scores to human review.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> failures from escalations feed new golden cases and knowledge-base fixes. (<a href="#support-design">05</a>)</p>
+    </div></details>
+
+    <h3>What if…</h3>
+
+    <details class="qa" id="q-latency"><summary><span class="qn">25</span>What if the latency budget halves?</summary><div class="ans">
+      <p><strong>Measure where the time goes, then precompute more, score fewer candidates with a cheaper model, and cut fan-out; accept a measured quality loss.</strong></p>
+      <ul>
+        <li><strong>Trace per-stage p99s</strong> first; cut the biggest stages, not all evenly.</li>
+        <li><strong>Precompute:</strong> cache user embeddings and candidate lists; bundle a user's features under one key so it's one fetch.</li>
+        <li><strong>Rank less:</strong> 500 → 250 candidates halves the heavy ranker (20 ms → 10 ms of one core); strengthen the light ranker (distilled from the heavy one) so the cut loses little.</li>
+        <li><strong>Cheaper model:</strong> quantize or distill; GPU batching.</li>
+        <li><strong>Tails:</strong> one multi-get per shard, hedged requests, partial results from slow sources.</li>
+        <li><strong>Price it:</strong> measure the offline loss of each cut (nDCG with 250 vs 500 candidates) and confirm with an A/B test.</li>
+      </ul>
+      <p>(<a href="#latency">02</a>, <a href="#model-size">02</a>)</p>
+    </div></details>
+
+    <details class="qa" id="q-labels"><summary><span class="qn">26</span>What if labels arrive 30 days late?</summary><div class="ans">
+      <p><strong>Train on matured windows, validate with a matching gap, monitor through proxies and drift, and keep the fast parts of the system (features, rules) fresh.</strong></p>
+      <ul>
+        <li><strong>Training:</strong> the newest usable labels are 30 days old; never count recent unlabelled events as negatives (<a href="./ds-project-lifecycle.html#label-delay">label delay</a>).</li>
+        <li><strong>Validation:</strong> an <a href="./ds-project-lifecycle.html#oot">out-of-time split</a> with a 30-day gap shows the decay you'll actually face.</li>
+        <li><strong>Proxies:</strong> early signals (customer reports, failed verification, early engagement), checked on old data to rank models the same way as the final label.</li>
+        <li><strong>Monitoring without labels:</strong> data quality, feature and score <a href="./ds-project-lifecycle.html#drift">drift</a>, proxy metrics.</li>
+        <li><strong>Stay current anyway:</strong> streaming features carry today's behaviour into a month-old model; rules react to new attacks within minutes.</li>
+        <li><strong>Experiments</strong> take at least 30 days longer to read on the true metric; pre-register a validated proxy.</li>
+        <li><strong>Modelling:</strong> treat unlabelled recent events as censored (a time-to-event or delayed-feedback model) instead of dropping them.</li>
+      </ul>
+    </div></details>
+
+    <details class="qa" id="q-traffic"><summary><span class="qn">27</span>What if traffic grows tenfold?</summary><div class="ans">
+      <p><strong>Redo the sizing, scale the stateless parts out, re-shard the stateful ones, and lower the cost per request.</strong></p>
+      <ul>
+        <li><strong>Sizing:</strong> 174,000 requests a second at peak; the ranker needs about 3,500 busy cores (about 7,000 at 50%) unless the cost per request falls.</li>
+        <li><strong>Ask which tenfold:</strong> ten times the users means ten times the keys (feature store and embedding memory grow too); ten times the requests per user means the same keys, more reads.</li>
+        <li><strong>Stateless:</strong> rankers and retrieval replicas scale horizontally; the 5 GB item index is replicated, not sharded.</li>
+        <li><strong>Stateful:</strong> more online-store shards and replicas; more stream partitions; logs at 50 TB a day, so sample what's logged.</li>
+        <li><strong>Cost per request:</strong> caching gets more effective with more traffic; fewer candidates; cheaper models; larger GPU batches.</li>
+        <li><strong>Tails:</strong> more shards means more fan-out; batch fetches, hedge, autoscale and shed load.</li>
+      </ul>
+      <p>(<a href="#sizing">02</a>)</p>
+    </div></details>
+
+    <h3>Operations</h3>
+
+    <details class="qa"><summary><span class="qn">28</span>Online learning or periodic retraining? And how do you roll back a bad model?</summary><div class="ans">
+      <p><strong>Periodic retraining by default, online updates where items and labels move in minutes; rollback is a registry switch that takes the features and the policy with the model.</strong></p>
+      <ul>
+        <li><strong>Periodic:</strong> simple, reproducible, easy to gate and audit; stale between retrains. Suits slow labels (credit, most fraud).</li>
+        <li><strong>Online:</strong> fresh within minutes; suits ads, news, trending content. Risks drift from bad data or attacks, feedback amplification, and hard reproduction; needs a streaming label join, continuous evaluation and frequent snapshots.</li>
+        <li><strong>Middle ground:</strong> periodic full retrains plus frequent updates to embeddings of new IDs, bias terms or a calibration layer.</li>
+        <li><strong>Rollback:</strong> keep the previous model warm and switch by config. Roll back the calibrator and thresholds with it, keep the old feature definitions served, and remember decisions already made stay made.</li>
+        <li><strong>Before it's needed:</strong> canary with automatic rollback on guardrails.</li>
+      </ul>
+      <p>(<a href="#online-learning">06</a>, <a href="#registry">06</a>)</p>
+    </div></details>
+
+    <!-- sheet -->
+    <h2 id="sheet"><span class="pn">11</span>Cheat sheet</h2>
+    <div class="sheet">
+      <h3>The framework</h3>
+      <p>Clarify (decision, output, scale, p99 latency, freshness, cost, constraints) → business goal → online metric + guardrails → offline metric that tracks it → formulation and labels (definition, delay, bias) → features by tier → baseline → model → serving (mode, budget, sizing, fallbacks) → offline, shadow, A/B → monitoring, retraining, feedback loops → version two. Serving by about minute 25, then depth.</p>
+      <h3>Sizing</h3>
+      <div class="mj">\[ \begin{aligned} \text{QPS}_{\text{peak}} &amp;\approx k \cdot \frac{\text{DAU} \times \text{requests per user}}{86{,}400}, \quad k \approx 2\text{–}3 \\ \text{in flight} &amp;= \text{QPS} \times \text{mean latency} \\ \text{compute} &amp;= \text{QPS} \times \text{candidates} \times \text{FLOP per candidate} \\ \text{memory} &amp;= N \times d \times \text{bytes} \end{aligned} \]</div>
+      <p>Feed: 17,400 QPS peak; 3,500 in flight; 1 GFLOP a request, about 350 busy cores; items 5.1 GB, users 51 GB, features 160 GB raw; logs 5 TB a day.</p>
+      <h3>Latency</h3>
+      <div class="mj">\[ \begin{aligned} P(\text{some call in its slowest } 1\%) &amp;= 1 - 0.99^N \\ \text{mean with cache} &amp;= h\, t_{\text{hit}} + (1 - h)\, t_{\text{miss}} \end{aligned} \]</div>
+      <p>N = 10, 50, 100: 9.6%, 39.5%, 63.4%. Cache 80% at 1 ms and 40 ms: mean 8.8 ms, p99 still about 40 ms. Batch fetches, hedge after p95 (about 5% extra load), partial results, headroom. Every dependency: timeout + fallback; monitor the fallback rate.</p>
+      <h3>Features</h3>
+      <div class="mj">\[ \begin{aligned} \text{feature}(k, t) &amp;= \text{latest row with } t_{\text{available}} \le t, \text{ if } t - t_{\text{data}} \le \text{TTL} \\ c_{\text{new}} &amp;= c_{\text{old}}\, e^{-(t - t_{\text{last}})/\tau} + 1 \end{aligned} \]</div>
+      <p>Tiers: batch (hours), streaming (seconds–minutes), request-time. Offline store = history for training; online store = latest values for serving. Bucketed window: 60 × 8 B = 480 B per key. Same staleness and TTL in training as in serving; a stale counter reads 0, so prefer missing.</p>
+      <h3>Retrieval and ranking</h3>
+      <div class="mj">\[ \begin{aligned} \text{value}(i) &amp;= \sum_k w_k\, P(\text{action}_k) - w_{\text{hide}}\, P(\text{hide}) \\ \text{MMR}(i) &amp;= \lambda\,\text{rel}(i) - (1 - \lambda)\max_{j \in S}\text{sim}(i, j) \\ P(\text{click} \mid i, k) &amp;= \theta_k\, r_i, \quad \hat r_i = \tfrac{1}{n_i}\textstyle\sum 1/\theta_k \\ \operatorname{logit} p &amp;= \operatorname{logit} p_s + \log q \end{aligned} \]</div>
+      <p>10M → ~1,500 (recall) → 500 → 50 (order) → 20 (the page). Heavy ranker on everything: 20 TFLOP a request; the funnel: about 1 GFLOP. Two-tower: no cross features. Negatives: random, in-batch (logQ), hard (false negatives). 1% CTR with 10% of negatives kept → 9.17%.</p>
+      <h3>Designs</h3>
+      <div class="mj">\[ \begin{aligned} p_1 &amp;= \frac{c_s}{(1 - \ell)A + c_s}, \quad p_2 = \frac{c_d - c_s}{\ell A + c_d - c_s} \\ \text{eCPM} &amp;= 1000 \cdot b \cdot \widehat{\text{CTR}} \\ \text{price per click}_1 &amp;= b_2\, \widehat{\text{CTR}}_2 / \widehat{\text{CTR}}_1 \end{aligned} \]</div>
+      <p>Fraud ₹5,000: approve below 0.44%, step up to 26.5%, decline above. Ads: A over-predicted 2× → revenue ₹200 → ₹125 per 1,000. Support bot: $0.0765 a conversation at assumed prices; the risk is quality, so measure containment with CSAT and repeat contacts.</p>
+      <h3>Operations</h3>
+      <p>Checks at ingestion, features and serving. Pseudonymize, minimize, delete everywhere. Fairness: action and error rates by group; calibration within groups, equal precision and equal error rates conflict when base rates differ. Cost next to lift. Registry: model + data + feature versions + calibrator + thresholds; canary; rollback by config. Periodic retraining by default, online updates for fast items.</p>
+    </div>
+
+    <footer><a href="./">More notes</a> · <a href="../">Deepam Minda</a></footer>
+  </article>
+</div>
+<a class="jump" href="#tldr">Contents ↑</a>
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+  svg: { fontCache: "global" },
+  options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script>
+(function () {
+  var d = document.getElementById("tocd");
+  var wide = window.matchMedia("(min-width: 1081px)");
+  function sync() { d.open = wide.matches; }
+  sync();
+  if (wide.addEventListener) wide.addEventListener("change", sync);
+  var jump = document.querySelector(".jump");
+  jump.addEventListener("click", function () { if (!wide.matches) d.open = true; });
+  d.addEventListener("click", function (e) {
+    if (!wide.matches && e.target.closest("a")) d.open = false;
+  });
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+  function spy() {
+    var y = window.scrollY + 120, cur = 0;
+    targets.forEach(function (t, i) { if (t && t.getBoundingClientRect().top + window.scrollY <= y) cur = i; });
+    links.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
+  }
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+})();
+</script>
+
+<script>
+(function () {
+  var root = document.documentElement, b = document.getElementById("theme-toggle");
+  function cur() { return root.getAttribute("data-theme") === "light" ? "light" : "dark"; }
+  function label() { b.setAttribute("aria-label", "Switch to " + (cur() === "dark" ? "light" : "dark") + " mode"); }
+  b.addEventListener("click", function () {
+    var n = cur() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", n);
+    try { localStorage.setItem("deepam-theme", n); } catch (e) {}
+    label();
+  });
+  label();
+})();
+</script>
+<script src="palette.js?v=86dbe50016" defer></script>
+<script src="reader-notes.js?v=cb3d5028bd" defer></script>
+</body>
+</html>
