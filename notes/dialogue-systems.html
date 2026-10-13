@@ -1069,8 +1069,14 @@ short sentences. One question per turn, at the end.</code></pre>
     <p>A <strong>regression suite</strong> is a set of fixed conversations with assertions: after turn 3 the state holds date = Fri 16 Oct; <code>schedule_promise</code> is called once, with amount 5000; the disclosure appears in turn 1; no forbidden phrase appears anywhere; a fraud mention triggers a handoff within one turn. Run it on every change of prompt, model, flow or tool. Every production failure that gets fixed becomes a new case. With an LLM in the loop, run the generation steps at temperature 0, which reduces but doesn't remove run-to-run variation, and repeat each case several times and assert on the pass rate (decoding settings; <a href="./llm-evals-guardrails.html#golden-set">golden sets</a>).</p>
 
     <h3 id="judge">Judging transcripts</h3>
-    <p>For what assertions can't check (was the explanation correct, was the tone right, was a confirmation skipped), use an <a href="./llm-evals-guardrails.html#llm-judge">LLM judge</a> with a rubric of narrow yes/no questions: was the task completed; did every number match the tool results; was explicit confirmation obtained before the action; was the customer pressured; should this have been escalated. Narrow questions usually agree with humans better than a 1–10 overall score. Calibrate the judge on a human-labelled sample, and keep humans reviewing a stratified sample every week, over-weighted towards escalations, abandoned conversations and cases where the judge was unsure.</p>
-    <p><strong>Why not BLEU, ROUGE or perplexity?</strong> They compare a reply with one reference reply, but a good reply has many forms (“Friday works, I've noted it” and “Done, ₹5,000 on the 16th” are both right), so overlap with one reference says little. Liu et al. (2016) found such metrics correlate very weakly with human judgements of dialogue responses. Perplexity measures how well a model predicts text, not whether the task got done. Task success, rubric judges and human review are what's used instead.</p>
+    <p>For what assertions can't check, use an LLM judge. The general method (writing the rubric, the judge's known biases, validating it against human labels) is in <a href="./llm-evals-guardrails.html#llm-judge">LLM-as-judge</a>. What's specific to conversations:</p>
+    <ul>
+      <li><strong>Judge the whole conversation, with its tool calls and their results,</strong> not single replies. Most dialogue failures (a lost correction, a skipped read-back, a missed escalation) only show across turns. Give the judge the transcript, the tool calls and results, the state log and the relevant policy text.</li>
+      <li><strong>A conversation-level rubric of narrow pass/fail questions:</strong> was the customer's goal met (checked against the final state where possible); does every amount and date the bot said match a tool result; was an explicit read-back confirmed before the action; were the mandatory disclosures made; was the customer pressured or misled; should the conversation have been escalated, and was it; were turns wasted re-asking known details.</li>
+      <li><strong>Validate it per language and channel.</strong> A judge that agrees with people on English chat may not on code-switched voice transcripts full of ASR errors, so check agreement on each (<a href="./llm-evals-guardrails.html#judge-validation">validating the judge</a>). Its taste for longer, more detailed answers (<a href="./llm-evals-guardrails.html#judge-bias">judge biases</a>) is a defect on voice, where a good turn is one or two short sentences: put the length budget in the rubric.</li>
+      <li><strong>Keep people in the loop:</strong> a stratified sample reviewed every week, over-weighted towards escalations, abandoned conversations and transcripts where the judge was unsure.</li>
+    </ul>
+    <p><strong>Why not BLEU or ROUGE?</strong> A good reply has many forms (“Friday works, I've noted it” and “Done, ₹5,000 on the 16th” are both right), so overlap with one reference reply says little; Liu et al. (2016) found such metrics barely track human judgements of dialogue replies (<a href="./llm-evals-guardrails.html#reference-based">reference-based metrics</a>). Perplexity measures how well a model predicts text, not whether the task got done.</p>
 
     <h3 id="online-ab">Online: A/B tests and the unit of randomization</h3>
     <p>The final test is a randomized experiment (<a href="./hypothesis-testing.html#ab">A/B testing end to end</a>), with three dialogue-specific choices.</p>
@@ -1100,7 +1106,7 @@ short sentences. One question per turn, at the end.</code></pre>
     <aside class="note trap"><p class="nl">Trap</p><p>Embeddings can cluster by surface form instead of meaning: the Devanagari, Romanized and English versions of one request land in three clusters, and every cluster of short messages (“hello”, “?”) looks coherent. Normalize scripts first or use an encoder trained on code-switched text, and judge clusters by reading them, not only by a cluster-quality score.</p></aside>
 
     <h3 id="taxonomy">A failure taxonomy</h3>
-    <p>Label a sample of failed conversations with the <em>first</em> thing that went wrong. The categories map onto the pipeline, which also tells you who fixes what:</p>
+    <p>Read a sample of failed conversations and label each with the <em>first</em> thing that went wrong (the method, from reading traces to a taxonomy, is in <a href="./llm-evals-guardrails.html#error-analysis">error analysis</a>). For a dialogue system the categories map onto the pipeline, which also tells you who fixes what:</p>
     <div class="tbl"><table>
       <thead><tr><th>Failure</th><th>Example</th><th>Fixed by</th></tr></thead>
       <tbody>
@@ -1118,7 +1124,7 @@ short sentences. One question per turn, at the end.</code></pre>
 
     <ul>
       <li><strong>Label where it helps most:</strong> send turns near the confidence threshold and low-confidence turns to annotators first (active learning); they teach the model more per label than random turns.</li>
-      <li><strong>Check that people agree:</strong> have two annotators label the same sample of intents and failure categories and measure agreement (Cohen's kappa). Low agreement means the intent definitions or the taxonomy are ambiguous, and no model will do better than the labels.</li>
+      <li><strong>Check that people agree:</strong> have two annotators label the same sample of intents and failure categories and measure agreement beyond chance (Cohen's kappa, worked in <a href="./llm-evals-guardrails.html#judge-validation">validating a judge</a>). Low agreement means the intent definitions or the taxonomy are ambiguous, and no model will do better than its labels.</li>
     </ul>
 
     <h3 id="prioritize">Prioritizing: volume × failure rate</h3>
@@ -1630,7 +1636,7 @@ def span_f1(gold_seqs, pred_seqs):
         <li><strong>Simulated users:</strong> persona, a goal with private facts, behaviour rules; scored by the final database state. Calibrate against real logs; simulators are too cooperative.</li>
         <li><strong>Reliability:</strong> run each scenario several times and report pass^k, the chance that all k runs succeed; at 0.8 per run, pass^8 = 0.17.</li>
         <li><strong>Regression suite:</strong> fixed conversations with assertions on state, tool calls, disclosures and banned phrases, run on every prompt or model change.</li>
-        <li><strong>Judge:</strong> narrow yes/no rubric questions, calibrated on human labels.</li>
+        <li><strong>Judge:</strong> a conversation-level rubric of narrow pass/fail questions over the full transcript and tool calls (goal met, numbers match tools, read-back before action, disclosures, missed escalation), validated against human labels per language.</li>
       </ul>
       <p><strong>Follow-up:</strong> then shadow mode and an A/B test; simulation is for regressions, not launch estimates. (<a href="#eval">09</a>)</p>
     </div></details>
