@@ -923,7 +923,7 @@ Final answer: Booked "Q3 forecast" with Priya
     </table></div>
     <p>The useful fact wins, but the durable preference ranks below a trivial coffee: recency decay buries old facts that are still true. Hence the split: durable preferences go in the always-loaded profile; only events compete for retrieval.</p>
     <ul>
-      <li><strong>Storage:</strong> a vector database with metadata filters for episodic memory, a key–value table for the profile, sometimes a graph for entities and relations. Retrieving memories is a small retrieval problem with the usual failure modes (see <a href="./rag.html#failure-modes">RAG</a>).</li>
+      <li><strong>Storage:</strong> a <a href="./embeddings-vector-search.html#vector-db">vector database</a> with metadata filters for episodic memory, a key–value table for the profile, sometimes a graph for entities and relations. Retrieving memories is a small retrieval problem with the usual failure modes (see <a href="./rag.html#failure-modes">RAG</a>).</li>
       <li><strong>Who writes:</strong> a fixed pipeline (predictable) or the agent itself through <code>remember</code> and <code>recall</code> tools, as in MemGPT (Packer et al., 2023), which pages information in and out of the context like an operating system's virtual memory. Agent-written memory is flexible but tends to store junk.</li>
     </ul>
 

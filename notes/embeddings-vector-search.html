@@ -1,0 +1,1725 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070707">
+<title>Embeddings and vector search · Deepam Minda</title>
+<meta name="description" content="How text becomes vectors and how the nearest ones are found fast: retrieval embedders and their training, bi-encoders vs cross-encoders vs ColBERT, cosine, dot and L2, HNSW, IVF and product quantization worked by hand, int8 and binary quantization, hybrid search with RRF, vector databases and filtering, and evaluating retrieval.">
+<meta property="og:title" content="Embeddings and vector search">
+<meta property="og:description" content="How text becomes vectors and how the nearest ones are found fast: retrieval embedders and their training, bi-encoders vs cross-encoders vs ColBERT, cosine, dot and L2, HNSW, IVF and product quantization worked by hand, int8 and binary quantization, hybrid search with RRF, vector databases and filtering, and evaluating retrieval.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080704'/%3E%3Cpath d='M14 18h36M14 32h25M14 46h31' stroke='%23d7a514' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem("deepam-theme"); } catch (e) {}
+  if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<link rel="stylesheet" href="../assets/design/tokens.css?v=2">
+<link rel="stylesheet" href="../assets/design/components.css?v=2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<style>
+/* Green graph-paper theme for the recurrent-notebook content.
+   Layout: a wide reading column with a sticky contents rail, on pale green graph paper.
+   One sans for text, one mono for labels; MathJax draws the maths. Green = the cell / notebook,
+   slate = the hidden state, orange only for gradients. */
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 16px; }
+body {
+  margin: 0; color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: 50% 0;
+  font: 16.5px/1.7 var(--sans); letter-spacing: -.003em;
+  padding-inline: 20px; padding-block: 44px 88px;
+  -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 640px) { body { font-size: 16px; padding-inline: 16px; padding-block: 24px 80px; } }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+table, button { font: inherit; }
+code { font: .86em var(--mono); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; }
+
+.page { max-width: 1200px; margin: 0 auto; display: grid; gap: 52px; grid-template-columns: 220px minmax(0, 860px); justify-content: center; }
+@media (max-width: 1080px) { .page { grid-template-columns: minmax(0, 860px); gap: 0; } }
+
+/* contents */
+.toc { position: sticky; top: 28px; align-self: start; font: 13.5px/1.4 var(--sans); max-height: calc(100vh - 56px); overflow-y: auto; }
+.toc summary { display: none; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--ink-2); text-decoration: none; }
+.toc a:hover { background: var(--surface); color: var(--ink); }
+.toc a.on { color: var(--ink); background: var(--surface); box-shadow: inset 2px 0 0 var(--cell); }
+.toc .n { font: 500 11px var(--mono); color: var(--ink-3); margin-right: 8px; }
+.toc .label { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 10px 10px; }
+.toc li.part { font: 500 10.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 14px 10px 4px; }
+@media (max-width: 1080px) {
+  .toc { position: static; margin-bottom: 26px; max-height: none; }
+  .toc .label { display: none; }
+  .toc details { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  .toc summary { display: block; cursor: pointer; padding: 12px 14px; font: 500 14px var(--sans); list-style: none; }
+  .toc summary::-webkit-details-marker { display: none; }
+  .toc summary::after { content: "+"; float: right; color: var(--ink-3); }
+  .toc details[open] summary::after { content: "–"; }
+  .toc details ol { padding: 0 6px 10px; }
+}
+.jump {
+  display: none; position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+  font: 500 13px var(--sans); color: var(--ink); background: var(--surface); text-decoration: none;
+  border: 1px solid var(--rule); border-radius: 999px; padding: 9px 14px;
+}
+@media (max-width: 1080px) { .jump { display: block; } }
+
+/* article */
+article { min-width: 0; }
+header.hero { display: grid; gap: 10px; margin-bottom: 26px; }
+.kicker { font: 500 12px/1 var(--mono); color: var(--ink-3); letter-spacing: .02em; }
+h1 { margin: 0; font-size: clamp(1.9rem, 1.4rem + 1.8vw, 2.6rem); line-height: 1.1; font-weight: 600; letter-spacing: -.028em; text-wrap: balance; }
+.dek { margin: 0; font-size: 1.1rem; line-height: 1.55; color: var(--ink-2); max-width: 40em; }
+.meta { font: 12px/1.5 var(--mono); color: var(--ink-3); }
+.key { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+.key span::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--c); margin-right: 6px; vertical-align: middle; }
+
+h2 { font-size: 1.36rem; line-height: 1.25; font-weight: 600; letter-spacing: -.018em; margin: 56px 0 12px; text-wrap: balance; scroll-margin-top: 16px; }
+h2 .pn { font: 500 .74em/1 var(--mono); color: var(--ink-3); margin-right: .7em; letter-spacing: 0; }
+h3 { font-size: 1.04rem; font-weight: 600; letter-spacing: -.01em; margin: 30px 0 6px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 1.25em; }
+li { margin-bottom: 5px; }
+li::marker { color: var(--ink-3); }
+strong { font-weight: 600; }
+.mj { overflow-x: auto; overflow-y: hidden; margin: 4px 0 16px; padding: 2px 0; }
+mjx-container[display="true"] { margin: 0 !important; }
+
+/* plan and summary panels */
+.tldr { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 22px 6px; margin-bottom: 14px; }
+.tldr h2 { margin: 0 0 10px; font: 500 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.tldr ol { padding-left: 1.3em; }
+.tldr li { margin-bottom: 8px; }
+.tldr p { margin: 0 0 12px; font-size: 15.5px; }
+.tldr .tbl { margin: 4px 0 12px; }
+
+/* notes: quote-style, coloured by kind */
+.note { margin: 16px 0 20px; padding: 2px 0 2px 16px; border-left: 2px solid var(--c); color: var(--ink-2); font-size: .97em; }
+.note > .nl { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); margin: 4px 0 8px; }
+.note strong { color: var(--ink); }
+.note.ask { --c: var(--cell); }
+.note.say { --c: var(--hid); }
+.note.trap { --c: var(--grad); }
+.note.lab { --c: var(--cell); }
+.note .q { font-style: italic; color: var(--ink); }
+.note ul { margin: 0 0 10px; }
+.note li { margin-bottom: 5px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 6px 0 20px; }
+table { border-collapse: collapse; width: 100%; font-size: .93em; line-height: 1.5; }
+th { text-align: left; vertical-align: bottom; font: 500 11px/1.4 var(--mono); color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; padding: 0 14px 8px 0; border-bottom: 1px solid var(--ink-3); }
+td { padding: 8px 14px 8px 0; vertical-align: top; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+td .src { display: block; font: 11.5px/1.4 var(--mono); color: var(--ink-3); margin-top: 2px; }
+
+/* gate cards */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0 20px; }
+@media (max-width: 640px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.gc { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 4px; font-size: 15.5px; line-height: 1.6; }
+.gc h4 { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.gc h4 .tag { font: 500 11px var(--mono); color: var(--c); }
+.gc.g1 { --c: var(--cell); }
+.gc.g2 { --c: var(--ink-3); }
+.gc p { margin-bottom: 10px; }
+
+/* figures */
+figure { margin: 18px 0 24px; }
+.plate { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 10px; overflow-x: auto; }
+.plate svg { display: block; width: 100%; height: auto; min-width: 460px; max-width: 700px; margin: 0 auto; }
+@media (max-width: 500px) { .plate svg { max-width: none; } }
+figcaption { font-size: .86rem; line-height: 1.5; color: var(--ink-3); margin-top: 10px; }
+.dg text { font-family: var(--sans); font-size: 12.5px; fill: var(--ink-2); }
+.dg .v { font-family: var(--serif); font-style: italic; font-size: 19px; fill: var(--ink); }
+.dg .v .s { font-size: 12.5px; }
+.dg .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; fill: var(--ink-3); }
+.dg .gl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--gate); }
+.dg .gs { font-family: var(--serif); font-style: normal; font-size: 12px; fill: var(--ink-3); }
+.dg .cl { font-family: var(--serif); font-style: italic; font-size: 18px; fill: var(--ink); }
+.dg .cs { font-family: var(--sans); font-size: 12px; fill: var(--ink-2); }
+.dg .optx { font: 500 17px var(--sans); fill: var(--ink); }
+.dg .cell { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.dg .hid { stroke: var(--hid); stroke-width: 2.4; fill: none; }
+.dg .hid.thick { stroke-width: 3.6; }
+.dg .in { stroke: var(--ink-3); stroke-width: 1.5; fill: none; }
+.dg .gw { stroke: var(--gate); stroke-width: 1.6; fill: none; }
+.dg .cw { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+.dg .grad { stroke: var(--grad); fill: none; stroke-linecap: round; }
+.dg .gbox { fill: var(--gate-wash); stroke: var(--gate); stroke-width: 1.3; }
+.dg .box { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .op { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.3; }
+.dg .node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.3; }
+.dg .dot { fill: var(--ink-2); }
+.dg .cellon { fill: var(--cell-wash); stroke: var(--cell); stroke-width: 1; }
+.dg .celloff { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+.dg .stream { stroke: var(--cell); stroke-width: 3.6; fill: none; }
+.mk-cell { fill: var(--cell); } .mk-hid { fill: var(--hid); } .mk-in { fill: var(--ink-3); }
+.mk-gate { fill: var(--gate); } .mk-cw { fill: var(--ink-2); } .mk-grad { fill: var(--grad); }
+
+/* questions */
+details.qa { border-bottom: 1px solid var(--rule); }
+details.qa:first-of-type { border-top: 1px solid var(--rule); }
+details.qa summary { cursor: pointer; padding: 11px 2px; font-weight: 500; font-size: 15.5px; line-height: 1.45; list-style: none; display: flex; gap: 12px; }
+details.qa summary::-webkit-details-marker { display: none; }
+details.qa summary .qn { font: 500 11.5px/1.9 var(--mono); color: var(--ink-3); flex: none; min-width: 1.9em; }
+details.qa summary::after { content: "+"; margin-left: auto; color: var(--ink-3); flex: none; }
+details.qa[open] summary::after { content: "–"; }
+details.qa .ans { padding: 0 4px 12px 32px; font-size: 15.5px; color: var(--ink-2); }
+summary:focus-visible, a:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+
+.sheet { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px 6px; }
+.sheet h3 { margin: 4px 0 6px; font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+footer { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: .9rem; color: var(--ink-3); }
+
+/* code blocks */
+pre.code { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; margin: 8px 0 20px; overflow-x: auto; font: 12.8px/1.6 var(--mono); color: var(--ink); white-space: pre; }
+pre.code code { font: inherit; background: none; border: 0; padding: 0; }
+pre.code .cm { color: var(--ink-3); }
+@media (max-width: 640px) { pre.code { font-size: 11.5px; padding: 12px; } }
+
+/* deep dive: a detail kept out of the reading flow. Without JS (or with ?dive=inline) it is a plain
+   collapsible; with JS the summary opens the content in a side panel (full screen on phones). */
+details.dive { margin: 14px 0 20px; }
+details.dive > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px; padding: 4px 0; }
+details.dive > summary::-webkit-details-marker { display: none; }
+.dive-tag { font: 500 12px/1.6 var(--mono); color: var(--accent, var(--link)); flex: none; }
+.dive-tag::before { content: "+ "; }
+details.dive[open] > summary .dive-tag::before { content: "– "; }
+.dive-title { font-weight: 500; color: var(--ink); }
+details.dive > summary:hover .dive-title { text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; }
+.dive-body { border-left: 2px solid var(--rule); padding: 2px 0 2px 18px; margin: 8px 0 4px 2px; }
+.dive-panel-mode details.dive > summary .dive-tag::before { content: ""; }
+.dive-panel-mode details.dive > summary .dive-title::after { content: " \2192"; color: var(--accent, var(--link)); }
+.dive-scrim { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, .45); opacity: 0; transition: opacity .2s ease; }
+.dive-scrim.open { opacity: 1; }
+.dive-sheet { position: fixed; top: 0; right: 0; bottom: 0; z-index: 91; width: min(680px, 100vw); overflow-y: auto; overscroll-behavior: contain;
+  background: var(--paper); border-left: 1px solid var(--rule); padding: 0 30px 56px; transform: translateX(100%); transition: transform .22s ease; }
+.dive-sheet.open { transform: none; }
+.dive-sheet .dive-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  background: var(--paper); padding: 20px 0 12px; margin-bottom: 14px; border-bottom: 1px solid var(--rule); }
+.dive-sheet .dive-head .dive-tag::before { content: ""; }
+.dive-sheet .dive-head h2 { margin: 2px 0 0; font-size: 18px; line-height: 1.35; font-weight: 600; }
+.dive-sheet .dive-close { flex: none; background: none; border: 0; padding: 4px 2px; cursor: pointer; color: var(--ink-3); font: 500 12px/1.6 var(--mono); }
+.dive-sheet .dive-close:hover { color: var(--ink); }
+.dive-sheet .dive-body { border-left: 0; padding: 0; margin: 0; }
+body.dive-lock { overflow: hidden; }
+@media (max-width: 720px) { .dive-sheet { width: 100vw; border-left: 0; padding: 0 18px 44px; } }
+@media (prefers-reduced-motion: reduce) { .dive-sheet, .dive-scrim { transition: none; } }
+
+/* reader notes (site_js/reader-notes.js): highlights, the note popover and the list; saved per browser */
+mark.nh { color: inherit; background: color-mix(in srgb, var(--accent, var(--link)) 18%, transparent); border-bottom: 1px solid var(--accent, var(--link)); border-radius: 2px; cursor: pointer; }
+mark.nh:focus-visible { outline: 2px solid var(--accent, var(--link)); outline-offset: 1px; }
+.nh-ask { position: absolute; z-index: 95; padding: 5px 11px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface); color: var(--accent, var(--link)); font: 500 12px/1.4 var(--mono); cursor: pointer; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+.nh-pop { position: absolute; z-index: 95; width: min(360px, calc(100vw - 24px)); padding: 12px 14px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); box-shadow: 0 10px 30px rgba(0, 0, 0, .25); }
+.nh-pop .nh-quote { margin: 0 0 8px; padding-left: 10px; border-left: 2px solid var(--accent, var(--link)); color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+.nh-pop textarea { box-sizing: border-box; width: 100%; min-height: 70px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--sans); resize: vertical; }
+.nh-pop textarea:focus { outline: 2px solid var(--accent, var(--link)); outline-offset: 0; }
+.nh-row { display: flex; gap: 14px; margin-top: 8px; }
+.nh-btn { padding: 2px 0; border: 0; background: none; cursor: pointer; color: var(--ink-3); font: 500 12px/1.6 var(--mono); }
+.nh-btn:hover { color: var(--ink); }
+.nh-save, .nh-go { color: var(--accent, var(--link)); }
+.nh-meta { margin: 0 0 4px; color: var(--ink-3); font: 500 12px/1.5 var(--mono); }
+.nh-text { margin: 0; color: var(--ink); font-size: 15px; line-height: 1.55; }
+.nh-sheet .nh-head-btns { display: flex; gap: 16px; flex: none; }
+.nh-sheet .nh-copy { color: var(--accent, var(--link)); }
+.nh-item { padding: 14px 0 16px; border-bottom: 1px solid var(--rule); }
+.nh-item blockquote { margin: 6px 0 8px; padding-left: 12px; border-left: 2px solid var(--accent, var(--link)); color: var(--ink-2); font-size: 15px; line-height: 1.55; }
+.nh-empty { color: var(--ink-2); }
+.nh-toc .n { color: var(--accent, var(--link)); }
+mjx-container.nh-eq { background: color-mix(in srgb, var(--accent, var(--link)) 14%, transparent); border-bottom: 1px solid var(--accent, var(--link)); border-radius: 3px; cursor: pointer; }
+mjx-container.nh-pick { outline: 1px dashed var(--accent, var(--link)); outline-offset: 3px; border-radius: 3px; }
+article mjx-container { cursor: pointer; }
+.nh-quote mjx-container.nh-eqcopy, .nh-item mjx-container.nh-eqcopy { cursor: default; font-size: 92%; margin: 2px 0 !important; overflow-x: auto; max-width: 100%; }
+.nh-hint { margin: -6px 0 4px; color: var(--ink-3); font-size: 13.5px; }
+.nav-search kbd { font: inherit; opacity: .6; margin-left: 6px; }
+.nh-editbox { margin-top: 6px; }
+.nh-editbox textarea { box-sizing: border-box; width: 100%; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--sans); resize: vertical; }
+.nh-editbox textarea:focus { outline: 2px solid var(--accent, var(--link)); outline-offset: 0; }
+.nh-sheet .nh-clear:hover { color: var(--grad, #c75a1a); }
+.nh-item [hidden], .nh-pop [hidden] { display: none !important; }
+
+/* public copy: colours, fonts and sizes come from the site's tokens.css; this maps the notebook's
+   token names onto them (green_theme.css's own token block is left out of public pages). */
+:root {
+  --paper: var(--void); --ink: var(--text); --ink-2: var(--soft); --ink-3: var(--muted);
+  --accent: var(--amber);
+  --cell: var(--green); --cell-wash: var(--green-wash); --hid: var(--blue); --hid-wash: var(--blue-wash);
+  --gate: var(--neutral); --gate-wash: var(--neutral-wash); --grad: var(--orange); --grad-wash: var(--orange-wash);
+  --sans: var(--font-sans); --mono: var(--font-mono);
+  --serif: "STIX Two Text", "Cambria Math", "Times New Roman", serif;
+}
+body { padding-block-start: 0; letter-spacing: 0; }
+/* the shared header sits inside the notebook's side padding */
+.site-header { width: min(100%, 1260px); margin-bottom: 40px; }
+.site-header a:hover { text-decoration: none; }
+@media (max-width: 720px) { .site-header { width: 100%; margin-bottom: 26px; } }
+/* the site's type scale */
+h1 { font-weight: 600; font-size: var(--fs-title); line-height: 1.12; letter-spacing: -.02em; }
+h2 { font-size: var(--fs-h2); letter-spacing: -.01em; }
+h3 { font-size: var(--fs-h3); }
+.dek { font-size: 18px; }
+.toc a.on { box-shadow: inset 2px 0 0 var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline-color: var(--accent); }
+footer .site-nav { display: block; margin-top: 10px; }
+.next { margin-top: 36px; font-weight: 500; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="a-cell" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path class="mk-cell" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-hid" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto"><path class="mk-hid" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-in" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-in" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-gate" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-cw" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path class="mk-cw" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="a-grad" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path class="mk-grad" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<header class="site-header"><a class="mark" href="../">deepam</a><nav aria-label="Primary navigation"><a href="../blog/">blog</a><a href="./">notes</a><button class="nav-search" type="button" data-search title="Search notes">search<kbd></kbd></button><button class="theme-toggle" id="theme-toggle" type="button" data-theme-toggle title="Switch color mode"><span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span><span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span></button></nav></header>
+<div class="page">
+  <nav class="toc" aria-label="Contents">
+    <details id="tocd" open>
+      <summary>Contents</summary>
+      <div class="label">Contents</div>
+      <ol>
+        <li><a href="#tldr"><span class="n">00</span>In short</a></li>
+        <li><a href="#from-words"><span class="n">01</span>From word vectors to text embeddings</a></li>
+        <li><a href="#sentence-embeddings"><span class="n">02</span>Sentence embeddings and how they're trained</a></li>
+        <li><a href="#bi-cross"><span class="n">03</span>Bi-encoders, cross-encoders and late interaction</a></li>
+        <li><a href="#similarity"><span class="n">04</span>Dot product, cosine and L2</a></li>
+        <li><a href="#ann"><span class="n">05</span>Exact and approximate search</a></li>
+        <li><a href="#hnsw"><span class="n">06</span>HNSW</a></li>
+        <li><a href="#ivf-pq"><span class="n">07</span>IVF and product quantization</a></li>
+        <li><a href="#hybrid"><span class="n">08</span>Hybrid search</a></li>
+        <li><a href="#vector-db"><span class="n">09</span>Vector databases</a></li>
+        <li><a href="#eval-retrieval"><span class="n">10</span>Evaluating retrieval</a></li>
+        <li><a href="#code"><span class="n">11</span>Pseudocode</a></li>
+        <li><a href="#reading"><span class="n">12</span>Further reading</a></li>
+        <li><a href="#questions"><span class="n">13</span>Interview questions</a></li>
+        <li><a href="#sheet"><span class="n">14</span>Cheat sheet</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <article>
+    <header class="hero">
+      <div class="tag">Notes · AI engineering</div>
+      <h1>Embeddings and vector search</h1>
+      <p class="dek">How text becomes a vector and how the nearest vectors are found fast: what an embedding captures and what it misses, how retrieval embedders are trained, bi-encoders against cross-encoders and late interaction, dot product, cosine and L2, exact against approximate search, HNSW, IVF and product quantization worked by hand, scalar and binary quantization, hybrid search with reciprocal rank fusion, what a vector database adds, and how to measure retrieval.</p>
+      <div class="meta">About 80 minutes, plus 30 questions · one running example: a six-article help centre · index numbers measured with FAISS and hnswlib on 200,000 synthetic vectors</div>
+    </header>
+
+    <section class="tldr" id="tldr" aria-labelledby="tldr-h">
+      <h2 id="tldr-h">In short</h2>
+      <ol>
+        <li><strong>An embedding model maps text to a fixed-length vector so that texts that should match land close together.</strong> It captures topic and paraphrase well, and negation, numbers, exact identifiers and long documents badly. A retrieval embedder is a transformer with a pooling step, trained contrastively on (query, relevant passage) pairs with in-batch and hard negatives.</li>
+        <li><strong>A bi-encoder embeds the query and each document separately, so documents are embedded once and searched with a dot product.</strong> A cross-encoder reads the query and document together and is more accurate, but costs a full forward pass per pair: cross-encoding a million documents for one query is about ten million times the work. So retrieve with a bi-encoder and rerank the top 50–100 with a cross-encoder. ColBERT sits between them.</li>
+        <li><strong>For unit-length vectors, dot product, cosine and L2 give the same ranking,</strong> because \(\lVert a - b \rVert^2 = 2 - 2\cos(a, b)\). Without normalization, the dot product rewards long vectors. Use the similarity the model was trained with.</li>
+        <li><strong>Exact search reads every vector:</strong> 10M × 768 float32 is 30.7 GB and 15.4 GFLOP per query, about 0.3 s at 100 GB/s of memory bandwidth. Approximate indexes trade a little recall (against exact search) for 100–1,000× less work: HNSW walks a layered neighbour graph; IVF scans only the clusters nearest the query; product quantization shrinks a 768-d vector from 3,072 bytes to 96.</li>
+        <li><strong>Dense retrieval misses exact terms and IDs; BM25 misses paraphrase.</strong> Run both and merge the rankings. Raw scores aren't comparable, so fuse ranks: reciprocal rank fusion scores a document \(\sum 1/(60 + \text{rank})\) over the lists, which rewards documents both retrievers agree on.</li>
+        <li><strong>A vector database is an index plus CRUD, metadata filters, persistence, sharding and replication.</strong> Filtering after ANN search can return too few results: with a filter that passes 1% of documents, a top-100 search leaves one match on average. Postgres with pgvector is enough up to a few million vectors. Measure retrieval with a labelled query set (recall@k, MRR, nDCG), and measure ANN recall separately, against brute force.</li>
+      </ol>
+    </section>
+
+    <!-- from-words -->
+    <h2 id="from-words"><span class="pn">01</span>From word vectors to text embeddings</h2>
+    <p>An <strong>embedding model</strong> is a function from a piece of text to a fixed-length list of numbers, usually 384 to 3,072 of them, trained so that texts that should match end up close together. Search then becomes geometry: embed every document once, embed the query, and return the stored vectors nearest to it. Everything in this note is either about making those vectors good (sections 01–04) or about finding the nearest ones fast (sections 05–09).</p>
+
+    <h3 id="lineage">Where text embeddings come from</h3>
+    <ul>
+      <li><strong>Word vectors</strong> (word2vec, GloVe) give one vector per word type, learned from which words appear near which (<a href="./classical-nlp.html#word2vec">classical NLP: word2vec</a>). Averaging them gives a sentence vector that ignores order and negation but is a reasonable baseline (<a href="./classical-nlp.html#using">from word vectors to a sentence vector</a>).</li>
+      <li><strong>Contextual encoders</strong> such as BERT give one vector per token, computed from the whole sentence, so “bank” differs between a river and a loan (<a href="./classical-nlp.html#contextual">static to contextual</a>). To get one vector per text you pool the token vectors (section 02).</li>
+      <li><strong>A pretrained BERT is not a sentence embedder.</strong> It was trained to fill in masked words, not to put similar sentences close together. On seven sentence-similarity benchmarks, the Sentence-BERT paper found averaged BERT token vectors scored 54.8 (the rank correlation with human similarity ratings, × 100, averaged), below averaged GloVe vectors at 61.3, and BERT's CLS vector scored 29.2. The same network fine-tuned on sentence pairs (SBERT) scored 74.9. The similarity comes from the training objective, not from the architecture.</li>
+      <li><strong>Other modalities use the same recipe.</strong> CLIP trains an image encoder and a text encoder with the same contrastive loss, so both map into one space; that's what makes searching images with text work.</li>
+    </ul>
+
+    <h3 id="example">The running example</h3>
+    <p>A help centre with six short articles. Every section comes back to it.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Id</th><th>Article</th></tr></thead>
+      <tbody>
+        <tr><td>d1</td><td>Reset your password from the sign-in page</td></tr>
+        <tr><td>d2</td><td>Refunds for cancelled orders take 5–7 days</td></tr>
+        <tr><td>d3</td><td>Error E-4012: card payment declined by the bank</td></tr>
+        <tr><td>d4</td><td>Change the email address on your account</td></tr>
+        <tr><td>d5</td><td>Track where your delivery is</td></tr>
+        <tr><td>d6</td><td>Payment failed but money was deducted</td></tr>
+      </tbody>
+    </table></div>
+    <p>Three queries test different things. “forgot my login details” shares no word with d1, so only meaning can find it. “E-4012” is an exact code that only d3 contains. “payment failed, error E-4012, want a refund” touches d3, d6 and d2 at once.</p>
+
+    <h3 id="encodes">What the space captures, and what it doesn't</h3>
+    <p>A retrieval embedder is trained on millions of (query, relevant passage) pairs, so it learns whatever those pairs have in common: <strong>topic, paraphrase and intent</strong>. “forgot my login details” lands near “Reset your password from the sign-in page” although they share no word. Subword tokens mean a typo never becomes an unknown word, though dense retrievers still lose noticeable accuracy on misspelled queries (Zhuang and Zuccon, 2021), so put some in your test set. Multilingual models put translations near each other.</p>
+    <p>What it handles badly, and why:</p>
+    <ul>
+      <li><strong>Negation.</strong> “Refunds are allowed after 30 days” and “Refunds are not allowed after 30 days” share almost every token and topic, and training pairs rarely differ by a “not” alone, so their vectors sit close together. The NevIR benchmark (Weller et al., 2023) found most neural retrievers at or below random at ranking such pairs; cross-encoders did best, late-interaction models next, and bi-encoders and sparse neural models worst.</li>
+      <li><strong>Numbers and quantities.</strong> “Orders over 50” and “orders over 500” are split into similar subword pieces, and nothing in training asks the vector to encode magnitude, so they look nearly identical.</li>
+      <li><strong>Exact identifiers and rare names.</strong> “E-4012” becomes pieces like “E”, “-”, “40”, “12”. The vector says “an error code”, not which one, so E-4012 and E-4021 are close. BM25 matches them exactly (section 08).</li>
+      <li><strong>Long documents.</strong> Text beyond the model's maximum length (often 512 tokens; some newer models take 8,192) is silently cut off. Even within the limit, one vector for a page that covers five topics is a blur of all five, so it matches none of them strongly. This is why documents are chunked (<a href="./rag.html#chunking">chunking</a>).</li>
+      <li><strong>Roles and structure.</strong> “Flights from Delhi to Mumbai” and “from Mumbai to Delhi” differ only in who does what, which a single pooled vector keeps only weakly.</li>
+      <li><strong>Similar is not the same as relevant.</strong> A question is most similar to other questions, not to its answer. Retrieval models fix this with training pairs and query prefixes (section 02), and it's why a general similarity model makes a poor retriever.</li>
+      <li><strong>Anything outside the text:</strong> freshness, permissions, popularity, which version is current. Those belong in metadata filters and the ranking stage.</li>
+    </ul>
+    <aside class="note trap"><p class="nl">Trap</p><p>“The cosine is 0.8, so the document is 80% relevant.” Similarity scores aren't probabilities and aren't comparable across models: one model puts unrelated texts at 0.1, another at 0.7 (section 04, anisotropy). Even within one model, a good match for one query may score lower than a poor match for another. Rank by score; if you need a cut-off (“no good answer”), set it per model on labelled data.</p></aside>
+    <p><strong>Say it in an interview:</strong> “An embedding model maps text to a vector so that texts that should match are close. It captures topic and paraphrase, which is why ‘forgot my login’ finds ‘reset your password’. It's weak at negation, numbers, exact IDs and long documents, so I pair it with keyword search, chunk long documents, and never treat a cosine as a probability.”</p>
+
+    <!-- sentence-embeddings -->
+    <h2 id="sentence-embeddings"><span class="pn">02</span>Sentence embeddings and how they're trained</h2>
+    <p>A sentence embedder is a transformer encoder (<a href="./transformers.html">transformers</a>) plus a pooling step that turns its token vectors into one vector, fine-tuned so that the pooled vectors of matching texts are close. Three choices define it: how to pool, what to train on, and with which loss.</p>
+
+    <h3 id="pooling">Pooling: CLS, mean or last token</h3>
+    <p>The encoder outputs one vector \(h_t\) per token. To get one vector per text:</p>
+    <ul>
+      <li><strong>CLS pooling:</strong> take the vector of the special first token. In a BERT pretrained only with masked words it's a poor summary (the 29.2 above); after contrastive fine-tuning it works, because training teaches it to summarize.</li>
+      <li><strong>Mean pooling:</strong> average the token vectors, skipping padding. Sentence-BERT's default, and the most common choice for encoder models.</li>
+      <li><strong>Last-token pooling:</strong> for embedders built from decoder LLMs. With causal attention only the final token has seen the whole text, so its vector (often of an end-of-sequence token) is the summary.</li>
+    </ul>
+    <p>Mean pooling with an attention mask \(m_t\) (1 for a real token, 0 for padding), followed by normalization to unit length:</p>
+    <div class="mj">\[ \begin{aligned} e &amp;= \frac{\sum_{t=1}^{T} m_t\, h_t}{\sum_{t=1}^{T} m_t} \\ \hat e &amp;= \frac{e}{\lVert e \rVert} \end{aligned} \]</div>
+    <p>In words: add up the vectors of the real tokens, divide by how many there are, then scale the result to length 1.</p>
+    <p><strong>Why the mask matters, in numbers.</strong> A three-token text with token vectors (2, 0), (0, 2), (1, 1) is padded to five tokens in a batch, and the padding positions come out as (0.5, −3). The masked mean is (1, 1). Averaging all five rows gives (0.8, −0.6), a vector pointing somewhere else entirely. Worse, the same text gets a different vector depending on how long the other texts in its batch were.</p>
+    <aside class="note trap"><p class="nl">Trap</p><p>Use the pooling the model was trained with; it's in the model's configuration. Mean-pooling a model trained with CLS pooling, or the reverse, gives vectors that still “work”, just worse, and no error tells you.</p></aside>
+
+    <h3 id="training">How a retrieval embedder is trained</h3>
+    <p><strong>The data</strong> is pairs of texts that should match: a search query and the page that was clicked, a question and its accepted answer, a title and its body, two questions marked as duplicates, a sentence and one it entails. Modern embedders are typically trained in two stages: contrastive pretraining on hundreds of millions of weakly related pairs scraped from the web, then fine-tuning on a smaller set of curated, labelled pairs with mined hard negatives.</p>
+    <p><strong>The loss</strong> is InfoNCE: for each query, a softmax over one positive passage and many negatives, trained to put its weight on the positive. The loss itself, its gradient, and why the temperature and batch size matter live in <a href="./loss-functions.html#contrastive">metric learning and contrastive losses</a>. For retrieval it usually looks like this, for a batch of \(B\) pairs \((q_i, p_i)\), each optionally with mined hard negatives \(n_{i,h}\):</p>
+    <div class="mj">\[ L_i = -\log \frac{e^{s(q_i, p_i)/\tau}}{\sum_{j=1}^{B} e^{s(q_i, p_j)/\tau} + \sum_{h} e^{s(q_i, n_{i,h})/\tau}} \]</div>
+    <p>In words: the score of the query with its own passage, against its scores with every other passage in the batch (the in-batch negatives) and with its hard negatives. \(s\) is the cosine and \(\tau\) the temperature.</p>
+    <ul>
+      <li><strong>In-batch negatives are free.</strong> One matrix product of the \(B\) query vectors with the \(B\) passage vectors gives every score; each query gets \(B - 1\) negatives without encoding anything extra. That's why bigger batches help, and why multi-GPU training gathers vectors from every device before the softmax.</li>
+      <li><strong>But they're mostly easy.</strong> A random passage about delivery tracking is an easy negative for a password question; the model separates topics within the first steps and then stops learning the fine distinctions retrieval needs.</li>
+      <li><strong>The temperature</strong> is small, typically 0.01–0.05. sentence-transformers' standard loss for this (MultipleNegativesRankingLoss) multiplies cosines by 20, which is \(\tau = 0.05\). Without it, cosines span only −1 to 1 and the softmax can never become confident (<a href="./loss-functions.html#contrastive">why the temperature matters</a>).</li>
+      <li><strong>Distillation</strong> is the other common signal: train the bi-encoder to reproduce a cross-encoder's scores on (query, passage) pairs, so the cheap model inherits some of the accurate one's judgement (section 03).</li>
+    </ul>
+
+    <h3 id="hard-negatives">Hard negatives, and false negatives</h3>
+    <p>A <strong>hard negative</strong> is a passage that looks relevant to the query but isn't. In the help centre, for “how do I change my email”, d1 (reset your password) is hard: same account-settings vocabulary, wrong task. d5 (delivery tracking) is easy. Hard negatives force the model to learn the distinction that matters.</p>
+    <ul>
+      <li><strong>Mining them:</strong> for each training query, take the top results of BM25 or of the current model, remove the labelled positives, and use what's left as negatives. Re-mine with the improved model and train again for a second round.</li>
+      <li><strong>The danger is false negatives.</strong> Labelled data usually marks one relevant passage per query, but the corpus often holds others. The top-ranked “negatives” are exactly where those unlabelled relevant passages sit, and training pushes them away: the model learns to rank relevant text lower.</li>
+      <li><strong>Fixes:</strong> score mined negatives with a cross-encoder and drop those it rates as relevant; sample from ranks 10–100 rather than the very top; deduplicate near-identical passages before mining.</li>
+    </ul>
+
+    <h3 id="prefixes">Asymmetric search: query prefixes and instructions</h3>
+    <p><strong>Symmetric</strong> tasks compare texts of the same kind: duplicate questions, clustering, “find similar tickets”. <strong>Asymmetric</strong> tasks compare a short query with a long passage that answers it. The two sides are different kinds of text, and the right passage isn't “similar” to the query in the everyday sense. Two designs handle the asymmetry:</p>
+    <ul>
+      <li><strong>Two encoders,</strong> one for queries and one for passages (DPR used two BERTs). Each side specializes, at twice the parameters.</li>
+      <li><strong>One shared encoder told which side it's encoding.</strong> E5 models expect every input to start with “query: ” or “passage: ”, and their model card warns that leaving them out degrades results. BGE v1.5 prepends “Represent this sentence for searching relevant passages: ” to queries only (optional for v1.5, with a slight drop without it). Instruction-tuned embedders take a free-text task description, so one model can serve retrieval, clustering and classification.</li>
+    </ul>
+    <aside class="note trap"><p class="nl">Trap</p><p>A missing or wrong prefix fails silently: no error, just worse retrieval. Use exactly what the model card says, on the right side, at both indexing and query time. And vectors from different models, or different versions of one model, live in different spaces: changing the model means re-embedding the whole corpus.</p></aside>
+
+    <h3 id="matryoshka">Matryoshka embeddings</h3>
+    <p>A <strong>Matryoshka</strong> model (Kusupati et al., 2022) is trained so that the first 64, 128, 256 or 512 numbers of its vector each work as an embedding on their own, like nested dolls. The loss is the usual contrastive loss applied to several prefixes of the vector and added up:</p>
+    <div class="mj">\[ L_{\text{MRL}} = \sum_{m \in \mathcal{M}} c_m\, L\big(e_{1:m}\big), \qquad \mathcal{M} = \{64, 128, 256, 512, 768\} \]</div>
+    <p>In words: compute the loss using only the first \(m\) dimensions, for each size \(m\) in the list, and minimize a weighted sum, so the most important information is packed into the earliest dimensions.</p>
+    <ul>
+      <li><strong>Use:</strong> store 256 of 768 dimensions for a third of the memory and distance cost, or shortlist with 64 dimensions and rescore the shortlist with all 768. The paper reports up to 14× smaller embeddings at the same accuracy on ImageNet classification; for text, check the loss at your chosen size on your own queries.</li>
+      <li><strong>Re-normalize after truncating.</strong> Take \(e = (0.6, 0, 0.8)\) and \(f = (0.8, 0.6, 0)\), both unit length, cosine 0.48. Keep the first two dimensions: the dot product is still 0.48, but the truncated vectors have lengths 0.6 and 1.0, so the true cosine is \(0.48/0.6 = 0.8\). Without re-normalizing, how much of each vector happened to sit in the kept dimensions leaks into the score.</li>
+      <li><strong>Truncating a non-Matryoshka model</strong> loses quality much faster, because its information is spread over all dimensions. Reduce it with PCA instead (PCA), or pick a smaller model.</li>
+    </ul>
+
+    <h3 id="multilingual">Multilingual embeddings</h3>
+    <p>A multilingual model puts a sentence and its translations close together, so a Hindi query can retrieve an English article: cross-lingual retrieval. It's trained with translation pairs as positives, or by distillation: a multilingual student learns to map both a sentence and its translation to an English teacher's vector for the original (Reimers and Gurevych, 2020).</p>
+    <ul>
+      <li><strong>Language bias:</strong> documents in the query's language often score higher than better documents in another language, so a mixed-language corpus can rank by language before relevance.</li>
+      <li><strong>Uneven quality:</strong> low-resource languages get less training data. Their tokenizers also split words into more pieces, so the same text uses more tokens and hits the length limit sooner.</li>
+      <li><strong>Romanized and code-mixed text</strong> (Hindi typed in Latin script, mixed with English) is common in real queries and thinly covered in training data.</li>
+      <li>Evaluate per language, on real queries in each one.</li>
+    </ul>
+
+    <h3 id="fine-tune">Domain fine-tuning: when it pays and how</h3>
+    <p><strong>It pays when</strong> the domain's vocabulary is far from web text (legal clauses, agricultural terms, internal product names), when the notion of relevance differs from the generic one (“same intent” rather than “same topic”), and when an off-the-shelf model's recall@k on a labelled set of your queries is clearly short. <strong>It doesn't</strong> when the failures are exact IDs (add BM25), bad chunks (fix chunking), or a ranking problem a reranker would solve, or when nobody will own re-embedding the corpus after every model change.</p>
+    <p><strong>Where positives come from:</strong></p>
+    <ul>
+      <li><strong>Behaviour logs:</strong> a query and the article the user opened and stayed on; a support ticket and the article that resolved it.</li>
+      <li><strong>Structure:</strong> FAQ question and answer, title and body, a heading and its section.</li>
+      <li><strong>Synthetic queries:</strong> ask an LLM to write two or three questions each chunk answers, then use (question, chunk) as a pair. Cheap and effective, but generated questions tend to copy the chunk's wording, so filter them (for example, keep a question only if the chunk ranks highly for it under a cross-encoder) and mix in real queries.</li>
+    </ul>
+    <p><strong>Negatives:</strong> mine hard negatives from BM25 and the current model, filter false negatives with a cross-encoder, and keep in-batch negatives too. <strong>Recipe:</strong> start from a strong general model, train for one to three epochs with a small learning rate (around \(2 \times 10^{-5}\)), split train and test by query and by document so nothing leaks (<a href="./data-preparation.html#split">honest splits</a>), check that general queries didn't get worse, then re-embed the corpus.</p>
+    <p><strong>Cheaper alternatives first:</strong> fine-tuning a cross-encoder reranker often gives more lift per labelled pair and needs no re-indexing; a small linear adapter trained on the query side only also leaves the document vectors untouched.</p>
+
+    <h3 id="choosing">Choosing a model: MTEB and its limits</h3>
+    <p><strong>MTEB</strong> (Massive Text Embedding Benchmark; Muennighoff et al., 2022) scores embedders on eight task types: retrieval, reranking, semantic similarity, classification, clustering, pair classification, summarization and bitext mining. The original release had 58 datasets in 112 languages; later versions extended it. It's the right place to build a shortlist and the wrong place to make the final choice:</p>
+    <ul>
+      <li><strong>The headline average mixes tasks.</strong> A model can top the average on classification and clustering while being mid-table at retrieval. For search, read the retrieval column (nDCG@10, a ranking-quality score; section 10).</li>
+      <li><strong>Your domain, language and query style may not be in it.</strong> Users type three-word, misspelled, code-mixed queries; benchmarks mostly don't.</li>
+      <li><strong>Overfitting to the benchmark:</strong> some models train on the training splits of benchmark datasets, or on near-copies of them, so their scores overstate how they'll do on unseen data.</li>
+      <li><strong>Gaps of a point or two between top models</strong> often vanish or reverse on your data.</li>
+      <li><strong>It ignores cost:</strong> parameters (embedding latency), dimension (index memory), maximum length, licence, and whether you can self-host.</li>
+    </ul>
+    <p><strong>A process that works:</strong> shortlist three to five models by retrieval score, size, dimension, maximum length, languages and licence; evaluate each on 100–300 labelled queries of your own (section 10); take the cheapest one within noise of the best.</p>
+
+    <h3 id="dims">Dimension and cost</h3>
+    <p>Every cost in search grows linearly with the dimension: memory, the work per distance, and the bytes read per query. For 10 million vectors stored as float32 (4 bytes per number):</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Dimensions</th><th>Bytes per vector</th><th>10M vectors</th></tr></thead>
+      <tbody>
+        <tr><td>384</td><td>1,536</td><td>15.4 GB</td></tr>
+        <tr><td>768</td><td>3,072</td><td>30.7 GB</td></tr>
+        <tr><td>1,024</td><td>4,096</td><td>41.0 GB</td></tr>
+        <tr><td>1,536</td><td>6,144</td><td>61.4 GB</td></tr>
+        <tr><td>3,072</td><td>12,288</td><td>122.9 GB</td></tr>
+      </tbody>
+    </table></div>
+    <p>The levers, roughly in order of compression: float16 (2× smaller, essentially free), Matryoshka truncation, int8 scalar quantization (4×), binary quantization (32×, with rescoring) and product quantization (16–64×), all in section 07. The model's size, separately, sets how long each query takes to embed and how much it costs to embed the corpus. A smaller, well-trained model often beats a bigger dimension; measure on your queries.</p>
+    <p><strong>Say it in an interview:</strong> “A retrieval embedder is a transformer with mean or CLS pooling, trained with InfoNCE on query–passage pairs: in-batch negatives for volume, mined hard negatives for the fine distinctions, filtered with a cross-encoder so false negatives don't teach it to push relevant text away. I'd shortlist from MTEB's retrieval column, then choose on a labelled set of my own queries, and fine-tune only if that set shows a domain gap that hybrid search and a reranker don't close.”</p>
+
+    <!-- bi-cross -->
+    <h2 id="bi-cross"><span class="pn">03</span>Bi-encoders, cross-encoders and late interaction</h2>
+    <p>Three ways to score a (query, document) pair with a transformer, which differ in one thing: <em>when</em> the query and the document first see each other.</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 660 270" role="img" aria-label="Three architectures side by side. Bi-encoder: the query and the document each go through their own encoder pass to a single vector, and the score is the dot product of the two vectors; the document side runs offline. Cross-encoder: the query and document are fed together into one encoder that outputs a score; one full pass per pair. Late interaction: query and document are encoded separately into one vector per token, and a MaxSim step compares every query token vector with every document token vector to produce the score.">
+          <text x="110" y="20" text-anchor="middle" style="fill:var(--ink);font-weight:600">Bi-encoder</text>
+          <text x="330" y="20" text-anchor="middle" style="fill:var(--ink);font-weight:600">Cross-encoder</text>
+          <text x="550" y="20" text-anchor="middle" style="fill:var(--ink);font-weight:600">Late interaction</text>
+          <path d="M220 34 V256 M440 34 V256" style="stroke:var(--rule);stroke-width:1;fill:none"/>
+          <!-- bi-encoder -->
+          <text x="110" y="46" text-anchor="middle">score</text>
+          <path class="cw" d="M110 68 V54" marker-end="url(#a-cw)"/>
+          <circle class="op" cx="110" cy="82" r="13"/>
+          <text x="110" y="86" text-anchor="middle" style="fill:var(--ink);font-size:11px">cos</text>
+          <path class="cw" d="M62 108 L99 91 M158 108 L121 91"/>
+          <rect class="cellon" x="37" y="112" width="10" height="10"/><rect class="cellon" x="47" y="112" width="10" height="10"/><rect class="cellon" x="57" y="112" width="10" height="10"/><rect class="cellon" x="67" y="112" width="10" height="10"/><rect class="cellon" x="77" y="112" width="10" height="10"/>
+          <rect class="cellon" x="135" y="112" width="10" height="10"/><rect class="cellon" x="145" y="112" width="10" height="10"/><rect class="cellon" x="155" y="112" width="10" height="10"/><rect class="cellon" x="165" y="112" width="10" height="10"/><rect class="cellon" x="175" y="112" width="10" height="10"/>
+          <path class="cw" d="M62 150 V128" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M160 150 V128" marker-end="url(#a-cw)"/>
+          <rect class="box" x="27" y="152" width="70" height="46" rx="8"/>
+          <rect class="box" x="125" y="152" width="70" height="46" rx="8"/>
+          <text x="62" y="180" text-anchor="middle">encoder</text>
+          <text x="160" y="180" text-anchor="middle">encoder</text>
+          <path class="cw" d="M62 222 V202" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M160 222 V202" marker-end="url(#a-cw)"/>
+          <text x="62" y="238" text-anchor="middle">query</text>
+          <text x="160" y="238" text-anchor="middle">doc</text>
+          <text class="lbl" x="110" y="260" text-anchor="middle">doc side runs once, offline</text>
+          <!-- cross-encoder -->
+          <text x="330" y="46" text-anchor="middle">score</text>
+          <path class="cw" d="M330 106 V54" marker-end="url(#a-cw)"/>
+          <rect class="gbox" x="268" y="108" width="124" height="90" rx="8"/>
+          <text x="330" y="146" text-anchor="middle" style="fill:var(--ink)">encoder</text>
+          <text class="lbl" x="330" y="166" text-anchor="middle">every token</text>
+          <text class="lbl" x="330" y="180" text-anchor="middle">sees every token</text>
+          <path class="cw" d="M330 222 V202" marker-end="url(#a-cw)"/>
+          <text x="330" y="238" text-anchor="middle">query + doc, together</text>
+          <text class="lbl" x="330" y="260" text-anchor="middle">one full pass per pair</text>
+          <!-- late interaction -->
+          <text x="550" y="46" text-anchor="middle">score</text>
+          <path class="cw" d="M550 64 V54" marker-end="url(#a-cw)"/>
+          <rect class="gbox" x="508" y="66" width="84" height="28" rx="6"/>
+          <text x="550" y="85" text-anchor="middle" style="fill:var(--ink)">MaxSim</text>
+          <path class="cw" d="M502 110 L530 96 M600 110 L570 96"/>
+          <rect class="cellon" x="482" y="112" width="11" height="11"/><rect class="cellon" x="497" y="112" width="11" height="11"/><rect class="cellon" x="512" y="112" width="11" height="11"/>
+          <rect class="cellon" x="572" y="112" width="11" height="11"/><rect class="cellon" x="587" y="112" width="11" height="11"/><rect class="cellon" x="602" y="112" width="11" height="11"/><rect class="cellon" x="617" y="112" width="11" height="11"/>
+          <path class="cw" d="M502 150 V128" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M600 150 V128" marker-end="url(#a-cw)"/>
+          <rect class="box" x="467" y="152" width="70" height="46" rx="8"/>
+          <rect class="box" x="565" y="152" width="70" height="46" rx="8"/>
+          <text x="502" y="180" text-anchor="middle">encoder</text>
+          <text x="600" y="180" text-anchor="middle">encoder</text>
+          <path class="cw" d="M502 222 V202" marker-end="url(#a-cw)"/>
+          <path class="cw" d="M600 222 V202" marker-end="url(#a-cw)"/>
+          <text x="502" y="238" text-anchor="middle">query</text>
+          <text x="600" y="238" text-anchor="middle">doc</text>
+          <text class="lbl" x="550" y="260" text-anchor="middle">one vector per token</text>
+        </svg>
+      </div>
+      <figcaption>Left: the query and document meet only at the final dot product, so every document vector can be computed in advance. Middle: they meet at the input, so nothing can be precomputed, but every layer can compare them. Right: they meet after encoding, token by token; document token vectors are precomputed.</figcaption>
+    </figure>
+
+    <h3 id="bi">Bi-encoder</h3>
+    <p>The query and the document are encoded separately, each into one vector, and the score is their dot product or cosine. Since a document's vector doesn't depend on the query, the whole corpus is embedded once, offline, and stored in an index; at query time you embed only the query and search. This is the architecture of every model in section 02, and the only one whose single vector per document drops straight into the vector indexes of sections 05–07 (ColBERT uses them too, over token vectors, with extra machinery).</p>
+
+    <h3 id="cross">Cross-encoder</h3>
+    <p>The query and document are concatenated into one input, <code>[CLS] query [SEP] document [SEP]</code>, and a transformer outputs a single relevance score from the CLS position, trained as a classifier or ranker on labelled pairs. Every query token attends to every document token in every layer, so it can check that the document answers <em>this</em> question: that the “not” is in the right place, that the error code matches, that the right entity does the right thing.</p>
+
+    <h3 id="cost">The cost per query, in arithmetic</h3>
+    <p>A useful rule: a transformer forward pass costs about 2 FLOPs (floating-point operations) per weight per token: one multiply and one add. Each BERT-base layer has \(4 \times 768^2\) weights in its query, key, value and output projections and \(2 \times 768 \times 3{,}072 = 8 \times 768^2\) in its feed-forward block, so \(12 \times 768^2\) per layer and about 85 million over 12 layers (the embedding table is a lookup, not a matrix product). For \(T = 256\) tokens that's \(2 \times 85\text{M} \times 256 = 43.5\) GFLOP; the attention scores and the weighted sum add \(4T^2 \times 768\) per layer, 2.4 GFLOP over 12 layers, for 45.9 GFLOP per pair:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Work</th><th>FLOPs</th><th>At an assumed 100 TFLOP/s</th></tr></thead>
+      <tbody>
+        <tr><td>One (query, document) pair, 256 tokens, through a cross-encoder</td><td>45.9 G</td><td>0.46 ms</td></tr>
+        <tr><td>Cross-encode all 1M documents for one query</td><td>45.9 P</td><td>459 s</td></tr>
+        <tr><td>Cross-encode the top 100 (reranking)</td><td>4.6 T</td><td>46 ms</td></tr>
+        <tr><td>Bi-encoder: embed a 16-token query</td><td>2.7 G</td><td>0.03 ms</td></tr>
+        <tr><td>Bi-encoder: 1M dot products at 768 dimensions</td><td>1.5 G</td><td>memory-bound (section 05)</td></tr>
+        <tr><td>Bi-encoder: embed the whole corpus once, offline</td><td>45.9 P</td><td>459 s, once</td></tr>
+      </tbody>
+    </table></div>
+    <p>In words: scoring a million documents with a cross-encoder costs about 46 PFLOP per query, versus about 4.3 GFLOP for the bi-encoder's query embedding and dot products, a ratio of about ten million. The bi-encoder pays the same 46 PFLOP once, when indexing, instead of on every query. (100 TFLOP/s is an assumption: a modern data-centre GPU at a realistic fraction of its peak.)</p>
+    <p>The Sentence-BERT paper puts the same point in its abstract: finding the most similar pair among 10,000 sentences means scoring \(10{,}000 \times 9{,}999 / 2 = 49{,}995{,}000\) pairs, which it estimates at about 65 hours with a BERT cross-encoder and about 5 seconds with SBERT embeddings.</p>
+
+    <h3 id="quality-gap">Why the cross-encoder is more accurate</h3>
+    <ul>
+      <li><strong>The bottleneck:</strong> a bi-encoder must squeeze the whole document into one vector before it knows the question, so the vector has to anticipate every question the document might answer. A cross-encoder reads the document with the question in hand.</li>
+      <li><strong>The interaction:</strong> the bi-encoder's only comparison is one dot product at the end, a weak function of the two texts. The cross-encoder compares them token by token through every layer, which is what negation, numbers and exact entity matches need; on NevIR it was the strongest family.</li>
+      <li><strong>The price:</strong> no precomputation, so it can only rerank a short list another retriever produced.</li>
+    </ul>
+
+    <h3 id="colbert">Late interaction: ColBERT</h3>
+    <p>ColBERT (Khattab and Zaharia, 2020) keeps the bi-encoder's separate encoding but doesn't pool: every token keeps its own vector (projected to 128 dimensions and normalized), and the score compares tokens:</p>
+    <div class="mj">\[ s(q, d) = \sum_{i=1}^{\lvert q \rvert} \max_{j}\, q_i^\top d_j \]</div>
+    <p>In words: each query token finds its best-matching document token, and the score adds up those best matches. This is <strong>MaxSim</strong>.</p>
+    <p><strong>By hand.</strong> Query token vectors \(q_1 = (1, 0)\), \(q_2 = (0, 1)\); document token vectors \(d_1 = (0.8, 0.6)\), \(d_2 = (0.6, 0.8)\), \(d_3 = (-1, 0)\):</p>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>\(d_1\)</th><th>\(d_2\)</th><th>\(d_3\)</th><th>Best match</th></tr></thead>
+      <tbody>
+        <tr><td>\(q_1\)</td><td>0.8</td><td>0.6</td><td>−1.0</td><td>0.8 (\(d_1\))</td></tr>
+        <tr><td>\(q_2\)</td><td>0.6</td><td>0.8</td><td>0.0</td><td>0.8 (\(d_2\))</td></tr>
+      </tbody>
+    </table></div>
+    <p>The score is 0.8 + 0.8 = 1.6. Now notice \(d_3\), a token that matches nothing. MaxSim ignores it: drop it and the score is still 1.6. Mean pooling doesn't: the pooled cosine is 0.874 with \(d_3\) and 1.0 without it. One vector per token keeps fine-grained matches that pooling dilutes.</p>
+    <ul>
+      <li><strong>Cheaper than a cross-encoder:</strong> document token vectors are computed offline; a query costs one encoder pass plus \(\lvert q \rvert \times \lvert d \rvert\) small dot products per candidate. The paper reports about two orders of magnitude faster than BERT-based rerankers, with four orders of magnitude fewer FLOPs per query, at competitive quality.</li>
+      <li><strong>Dearer than a bi-encoder, in storage:</strong> a 100-token passage at 128 dimensions in float16 is 25.6 KB, against 3 KB for one 768-dimension float32 vector (8.3×). ColBERTv2 compresses each token vector to a cluster id plus a 1–2-bit residual per dimension: at 2 bits that's 36 bytes per token, 3.6 KB per passage. Its paper reports 6–10× less storage.</li>
+      <li><strong>More machinery:</strong> searching over token vectors needs its own candidate-generation stage, so it's less plug-and-play than “a vector per chunk in a vector database”.</li>
+    </ul>
+
+    <h3 id="combine">How they combine</h3>
+    <p>The standard pipeline is a funnel, each stage costlier per item and given fewer items: retrieve 100–1,000 candidates with the bi-encoder (usually alongside BM25, section 08), rerank the top 50–100 with a cross-encoder, and pass the top 5–10 on, for example to an LLM. The reranking stage itself, its models and its latency budget, is covered in <a href="./rag.html#rerank">RAG: reranking</a>; the same retrieve-then-rank shape runs recommendation systems (<a href="./ml-system-design.html#two-stage">two-stage retrieval and ranking</a>).</p>
+    <aside class="note trap"><p class="nl">Trap</p><p>A reranker can only reorder what retrieval found. If the right chunk isn't in the top 100, no reranker brings it back. So tune the first stage for recall at the depth you rerank (recall@100: the share of relevant documents found in the top 100; section 10), and the reranker for precision at the top.</p></aside>
+    <p><strong>Say it in an interview:</strong> “A bi-encoder embeds query and document separately, so the corpus is embedded once and searched with a dot product. A cross-encoder reads them together, which catches negation and exact matches but costs a forward pass per pair: about ten million times more work than a bi-encoder to score a million documents. So I retrieve a few hundred with a bi-encoder plus BM25 and rerank the top 50 with a cross-encoder. ColBERT is the middle: precomputed token vectors scored with MaxSim, at several times the storage.”</p>
+
+    <!-- similarity -->
+    <h2 id="similarity"><span class="pn">04</span>Dot product, cosine and L2</h2>
+    <p>Three ways to measure how close two vectors are:</p>
+    <div class="mj">\[ \begin{aligned} \text{dot}(a, b) &amp;= a^\top b = \sum_i a_i b_i \\ \cos(a, b) &amp;= \frac{a^\top b}{\lVert a \rVert\, \lVert b \rVert} \\ \lVert a - b \rVert^2 &amp;= \lVert a \rVert^2 + \lVert b \rVert^2 - 2\, a^\top b \end{aligned} \]</div>
+    <p>In words: the dot product multiplies matching coordinates and adds them; the cosine is the dot product with both lengths divided out, so it measures only the angle (1 for the same direction, 0 for perpendicular); the squared Euclidean (L2) distance is the squared length of the gap between them, which the third line expands. Larger dot and cosine mean closer; smaller L2 means closer.</p>
+    <p><strong>Example.</strong> \(a = (3, 4)\), \(b = (4, 3)\). Dot product \(12 + 12 = 24\); both lengths are 5, so the cosine is \(24/25 = 0.96\); the squared L2 distance is \(1^2 + 1^2 = 2\).</p>
+
+    <h3 id="agree">When they agree: unit vectors</h3>
+    <p>Scale both vectors to length 1, so \(\lVert a \rVert = \lVert b \rVert = 1\). The dot product is then the cosine, and the expansion of the L2 distance becomes:</p>
+    <div class="mj">\[ \begin{aligned} \lVert a - b \rVert^2 &amp;= \lVert a \rVert^2 + \lVert b \rVert^2 - 2\, a^\top b \\ &amp;= 1 + 1 - 2\cos(a, b) \\ &amp;= 2 - 2\cos(a, b) \end{aligned} \]</div>
+    <p>In words: for unit vectors the squared distance is a decreasing straight-line function of the cosine, so sorting by largest dot product, largest cosine or smallest L2 distance gives exactly the same order.</p>
+    <p><strong>Check:</strong> normalized, \(a = (0.6, 0.8)\) and \(b = (0.8, 0.6)\). Their squared distance is \(0.2^2 + 0.2^2 = 0.08\), and \(2 - 2 \times 0.96 = 0.08\).</p>
+    <p>So normalize every vector once, at indexing and at query time, and any index can serve any of the three: an L2 index answers cosine queries, and an inner-product index does too.</p>
+
+    <h3 id="disagree">When they disagree: length</h3>
+    <p>A query \(q = (1, 0)\) and two documents: \(u = (0.9, 0.1)\), short and pointing almost the same way, and \(v = (3, 3)\), long and at 45°.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Document</th><th>Length</th><th>Dot</th><th>Cosine</th><th>L2</th><th>Winner by</th></tr></thead>
+      <tbody>
+        <tr><td>\(u = (0.9, 0.1)\)</td><td>0.91</td><td>0.90</td><td>0.994</td><td>0.141</td><td>cosine, L2</td></tr>
+        <tr><td>\(v = (3, 3)\)</td><td>4.24</td><td>3.00</td><td>0.707</td><td>3.606</td><td>dot</td></tr>
+      </tbody>
+    </table></div>
+    <p>The dot product rewards length: \(v\) wins although it points further away. L2 penalizes any difference in length, longer or shorter.</p>
+    <ul>
+      <li><strong>Length can carry meaning.</strong> In two-tower recommenders trained with the dot product, an item vector's length often tracks popularity, and normalizing removes that signal. Some text retrievers (DPR, for one) were trained with an unnormalized dot product, so normalizing their vectors changes their rankings.</li>
+      <li><strong>The rule:</strong> use the similarity the model was trained with; the model card says. Most sentence-transformer retrieval models use cosine, which in practice means normalize, then take the dot product.</li>
+    </ul>
+    <aside class="note trap"><p class="nl">Trap</p><p>Storing unnormalized vectors in an inner-product index and calling it cosine search. The index computes dot products, so long chunks win. Normalization mismatches between indexing and querying fail silently, like prefixes.</p></aside>
+
+    <h3 id="mips">Maximum inner product search</h3>
+    <p>When the model needs a raw dot product, the search problem is <strong>maximum inner product search (MIPS)</strong>. It's awkward for some indexes because the inner product isn't a distance: a vector needn't be its own best match (a longer vector in the same direction beats it), and the triangle inequality fails. A standard trick turns it back into L2: let \(R\) be the largest document length, append one coordinate to every document and a zero to the query:</p>
+    <div class="mj">\[ \begin{aligned} x' &amp;= \Big(x,\ \sqrt{R^2 - \lVert x \rVert^2}\Big), \qquad q' = (q,\ 0) \\ \lVert q' - x' \rVert^2 &amp;= \lVert q \rVert^2 + \lVert x \rVert^2 + \big(R^2 - \lVert x \rVert^2\big) - 2\, q^\top x \\ &amp;= \lVert q \rVert^2 + R^2 - 2\, q^\top x \end{aligned} \]</div>
+    <p>In words: every padded document now has length \(R\), and the distance depends on the document only through \(-2\, q^\top x\), so the nearest document in L2 is the one with the largest inner product.</p>
+
+    <h3 id="anisotropy">Anisotropy and hubness</h3>
+    <p><strong>Anisotropy</strong> means the vectors crowd into a narrow cone instead of spreading over the sphere, so even unrelated texts have high cosines. A simple picture: if every vector has a shared component of length 0.6 along one direction, and the rest of it (length 0.8) points in unrelated directions, two unrelated texts have cosine \(0.6^2 = 0.36\) instead of about 0. Pretrained language models are strongly anisotropic; contrastive training spreads vectors out, and subtracting the corpus mean (centering) removes the shared part. A very low training temperature can still leave every cosine high: E5's model card notes its scores sit around 0.7–1.0 because it was trained with \(\tau = 0.01\). That shifts thresholds, not rankings, and it's why absolute similarity thresholds don't transfer between models.</p>
+    <p><strong>Hubness</strong> is a high-dimensional effect: a few points (hubs) turn up among the nearest neighbours of a large share of queries, while others are never retrieved. In search, a boilerplate chunk such as a generic “contact support” paragraph becomes a hub and appears for unrelated queries. Remedies: remove boilerplate before indexing, center the vectors, or adjust scores by each document's average similarity to its own neighbours, so that hubs are penalized.</p>
+    <p><strong>Say it in an interview:</strong> “For unit vectors, \(\lVert a - b \rVert^2 = 2 - 2\cos\), so dot, cosine and L2 rank identically, and any index works once everything's normalized. Without normalization the dot product favours long vectors, which is right only if the model was trained that way, as some recommenders are; and maximum inner product search can be turned into L2 search by padding each vector to the same length.”</p>
+
+    <!-- ann -->
+    <h2 id="ann"><span class="pn">05</span>Exact and approximate search</h2>
+    <p>Given \(N\) stored vectors and a query, return the \(k\) most similar. The exact way is to score every vector. Everything else in this section and the next two is about scoring far fewer of them while still finding nearly the same \(k\).</p>
+
+    <h3 id="brute">Brute force, with the arithmetic</h3>
+    <p>Scoring one query against \(N\) vectors of \(d\) dimensions takes \(N \cdot d\) multiply-adds and reads every stored number once. For 10 million vectors of 768 float32 numbers:</p>
+    <div class="mj">\[ \begin{aligned} \text{memory} &amp;= N \cdot d \cdot 4 \text{ bytes} = 10^7 \times 768 \times 4 = 30.72 \text{ GB} \\ \text{work per query} &amp;= 2\, N d = 15.36 \text{ GFLOP} \\ \text{time per query} &amp;\approx \frac{30.72 \text{ GB}}{100 \text{ GB/s}} \approx 0.31 \text{ s} \end{aligned} \]</div>
+    <p>In words: 30.72 GB (28.6 GiB) just to hold the vectors, and every query has to stream all of it from memory. One query does only half a FLOP per byte read, so memory bandwidth, not arithmetic, sets the speed. At 100 GB/s that's about 0.3 s per query; on a GPU with about 2 TB/s it's about 15 ms, if 30.7 GB fits in its memory.</p>
+    <p><strong>Measured on a laptop</strong> (Apple M2, NumPy, one query at a time against 1 million 768-d vectors, 3.07 GB): 72 ms for the dot products, about 43 GB/s, plus 13 ms to pick the top 10. Batching 64 queries into one matrix product cut it to about 10 ms per query, because each vector loaded from memory is reused 64 times. Scaled to 10 million vectors: about 0.7 s per single query.</p>
+    <ul>
+      <li><strong>Brute force is the right answer</strong> up to roughly a million vectors at modest query rates, on a GPU, when a filter leaves up to roughly 100,000 candidates (section 09), and always as the ground truth for measuring an approximate index.</li>
+      <li><strong>Picking the top k</strong> doesn't need a full sort: a partial selection (<code>argpartition</code>, or a heap of size \(k\)) is linear in \(N\).</li>
+    </ul>
+
+    <h3 id="ann-recall">What “approximate” gives up</h3>
+    <p>An approximate nearest neighbour (ANN) index returns <em>a</em> top-\(k\), usually not exactly the true one. How close it is gets measured against brute force:</p>
+    <div class="mj">\[ \text{recall@}k = \frac{1}{\lvert Q \rvert} \sum_{q \in Q} \frac{\lvert \text{ANN}_k(q) \cap \text{Exact}_k(q) \rvert}{k} \]</div>
+    <p>In words: for each test query, the share of the true top \(k\) that the index found, averaged over the queries. A recall@10 of 0.95 means that, on average, 9.5 of the true 10 nearest came back.</p>
+    <aside class="note trap"><p class="nl">Trap</p><p>This recall is against <em>exact search</em>, not against human relevance labels. An index can have ANN recall 0.99 while the retriever finds the right document for only 60% of queries; then the embeddings or the chunks are the problem, not the index (section 10).</p></aside>
+    <p>Every index trades four things: <strong>recall, query latency (or throughput), memory and build time</strong>, plus how well it handles inserts, deletes and filters. Each has a knob, set at query time, that slides along its recall–latency curve: <code>efSearch</code> for HNSW, <code>nprobe</code> for IVF. Tuning means picking the cheapest setting that meets a recall target on real queries.</p>
+
+    <h3 id="families">The families</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Family</th><th>Idea</th><th>Examples</th><th>Good at</th><th>Weak at</th></tr></thead>
+      <tbody>
+        <tr><td>Trees</td><td>Split space recursively; search the query's leaf and nearby ones</td><td>k-d tree, Annoy</td><td>Low dimensions; simple</td><td>High dimensions: distances concentrate (the nearest and farthest points end up at similar distances), so the query's search ball crosses most splits and almost every leaf gets checked</td></tr>
+        <tr><td>Hashing</td><td>Hash so that close vectors collide</td><td>LSH (random hyperplanes)</td><td>Guarantees; streaming data</td><td>Needs many tables for high recall</td></tr>
+        <tr><td>Clustering</td><td>Scan only the clusters nearest the query</td><td>IVF</td><td>Small memory overhead; cheap inserts; pairs with PQ</td><td>Misses near cluster borders; needs training</td></tr>
+        <tr><td>Quantization</td><td>Compress vectors; compute approximate distances</td><td>PQ, scalar, binary, ScaNN</td><td>4–64× less memory and bandwidth</td><td>Distances are approximate: rerank</td></tr>
+        <tr><td>Graphs</td><td>Walk a neighbour graph towards the query</td><td>HNSW, NSG, DiskANN</td><td>Best recall for the latency, in memory</td><td>Memory, slow builds, deletes and filters</td></tr>
+      </tbody>
+    </table></div>
+    <p>Production indexes combine families: IVF with PQ codes, HNSW over compressed vectors, or DiskANN's graph on SSD with PQ codes in RAM for billions of vectors.</p>
+    <p><strong>Say it in an interview:</strong> “Brute force over 10 million 768-d vectors is 30 GB and 15 GFLOP per query, and it's memory-bound: about 0.3 s at 100 GB/s. ANN indexes give that up for a recall@k against exact search, tuned by one query-time knob. Graphs like HNSW win on recall per millisecond in memory; IVF and quantization win when memory is the limit.”</p>
+
+    <!-- hnsw -->
+    <h2 id="hnsw"><span class="pn">06</span>HNSW</h2>
+    <p>Hierarchical Navigable Small World graphs (Malkov and Yashunin, 2016) are the default in-memory index in most vector databases. The idea comes in two parts: a graph you can walk greedily, and layers that make the walk short.</p>
+
+    <h3 id="greedy">A graph you can walk</h3>
+    <p>Link every vector to a handful of its near neighbours. To search, start at some node, look at its neighbours, move to whichever is closest to the query, and repeat until no neighbour is closer. That's <strong>greedy search</strong> on a proximity graph. On one flat graph it has two problems: from a random start it takes many short hops to cross the space, and it can stop at a node that is closer than its own neighbours but isn't the nearest overall (a local minimum).</p>
+
+    <h3 id="layers">Layers, like a skip list</h3>
+    <p>A <strong>skip list</strong> speeds up search in a sorted linked list by adding sparser “express” lists on top: walk the express lane until you'd overshoot, drop down a level, repeat. HNSW does the same with graphs. Every vector is in layer 0. Each vector also gets a random top layer \(\ell\), drawn so that each layer holds about \(1/M\) of the one below:</p>
+    <div class="mj">\[ \begin{aligned} \ell &amp;= \big\lfloor -\ln(U) \cdot m_L \big\rfloor, \qquad U \sim \text{Uniform}(0, 1),\ \ m_L = \frac{1}{\ln M} \\ P(\ell \ge L) &amp;= M^{-L} \end{aligned} \]</div>
+    <p>In words: most vectors live only in layer 0; one in \(M\) also appears in layer 1, one in \(M^2\) in layer 2, and so on. With \(N = 10\) million and \(M = 16\) the layers hold about 10,000,000, 625,000, 39,062, 2,441, 153 and 10 nodes: six layers, since \(\log_{16} 10^7 \approx 5.8\).</p>
+    <p>Upper layers are sparse, so their links are long: one hop crosses a large part of the space. Each layer down, the links get shorter and the walk gets more precise. The number of hops grows roughly with \(\log N\) instead of with the size of the space.</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 660 300" role="img" aria-label="Three stacked layers of a graph. Layer 2 has two nodes joined by one long link; layer 1 has five nodes; layer 0 has fourteen nodes with short links. Dotted vertical lines join each node to its copies in the layers below. A highlighted path starts at the entry point in layer 2, hops right along the long link, drops to layer 1, hops once more, drops to layer 0, and takes one short hop to the node nearest the query, which is marked with a cross.">
+          <rect x="70" y="30" width="572" height="50" rx="8" style="fill:none;stroke:var(--rule);stroke-dasharray:4 4"/>
+          <rect x="70" y="100" width="572" height="60" rx="8" style="fill:none;stroke:var(--rule);stroke-dasharray:4 4"/>
+          <rect x="70" y="180" width="572" height="90" rx="8" style="fill:none;stroke:var(--rule);stroke-dasharray:4 4"/>
+          <text class="lbl" x="10" y="59">LAYER 2</text>
+          <text class="lbl" x="10" y="134">LAYER 1</text>
+          <text class="lbl" x="10" y="229">LAYER 0</text>
+          <!-- copies across layers -->
+          <path d="M95 52 V212 M455 58 V238 M215 142 V250 M335 118 V218 M575 124 V214" style="stroke:var(--ink-3);stroke-width:1;stroke-dasharray:2 3;fill:none"/>
+          <!-- query column -->
+          <path d="M522 34 V266" style="stroke:var(--grad);stroke-width:1;stroke-dasharray:3 4;fill:none;opacity:.6"/>
+          <!-- layer 2 edges -->
+          <path class="in" d="M95 52 L455 58"/>
+          <!-- layer 1 edges -->
+          <path class="in" d="M95 120 L215 142 L335 118 L455 138 L575 124 M215 142 L455 138"/>
+          <!-- layer 0 edges -->
+          <path class="in" style="stroke-width:1.2" d="M95 212 L135 240 L175 222 L215 250 L255 205 L295 236 L335 218 L375 248 L415 210 L455 238 L495 224 L535 246 L575 214 L615 232 M95 212 L175 222 M215 250 L295 236 M335 218 L415 210 M455 238 L535 246 M495 224 L575 214 M535 246 L615 232"/>
+          <!-- search path -->
+          <path class="hid thick" d="M95 52 L455 58" marker-end="url(#a-hid)"/>
+          <path class="hid" d="M455 64 V132" style="stroke-dasharray:5 4" marker-end="url(#a-hid)"/>
+          <path class="hid thick" d="M455 138 L569 125" marker-end="url(#a-hid)"/>
+          <path class="hid" d="M575 130 V208" style="stroke-dasharray:5 4" marker-end="url(#a-hid)"/>
+          <path class="hid thick" d="M575 214 L540 242" marker-end="url(#a-hid)"/>
+          <!-- nodes -->
+          <g class="node">
+            <circle cx="95" cy="52" r="5.5"/><circle cx="455" cy="58" r="5.5"/>
+            <circle cx="95" cy="120" r="5.5"/><circle cx="215" cy="142" r="5.5"/><circle cx="335" cy="118" r="5.5"/><circle cx="455" cy="138" r="5.5"/><circle cx="575" cy="124" r="5.5"/>
+            <circle cx="95" cy="212" r="5"/><circle cx="135" cy="240" r="5"/><circle cx="175" cy="222" r="5"/><circle cx="215" cy="250" r="5"/><circle cx="255" cy="205" r="5"/><circle cx="295" cy="236" r="5"/><circle cx="335" cy="218" r="5"/><circle cx="375" cy="248" r="5"/><circle cx="415" cy="210" r="5"/><circle cx="455" cy="238" r="5"/><circle cx="495" cy="224" r="5"/><circle cx="535" cy="246" r="5"/><circle cx="575" cy="214" r="5"/><circle cx="615" cy="232" r="5"/>
+          </g>
+          <circle cx="95" cy="52" r="5.5" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:2"/>
+          <circle cx="535" cy="246" r="5" style="fill:var(--hid-wash);stroke:var(--hid);stroke-width:2"/>
+          <text class="lbl" x="106" y="44">ENTRY POINT</text>
+          <!-- query -->
+          <path d="M516 256 L528 268 M528 256 L516 268" style="stroke:var(--grad);stroke-width:2.2;fill:none"/>
+          <text x="522" y="290" text-anchor="middle" style="fill:var(--grad)">query</text>
+          <text class="lbl" x="560" y="262">NEAREST</text>
+        </svg>
+      </div>
+      <figcaption>The search for one query (the cross). In layer 2, one long hop gets close; drop to the same node in layer 1, hop once more; drop to layer 0 and finish among short links. Each upper layer holds about \(1/M\) of the nodes of the layer below.</figcaption>
+    </figure>
+
+    <h3 id="hnsw-search">Search, step by step</h3>
+    <ol>
+      <li><strong>Start at the entry point,</strong> a node in the top layer.</li>
+      <li><strong>In each layer above 0, walk greedily:</strong> move to the neighbour closest to the query until none is closer. The node you stop at becomes the starting point one layer down.</li>
+      <li><strong>In layer 0, run a beam search of width efSearch</strong> (written \(ef\)). Keep two lists: <em>candidates</em> still to expand, closest first, and the <em>results</em>, the \(ef\) closest nodes seen so far. Repeatedly take the closest unexpanded candidate and look at its neighbours; any neighbour closer than the worst result joins both lists (and the worst result is dropped). Stop when the closest remaining candidate is farther than the worst result: nothing left can improve the list.</li>
+      <li><strong>Return the best \(k\)</strong> of the \(ef\) results, so \(ef \ge k\).</li>
+    </ol>
+    <p>The beam is what fixes the local-minimum problem: by keeping \(ef\) nodes alive instead of one, the walk can go around a dead end. A larger \(ef\) explores more of the graph, which raises recall and costs time.</p>
+
+    <h3 id="hnsw-insert">Insert</h3>
+    <ol>
+      <li>Draw the new vector's top layer \(\ell\).</li>
+      <li>From the entry point, walk greedily down to layer \(\ell + 1\).</li>
+      <li>In each layer from \(\ell\) down to 0, run the beam search with width <strong>efConstruction</strong> to find candidate neighbours, then keep \(M\) of them and link both ways.</li>
+      <li>If a neighbour now has too many links (more than \(M\) above layer 0, \(2M\) in layer 0), prune its list back.</li>
+      <li>If \(\ell\) is above the current top layer, the new node becomes the entry point.</li>
+    </ol>
+    <p><strong>Which \(M\) to keep</strong> uses a heuristic, not simply the \(M\) closest: a candidate is kept only if it's closer to the new node than to any neighbour already kept. Without it, a node at the edge of a dense cluster links only into that cluster; with it, links spread in different directions and keep bridges between clusters, which is what lets the greedy walk cross from one cluster to another.</p>
+
+    <h3 id="hnsw-params">The three parameters, measured</h3>
+    <ul>
+      <li><strong>M:</strong> links per node (2M in layer 0). More links mean more routes, so higher recall at the same \(ef\), at the cost of memory, build time and more distances per hop.</li>
+      <li><strong>efConstruction:</strong> the beam width while building. A wider beam finds better neighbours and a better graph, at a build time that grows with it. It saturates.</li>
+      <li><strong>efSearch:</strong> the beam width while searching, at least \(k\). The recall–latency knob, settable per query without rebuilding.</li>
+    </ul>
+    <p>Measured with hnswlib on 200,000 synthetic 384-d vectors (clustered, normalized), 1,000 queries, recall@10 against brute force, one thread on a laptop. Exact search took 12.1 ms per query on the same machine.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>efSearch</th><th>Recall@10, M = 8</th><th>Recall@10, M = 16</th><th>Recall@10, M = 32</th><th>Latency, M = 16</th></tr></thead>
+      <tbody>
+        <tr><td>10</td><td>0.603</td><td>0.863</td><td>0.906</td><td>0.22 ms</td></tr>
+        <tr><td>20</td><td>0.793</td><td>0.947</td><td>0.966</td><td>0.29 ms</td></tr>
+        <tr><td>40</td><td>0.912</td><td>0.976</td><td>0.983</td><td>0.47 ms</td></tr>
+        <tr><td>80</td><td>0.963</td><td>0.986</td><td>0.992</td><td>0.87 ms</td></tr>
+        <tr><td>160</td><td>0.981</td><td>0.993</td><td>0.997</td><td>1.43 ms</td></tr>
+        <tr><td>320</td><td>0.992</td><td>0.997</td><td>1.000</td><td>3.23 ms</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>The curve flattens:</strong> going from \(ef = 10\) to 40 bought 11 points of recall for 0.25 ms; from 80 to 320 bought one point for 2.4 ms. At \(ef = 40\), HNSW was about 26× faster than exact search at 97.6% recall.</li>
+      <li><strong>M:</strong> at \(ef = 40\), M = 8 reached 0.912 and M = 32 reached 0.983. The index grew from 1,621 to 1,812 bytes per vector (the raw vector is 1,536), and the build took about 3× longer (44 s against 134 s on 8 threads).</li>
+      <li><strong>efConstruction</strong> (M = 16, recall at \(ef = 40\)): 0.953 at efConstruction 40, 0.975 at 100, 0.975 at 200 and 0.977 at 400. Past about 100 it bought almost nothing here, while the build time kept growing (48 s, 135 s, 230 s, 363 s). Timings on this shared laptop varied by up to about 1.6× between runs: the same M = 16, efConstruction 100 build took 82 s for the first table.</li>
+      <li>These are synthetic vectors on a shared laptop: read the shapes and ratios, not the absolute milliseconds. Real embeddings at 768 dimensions and millions of vectors typically need a larger \(ef\) for the same recall.</li>
+    </ul>
+
+    <h3 id="hnsw-memory">Memory</h3>
+    <p>Each vector stores its raw numbers plus its layer-0 links as 4-byte ids. Upper layers add little: a node has on average \(1/M + 1/M^2 + \dots = 1/(M-1)\) layers above 0 (about 0.067 for \(M = 16\)), each with up to \(M\) links: about 4 more bytes. The rule of thumb, as in the FAISS guidelines:</p>
+    <div class="mj">\[ \text{bytes per vector} \approx 4d + 2M \times 4 \]</div>
+    <p>In words: four bytes per dimension for the vector, plus \(2M\) neighbour ids of four bytes each.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Setting</th><th>Vector</th><th>Links</th><th>Overhead</th><th>10M vectors</th></tr></thead>
+      <tbody>
+        <tr><td>d = 768, M = 16</td><td>3,072 B</td><td>128 B</td><td>4%</td><td>32.0 GB</td></tr>
+        <tr><td>d = 768, M = 32</td><td>3,072 B</td><td>256 B</td><td>8%</td><td>33.3 GB</td></tr>
+        <tr><td>d = 384, M = 16</td><td>1,536 B</td><td>128 B</td><td>8%</td><td>16.6 GB</td></tr>
+        <tr><td>d = 128, M = 32</td><td>512 B</td><td>256 B</td><td>50%</td><td>7.7 GB</td></tr>
+      </tbody>
+    </table></div>
+    <p>The measured hnswlib files matched within about 20 bytes per vector of bookkeeping. So for text embeddings the graph is cheap; <strong>the vectors are the memory problem</strong>, because the walk jumps to random nodes and needs them all in RAM. The fixes are to store compressed vectors in the graph (int8, PQ; section 07) and rerank the shortlist with full vectors, or to put the graph on SSD (DiskANN).</p>
+
+    <h3 id="hnsw-deletes">Deletes and updates</h3>
+    <p>Removing a node cuts every path that went through it, and repairing the graph means re-linking its neighbours. So most implementations <strong>mark a node deleted</strong> (a tombstone): it's still walked through but never returned, and its slot can be reused by a later insert. Many deletes leave a graph full of tombstones: memory isn't freed, searches waste hops, and recall drifts down. An update is a delete plus an insert. The usual remedy is a periodic rebuild or compaction in the background. Inserts, by contrast, are online, each costing one beam search with efConstruction.</p>
+
+    <h3 id="hnsw-filters">Why filters are painful</h3>
+    <p>“The 10 nearest articles <em>in Hindi</em>” or “<em>for tenant 42</em>”. The graph was built over all vectors, ignoring the filter, so:</p>
+    <ul>
+      <li><strong>Skipping disallowed nodes entirely</strong> leaves the allowed nodes as islands; the walk gets stuck and recall collapses.</li>
+      <li><strong>Walking through disallowed nodes but not returning them</strong> keeps the graph connected, but with a filter that passes 1% of nodes, about 99 of every 100 nodes visited are wasted, so the walk must visit roughly \(1/\text{selectivity}\) times as many nodes to collect \(k\) allowed results, where the selectivity is the share of nodes that pass. Measured in section 09: 150 nodes with no filter, about 9,400 with a 1% filter.</li>
+      <li><strong>Filtering after the search</strong> returns too few results (section 09 has the arithmetic and measurements).</li>
+    </ul>
+    <p>The practical answers: brute force over the allowed set when it's small; separate indexes per tenant or language; graphs built with the filter in mind (extra links per filter value); and planners that pick a strategy from the filter's estimated selectivity (section 09).</p>
+    <p><strong>Say it in an interview:</strong> “HNSW is a layered proximity graph. Each node gets a random top layer, so each layer has about 1/M of the one below, like a skip list. A search walks greedily through the sparse top layers, then runs a beam search of width efSearch in layer 0. M sets links per node, recall and memory; efConstruction sets build quality; efSearch is the recall–latency knob at query time. Its costs are RAM for the raw vectors, slow builds, tombstoned deletes and awkward filtering.”</p>
+
+    <!-- ivf-pq -->
+    <h2 id="ivf-pq"><span class="pn">07</span>IVF and product quantization</h2>
+    <p>Two independent ideas that are usually combined: <strong>IVF</strong> cuts how many vectors a query looks at, and <strong>product quantization</strong> cuts how many bytes each one takes and how fast its distance is computed.</p>
+
+    <h3 id="ivf">IVF: search only the nearest clusters</h3>
+    <p>An <strong>inverted file index</strong> (IVF) borrows the inverted index of text search, with clusters in place of words:</p>
+    <ol>
+      <li><strong>Train:</strong> run k-means on a sample of the vectors to get \(n_{\text{list}}\) centroids (k-means).</li>
+      <li><strong>Add:</strong> put each vector in the list of its nearest centroid. Each list is a cluster.</li>
+      <li><strong>Search:</strong> compare the query with all centroids, pick the \(n_{\text{probe}}\) nearest, and scan only those lists.</li>
+    </ol>
+    <div class="mj">\[ \text{distances per query} \approx n_{\text{list}} + n_{\text{probe}} \cdot \frac{N}{n_{\text{list}}} \]</div>
+    <p>In words: one distance per centroid, plus one per vector in each probed list, where an average list holds \(N/n_{\text{list}}\) vectors.</p>
+    <p><strong>Worked numbers.</strong> \(N = 10\) million. The FAISS guidelines suggest \(n_{\text{list}}\) between \(4\sqrt N\) and \(16\sqrt N\), here 12,649 to 50,596; take \(n_{\text{list}} = 16{,}384\), so lists average 610 vectors. With \(n_{\text{probe}} = 32\): \(16{,}384 + 32 \times 610 = 35{,}915\) distances, 0.36% of brute force, about 278× less work.</p>
+    <p><strong>Where the \(\sqrt N\) comes from.</strong> The first term grows with \(n_{\text{list}}\) and the second shrinks with it. Their sum is smallest where they're equal, \(n_{\text{list}} = \sqrt{n_{\text{probe}} N}\): 17,889 for the numbers above, close to the 16,384 chosen. Since \(\sqrt{n_{\text{probe}} N} = \sqrt{n_{\text{probe}}}\,\sqrt N\), FAISS's \(4\sqrt N\) to \(16\sqrt N\) is the same rule for nprobe between 16 and 256. More lists make each scan cheaper but cost more centroid comparisons and need more probes for the same recall.</p>
+    <figure>
+      <div class="plate">
+        <svg class="dg" viewBox="0 0 660 300" role="img" aria-label="A plane divided into six clusters by straight borders, each with a centroid marked by a square and a few data points. The query, marked with a cross, sits in one cluster close to its border with the cluster to the right. Its true nearest neighbour is just across that border. Scanning only the query's own cluster misses it; scanning the two nearest clusters finds it.">
+          <path d="M363.4,250.0 L80.1,250.0 L220.1,76.7 L356.2,183.2 Z" style="fill:var(--hid-wash);stroke:none"/>
+          <path d="M508.6,250.0 L363.4,250.0 L356.2,183.2 L444.0,46.6 L554.5,141.4 Z" style="fill:var(--cell-wash);stroke:none"/>
+          <g style="fill:none;stroke:var(--ink-3);stroke-width:1.3">
+            <path d="M20.0,20.0 L217.5,20.0 L220.1,76.7 L80.1,250.0 L20.0,250.0 Z"/>
+            <path d="M363.4,250.0 L80.1,250.0 L220.1,76.7 L356.2,183.2 Z"/>
+            <path d="M217.5,20.0 L442.2,20.0 L444.0,46.6 L356.2,183.2 L220.1,76.7 Z"/>
+            <path d="M508.6,250.0 L363.4,250.0 L356.2,183.2 L444.0,46.6 L554.5,141.4 Z"/>
+            <path d="M442.2,20.0 L640.0,20.0 L640.0,120.0 L554.5,141.4 L444.0,46.6 Z"/>
+            <path d="M640.0,120.0 L640.0,250.0 L508.6,250.0 L554.5,141.4 Z"/>
+          </g>
+          <g style="fill:var(--ink-3)">
+            <circle cx="163" cy="30" r="3"/><circle cx="121" cy="65" r="3"/><circle cx="98" cy="74" r="3"/><circle cx="57" cy="74" r="3"/><circle cx="88" cy="166" r="3"/><circle cx="116" cy="71" r="3"/><circle cx="103" cy="63" r="3"/>
+            <circle cx="213" cy="175" r="3"/><circle cx="253" cy="179" r="3"/><circle cx="265" cy="180" r="3"/><circle cx="241" cy="225" r="3"/><circle cx="254" cy="172" r="3"/><circle cx="235" cy="199" r="3"/><circle cx="290" cy="178" r="3"/>
+            <circle cx="324" cy="96" r="3"/><circle cx="307" cy="62" r="3"/><circle cx="353" cy="85" r="3"/><circle cx="332" cy="87" r="3"/><circle cx="256" cy="97" r="3"/><circle cx="305" cy="30" r="3"/><circle cx="337" cy="88" r="3"/>
+            <circle cx="458" cy="132" r="3"/><circle cx="471" cy="159" r="3"/><circle cx="507" cy="179" r="3"/><circle cx="475" cy="189" r="3"/><circle cx="465" cy="136" r="3"/><circle cx="485" cy="175" r="3"/><circle cx="464" cy="140" r="3"/>
+            <circle cx="566" cy="30" r="3"/><circle cx="578" cy="68" r="3"/><circle cx="517" cy="57" r="3"/><circle cx="535" cy="75" r="3"/><circle cx="507" cy="31" r="3"/><circle cx="578" cy="85" r="3"/><circle cx="504" cy="42" r="3"/>
+            <circle cx="609" cy="199" r="3"/><circle cx="630" cy="184" r="3"/><circle cx="609" cy="188" r="3"/><circle cx="630" cy="214" r="3"/><circle cx="590" cy="170" r="3"/><circle cx="630" cy="235" r="3"/><circle cx="620" cy="240" r="3"/>
+          </g>
+          <g style="fill:var(--surface);stroke:var(--gate);stroke-width:2">
+            <rect x="104" y="74" width="12" height="12"/><rect x="234" y="179" width="12" height="12"/><rect x="324" y="64" width="12" height="12"/><rect x="464" y="154" width="12" height="12"/><rect x="554" y="49" width="12" height="12"/><rect x="594" y="209" width="12" height="12"/>
+          </g>
+          <circle cx="372" cy="212" r="5" style="fill:var(--hid);stroke:none"/>
+          <path d="M339 199 L351 211 M351 199 L339 211" style="stroke:var(--grad);stroke-width:2.4;fill:none"/>
+          <text x="338" y="234" text-anchor="end" style="fill:var(--grad)">query</text>
+          <text x="384" y="228" style="fill:var(--hid)">true nearest</text>
+          <rect x="24" y="266" width="12" height="12" style="fill:var(--surface);stroke:var(--gate);stroke-width:2"/>
+          <text x="42" y="277">centroid</text>
+          <rect x="120" y="266" width="14" height="12" style="fill:var(--hid-wash)"/>
+          <text x="140" y="277">the query's cell: all that nprobe = 1 scans</text>
+          <rect x="420" y="266" width="14" height="12" style="fill:var(--cell-wash)"/>
+          <text x="440" y="277">added by nprobe = 2</text>
+        </svg>
+      </div>
+      <figcaption>The edge problem. The query's nearest centroid is the one in the blue cell, so with one probe only that cell is scanned, and the true nearest neighbour, just across the border, is never looked at. The second-nearest centroid's cell (green) contains it, so two probes find it. Recall climbs with nprobe because neighbours near borders are common in high dimensions.</figcaption>
+    </figure>
+    <p><strong>Measured</strong> with FAISS on the same 200,000 vectors, \(n_{\text{list}} = 1{,}024\) (lists of 82 to 419 vectors, median 186), one thread:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>nprobe</th><th>Share of vectors scanned</th><th>Recall@10</th><th>Latency</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>0.1%</td><td>0.715</td><td>0.02 ms</td></tr>
+        <tr><td>4</td><td>0.4%</td><td>0.790</td><td>0.07 ms</td></tr>
+        <tr><td>16</td><td>1.6%</td><td>0.867</td><td>0.28 ms</td></tr>
+        <tr><td>32</td><td>3.1%</td><td>0.908</td><td>0.52 ms</td></tr>
+        <tr><td>64</td><td>6.2%</td><td>0.943</td><td>1.44 ms</td></tr>
+        <tr><td>128</td><td>12.5%</td><td>0.973</td><td>2.57 ms</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Against HNSW on the same data:</strong> IVF needed 2.6 ms for recall 0.973, where HNSW (M = 16) reached 0.976 in 0.47 ms. Graphs win on recall per millisecond; IVF wins on memory overhead (one list entry per vector, no links), build speed (seconds of k-means against minutes of graph building), and cheap inserts and deletes (append to, or remove from, one list).</li>
+      <li><strong>Uneven lists:</strong> k-means cells differ in size (here 82 to 419), so query latency varies with which lists get probed.</li>
+      <li><strong>Drift:</strong> the centroids are trained once. If new data moves elsewhere (new products, a new language), lists grow lopsided and recall drops; retrain and rebuild periodically.</li>
+    </ul>
+
+    <h3 id="pq">Product quantization, by hand</h3>
+    <p><strong>Product quantization</strong> (PQ; Jégou, Douze and Schmid, 2011) compresses each vector into a few bytes by describing each slice of it with the id of the nearest of 256 learned prototypes:</p>
+    <ol>
+      <li><strong>Split</strong> each \(d\)-dimensional vector into \(m\) sub-vectors of \(d/m\) dimensions.</li>
+      <li><strong>Train</strong> a separate k-means with 256 centroids on each slot's sub-vectors: \(m\) small codebooks.</li>
+      <li><strong>Encode:</strong> replace each sub-vector with the id of its nearest centroid in that slot's codebook. With 256 centroids an id fits in one byte, so the vector becomes \(m\) bytes.</li>
+    </ol>
+    <p><strong>A tiny version.</strong> Four-dimensional vectors, \(m = 2\) slots of two dimensions, and four centroids per codebook (2-bit codes) instead of 256, chosen by hand as if k-means had produced them:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Code</th><th>Codebook 1 (dims 1–2)</th><th>Codebook 2 (dims 3–4)</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>(1, 0)</td><td>(0.5, 0.5)</td></tr>
+        <tr><td>1</td><td>(0, 1)</td><td>(−0.5, 0.5)</td></tr>
+        <tr><td>2</td><td>(−1, 0)</td><td>(−0.5, −0.5)</td></tr>
+        <tr><td>3</td><td>(0, −1)</td><td>(0.5, −0.5)</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Encoding</strong> \(x_1 = (0.9, 0.1 \mid -0.4, 0.8)\): its first half's squared distances to the four centroids of codebook 1 are 0.02, 1.62, 3.62 and 2.02, so its first code is 0; its second half's distances to codebook 2 are 0.90, 0.10, 1.70 and 2.50, so its second code is 1. Two vectors more, the same way:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Vector</th><th>Codes</th><th>What the codes decode to</th></tr></thead>
+      <tbody>
+        <tr><td>\(x_1 = (0.9, 0.1, -0.4, 0.8)\)</td><td>(0, 1)</td><td>(1, 0, −0.5, 0.5)</td></tr>
+        <tr><td>\(x_2 = (0.2, 0.9, 0.6, 0.4)\)</td><td>(1, 0)</td><td>(0, 1, 0.5, 0.5)</td></tr>
+        <tr><td>\(x_3 = (-0.8, -0.3, -0.6, -0.4)\)</td><td>(2, 2)</td><td>(−1, 0, −0.5, −0.5)</td></tr>
+      </tbody>
+    </table></div>
+    <p>Each vector is now 4 bits instead of 4 float32 numbers (128 bits). The decoded vectors are close to the originals but not equal: that gap is the quantization error.</p>
+
+    <h3 id="adc">Asymmetric distance computation</h3>
+    <p>To search, the query is <em>not</em> quantized. For each slot, compute the squared distance from the query's sub-vector to every centroid in that slot's codebook: \(m\) small tables. Then the distance to any stored vector is a sum of \(m\) table lookups:</p>
+    <div class="mj">\[ \lVert q - x \rVert^2 \approx \sum_{j=1}^{m} \big\lVert q^{(j)} - c^{(j)}_{\,\text{code}_j(x)} \big\rVert^2 = \sum_{j=1}^{m} T_j\big[\text{code}_j(x)\big] \]</div>
+    <p>In words: the distance to the decoded vector splits into one piece per slot, and each piece was precomputed in table \(T_j\), so scoring a stored vector costs \(m\) lookups and additions, with no multiplications.</p>
+    <p><strong>By hand,</strong> for \(q = (0.7, 0.4 \mid 0.5, 0.6)\):</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Code</th><th>\(T_1\): distance from (0.7, 0.4)</th><th>\(T_2\): distance from (0.5, 0.6)</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>0.25</td><td>0.01</td></tr>
+        <tr><td>1</td><td>0.85</td><td>1.01</td></tr>
+        <tr><td>2</td><td>3.05</td><td>2.21</td></tr>
+        <tr><td>3</td><td>2.45</td><td>1.21</td></tr>
+      </tbody>
+    </table></div>
+    <div class="tbl"><table>
+      <thead><tr><th>Vector</th><th>Codes</th><th>ADC distance</th><th>Exact distance</th></tr></thead>
+      <tbody>
+        <tr><td>\(x_1\)</td><td>(0, 1)</td><td>\(T_1[0] + T_2[1] = 0.25 + 1.01 = 1.26\)</td><td>0.98</td></tr>
+        <tr><td>\(x_2\)</td><td>(1, 0)</td><td>\(T_1[1] + T_2[0] = 0.85 + 0.01 = 0.86\)</td><td>0.55</td></tr>
+        <tr><td>\(x_3\)</td><td>(2, 2)</td><td>\(T_1[2] + T_2[2] = 3.05 + 2.21 = 5.26\)</td><td>4.95</td></tr>
+      </tbody>
+    </table></div>
+    <p>The order is right (\(x_2\), then \(x_1\), then \(x_3\)) and the distances are approximate, each about 0.3 too high here. With real data, close calls get swapped, which is why PQ results are usually reranked with full vectors.</p>
+    <ul>
+      <li><strong>Why asymmetric:</strong> quantizing the query too (symmetric distance) would add the query's own quantization error for no saving, since the tables are built once per query either way.</li>
+      <li><strong>Why “product”:</strong> the codes pick one centroid per slot, so the vector is effectively matched against every combination: \(256^m\) possible reconstructions (for \(m = 96\), \(256^{96}\)) while storing only \(m \times 256\) small centroids. A single k-means with that many centroids could never be trained or stored.</li>
+      <li><strong>Inner product works the same way:</strong> the tables hold dot products of query slices with centroids instead of distances.</li>
+      <li><strong>OPQ</strong> first learns a rotation of the space so each slot carries a similar share of the information, which lowers the error.</li>
+    </ul>
+
+    <h3 id="pq-arith">The compression arithmetic</h3>
+    <p>A 768-d float32 vector is 3,072 bytes. Split it into \(m = 96\) slots of 8 dimensions, with 256 centroids each:</p>
+    <ul>
+      <li><strong>Per vector:</strong> 96 one-byte codes = 96 bytes, 32× smaller. Ten million vectors go from 30.72 GB to 0.96 GB.</li>
+      <li><strong>Codebooks:</strong> \(96 \times 256 \times 8\) floats = 786 KB, shared by all vectors.</li>
+      <li><strong>Per query:</strong> the tables have \(96 \times 256 = 24{,}576\) entries (98 KB), costing about as much as 256 full distance computations. After that, each stored vector costs 96 lookups and additions instead of 768 multiply-adds, and only 96 bytes are read instead of 3,072, which matters most since search is memory-bound.</li>
+    </ul>
+    <p><strong>Measured</strong> with FAISS on the 200,000 synthetic vectors (384-d, so 1,536 bytes each in float32), 256 centroids per slot:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Bytes per vector (\(m\))</th><th>Compression</th><th>Recall@10, PQ distances alone</th><th>Recall@10 after rescoring PQ's top 100 exactly</th></tr></thead>
+      <tbody>
+        <tr><td>16</td><td>96×</td><td>0.463</td><td>0.944</td></tr>
+        <tr><td>48</td><td>32×</td><td>0.677</td><td>0.999</td></tr>
+        <tr><td>96</td><td>16×</td><td>0.812</td><td>1.000</td></tr>
+      </tbody>
+    </table></div>
+    <p>PQ alone is a coarse ranker: at 48 bytes it found only two-thirds of the true top 10. But the true neighbours were almost always somewhere in its top 100, so rescoring just 100 candidates exactly restored nearly all the recall. (The last column is also the share of the true top 10 that PQ's top 100 contained: exact rescoring puts every true neighbour that's present back in its place.) That's the pattern for every compressed index: compress for the first pass, rerank with full precision.</p>
+
+    <h3 id="ivfpq">IVF-PQ: the two together</h3>
+    <ul>
+      <li><strong>IVF chooses which lists to scan; PQ codes fill the lists.</strong> The codes encode the <em>residual</em>, the vector minus its list's centroid, rather than the vector itself. Residuals are smaller and look alike across lists, so the same codebooks describe them more precisely.</li>
+      <li><strong>Memory for 10 million 768-d vectors</strong> with \(m = 96\) and 16,384 lists: 0.96 GB of codes, 0.08 GB of 8-byte ids and 50 MB of centroids, about 1.1 GB against 30.7 GB raw.</li>
+      <li><strong>Rerank:</strong> fetch the top 100 or so by PQ distance and recompute exact distances from full vectors kept in RAM or on SSD. This is the standard recipe from tens of millions to billions of vectors.</li>
+    </ul>
+    <p><strong>Measured</strong> (1,024 lists, 48-byte codes): IVF-PQ alone reached recall@10 0.608 at nprobe 8 and 0.640 at nprobe 32. Reranking its top 100 with full vectors raised these to 0.827 and 0.907, which are IVF-Flat's own recalls at the same nprobe (0.827 and 0.908). Reranking repairs PQ's distance errors but not IVF's misses: a neighbour in a list that wasn't probed never becomes a candidate.</p>
+
+    <h3 id="sq-bq">Scalar and binary quantization</h3>
+    <p><strong>Scalar quantization (int8)</strong> maps each dimension's range onto 256 levels. If a dimension runs from −0.2 to 0.3, the step is \(0.5/255 = 0.00196\); the value 0.07 becomes level \(\text{round}((0.07 + 0.2)/0.00196) = 138\), which decodes to 0.0706, an error of 0.0006. Ranges are learned per dimension from a sample (percentiles rather than the extreme values, so outliers don't stretch them). It's 4× smaller than float32, and int8 dot products are fast on modern CPUs.</p>
+    <p><strong>Binary quantization</strong> keeps one bit per dimension: 1 if positive, 0 if not. A 768-d vector becomes 96 bytes, 32× smaller, and similarity becomes the <strong>Hamming distance</strong>, the number of differing bits, computed with an XOR and a population count (counting the 1 bits) over 64 bits at a time. \(x_1 = (0.9, 0.1, -0.4, 0.8)\) becomes 1101 and \(x_2 = (0.2, 0.9, 0.6, 0.4)\) becomes 1111: Hamming distance 1. It throws away all magnitude, so it works only for embeddings whose dimensions are roughly centred on zero, and it needs <strong>rescoring</strong>: take a few times \(k\) candidates by Hamming distance, then rescore them with int8 or float vectors.</p>
+    <p><strong>Measured</strong> on the 200,000 synthetic vectors, recall@10 against float32 exact search:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Encoding</th><th>Bytes per vector (384-d)</th><th>Recall@10 alone</th><th>After rescoring with float vectors</th></tr></thead>
+      <tbody>
+        <tr><td>float32</td><td>1,536</td><td>1.000</td><td>–</td></tr>
+        <tr><td>int8</td><td>384</td><td>0.992</td><td>1.000 (top 40 rescored)</td></tr>
+        <tr><td>binary</td><td>48</td><td>0.552</td><td>0.912 (top 40), 0.979 (top 100), 0.997 (top 400)</td></tr>
+      </tbody>
+    </table></div>
+    <p>These synthetic vectors are harsher on binary codes than real embedding models are, but the pattern holds. On real models, Hugging Face measured retrieval quality kept (nDCG@10 on MTEB retrieval, relative to float32; a different quantity from the recall above): for one 1,024-d model, int8 kept about 97% without rescoring and about 99% with it; binary kept about 92.5% without rescoring and about 96.5% with it, for 32× less memory and a mean speed-up of about 25× (exact search on CPU, for that one model; int8 gave about 3.7×). Both are model-dependent: across the five models in their table, binary with rescoring kept from about 75% (e5-base-v2) to about 96% (mxbai-embed-large-v1), and int8 without rescoring from about 91% to 100%. Measure it on your own model and queries before switching.</p>
+
+    <h3 id="lsh">Locality-sensitive hashing, in one paragraph</h3>
+    <p><strong>LSH</strong> hashes vectors so that close ones collide. For cosine, pick a random direction \(r\) and record one bit, whether \(r^\top x\) is positive. Two vectors at angle \(\theta\) get the same bit with probability \(1 - \theta/\pi\), since a random hyperplane separates them with probability \(\theta/\pi\). At cosine 0.9 (25.8°) that's 0.856; at cosine 0.5 (60°) it's 0.667. Concatenate 16 bits into one bucket key and the chance that all 16 match is 0.084 for the close pair and 0.0015 for the far pair, so close pairs share a bucket about 55 times as often. Several such tables, each with its own random directions, raise the chance of catching a true neighbour in at least one of them. LSH is simple and data-independent and comes with guarantees, but reaching high recall takes many tables and many candidates, so on real embeddings learned methods (graphs, IVF, PQ) usually beat it.</p>
+
+    <h3 id="choose-index">Which index, when</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Situation</th><th>Rule of thumb</th></tr></thead>
+      <tbody>
+        <tr><td>Up to about a million vectors, or a GPU, or heavy filters</td><td>Exact search</td></tr>
+        <tr><td>Fits in RAM, best recall per millisecond</td><td>HNSW, on float32 or int8 vectors</td></tr>
+        <tr><td>Memory-bound, tens of millions to billions</td><td>IVF-PQ with reranking, or HNSW over compressed vectors</td></tr>
+        <tr><td>Billions, on SSD</td><td>A disk-based graph (DiskANN-style) with PQ codes in RAM</td></tr>
+        <tr><td>Constant inserts and deletes</td><td>IVF (cheap list updates), or HNSW with periodic rebuilds</td></tr>
+        <tr><td>Most queries filter on one key (tenant, language)</td><td>A separate index or partition per value</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Say it in an interview:</strong> “IVF clusters the vectors with k-means and scans only the nprobe nearest lists, so the cost is about nlist plus nprobe times N over nlist distances; nlist near the square root of N balances the two. PQ splits each vector into m slices and stores each slice as the id of its nearest of 256 centroids, so a 768-d float vector becomes 96 bytes. At query time I build m lookup tables once and every distance is m lookups. Then I rerank the top 100 with full vectors, which recovers almost all the recall.”</p>
+
+    <!-- hybrid -->
+    <h2 id="hybrid"><span class="pn">08</span>Hybrid search</h2>
+    <p>Dense and keyword retrieval fail on different queries, which is the whole case for running both.</p>
+
+    <h3 id="why-hybrid">Each misses what the other finds</h3>
+    <p>BM25 (<a href="./classical-nlp.html#bm25">classical NLP: BM25</a>) scores documents by the query words they contain, weighted by rarity, with saturation and length normalization. On the help centre (stop words removed, plural “s” stripped, \(k_1 = 1.2\), \(b = 0.75\)); the dense column describes typical embedder behaviour, not a measured run:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Query</th><th>BM25</th><th>Dense retrieval</th></tr></thead>
+      <tbody>
+        <tr><td>forgot my login details</td><td>Every article scores 0: no shared word. d1 says “sign-in” and “password”.</td><td>Finds d1: “forgot … login” and “reset … password … sign-in” mean the same thing.</td></tr>
+        <tr><td>E-4012</td><td>Only d3 scores (1.31): the token is rare, so it's decisive.</td><td>Sees “an error code”; may rank d6 (payment failed) first, or confuse E-4012 with E-4021.</td></tr>
+        <tr><td>payment failed, error E-4012, want a refund</td><td>d3 3.48, d6 2.61, d2 1.42, the rest 0</td><td>Picks up d6 and d2 by meaning, and d5 weakly</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>One BM25 term by hand:</strong> “E-4012” appears in one of the six articles, so \(\text{idf} = \ln(1 + 5.5/1.5) = 1.540\). d3 has 6 indexed words against an average of 4.17, so \(K = 1.2 \times (0.25 + 0.75 \times 6/4.17) = 1.596\), and with the term appearing once it scores \(1.540 \times 2.2/(1 + 1.596) = 1.305\).</p>
+    <p>In general, sparse retrieval wins on <strong>identifiers, codes, names, rare terms and exact phrases</strong>, and on new jargon the embedding model never saw. Dense retrieval wins on <strong>paraphrase, synonyms, natural-language questions and other languages</strong>. Their errors overlap little, so combining them usually beats either alone.</p>
+
+    <h3 id="fusion-scores">Why you can't just add the scores</h3>
+    <p>For the third query, the two retrievers' top lists, with BM25 scores computed as above and dense cosines made up for illustration (they assume the embedder, blurring the code, ranks d3 last, even below d5):</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Doc</th><th>BM25</th><th>Cosine</th><th>BM25 min-max</th><th>Cosine min-max</th><th>Average of min-max</th></tr></thead>
+      <tbody>
+        <tr><td>d3</td><td>3.483</td><td>0.74</td><td>1.000</td><td>0.000</td><td>0.500</td></tr>
+        <tr><td>d6</td><td>2.613</td><td>0.82</td><td>0.750</td><td>1.000</td><td>0.875</td></tr>
+        <tr><td>d2</td><td>1.424</td><td>0.79</td><td>0.409</td><td>0.625</td><td>0.517</td></tr>
+        <tr><td>d5</td><td>0</td><td>0.77</td><td>0.000</td><td>0.375</td><td>0.188</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Raw sums:</strong> BM25 here spans 0 to 3.5, the cosines 0.74 to 0.82. The sum (d3 4.22, d6 3.43, d2 2.21, d5 0.77) is just the BM25 order; the dense retriever might as well not exist. BM25's scale also changes from query to query (more query terms, bigger scores) and with the corpus.</li>
+      <li><strong>Min-max per query</strong> rescales each list to 0–1, but it stretches tiny gaps: d3's cosine of 0.74 is only 0.08 below the best, yet becomes 0 because it's the lowest of four close values. The result depends on which other documents happened to make the list, and one outlier squashes everything else. Averaged, the min-max scores rank d6 0.875, d2 0.517, d3 0.500, d5 0.188: d3, the only article with the exact code and BM25's clear winner, drops to third.</li>
+      <li><strong>Weighted sums of normalized scores</strong> can work, but the weight has to be tuned on labelled queries and drifts when either model changes. With a few hundred labelled queries, a tuned weighted combination often matches or beats rank fusion; without labels, rank fusion is the safer default.</li>
+    </ul>
+
+    <h3 id="rrf">Reciprocal rank fusion</h3>
+    <p>Reciprocal rank fusion (RRF; Cormack, Clarke and Büttcher, 2009) ignores the scores and uses only ranks:</p>
+    <div class="mj">\[ \text{RRF}(d) = \sum_{r \in R} \frac{1}{k + \text{rank}_r(d)} \]</div>
+    <p>In words: each retriever \(r\) gives the document \(1/(k + \text{its rank})\), counting from 1; a document a retriever didn't return gets nothing from it; add up across retrievers and sort. The constant \(k\) is 60 in the original paper and in most systems.</p>
+    <p><strong>By hand,</strong> with BM25's list d3, d6, d2 and the dense list d6, d2, d5, d3:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Doc</th><th>BM25 rank</th><th>Dense rank</th><th>RRF score (k = 60)</th><th>Final</th></tr></thead>
+      <tbody>
+        <tr><td>d6</td><td>2</td><td>1</td><td>1/62 + 1/61 = 0.01613 + 0.01639 = 0.03252</td><td>1</td></tr>
+        <tr><td>d3</td><td>1</td><td>4</td><td>1/61 + 1/64 = 0.01639 + 0.01563 = 0.03202</td><td>2</td></tr>
+        <tr><td>d2</td><td>3</td><td>2</td><td>1/63 + 1/62 = 0.01587 + 0.01613 = 0.03200</td><td>3</td></tr>
+        <tr><td>d5</td><td>–</td><td>3</td><td>1/63 = 0.01587</td><td>4</td></tr>
+      </tbody>
+    </table></div>
+    <ul>
+      <li><strong>Agreement wins.</strong> d6, second and first, beats d3, first and fourth. d5, found by only one retriever, gets half the score of anything both found.</li>
+      <li><strong>What \(k\) does:</strong> it flattens the rank curve. At \(k = 60\), rank 1 is worth only 1.15× rank 10 (\(1/61\) against \(1/70\)), so the fused order is driven by how many lists a document is in and roughly where. At \(k = 1\), rank 1 is worth 5.5× rank 10, so the top of each list dominates; here the scores become d6 0.833, d3 0.700, d2 0.583, d5 0.250: the same order with wider gaps.</li>
+      <li><strong>Why it's the default:</strong> no score calibration, no training, robust to one retriever having odd scores, and one line of code. Fetch deep lists (50–100 per retriever) before fusing, so documents ranked moderately by both are present to be rewarded.</li>
+      <li><strong>Its weakness:</strong> it throws away confidence. A perfect BM25 match on an exact error code counts the same at rank 1 as a weak rank-1 match. Fixes: per-retriever weights (weighted RRF), or route queries that look like IDs or codes to keyword search first.</li>
+    </ul>
+    <aside class="note trap"><p class="nl">Trap</p><p>Fusing and then cutting to the top 5 with nothing after it. Fusion widens what's found; it doesn't make the order precise. The usual pipeline is BM25 + dense, fused with RRF to about 100, then a cross-encoder rerank (section 03).</p></aside>
+
+    <h3 id="splade">Learned sparse retrieval: SPLADE</h3>
+    <p>SPLADE (Formal et al., 2021) keeps BM25's machinery but learns the weights. A BERT model's masked-language-model head predicts, for every token position, a score over the whole vocabulary; SPLADE takes \(\log(1 + \text{ReLU}(\cdot))\) of those scores and pools them over positions (a sum in the first version, the maximum from SPLADE v2), giving one weight per vocabulary term; a sparsity penalty during training drives most weights to zero. The result is a sparse vector of a few hundred weighted terms per text, including terms that <em>aren't</em> in it: “login” can switch on “sign”, “password” and “account”. It's stored and searched in an ordinary inverted index, so exact-term matching survives, plus learned expansion and weighting. The costs: a model forward pass to encode queries (unless a document-only variant is used), and longer posting lists than BM25, so slower queries. It often generalizes to new domains better than dense retrievers of similar size, and still pairs well with them.</p>
+    <p><strong>Say it in an interview:</strong> “Dense retrieval misses exact codes and rare names; BM25 misses paraphrase. I run both and fuse with reciprocal rank fusion, \(\sum 1/(60 + \text{rank})\), because their raw scores live on different scales: summing lets BM25 dominate, and min-max stretches tiny cosine gaps. RRF rewards documents both retrievers agree on. Then a cross-encoder reranks the fused top 100.”</p>
+
+    <!-- vector-db -->
+    <h2 id="vector-db"><span class="pn">09</span>Vector databases</h2>
+    <p>An index like FAISS's is a data structure in one process's memory: you add vectors with integer ids and search. A <strong>vector database</strong> wraps indexes in everything a production store needs.</p>
+
+    <h3 id="db-adds">What it adds beyond an index</h3>
+    <ul>
+      <li><strong>CRUD by id:</strong> insert, upsert, update and delete records (vector + id + metadata), with the index kept in step. Usually built like a log-structured store: new writes land in a small, freshly searchable segment (searched by brute force or a small index), background jobs build proper indexes over sealed segments and merge them, and deletes are tombstones until compaction.</li>
+      <li><strong>Metadata storage and filtering:</strong> “nearest 10 where language = hi and updated after March”, with payload indexes so the filter itself is fast.</li>
+      <li><strong>Persistence:</strong> a write-ahead log and snapshots, so a crash loses nothing and restarts don't rebuild every index from scratch.</li>
+      <li><strong>Scale-out:</strong> sharding and replication (below), plus multi-tenancy, access control, backups and monitoring.</li>
+      <li><strong>Often hybrid search</strong> (BM25 or sparse vectors next to dense, with fusion) and quantization options built in.</li>
+    </ul>
+
+    <h3 id="filtering">Filtering: pre, post, or during the search</h3>
+    <p><strong>Post-filtering:</strong> run the ANN search for the top \(K'\), then drop the results that fail the filter. If a fraction \(s\) of documents pass (the filter's <strong>selectivity</strong>) and the filter is unrelated to similarity, about \(K' \cdot s\) results survive:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Share passing the filter</th><th>Expected survivors of a top-100</th><th>Chance none survive</th><th>\(K'\) needed to expect 10</th></tr></thead>
+      <tbody>
+        <tr><td>10%</td><td>10</td><td>0.003%</td><td>100</td></tr>
+        <tr><td>1%</td><td>1</td><td>37%</td><td>1,000</td></tr>
+        <tr><td>0.1%</td><td>0.1</td><td>90%</td><td>10,000</td></tr>
+      </tbody>
+    </table></div>
+    <p>In words: with a filter that passes 1% of documents, asking for 100 neighbours and filtering leaves one result on average, and none at all 37% of the time (\(0.99^{100} = 0.366\)). It gets worse when the filter works against the query: the nearest neighbours of a delivery question are delivery articles, and a filter for “billing” removes nearly all of them.</p>
+    <p><strong>Pre-filtering:</strong> find the allowed ids first (from a metadata index, as a bitmap), then search only among them. If the allowed set is small, search it exactly: 1% of 10 million 768-d vectors is 100,000 vectors, 307 MB, about 7 ms to scan at the laptop's 43 GB/s, and the answer is exact. If it's large, pass the bitmap into the ANN search.</p>
+    <p><strong>Filtering during the search:</strong> the graph walk checks the bitmap at every node, walking through disallowed nodes but returning only allowed ones. Good for moderate selectivity; for very selective filters most of the walk is wasted, so query planners in several vector databases switch to exact search below a selectivity threshold.</p>
+    <p><strong>Measured</strong> on the 200,000 synthetic vectors with HNSW (M = 16), a random attribute, \(k = 10\), 200 queries, recall@10 against exact search over the allowed vectors:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Strategy</th><th>10% pass (20,000 allowed)</th><th>1% pass (2,000)</th><th>0.1% pass (200)</th></tr></thead>
+      <tbody>
+        <tr><td>Post-filter a top-100, keep up to 10: results returned</td><td>8.8</td><td>0.98; none for 40% of queries</td><td>0.10; none for 91%</td></tr>
+        <tr><td>Post-filter a top-1,000: recall@10</td><td>0.994</td><td>0.828</td><td>0.103</td></tr>
+        <tr><td>Filter during the walk (ef 40): recall@10</td><td>0.969</td><td>0.994</td><td>1.000</td></tr>
+        <tr><td>… nodes tested against the filter per query (150 with no filter)</td><td>1,099</td><td>9,438</td><td>65,540</td></tr>
+        <tr><td>Pre-filter, then exact search: distances computed</td><td>20,000</td><td>2,000</td><td>200</td></tr>
+      </tbody>
+    </table></div>
+    <p>Post-filtering failed just as the arithmetic predicts. (The first row is capped at the 10 asked for: at a 10% filter about 10 survive on average, but fewer than 10 for 45% of queries, so the average returned is 8.8.) Filtering inside the walk kept recall high, but hnswlib keeps walking until it has \(ef\) allowed results, so the work exploded as the filter tightened: at 0.1% it tested about a third of all 200,000 vectors to find 10 of the 200 allowed ones, which exact search over those 200 does with 200 distance computations. Hence the planner's rule: below some selectivity, switch to exact search over the allowed set; above it, filter inside the walk.</p>
+    <aside class="note trap"><p class="nl">Trap</p><p>pgvector, by default, applies the SQL <code>WHERE</code> clause after the index scan, and the HNSW scan returns at most <code>hnsw.ef_search</code> rows (40 by default), so a selective filter can return fewer rows than the <code>LIMIT</code>, or none. Version 0.8.0 added iterative index scans (<code>hnsw.iterative_scan</code>), which keep scanning until enough rows pass.</p></aside>
+
+    <h3 id="scale-out">Sharding, replication and persistence</h3>
+    <ul>
+      <li><strong>Sharding</strong> splits the vectors across machines when they don't fit on one, or to spread the work. A query goes to every shard, each returns its own top \(k\), and a coordinator merges them (scatter–gather). The merged top \(k\) is right as long as each shard's is, but the query is as slow as the slowest shard, so tail latency grows with the shard count. Sharding by tenant instead sends each query to one shard.</li>
+      <li><strong>Replication</strong> keeps copies of each shard for read throughput and for surviving a machine loss. Writes must reach every copy, so most systems are eventually consistent: a just-inserted vector may not be searchable for a moment.</li>
+      <li><strong>Persistence:</strong> the index lives in memory (or memory-mapped files), the write-ahead log and snapshots on disk. Rebuilding a large HNSW index can take hours, which is why systems persist built segments rather than raw vectors only.</li>
+    </ul>
+
+    <h3 id="db-options">The options in one line each</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Option</th><th>What it is</th></tr></thead>
+      <tbody>
+        <tr><td>FAISS</td><td>A library, not a database: the widest set of index types (flat, IVF, PQ, HNSW, GPU). It can save an index to a file and restrict a search to a set of ids you compute, but metadata storage, payload indexes, durable updates, replication and serving are yours to build.</td></tr>
+        <tr><td>pgvector</td><td>A Postgres extension: a vector column with HNSW and IVFFlat indexes, next to your relational data, with SQL filters, joins and transactions. Indexes take up to 2,000 dimensions (4,000 at half precision).</td></tr>
+        <tr><td>Qdrant</td><td>An open-source vector database in Rust, known for filtering built into its HNSW search, quantization and sparse + dense hybrid search.</td></tr>
+        <tr><td>Milvus</td><td>An open-source, distributed vector database built for very large collections, with storage separate from compute and many index types (including GPU and disk-based).</td></tr>
+        <tr><td>Weaviate</td><td>An open-source vector database with built-in BM25 hybrid search and modules that call embedding models for you.</td></tr>
+        <tr><td>Pinecone</td><td>A fully managed, closed-source service: no servers to run, priced by usage.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3 id="pgvector-enough">When Postgres with pgvector is enough</h3>
+    <p>Often. Up to a few million vectors (5 million at 768 dimensions is about 15 GB of vectors in the table, plus about 16 GB for the HNSW index, which stores its own copy of each vector and is the part that must stay in RAM), at moderate query rates, when you already run Postgres and want vectors in the same transactions as the rows they describe: permissions, tenants and soft deletes are one <code>JOIN</code> or <code>WHERE</code> away, and backups and replicas are already solved. Reach for a dedicated database when you have tens of millions of vectors or more, high query rates with a tight p99, heavily filtered search at scale, a need for quantized or on-disk indexes, or vector workloads that should scale separately from the main database. Watch pgvector's HNSW build time and memory (<code>maintenance_work_mem</code>), the filtering trap above, and vacuuming after many deletes.</p>
+
+    <h3 id="migration">Changing the embedding model</h3>
+    <p>Vectors from different models, or different versions of one model, can't be compared, so a model upgrade is a migration, not a config change:</p>
+    <ol>
+      <li><strong>Store the model name and version with every vector,</strong> so nothing ever mixes spaces silently.</li>
+      <li><strong>Build the new index in parallel</strong> (a new collection or table) and backfill it by re-embedding every chunk with the new model, with the right prefixes.</li>
+      <li><strong>Dual-write</strong> new and edited documents to both indexes until the switch.</li>
+      <li><strong>Compare</strong> old against new on the labelled query set (section 10), and on a sample of live traffic run in shadow.</li>
+      <li><strong>Switch</strong> queries through an alias, embedding each query with the model that matches the index it hits; keep the old index for a quick rollback, then delete it.</li>
+    </ol>
+    <p>A query-side adapter (section 02) or a better reranker avoids re-embedding entirely, which is why they're worth trying first.</p>
+    <p><strong>Say it in an interview:</strong> “A vector database is ANN indexes plus CRUD, metadata filtering, persistence, sharding and replication. The subtle part is filtering: post-filtering a top 100 with a 1% filter leaves one result on average, so for selective filters I pre-filter and brute-force the allowed set, and for broad ones filter inside the graph walk. Below a few million vectors I'd start with pgvector next to the relational data.”</p>
+
+    <!-- eval-retrieval -->
+    <h2 id="eval-retrieval"><span class="pn">10</span>Evaluating retrieval</h2>
+    <p>Two different questions, measured differently, and worth keeping apart when debugging:</p>
+    <ol>
+      <li><strong>Does the retriever find the right documents?</strong> Measured against human (or carefully checked) relevance labels.</li>
+      <li><strong>Does the index find what exact search would?</strong> Measured against brute force on the same embeddings: ANN recall (section 05).</li>
+    </ol>
+    <p>If ANN recall is 0.99 and labelled recall@10 is 0.6, the index is fine and the embeddings, the chunks or the queries are the problem. If exact search scores well and the index doesn't, tune the index.</p>
+
+    <h3 id="metrics">The metrics</h3>
+    <p>The definitions and worked examples of the ranking metrics live in evaluation: ranking metrics. In brief:</p>
+    <ul>
+      <li><strong>Recall@k:</strong> the share of a query's relevant documents that appear in the top \(k\), averaged over queries. The main first-stage metric for RAG, since the generator can only use what was retrieved; measure it at the depth you pass on (recall@100 before a reranker, recall@5 after it). With one relevant document per query it equals the <strong>hit rate</strong>: the share of queries with a relevant document in the top \(k\).</li>
+      <li><strong>MRR</strong> (mean reciprocal rank): the average of \(1/\text{rank}\) of the first relevant result, 0 if none is found. First relevant results at ranks 1, 3, none and 2 give \((1 + 1/3 + 0 + 1/2)/4 = 0.458\). Use it when one good answer at the top is what matters.</li>
+      <li><strong>nDCG@k:</strong> graded relevance (0, 1, 2…) with a discount for lower positions, normalized by the best possible ordering. Use it when relevance has degrees and order matters.</li>
+    </ul>
+
+    <h3 id="labelled-set">Building a labelled query set</h3>
+    <ul>
+      <li><strong>Sample real queries</strong> from logs rather than inventing them, and stratify by type: keyword and ID lookups, natural-language questions, paraphrases, multi-part questions, and queries with no answer in the corpus (which should retrieve nothing confident).</li>
+      <li><strong>Label a pooled candidate set.</strong> Take the top 10–20 from several systems (BM25, dense, hybrid) and label the union. Labelling only one system's results makes the set biased towards that system: anything relevant that only another system finds counts as wrong.</li>
+      <li><strong>LLM-assisted labelling</strong> speeds this up; audit a random sample by hand and check agreement before trusting it.</li>
+      <li><strong>Synthetic queries</strong> generated from chunks are easy (they reuse the chunk's words) and overstate recall; use them as a supplement, not the core.</li>
+      <li><strong>Size, from the standard error</strong> of a rate (<a href="./hypothesis-testing.html#se">standard error</a>), \(\sqrt{p(1 - p)/n}\); the 95% margin is about 1.96 × SE. At a hit rate of 0.8, 50 queries give SE 0.057, so ±0.11; 200 give ±0.055 and 1,000 give ±0.025. So with 50 queries, a 5-point difference between two models is noise. Compare systems on the <em>same</em> queries with a paired bootstrap (<a href="./hypothesis-testing.html#boot">the bootstrap</a>), which is far more sensitive than comparing two separate intervals.</li>
+      <li><strong>Keep it current:</strong> version the set with the corpus, since edited or deleted documents make labels stale; hold out a test split if you fine-tune on similar data.</li>
+    </ul>
+
+    <h3 id="measure-ann">Measuring ANN recall against exact search</h3>
+    <ol>
+      <li>Take about 1,000 real queries (not random vectors: real queries cluster differently).</li>
+      <li>Run brute force (for example FAISS <code>IndexFlat</code>) to get the true top \(k\) for each.</li>
+      <li>For each setting of the knob (efSearch, nprobe, rerank depth), measure recall@k and latency at the expected load: p50 and p99, not the average.</li>
+      <li>Pick the cheapest setting that meets the target (often 0.95–0.99), and measure again <em>with filters</em>, which can drop recall well below the unfiltered number.</li>
+      <li>Re-check as the collection grows or shifts: the same efSearch gives lower recall at ten times the vectors.</li>
+    </ol>
+    <p>Then check that the end task moved: a point of ANN recall rarely matters to answer quality, a point of labelled recall@5 often does (<a href="./rag.html#rag-eval">evaluating a RAG system</a>).</p>
+    <p><strong>Say it in an interview:</strong> “I'd separate retrieval quality from index fidelity. For quality, a few hundred real queries, stratified by type, labelled over a pool from several retrievers, scored with recall@k at the depth I pass on, plus MRR or nDCG. With 200 queries the 95% margin on a 0.8 hit rate is about ±5.5 points, so I'd compare systems with a paired bootstrap. For the index, recall@k against brute force at each efSearch or nprobe, with filters on, at production load.”</p>
+
+    <!-- code -->
+    <h2 id="code"><span class="pn">11</span>Pseudocode</h2>
+    <p>Python-flavoured and short enough to write from memory. Each block was run as real code on the note's examples (the HNSW search on a small graph built from scratch); results are in the → comments.</p>
+
+    <h3>Brute-force top-k</h3>
+    <pre class="code"><code>def brute_force_topk(X, q, k):
+    <span class="cm"># normalize X once, at index time</span>
+    X = X / norm(X, axis=1, keepdims=True)
+    q = q / norm(q)
+    s = X @ q                      <span class="cm"># N dot products</span>
+    idx = argpartition(-s, k)[:k]  <span class="cm"># top k, O(N)</span>
+    return idx[argsort(-s[idx])]   <span class="cm"># sort those k</span>
+
+<span class="cm"># X = [(0.9, 0.1), (3, 3), (0, 1), (-1, 0)]</span>
+<span class="cm"># q = (1, 0), k = 2 → [0, 1]:</span>
+<span class="cm"># by cosine, (0.9, 0.1) beats (3, 3)</span></code></pre>
+
+    <h3>Masked mean pooling</h3>
+    <pre class="code"><code>def mean_pool(H, mask):          <span class="cm"># H: T x d, mask: T of 0/1</span>
+    e = (H * mask[:, None]).sum(0) / mask.sum()
+    return e / norm(e)
+
+<span class="cm"># rows (2,0), (0,2), (1,1) + two padding</span>
+<span class="cm"># rows → (0.707, 0.707)</span></code></pre>
+
+    <h3>HNSW search</h3>
+    <pre class="code"><code>def greedy(q, ep, level, nbrs, dist):
+    cur, d = ep, dist(q, ep)
+    improved = True
+    while improved:            <span class="cm"># move while a</span>
+        improved = False       <span class="cm"># neighbour is closer</span>
+        for v in nbrs[level][cur]:
+            dv = dist(q, v)
+            if dv &lt; d:
+                cur, d, improved = v, dv, True
+    return cur
+
+def beam_search(q, ep, level, ef, nbrs, dist):
+    d0 = dist(q, ep)
+    visited = {ep}
+    cand = [(d0, ep)]            <span class="cm"># min-heap: closest first</span>
+    best = [(-d0, ep)]           <span class="cm"># max-heap: worst on top</span>
+    while cand:
+        d, c = heappop(cand)
+        if d &gt; -best[0][0]:  <span class="cm"># closest candidate is</span>
+            break            <span class="cm"># worse than worst result</span>
+        for v in nbrs[level][c]:
+            if v in visited:
+                continue
+            visited.add(v)
+            dv = dist(q, v)
+            if len(best) &lt; ef or dv &lt; -best[0][0]:
+                heappush(cand, (dv, v))
+                heappush(best, (-dv, v))
+                if len(best) &gt; ef:
+                    heappop(best)        <span class="cm"># drop the worst</span>
+    return sorted((-nd, v) for nd, v in best)
+
+def hnsw_search(q, k, ef, entry, top, nbrs, dist):
+    ep = entry
+    for level in range(top, 0, -1):       <span class="cm"># upper layers:</span>
+        ep = greedy(q, ep, level, nbrs, dist)  <span class="cm"># 1 node</span>
+    W = beam_search(q, ep, 0, max(ef, k), nbrs, dist)
+    return [v for _, v in W[:k]]
+
+<span class="cm"># 3,000 points, 16-d, M = 8: layers of 3000, 393, 51, 7, 2</span>
+<span class="cm"># recall@10 vs brute force: ef 8 → 0.976, 16 → 0.996,</span>
+<span class="cm"># 32 → 0.999, 64 → 1.000</span></code></pre>
+
+    <h3>IVF search</h3>
+    <pre class="code"><code>def ivf_search(q, centroids, lists, X, k, nprobe):
+    near = argsort(((centroids - q)**2).sum(1))[:nprobe]
+    cand = concat([lists[c] for c in near])
+    d = ((X[cand] - q)**2).sum(1)        <span class="cm"># exact, on few</span>
+    return cand[argsort(d)[:k]]
+
+<span class="cm"># the figure's query: nprobe 1 → point (290, 178),</span>
+<span class="cm"># nprobe 2 → (372, 212), the true nearest</span></code></pre>
+
+    <h3>PQ encode and asymmetric search</h3>
+    <pre class="code"><code>def pq_train(X, m, ksub=256):
+    D = X.shape[1] // m
+    return [kmeans(X[:, j*D:(j+1)*D], ksub)  <span class="cm"># m codebooks</span>
+            for j in range(m)]
+
+def pq_encode(x, books):
+    D = len(x) // len(books)
+    return [argmin(((C - x[j*D:(j+1)*D])**2).sum(1))
+            for j, C in enumerate(books)]    <span class="cm"># m small ints</span>
+
+def adc_search(q, codes, books, k):
+    D = len(q) // len(books)
+    T = [((C - q[j*D:(j+1)*D])**2).sum(1)   <span class="cm"># one table</span>
+         for j, C in enumerate(books)]       <span class="cm"># per slot</span>
+    dist = [sum(T[j][c[j]] for j in range(len(books)))
+            for c in codes]                  <span class="cm"># m lookups</span>
+    return argsort(dist)[:k]
+
+<span class="cm"># toy codebooks: codes (0,1), (1,0), (2,2)</span>
+<span class="cm"># q = (0.7, 0.4, 0.5, 0.6) → dists 1.26, 0.86, 5.26</span>
+<span class="cm"># → order [x2, x1, x3]</span></code></pre>
+
+    <h3>Reciprocal rank fusion</h3>
+    <pre class="code"><code>def rrf(rankings, k=60):
+    score = defaultdict(float)
+    for ranking in rankings:     <span class="cm"># one per retriever</span>
+        for rank, doc in enumerate(ranking, start=1):
+            score[doc] += 1 / (k + rank)
+    return sorted(score, key=score.get, reverse=True)
+
+<span class="cm"># rrf([[d3, d6, d2], [d6, d2, d5, d3]])</span>
+<span class="cm"># → [d6, d3, d2, d5]  (scores 0.03252,</span>
+<span class="cm">#   0.03202, 0.03200, 0.01587)</span></code></pre>
+
+    <h3>Filtered search</h3>
+    <pre class="code"><code>def filtered_search(q, k, allowed, X, ann_search,
+                    n_total, brute_max=20_000):
+    ids = sorted(allowed)         <span class="cm"># from metadata index</span>
+    if len(ids) &lt;= brute_max:         <span class="cm"># selective filter:</span>
+        s = X[ids] @ q                <span class="cm"># exact on the subset</span>
+        return [ids[i] for i in argsort(-s)[:k]]
+    k2 = int(2 * k * n_total / len(ids))  <span class="cm"># over-fetch</span>
+    while True:                       <span class="cm"># post-filter</span>
+        res = [i for i in ann_search(q, k2) if i in allowed]
+        if len(res) &gt;= k or k2 &gt;= n_total:
+            return res[:k]
+        k2 *= 2                       <span class="cm"># too few: go deeper</span>
+
+<span class="cm"># 50,000 vectors; 1% allowed → exact branch;</span>
+<span class="cm"># 50% allowed → over-fetch 40; both match exact top-10</span>
+<span class="cm"># (a filter-aware index would instead pass `allowed`</span>
+<span class="cm">#  into the graph walk)</span></code></pre>
+
+    <!-- reading -->
+    <h2 id="reading"><span class="pn">12</span>Further reading</h2>
+    <ul>
+      <li><strong>Malkov and Yashunin, <a href="https://arxiv.org/abs/1603.09320">Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs</a>.</strong> The HNSW paper: the layer assignment, the search and insert algorithms, and the neighbour-selection heuristic. Read after section 06, for the algorithm listings.</li>
+      <li><strong>Jégou, Douze and Schmid, <a href="https://doi.org/10.1109/TPAMI.2010.57">Product quantization for nearest neighbor search</a>.</strong> The PQ paper: asymmetric distances, the error analysis, and IVF with residual encoding (IVFADC). Read for why the asymmetric version is better.</li>
+      <li><strong>Douze et al., <a href="https://arxiv.org/abs/2401.08281">The Faiss library</a>, and the FAISS wiki's <a href="https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index">guidelines to choose an index</a>.</strong> A survey of every index family in one design space, and the practical rules (list counts, memory per vector) used here. The guidelines are the page to keep open while building an index.</li>
+      <li><strong>Reimers and Gurevych, <a href="https://arxiv.org/abs/1908.10084">Sentence-BERT</a>.</strong> Why raw BERT vectors are poor sentence embeddings, the siamese training that fixed it, and the bi-encoder cost argument. Short and readable.</li>
+      <li><strong>Khattab and Zaharia, <a href="https://arxiv.org/abs/2004.12832">ColBERT</a>.</strong> Late interaction and MaxSim, with the cost comparison against cross-encoders. Read when a reranker is too slow and a bi-encoder too coarse.</li>
+      <li><strong>Muennighoff et al., <a href="https://arxiv.org/abs/2210.07316">MTEB: Massive Text Embedding Benchmark</a>.</strong> What the leaderboard's tasks and scores actually measure. Read before trusting the average.</li>
+      <li><strong>Pinecone's <a href="https://www.pinecone.io/learn/series/faiss/hnsw/">HNSW</a> and <a href="https://www.pinecone.io/learn/series/faiss/product-quantization/">product quantization</a> articles.</strong> Illustrated walk-throughs with FAISS code on a standard dataset. Good second explanations of sections 06 and 07.</li>
+      <li><strong>Hugging Face, <a href="https://huggingface.co/blog/embedding-quantization">Binary and scalar embedding quantization</a>.</strong> Measured quality retained by int8 and binary embeddings across real models, with and without rescoring, and the memory and speed gains. Read before choosing a quantization.</li>
+    </ul>
+
+    <!-- questions -->
+    <h2 id="questions"><span class="pn">13</span>Interview questions</h2>
+    <p>Answer out loud first, then open the answer. Each answer stands on its own: the short answer, the mechanism, the why, then the trade-off or the likely follow-up. Questions 10, 13, 16, 24 and 25 are hand drills; do them with a pen. Question 30 asks for code.</p>
+
+    <details class="qa"><summary><span class="qn">1</span>What is a text embedding, and what does a cosine similarity of 0.8 tell you?</summary><div class="ans">
+      <p><strong>A fixed-length vector from a model trained so that texts that should match are close; a cosine of 0.8 tells you the rank order among candidates, not a probability of relevance.</strong></p>
+      <ul>
+        <li><strong>What it captures:</strong> topic, paraphrase and intent, because it's trained on millions of (query, relevant passage) pairs. “forgot my login details” lands near “Reset your password from the sign-in page” with no shared word.</li>
+        <li><strong>What it misses:</strong> negation (“refunds allowed” against “not allowed”), numbers (50 against 500), exact IDs (E-4012 against E-4021), and anything past the length limit or diluted in a long, multi-topic text.</li>
+        <li><strong>Why 0.8 means little alone:</strong> scales differ by model (some put unrelated texts at 0.7, which is anisotropy) and by query. Compare scores within one query; set any “no good match” threshold per model on labelled data.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> “how would you fix the misses?” Hybrid search with BM25 for IDs, chunking for long documents, a cross-encoder reranker for negation. (<a href="#encodes">01</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">2</span>CLS pooling or mean pooling? What goes wrong with padding?</summary><div class="ans">
+      <p><strong>Use whichever the model was trained with; mean pooling must average only real tokens, using the attention mask.</strong></p>
+      <ul>
+        <li><strong>CLS:</strong> the first token's vector. Poor in a BERT pretrained only on masked words (Sentence-BERT measured 29.2 on sentence similarity against 61.3 for averaged GloVe); fine after contrastive fine-tuning, which teaches it to summarize.</li>
+        <li><strong>Mean:</strong> \(e = \sum_t m_t h_t / \sum_t m_t\), then normalize. Sentence-BERT's default.</li>
+        <li><strong>Last token:</strong> for embedders built on decoder LLMs, since with causal attention only the last token has seen everything.</li>
+        <li><strong>The padding bug:</strong> tokens (2, 0), (0, 2), (1, 1) plus two padding rows (0.5, −3): the masked mean is (1, 1), the naive mean over five rows is (0.8, −0.6). The vector then depends on the batch it was encoded in.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> mismatched pooling or a missing prefix fails silently: no error, just worse retrieval. (<a href="#pooling">02</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">3</span>How is a retrieval embedding model trained?</summary><div class="ans">
+      <p><strong>Contrastively, on (query, relevant passage) pairs: InfoNCE pushes each query's score with its own passage above its scores with every other passage in the batch and with mined hard negatives.</strong></p>
+      <ul>
+        <li><strong>Data:</strong> usually two stages: weakly related pairs from the web at large scale (title and body, question and answer), then curated labelled pairs with hard negatives.</li>
+        <li><strong>Loss:</strong> softmax cross-entropy over \(B\) in-batch passages plus hard negatives, with cosine scores divided by a temperature of about 0.01–0.05 (sentence-transformers' default scale of 20 is \(\tau = 0.05\)).</li>
+        <li><strong>In-batch negatives</strong> come free from one \(B \times B\) matrix product, so larger batches mean more negatives; but they're mostly easy.</li>
+        <li><strong>Hard negatives</strong> teach the fine distinctions; distillation from a cross-encoder's scores is a common extra signal.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> the loss's gradient and why temperature and batch size matter are in <a href="./loss-functions.html#contrastive">contrastive losses</a>. (<a href="#training">02</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">4</span>What are hard negatives, how do you mine them, and what can go wrong?</summary><div class="ans">
+      <p><strong>Passages that look relevant but aren't; mined from the top results of BM25 or the current model; the risk is that many of them are actually relevant but unlabelled.</strong></p>
+      <ul>
+        <li><strong>Example:</strong> for “how do I change my email”, “reset your password” is hard (same account vocabulary, wrong task); “track your delivery” is easy.</li>
+        <li><strong>Mining:</strong> retrieve the top 50–100 for each training query, remove labelled positives, keep the rest as negatives; re-mine after a round of training.</li>
+        <li><strong>False negatives:</strong> datasets usually label one positive per query, but the top-ranked “negatives” are where other relevant passages sit. Training pushes them away, teaching the model to rank relevant text lower.</li>
+        <li><strong>Fixes:</strong> drop mined negatives that a cross-encoder scores as relevant; sample from ranks 10–100 rather than the top few; deduplicate the corpus.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> without any hard negatives the model learns topic separation quickly and then plateaus, because random in-batch negatives are too easy. (<a href="#hard-negatives">02</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">5</span>Why do some embedding models need “query: ” and “passage: ” prefixes?</summary><div class="ans">
+      <p><strong>Because search is asymmetric: a short question and the long passage that answers it are different kinds of text, and the prefix tells one shared encoder which side it's encoding.</strong></p>
+      <ul>
+        <li><strong>Symmetric tasks</strong> (duplicate questions, clustering) compare like with like. <strong>Asymmetric</strong> retrieval compares a query with an answer, which isn't “similar” in the everyday sense; a symmetric model tends to retrieve other questions.</li>
+        <li><strong>Designs:</strong> two separate encoders (DPR), or one encoder with prefixes (E5: “query: ” and “passage: ”; BGE: an instruction on queries only), or instruction-tuned embedders that take a task description.</li>
+        <li><strong>Getting it wrong</strong> fails silently: E5's model card warns of degraded results without the prefixes.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> a change of model, version or prefix means re-embedding the whole corpus, since vectors from different models aren't comparable. (<a href="#prefixes">02</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">6</span>What are Matryoshka embeddings, and why re-normalize after truncating?</summary><div class="ans">
+      <p><strong>Embeddings trained so that their first 64, 128, 256… dimensions each work as an embedding; after cutting, rescale to unit length or the score mixes in how much of each vector survived the cut.</strong></p>
+      <ul>
+        <li><strong>Training:</strong> the contrastive loss is applied to several prefixes of the vector and summed, \(\sum_m c_m L(e_{1:m})\), so information is packed into the early dimensions.</li>
+        <li><strong>Use:</strong> store 256 of 768 dimensions (3× less memory and distance work), or shortlist with 64 and rescore with 768.</li>
+        <li><strong>Re-normalizing, in numbers:</strong> \(e = (0.6, 0, 0.8)\), \(f = (0.8, 0.6, 0)\), cosine 0.48. Truncated to two dimensions, the dot product is still 0.48, but the lengths are 0.6 and 1.0, so the true cosine is 0.8.</li>
+        <li><strong>A non-Matryoshka model</strong> degrades much faster when truncated; use PCA or a smaller model instead.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> Matryoshka truncation stacks with int8 or binary quantization. (<a href="#matryoshka">02</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">7</span>When would you fine-tune an embedding model on your own domain, and where would the training pairs come from?</summary><div class="ans">
+      <p><strong>When a labelled set of real queries shows a clear recall gap that hybrid search and a reranker don't close, typically because of domain vocabulary or a different notion of relevance.</strong></p>
+      <ul>
+        <li><strong>Positives:</strong> query and clicked-and-read article; ticket and resolving article; FAQ question and answer; title and body; LLM-generated questions per chunk, filtered (keep a question only if a cross-encoder ranks its chunk highly).</li>
+        <li><strong>Negatives:</strong> mined from BM25 and the current model, filtered for false negatives with a cross-encoder, plus in-batch negatives.</li>
+        <li><strong>Recipe:</strong> start from a strong general model, one to three epochs at a small learning rate, train/test split by query <em>and</em> document, check general queries didn't regress, re-embed the corpus.</li>
+        <li><strong>Not worth it</strong> when misses are exact IDs (add BM25), bad chunks, or ordering at the top (fine-tune a reranker, which needs no re-indexing).</li>
+      </ul>
+      <p><strong>Follow-up:</strong> a query-side linear adapter is a cheap middle ground: it changes query vectors only, so the index stays. (<a href="#fine-tune">02</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">8</span>How do you choose an embedding model? What's wrong with taking the top of the MTEB leaderboard?</summary><div class="ans">
+      <p><strong>Shortlist from MTEB's retrieval scores and practical constraints, then decide on a labelled set of your own queries.</strong></p>
+      <ul>
+        <li><strong>The average mixes eight task types</strong> (classification, clustering, similarity, retrieval…); a model can lead overall and be middling at retrieval. Read the retrieval column (nDCG@10).</li>
+        <li><strong>Domain and query style:</strong> your users' short, misspelled or code-mixed queries may look nothing like the benchmarks.</li>
+        <li><strong>Benchmark overfitting:</strong> some models train on benchmark training splits or near-copies, inflating their scores.</li>
+        <li><strong>Small gaps</strong> between top models often vanish on your data, and MTEB ignores cost: parameters, dimension, maximum length, licence, hosting.</li>
+        <li><strong>Process:</strong> three to five candidates, 100–300 labelled queries, recall@k and nDCG; choose the cheapest within noise of the best.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> with 200 queries the 95% margin on a 0.8 hit rate is about ±5.5 points, so compare models on the same queries with a paired bootstrap. (<a href="#choosing">02</a>, <a href="#labelled-set">10</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">9</span>Bi-encoder versus cross-encoder: how do they differ, and why is the cross-encoder more accurate?</summary><div class="ans">
+      <p><strong>A bi-encoder encodes query and document separately and compares two vectors; a cross-encoder reads them together and outputs a score. The cross-encoder sees both texts in every layer, so it's more accurate but can't precompute anything.</strong></p>
+      <ul>
+        <li><strong>Bi-encoder:</strong> document vectors computed once and indexed; per query, one encoder pass plus a vector search.</li>
+        <li><strong>Cross-encoder:</strong> <code>[CLS] query [SEP] doc</code> through a full transformer per pair, so it only reranks a short list.</li>
+        <li><strong>Why more accurate:</strong> the bi-encoder compresses a document into one vector before seeing the question and compares with a single dot product; the cross-encoder compares tokens across all layers, which handles negation, numbers and exact entities (it led on the NevIR negation benchmark).</li>
+        <li><strong>Together:</strong> retrieve a few hundred with bi-encoder + BM25, rerank the top 50–100 with a cross-encoder.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> the reranker can't recover what retrieval missed, so tune the first stage for recall@100. (<a href="#bi-cross">03</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">10</span>Drill: a BERT-base cross-encoder, 256-token pairs, 1 million documents. What does one query cost with cross-encoding, with a bi-encoder, and with retrieve-then-rerank the top 100?</summary><div class="ans">
+      <p><strong>About 46 PFLOP, about 4.3 GFLOP, and about 4.6 TFLOP: roughly 459 s at an assumed 100 TFLOP/s for the first; for the bi-encoder, about 30 ms by brute force at 100 GB/s (memory-bound; under 1 ms with an ANN index); and 46 ms of reranking on top of retrieval for the third.</strong></p>
+      <ul>
+        <li><strong>Per pair:</strong> about 2 FLOPs per parameter per token; 85M non-embedding parameters × 256 tokens × 2 = 43.5 GFLOP, plus attention, about 45.9 GFLOP.</li>
+        <li><strong>All 1M documents:</strong> \(10^6 \times 45.9\) GFLOP = 45.9 PFLOP per query.</li>
+        <li><strong>Bi-encoder:</strong> a 16-token query is 2.7 GFLOP; 1M dot products at 768 dimensions are 1.5 GFLOP; total about 4.3 GFLOP, about ten million times less. The corpus embedding (also 45.9 PFLOP) is paid once.</li>
+        <li><strong>The bi-encoder's time</strong> isn't set by FLOPs: the 1M dot products read 3.07 GB of vectors, about 31 ms at 100 GB/s (72 ms measured on a laptop), or well under a millisecond through an ANN index.</li>
+        <li><strong>Rerank top 100:</strong> 100 × 45.9 GFLOP = 4.6 TFLOP, about 46 ms, plus the retrieval time before it.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> the Sentence-BERT paper's version: 10,000 sentences have 49,995,000 pairs, about 65 hours with BERT against about 5 seconds with SBERT. (<a href="#cost">03</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">11</span>What is late interaction (ColBERT)? Compute a MaxSim score, and say what it costs.</summary><div class="ans">
+      <p><strong>Encode query and document separately but keep one vector per token; score by summing, over query tokens, each one's best dot product with any document token.</strong></p>
+      <ul>
+        <li><strong>Formula:</strong> \(s(q, d) = \sum_i \max_j q_i^\top d_j\).</li>
+        <li><strong>By hand:</strong> \(q_1 = (1, 0)\), \(q_2 = (0, 1)\); \(d_1 = (0.8, 0.6)\), \(d_2 = (0.6, 0.8)\), \(d_3 = (-1, 0)\). Best matches 0.8 and 0.8, score 1.6. Dropping the irrelevant \(d_3\) leaves 1.6, while a mean-pooled cosine moves from 0.874 to 1.0: MaxSim isn't diluted by tokens that match nothing.</li>
+        <li><strong>Cost:</strong> document token vectors are precomputed, so queries are far cheaper than a cross-encoder; but storage is a vector per token: 100 tokens × 128 dims × 2 bytes = 25.6 KB per passage against 3 KB for one 768-d float vector. ColBERTv2's residual compression gets about 36 bytes per token.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> it needs its own candidate-generation machinery, so it's less plug-and-play than one vector per chunk. (<a href="#colbert">03</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">12</span>When do dot product, cosine and L2 distance give the same ranking, and when does the choice matter?</summary><div class="ans">
+      <p><strong>They agree when all vectors have unit length, since then \(\lVert a - b \rVert^2 = 2 - 2\cos(a, b)\); they disagree when lengths differ, and the dot product then favours long vectors.</strong></p>
+      <ol>
+        <li>Expand: \(\lVert a - b \rVert^2 = \lVert a \rVert^2 + \lVert b \rVert^2 - 2\, a^\top b\).</li>
+        <li>With unit vectors, \(\lVert a \rVert^2 = \lVert b \rVert^2 = 1\) and \(a^\top b = \cos(a, b)\).</li>
+        <li>So \(\lVert a - b \rVert^2 = 2 - 2\cos(a, b)\), a decreasing function of the cosine: smallest distance = largest cosine = largest dot. Check: \((0.6, 0.8)\) and \((0.8, 0.6)\) have squared distance 0.08 and cosine 0.96, and \(2 - 1.92 = 0.08\).</li>
+      </ol>
+      <ul>
+        <li><strong>When it matters:</strong> \(q = (1, 0)\); \(u = (0.9, 0.1)\) has dot 0.90 and cosine 0.994; \(v = (3, 3)\) has dot 3.00 and cosine 0.707. Dot picks \(v\), cosine picks \(u\).</li>
+        <li><strong>Where length means something:</strong> two-tower recommenders (length often tracks popularity) and retrievers trained with an unnormalized dot product, like DPR. Use the similarity the model was trained with; for cosine models, normalize at indexing and at query time, and any index type works.</li>
+        <li><strong>Maximum inner product search with an L2 index:</strong> with \(R\) the largest document length, map \(x \to (x, \sqrt{R^2 - \lVert x \rVert^2})\) and \(q \to (q, 0)\). Then \(\lVert q' - x' \rVert^2 = \lVert q \rVert^2 + R^2 - 2\, q^\top x\), so the nearest in L2 has the largest inner product.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> why is inner-product search awkward? It isn't a metric: no triangle inequality, and a vector needn't be its own best match. (<a href="#agree">04</a>, <a href="#mips">04</a>)</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">13</span>Drill: \(a^\top b = 12\), \(\lVert a \rVert = 3\), \(\lVert b \rVert = 5\). What are the cosine and the squared L2 distance? And if both were normalized first?</summary><div class="ans">
+      <p><strong>Cosine 0.8; squared distance 10; after normalizing, squared distance 0.4.</strong></p>
+      <ul>
+        <li>\(\cos = 12 / (3 \times 5) = 0.8\).</li>
+        <li>\(\lVert a - b \rVert^2 = 9 + 25 - 2 \times 12 = 10\).</li>
+        <li>Normalized: \(2 - 2 \times 0.8 = 0.4\). The cosine doesn't change with normalization; the distance does.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> “which would a dot-product index rank higher, \(b\) or a unit vector at the same angle?” \(b\): its dot with \(a\) is 12 against 2.4, because the dot product rewards length. (<a href="#similarity">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">14</span>What are anisotropy and hubness, and why should a search engineer care?</summary><div class="ans">
+      <p><strong>Anisotropy: embeddings crowd into a narrow cone, so unrelated texts have high cosines. Hubness: a few vectors are among the nearest neighbours of many queries.</strong></p>
+      <ul>
+        <li><strong>Anisotropy in numbers:</strong> a shared component of length 0.6 in every unit vector gives unrelated texts a cosine of about \(0.6^2 = 0.36\). Thresholds don't transfer across models; centering (subtracting the mean) and contrastive training reduce it.</li>
+        <li><strong>Hubness:</strong> a boilerplate chunk (“contact support for help”) shows up for unrelated queries and crowds out real answers.</li>
+        <li><strong>Remedies:</strong> remove boilerplate before indexing; center vectors; penalize documents by their average similarity to their own neighbours.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> both are reasons to look at retrieved results by eye during evaluation, not only at metrics. (<a href="#anisotropy">04</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">15</span>How much does brute-force search over 10 million 768-d vectors cost, and when is it the right choice?</summary><div class="ans">
+      <p><strong>30.7 GB of float32 and 15.4 GFLOP per query; it's memory-bound, about 0.3 s per query at 100 GB/s.</strong></p>
+      <ul>
+        <li><strong>Memory:</strong> \(10^7 \times 768 \times 4 = 30.72\) GB (28.6 GiB).</li>
+        <li><strong>Work:</strong> \(2 N d = 15.36\) GFLOP, but only half a FLOP per byte read, so bandwidth sets the time. Measured on a laptop: 72 ms per query for 1M vectors (about 43 GB/s); batching 64 queries brought it to about 10 ms each.</li>
+        <li><strong>Right choice:</strong> up to about a million vectors at modest load, on a GPU, after a selective filter, and always as ground truth for measuring ANN recall.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> picking the top \(k\) uses a partial selection (<code>argpartition</code> or a size-\(k\) heap), linear in \(N\), not a full sort. (<a href="#brute">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">16</span>Drill: 50 million vectors of 1,024 dimensions. Memory in float32, float16, int8, binary and PQ with 64-byte codes? What do HNSW links add at M = 32?</summary><div class="ans">
+      <p><strong>204.8 GB, 102.4 GB, 51.2 GB, 6.4 GB and 3.2 GB; HNSW's layer-0 links add 12.8 GB.</strong></p>
+      <ul>
+        <li><strong>float32:</strong> \(5 \times 10^7 \times 1{,}024 \times 4 = 204.8\) GB. float16 halves it: 102.4 GB.</li>
+        <li><strong>int8:</strong> one byte per dimension: 51.2 GB.</li>
+        <li><strong>Binary:</strong> 1,024 bits = 128 bytes per vector: 6.4 GB.</li>
+        <li><strong>PQ, 64 one-byte codes:</strong> 64 bytes per vector: 3.2 GB (64×).</li>
+        <li><strong>HNSW links:</strong> \(2M \times 4 = 256\) bytes per vector: 12.8 GB, on top of whatever the vectors take.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> a practical layout is binary or PQ codes in RAM for the first pass and int8 or float vectors on SSD for rescoring the shortlist. (<a href="#pq-arith">07</a>, <a href="#hnsw-memory">06</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">17</span>Explain how HNSW is built and searched. Why the layers?</summary><div class="ans">
+      <p><strong>A proximity graph in layers: each node gets a random top layer, so each layer holds about 1/M of the one below; search walks greedily through the sparse upper layers and finishes with a beam search in layer 0.</strong></p>
+      <ul>
+        <li><strong>Layers:</strong> \(\ell = \lfloor -\ln U / \ln M \rfloor\), so \(P(\ell \ge L) = M^{-L}\). For 10M vectors and M = 16: about 10M, 625k, 39k, 2.4k, 153 and 10 nodes, six layers.</li>
+        <li><strong>Search:</strong> from the entry point, greedy hops in each upper layer; in layer 0, a beam of width efSearch, expanding the closest candidate until none can beat the worst of the \(ef\) results; return the best \(k\).</li>
+        <li><strong>Insert:</strong> beam search with efConstruction at each of the node's layers, keep M neighbours chosen by a diversity heuristic, link both ways, prune overfull lists.</li>
+        <li><strong>Why layers:</strong> like a skip list, long hops at the top and short ones at the bottom, so a search takes roughly \(\log N\) hops instead of crawling across a flat graph and stalling in local minima.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> the neighbour heuristic keeps a candidate only if it's closer to the new node than to any neighbour already kept, which preserves bridges between clusters. (<a href="#hnsw">06</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">18</span>What do M, efConstruction and efSearch trade? Recall has dropped in production: what do you check?</summary><div class="ans">
+      <p><strong>M: links per node (recall vs memory and build time). efConstruction: build beam (graph quality vs build time). efSearch: query beam (recall vs latency, per query).</strong></p>
+      <ul>
+        <li><strong>Measured</strong> (200k synthetic 384-d vectors): M = 16, efSearch 10 → 0.863 recall@10 in 0.22 ms; 40 → 0.976 in 0.47 ms; 320 → 0.997 in 3.2 ms. At efSearch 40, M = 8 gave 0.912 and M = 32 gave 0.983. efConstruction above 100 added almost nothing.</li>
+        <li><strong>Recall drop, checklist:</strong> has the collection grown (same efSearch, lower recall at larger N)? Many deletes (tombstones)? Are queries now filtered (filtered recall is far lower)? Did the embedding model or normalization change between old and new vectors? Has the data drifted?</li>
+        <li><strong>Measure first:</strong> recall@k against brute force on a sample of real queries, then raise efSearch, or rebuild.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> efSearch is the cheap knob, since it needs no rebuild; M and efConstruction need one. (<a href="#hnsw-params">06</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">19</span>Why are deletes and metadata filters hard for HNSW?</summary><div class="ans">
+      <p><strong>Deleting a node cuts the paths through it, and a filter makes most of the graph unusable for the query; both break the assumption that the greedy walk can reach the answer.</strong></p>
+      <ul>
+        <li><strong>Deletes:</strong> implementations mark nodes deleted (still traversed, never returned). Many tombstones waste memory and hops and lower recall; the fix is periodic compaction or rebuild.</li>
+        <li><strong>Filters, skipping disallowed nodes:</strong> the allowed nodes become disconnected islands; recall collapses.</li>
+        <li><strong>Filters, walking through but not returning:</strong> connected, but with a 1% filter about 99 of every 100 visits are wasted. Measured: 150 nodes tested per query with no filter, 1,099 at a 10% filter, 9,438 at 1%, 65,540 at 0.1%.</li>
+        <li><strong>Fixes:</strong> exact search on small allowed sets, per-tenant indexes, filter-aware links, and planners that choose by estimated selectivity.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> post-filtering a top-100 with a 1% filter leaves one result on average. (<a href="#hnsw-filters">06</a>, <a href="#filtering">09</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">20</span>Explain IVF and nprobe. What is the edge problem, and how do you choose the number of lists?</summary><div class="ans">
+      <p><strong>k-means splits the vectors into nlist clusters; a query scans only the nprobe clusters with the nearest centroids. Neighbours just across a cluster border are missed unless more lists are probed.</strong></p>
+      <ul>
+        <li><strong>Cost:</strong> about \(n_{\text{list}} + n_{\text{probe}} N / n_{\text{list}}\) distances. For \(N = 10^7\), nlist 16,384, nprobe 32: 35,915, about 278× less than brute force.</li>
+        <li><strong>Choosing nlist:</strong> the sum is smallest at \(n_{\text{list}} = \sqrt{n_{\text{probe}} N}\) (17,889 here); FAISS suggests \(4\sqrt N\) to \(16\sqrt N\).</li>
+        <li><strong>Edge problem:</strong> in high dimensions many neighbours lie near borders, so recall climbs slowly with nprobe: measured 0.715 at nprobe 1, 0.908 at 32, 0.973 at 128 (12.5% scanned, 2.6 ms) on data where HNSW reached 0.976 in 0.47 ms.</li>
+        <li><strong>Why still use IVF:</strong> tiny memory overhead, fast builds, cheap inserts and deletes, and it pairs with PQ.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> lists are uneven and centroids go stale as data drifts; retrain periodically. (<a href="#ivf">07</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">21</span>Explain product quantization: encoding and asymmetric distance. Why asymmetric, and why rerank?</summary><div class="ans">
+      <p><strong>Split each vector into m slices, replace each slice with the id of its nearest of 256 learned centroids (m bytes per vector), and at query time sum m precomputed table entries per vector.</strong></p>
+      <ul>
+        <li><strong>By hand:</strong> \(x_1 = (0.9, 0.1 \mid -0.4, 0.8)\) encodes to codes (0, 1). For \(q = (0.7, 0.4 \mid 0.5, 0.6)\) the tables give \(T_1[0] + T_2[1] = 0.25 + 1.01 = 1.26\) against an exact 0.98; the ranking of three vectors is preserved.</li>
+        <li><strong>Compression:</strong> 768-d float32 (3,072 B) with m = 96 becomes 96 bytes (32×); 10M vectors drop from 30.7 GB to 0.96 GB.</li>
+        <li><strong>Asymmetric:</strong> only stored vectors are quantized, not the query, which removes one of the two errors at no extra cost.</li>
+        <li><strong>Rerank:</strong> PQ distances are coarse (measured recall@10 0.68 at 48 bytes), but the true top 10 were almost always within PQ's top 100, so rescoring 100 with full vectors gave 0.999.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> in IVF-PQ the codes encode the residual from the list's centroid, which is more precise; and reranking can't recover what IVF's probes missed. (<a href="#pq">07</a>, <a href="#ivfpq">07</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">22</span>Scalar versus binary quantization of embeddings: compression, quality and rescoring?</summary><div class="ans">
+      <p><strong>int8 is 4× smaller and nearly lossless; binary is 32× smaller and loses noticeably until you rescore a shortlist with int8 or float vectors.</strong></p>
+      <ul>
+        <li><strong>int8:</strong> each dimension's range mapped to 256 levels (range −0.2 to 0.3: step 0.00196; 0.07 → level 138 → 0.0706). Measured recall@10 0.992 against float search on synthetic data; Hugging Face reports about 97% of retrieval quality kept without rescoring and about 99% with, for one model (91–100% without rescoring across models).</li>
+        <li><strong>Binary:</strong> the sign bit per dimension; Hamming distance by XOR and popcount. Hugging Face reports about 92.5% of quality kept without rescoring and about 96.5% with it for one model; with rescoring, from about 75% to about 96% across five models: it's model-dependent.</li>
+        <li><strong>Rescoring:</strong> fetch a few times \(k\) by Hamming distance, rescore with int8 or float vectors kept on disk.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> binary needs roughly zero-centred dimensions; check the share of positive bits per dimension. (<a href="#sq-bq">07</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">23</span>Why hybrid search? Why not just add the BM25 score to the cosine? Where does SPLADE fit?</summary><div class="ans">
+      <p><strong>Dense retrieval misses exact codes and rare terms, BM25 misses paraphrase; their scores live on different scales, so fuse ranks instead of adding scores.</strong></p>
+      <ul>
+        <li><strong>The misses:</strong> “forgot my login details” scores 0 under BM25 against every help article; “E-4012” is decisive for BM25 and a vague “error code” for a dense model.</li>
+        <li><strong>Scales:</strong> BM25 here spans 0–3.5 and the cosines 0.74–0.82, so a raw sum is just the BM25 order. Min-max turns a cosine of 0.74, only 0.08 below the best, into 0.</li>
+        <li><strong>Fusion:</strong> reciprocal rank fusion, or a weighted combination tuned on labelled queries.</li>
+        <li><strong>SPLADE:</strong> learned sparse vectors from BERT's masked-word head, with expansion terms (“login” switches on “password”), served from an inverted index: exact matching plus learned meaning.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> after fusion, rerank the top 100 with a cross-encoder. (<a href="#hybrid">08</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">24</span>Drill: two retrievers return A = [x, y, z] and B = [z, x, w]. Compute RRF with k = 60. What does k do?</summary><div class="ans">
+      <p><strong>x 0.03252, z 0.03227, y 0.01613, w 0.01587; final order x, z, y, w.</strong></p>
+      <ul>
+        <li><strong>x:</strong> rank 1 and 2: \(1/61 + 1/62 = 0.01639 + 0.01613 = 0.03252\).</li>
+        <li><strong>z:</strong> rank 3 and 1: \(1/63 + 1/61 = 0.01587 + 0.01639 = 0.03227\).</li>
+        <li><strong>y:</strong> rank 2 in A only: \(1/62 = 0.01613\). <strong>w:</strong> rank 3 in B only: \(1/63 = 0.01587\).</li>
+        <li><strong>k flattens the rank curve:</strong> at 60, rank 1 is worth 1.15× rank 10, so being in both lists dominates; at \(k = 1\) it's 5.5×, so the top of each list dominates.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> RRF ignores score confidence; weight retrievers or route ID-like queries to keyword search when that matters. (<a href="#rrf">08</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">25</span>Pre-filtering, post-filtering, or filtering during the search? Drill: a filter passes 1% of documents and you post-filter a top-100.</summary><div class="ans">
+      <p><strong>About one result survives on average, and 37% of the time none do; selective filters need pre-filtering.</strong></p>
+      <ul>
+        <li><strong>The arithmetic:</strong> survivors \(\approx K' s = 100 \times 0.01 = 1\); \(P(\text{none}) = 0.99^{100} = 0.366\); to expect 10 survivors you'd need \(K' = 1{,}000\), and 10,000 at a 0.1% filter.</li>
+        <li><strong>Pre-filter:</strong> compute the allowed ids from a metadata index, then search only them: exactly when small (1% of 10M at 768-d is 307 MB, about 7 ms to scan at 43 GB/s), or pass the bitmap into the ANN search when large.</li>
+        <li><strong>During the search:</strong> the graph walk checks the bitmap and returns only allowed nodes; good for moderate selectivity, wasteful for very selective filters.</li>
+        <li><strong>Planners</strong> pick by estimated selectivity; filters correlated against the query make post-filtering even worse.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> pgvector post-filters by default and its HNSW scan returns at most <code>hnsw.ef_search</code> (40) rows; enable iterative scans (0.8.0+). (<a href="#filtering">09</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">26</span>What does a vector database add over FAISS? When is Postgres with pgvector enough?</summary><div class="ans">
+      <p><strong>CRUD by id, metadata filtering, persistence, sharding and replication around the index; pgvector is enough up to a few million vectors when you already run Postgres.</strong></p>
+      <ul>
+        <li><strong>FAISS</strong> is a library: indexes in your process, integer ids, filtering only by an id set you compute, and it saves to a file but has no write-ahead log or scale-out.</li>
+        <li><strong>A database adds:</strong> upserts and deletes (fresh segments plus background index builds and compaction), payload indexes and filtered search, a write-ahead log and snapshots, scatter–gather sharding, replicas, often hybrid search and quantization.</li>
+        <li><strong>pgvector is enough</strong> when vectors fit one server (5M × 768 float32 is 15.4 GB in the table plus about 16 GB for the HNSW index, which keeps its own copy of each vector), load is moderate, and vectors belong in the same transactions and joins as their rows.</li>
+        <li><strong>Move on</strong> at tens of millions of vectors, high QPS with a tight p99, heavy filtered search at scale, or a need for quantized or on-disk indexes.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> one line each: Qdrant (filter-aware HNSW, Rust), Milvus (distributed, many index types), Weaviate (built-in hybrid), Pinecone (managed). (<a href="#vector-db">09</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">27</span>How would you evaluate a retrieval system?</summary><div class="ans">
+      <p><strong>Separately for retrieval quality (against relevance labels) and index fidelity (against brute force), on a few hundred real, stratified queries.</strong></p>
+      <ul>
+        <li><strong>Quality metrics:</strong> recall@k at the depth passed on (recall@100 before a reranker), MRR when one answer at the top matters, nDCG for graded relevance (ranking metrics).</li>
+        <li><strong>Labelled set:</strong> real queries stratified by type (IDs, questions, paraphrases, no-answer); label a pool of candidates from several retrievers so no system is favoured; audit any LLM labels.</li>
+        <li><strong>Size:</strong> SE \(= \sqrt{p(1-p)/n}\), and the 95% margin is about 1.96 × SE: at 0.8, ±11 points with 50 queries, ±5.5 with 200, ±2.5 with 1,000. Compare systems with a paired bootstrap on the same queries.</li>
+        <li><strong>Index fidelity:</strong> recall@k against exact search per efSearch or nprobe, at production load (p99), with filters on.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> if ANN recall is 0.99 but labelled recall is 0.6, fix embeddings or chunking, not the index. (<a href="#eval-retrieval">10</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">28</span>Design: semantic search over 50 million support documents in several languages, for 1,000 tenants, p99 under 100 ms. What do you build?</summary><div class="ans">
+      <p><strong>Hybrid retrieval (BM25 + a multilingual bi-encoder), compressed vectors in a sharded ANN index with tenant filtering, RRF, then a cross-encoder rerank of a short list.</strong></p>
+      <ul>
+        <li><strong>Count vectors, not documents:</strong> each document becomes several chunks, so 50M documents may mean 200M+ vectors; the numbers below are per 50M vectors and scale up with the chunk count.</li>
+        <li><strong>Memory:</strong> 50M × 768 float32 is 153.6 GB; int8 is 38.4 GB (4.8 GB per shard across 8 shards); binary or PQ-96 is 4.8 GB in total. HNSW links at M = 16 add 6.4 GB. So: int8 or PQ in RAM, float vectors on SSD for rescoring.</li>
+        <li><strong>Tenancy:</strong> 50,000 documents per tenant on average, so partition by tenant (or filter inside the walk), and brute-force small tenants exactly; never post-filter a global index.</li>
+        <li><strong>Quality:</strong> a multilingual embedder chosen on labelled queries per language; BM25 alongside for codes and names, with per-language analyzers (tokenization, stemming) and care for romanized or code-mixed text; RRF over the top 100 of each; a cross-encoder on the top 50 (budget about 20–50 ms on a GPU).</li>
+        <li><strong>Operations:</strong> upserts into fresh segments, background index builds, tombstone compaction; ANN recall monitored against brute force on sampled queries; re-embedding plan for model changes.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> “where does the 100 ms go?” Roughly: query embedding a few ms, ANN and BM25 in parallel a few ms each, rerank the largest share; measure p99 per stage. (<a href="#vector-db">09</a>, <a href="#bi-cross">03</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">29</span>A better embedding model comes out. How do you switch to it safely?</summary><div class="ans">
+      <p><strong>Treat it as a migration: build a second index with the new model in parallel, compare on labelled queries, switch through an alias, and keep the old index for rollback.</strong></p>
+      <ul>
+        <li><strong>Why:</strong> vectors from different models (or versions) live in different spaces; a query embedded with one model can't be searched against another's vectors, and mixing them fails silently.</li>
+        <li><strong>Steps:</strong> store model and version with every vector; backfill the new index by re-embedding every chunk (with the new model's prefixes); dual-write new and edited documents to both; evaluate on the labelled set and on shadow traffic; switch the alias; delete the old index once rollback is no longer needed.</li>
+        <li><strong>Cost:</strong> re-embedding the corpus costs as much as indexing did originally (1M chunks of 256 tokens through a BERT-base-sized model is about 46 PFLOP), plus double storage during the switch.</li>
+        <li><strong>Cheaper first:</strong> a query-side adapter or a better reranker can improve results without touching the stored vectors.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> a model swap also changes score ranges, so any similarity thresholds must be re-set. (<a href="#migration">09</a>)</p>
+    </div></details>
+    <details class="qa"><summary><span class="qn">30</span>Write the layer-0 beam search of HNSW from memory.</summary><div class="ans">
+      <p><strong>Two heaps: candidates to expand (closest first) and the best \(ef\) results so far (worst on top); expand the closest candidate until it's farther than the worst result.</strong></p>
+      <ol>
+        <li>Start from the entry node found by the greedy upper-layer walk: put it in both heaps and in a visited set.</li>
+        <li>Pop the closest candidate. If it's farther than the worst result, stop: every remaining candidate is farther still, so nothing can improve the results.</li>
+        <li>For each unvisited neighbour: mark it visited, compute its distance, and if there are fewer than \(ef\) results or it beats the worst one, push it onto both heaps; if the results now exceed \(ef\), pop the worst.</li>
+        <li>Repeat from step 2; return the \(k\) best results, sorted.</li>
+      </ol>
+      <ul>
+        <li><strong>Why it beats pure greedy:</strong> keeping \(ef\) live nodes lets the walk route around local minima; \(ef\) is the recall–latency knob.</li>
+        <li><strong>The same exercise for RRF:</strong> a dictionary of scores, adding \(1/(60 + \text{rank})\) for each list a document appears in, then sorting; for brute force: normalize, one matrix–vector product, <code>argpartition</code> for the top \(k\), then sort those \(k\).</li>
+      </ul>
+      <p><strong>Follow-up:</strong> the full code, run on a small graph built from scratch (recall@10 of 0.996 at \(ef = 16\)), is in <a href="#code">11</a>.</p>
+    </div></details>
+
+    <!-- sheet -->
+    <h2 id="sheet"><span class="pn">14</span>Cheat sheet</h2>
+    <div class="sheet">
+      <h3>Embeddings</h3>
+      <div class="mj">\[ \begin{aligned} e &amp;= \frac{\sum_t m_t h_t}{\sum_t m_t}, \qquad \hat e = e / \lVert e \rVert \\ L_i &amp;= -\log \frac{e^{s(q_i, p_i)/\tau}}{\sum_j e^{s(q_i, p_j)/\tau} + \sum_h e^{s(q_i, n_{i,h})/\tau}} \\ L_{\text{MRL}} &amp;= \sum_{m \in \mathcal M} c_m L(e_{1:m}) \end{aligned} \]</div>
+      <p>Good at topic and paraphrase; weak at negation, numbers, exact IDs, long texts. Cosines aren't probabilities. Pool and prefix exactly as trained (E5: “query: ”/“passage: ”). Hard negatives from BM25 or the model, filtered for false negatives by a cross-encoder. \(\tau \approx 0.01\text{–}0.05\). Matryoshka: truncate, then re-normalize. Choose on your own labelled queries; MTEB's retrieval column only shortlists. A new model means re-embedding everything.</p>
+      <h3>Bi, cross, late interaction</h3>
+      <div class="mj">\[ \begin{aligned} \text{FLOPs per pass} &amp;\approx 2 \times \text{params} \times \text{tokens} \\ s_{\text{ColBERT}}(q, d) &amp;= \sum_i \max_j q_i^\top d_j \end{aligned} \]</div>
+      <p>Cross-encoding 1M docs of 256 tokens: 46 PFLOP per query; bi-encoder: about 4.3 GFLOP; ratio about \(10^7\). Rerank top 100: 4.6 TFLOP. ColBERT: 25.6 KB per 100-token passage in fp16. Retrieve 100–1,000 → rerank 50–100 → keep 5–10; the reranker can't recover retrieval misses.</p>
+      <h3>Similarity</h3>
+      <div class="mj">\[ \begin{aligned} \cos(a, b) &amp;= \frac{a^\top b}{\lVert a \rVert \lVert b \rVert} \\ \lVert a - b \rVert^2 &amp;= 2 - 2\cos(a, b) \quad \text{(unit vectors)} \\ x' &amp;= \big(x, \sqrt{R^2 - \lVert x \rVert^2}\big),\ q' = (q, 0) \quad \text{(MIPS} \to \text{L2)} \end{aligned} \]</div>
+      <p>Normalize ⇒ dot, cosine and L2 rank alike. Unnormalized dot favours long vectors. Use the model's training similarity. Anisotropy: shared offset inflates all cosines; hubness: some docs retrieved for everything.</p>
+      <h3>Brute force and ANN</h3>
+      <div class="mj">\[ \begin{aligned} \text{memory} &amp;= N d \times \text{bytes per number} \\ \text{recall@}k &amp;= \frac{\lvert \text{ANN}_k \cap \text{Exact}_k \rvert}{k} \end{aligned} \]</div>
+      <p>10M × 768 float32: 30.72 GB, 15.36 GFLOP per query, about 0.3 s at 100 GB/s (memory-bound). Families: trees, LSH, IVF, quantization, graphs.</p>
+      <h3>HNSW</h3>
+      <div class="mj">\[ \begin{aligned} P(\ell \ge L) &amp;= M^{-L}, \qquad m_L = 1/\ln M \\ \text{bytes per vector} &amp;\approx 4d + 8M \end{aligned} \]</div>
+      <p>Greedy in upper layers, beam of efSearch in layer 0. M: recall vs memory; efConstruction: build quality vs time (saturates); efSearch: recall vs latency per query. Measured (M = 16): ef 10 → 0.863, 40 → 0.976, 320 → 0.997. Deletes are tombstones; filters break the walk.</p>
+      <h3>IVF and PQ</h3>
+      <div class="mj">\[ \begin{aligned} \text{distances} &amp;\approx n_{\text{list}} + n_{\text{probe}} N / n_{\text{list}}, \qquad n_{\text{list}}^{*} = \sqrt{n_{\text{probe}} N} \\ \lVert q - x \rVert^2 &amp;\approx \sum_{j=1}^{m} T_j[\text{code}_j(x)] \end{aligned} \]</div>
+      <p>FAISS: \(n_{\text{list}} \approx 4\sqrt N\text{–}16\sqrt N\). 10M, 16,384 lists, nprobe 32: 35,915 distances (278× fewer). PQ 768-d, \(m = 96\): 3,072 → 96 bytes; 10M: 0.96 GB. Rerank the top 100 with full vectors. IVF-PQ codes the residual; reranking can't fix IVF misses. int8: 4×, ~lossless; binary: 32×, Hamming, rescore. LSH bit agreement: \(1 - \theta/\pi\).</p>
+      <h3>Hybrid</h3>
+      <div class="mj">\[ \text{RRF}(d) = \sum_{r} \frac{1}{60 + \text{rank}_r(d)} \]</div>
+      <p>BM25 for IDs and rare terms, dense for paraphrase. Don't add raw scores; min-max stretches small gaps. Help-centre example: d6 0.03252, d3 0.03202, d2 0.03200, d5 0.01587. At \(k = 60\), rank 1 is worth 1.15× rank 10. SPLADE: learned sparse terms with expansion, in an inverted index.</p>
+      <h3>Vector databases and evaluation</h3>
+      <p>Post-filter survivors \(\approx K' s\); at 1% and \(K' = 100\): one on average, none 37% of the time. Pre-filter + exact for small allowed sets; filter inside the walk for broad ones. Shards: scatter–gather, latency of the slowest. pgvector: fine to a few million vectors; post-filters by default (ef_search 40), iterative scans from 0.8.0. Evaluate quality against labels (recall@k at the depth passed on, MRR, nDCG) and the index against brute force. Margin on a 0.8 hit rate: ±0.11 (50 queries), ±0.055 (200), ±0.025 (1,000).</p>
+    </div>
+
+    <footer><a href="./">More notes</a> · <a href="../">Deepam Minda</a></footer>
+  </article>
+</div>
+<a class="jump" href="#tldr">Contents ↑</a>
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+  svg: { fontCache: "global" },
+  options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script>
+(function () {
+  var d = document.getElementById("tocd");
+  var wide = window.matchMedia("(min-width: 1081px)");
+  function sync() { d.open = wide.matches; }
+  sync();
+  if (wide.addEventListener) wide.addEventListener("change", sync);
+  var jump = document.querySelector(".jump");
+  jump.addEventListener("click", function () { if (!wide.matches) d.open = true; });
+  d.addEventListener("click", function (e) {
+    if (!wide.matches && e.target.closest("a")) d.open = false;
+  });
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+  function spy() {
+    var y = window.scrollY + 120, cur = 0;
+    targets.forEach(function (t, i) { if (t && t.getBoundingClientRect().top + window.scrollY <= y) cur = i; });
+    links.forEach(function (a, i) { a.classList.toggle("on", i === cur); });
+  }
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+})();
+</script>
+
+<script>
+(function () {
+  var root = document.documentElement, b = document.getElementById("theme-toggle");
+  function cur() { return root.getAttribute("data-theme") === "light" ? "light" : "dark"; }
+  function label() { b.setAttribute("aria-label", "Switch to " + (cur() === "dark" ? "light" : "dark") + " mode"); }
+  b.addEventListener("click", function () {
+    var n = cur() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", n);
+    try { localStorage.setItem("deepam-theme", n); } catch (e) {}
+    label();
+  });
+  label();
+})();
+</script>
+<script src="palette.js?v=86dbe50016" defer></script>
+<script src="reader-notes.js?v=cb3d5028bd" defer></script>
+</body>
+</html>

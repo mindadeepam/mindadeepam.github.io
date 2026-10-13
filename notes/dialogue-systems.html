@@ -444,7 +444,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       <tbody>
         <tr><td>TF-IDF + logistic regression (<a href="./classical-nlp.html#classifiers">classical text classifiers</a>)</td><td>Dozens to hundreds per intent</td><td>Tiny, sub-millisecond</td><td>Baseline; stable vocabulary; English-only or one script</td></tr>
         <tr><td>Fine-tuned encoder (BERT, or a multilingual one such as MuRIL for Indian languages), the <code>[CLS]</code> vector into a softmax (<a href="./transformers.html#bert-train">how</a>)</td><td>Rule of thumb: tens to a hundred per intent</td><td>Milliseconds on a CPU or small GPU</td><td>The production workhorse when the intent list is stable</td></tr>
-        <tr><td>Sentence embeddings + nearest examples or class centroids (embeddings)</td><td>A handful per intent</td><td>Small</td><td>Few-shot start; adding an intent means adding examples, no retraining</td></tr>
+        <tr><td>Sentence embeddings + nearest examples or class centroids (<a href="./embeddings-vector-search.html#sentence-embeddings">embeddings</a>)</td><td>A handful per intent</td><td>Small</td><td>Few-shot start; adding an intent means adding examples, no retraining</td></tr>
         <tr><td>LLM with intent names, descriptions and a few examples in the prompt</td><td>None to a few per intent</td><td>Highest; hundreds of milliseconds</td><td>Long or changing intent lists, messy code-switched input, or when the LLM is already in the turn</td></tr>
       </tbody>
     </table></div>
@@ -1098,7 +1098,7 @@ short sentences. One question per turn, at the end.</code></pre>
     <h3 id="intent-discovery">Finding new intents by clustering</h3>
     <p>The utterances the bot couldn't handle (fallbacks, out-of-scope rejections, escalations with reason “other”) are where missing intents hide. To find them:</p>
     <ol>
-      <li><strong>Embed</strong> each utterance with a multilingual sentence encoder (sentence embeddings).</li>
+      <li><strong>Embed</strong> each utterance with a multilingual sentence encoder (<a href="./embeddings-vector-search.html#sentence-embeddings">sentence embeddings</a>).</li>
       <li><strong>Cluster:</strong> k-means when you can guess roughly how many groups to expect (k-means); a density method such as DBSCAN or HDBSCAN when you can't, and to leave the one-off noise unclustered (DBSCAN).</li>
       <li><strong>Name the clusters</strong> by reading samples, or have an LLM propose a name and description for each that a person checks.</li>
       <li><strong>Size and decide:</strong> a large, coherent cluster (“asking for an NOC after closing the loan”) becomes a new intent or a knowledge article; a small one waits.</li>
