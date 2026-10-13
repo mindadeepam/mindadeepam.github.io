@@ -1099,7 +1099,7 @@ short sentences. One question per turn, at the end.</code></pre>
     <p>The utterances the bot couldn't handle (fallbacks, out-of-scope rejections, escalations with reason “other”) are where missing intents hide. To find them:</p>
     <ol>
       <li><strong>Embed</strong> each utterance with a multilingual sentence encoder (<a href="./embeddings-vector-search.html#sentence-embeddings">sentence embeddings</a>).</li>
-      <li><strong>Cluster:</strong> k-means when you can guess roughly how many groups to expect (k-means); a density method such as DBSCAN or HDBSCAN when you can't, and to leave the one-off noise unclustered (DBSCAN).</li>
+      <li><strong>Cluster:</strong> k-means when you can guess roughly how many groups to expect (<a href="./unsupervised-learning.html#kmeans">k-means</a>); a density method such as DBSCAN or HDBSCAN when you can't, and to leave the one-off noise unclustered (<a href="./unsupervised-learning.html#dbscan">DBSCAN</a>).</li>
       <li><strong>Name the clusters</strong> by reading samples, or have an LLM propose a name and description for each that a person checks.</li>
       <li><strong>Size and decide:</strong> a large, coherent cluster (“asking for an NOC after closing the loan”) becomes a new intent or a knowledge article; a small one waits.</li>
     </ol>

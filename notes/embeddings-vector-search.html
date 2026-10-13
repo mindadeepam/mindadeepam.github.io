@@ -432,7 +432,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ul>
       <li><strong>Use:</strong> store 256 of 768 dimensions for a third of the memory and distance cost, or shortlist with 64 dimensions and rescore the shortlist with all 768. The paper reports up to 14× smaller embeddings at the same accuracy on ImageNet classification; for text, check the loss at your chosen size on your own queries.</li>
       <li><strong>Re-normalize after truncating.</strong> Take \(e = (0.6, 0, 0.8)\) and \(f = (0.8, 0.6, 0)\), both unit length, cosine 0.48. Keep the first two dimensions: the dot product is still 0.48, but the truncated vectors have lengths 0.6 and 1.0, so the true cosine is \(0.48/0.6 = 0.8\). Without re-normalizing, how much of each vector happened to sit in the kept dimensions leaks into the score.</li>
-      <li><strong>Truncating a non-Matryoshka model</strong> loses quality much faster, because its information is spread over all dimensions. Reduce it with PCA instead (PCA), or pick a smaller model.</li>
+      <li><strong>Truncating a non-Matryoshka model</strong> loses quality much faster, because its information is spread over all dimensions. Reduce it with PCA instead (<a href="./unsupervised-learning.html#pca">PCA</a>), or pick a smaller model.</li>
     </ul>
 
     <h3 id="multilingual">Multilingual embeddings</h3>
@@ -806,7 +806,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <h3 id="ivf">IVF: search only the nearest clusters</h3>
     <p>An <strong>inverted file index</strong> (IVF) borrows the inverted index of text search, with clusters in place of words:</p>
     <ol>
-      <li><strong>Train:</strong> run k-means on a sample of the vectors to get \(n_{\text{list}}\) centroids (k-means).</li>
+      <li><strong>Train:</strong> run k-means on a sample of the vectors to get \(n_{\text{list}}\) centroids (<a href="./unsupervised-learning.html#kmeans">k-means</a>).</li>
       <li><strong>Add:</strong> put each vector in the list of its nearest centroid. Each list is a cluster.</li>
       <li><strong>Search:</strong> compare the query with all centroids, pick the \(n_{\text{probe}}\) nearest, and scan only those lists.</li>
     </ol>
