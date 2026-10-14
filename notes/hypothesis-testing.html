@@ -356,10 +356,58 @@ footer .site-nav { display: block; margin-top: 10px; }
     <div class="mj">\[ \begin{aligned} \bar x &amp;= \frac{1}{n}\sum_{i=1}^{n} x_i = \frac{500}{5} = 100 \\ s^2 &amp;= \frac{1}{n-1}\sum_{i=1}^{n} (x_i - \bar x)^2 = \frac{200{,}000}{4} = 50{,}000, \qquad s = 224 \\ \sigma^2 &amp;= \frac{1}{N}\sum_{i=1}^{N} (x_i - \mu)^2 = \frac{200{,}000}{5} = 40{,}000, \qquad \sigma = 200 \end{aligned} \]</div>
     <p>In words: the mean shares the total out equally. The <strong>variance</strong> is the average squared distance from the mean. Squaring stops the minus and plus distances from cancelling (they always sum to zero, as the table's third column shows), and it makes far-out points count heavily: the whale supplies 160,000 of the 200,000. The <strong>standard deviation</strong> (SD) is the square root of the variance, which brings it back to rupees: a typical distance from the mean of about ₹200 (a root-mean-square distance: four users are 100 away and one is 400). The middle line treats the five users as a sample from some bigger population; the last line treats them as the whole population (of size \(N\)), which is how they're used from here on: \(\mu = 100\), \(\sigma = 200\).</p>
     <ul>
-      <li><strong>Why \(n - 1\) for a sample.</strong> The distances are measured from the sample's own mean, which sits in the middle of the sample's points, closer to them than the true mean is. So the squared distances come out a little too small, and dividing by \(n - 1\) instead of \(n\) corrects for exactly that. Check: over all 125 equally likely samples of 3 drawn with replacement (each draw any of the five), dividing by \(n\) gives 26,667 on average, two-thirds of the true 40,000; dividing by \(n - 1 = 2\) gives exactly 40,000. At A/B-test sizes the two are indistinguishable.</li>
+      <li><strong>Why \(n - 1\) for a sample.</strong> The distances are measured from the sample's own mean, which sits in the middle of the sample's points, closer to them than the true mean is. So the squared distances come out a little too small, and dividing by \(n - 1\) instead of \(n\) corrects for exactly that. Check: over all 125 equally likely samples of 3 drawn with replacement (each draw any of the five), dividing by \(n\) gives 26,667 on average, two-thirds of the true 40,000; dividing by \(n - 1 = 2\) gives exactly 40,000. At A/B-test sizes the two are indistinguishable. The step-by-step reason is in the <a href="#dive-n-minus-1">deep dive below</a>.</li>
       <li><strong>Degrees of freedom</strong> come from the same place: the \(n\) deviations from the sample mean always sum to zero, so once \(n - 1\) of them are known the last is fixed. Only \(n - 1\) are free, and that count is the degrees of freedom that t and chi-square tests quote.</li>
       <li><strong>Notation used later.</strong> A capital \(X\) stands for a random quantity, such as the spend of a randomly picked user. \(\operatorname{Var}(X)\) is its variance, and \(\mathbb E[X]\) is its <strong>expected value</strong>: the average over the whole population, or over endless repeats. So \(\mu = \mathbb E[X]\) and \(\sigma^2 = \mathbb E\big[(X - \mu)^2\big]\).</li>
     </ul>
+    <details class="dive" id="dive-n-minus-1">
+      <summary><span class="dive-tag">deep dive</span><span class="dive-title">Where the \(n - 1\) comes from, step by step</span></summary>
+      <div class="dive-body">
+        <p><strong>What we want.</strong> The population variance \(\sigma^2\) is the average squared distance from the <em>true</em> mean \(\mu\). We can't measure from \(\mu\), because we don't know it, so we measure from the sample's own mean \(\bar x\) instead. The question is what that swap costs.</p>
+        <p><strong>Step 1: a sample's mean is the closest centre to its own points.</strong> Of every point you could measure from, \(\bar x\) gives the smallest sum of squared distances to the sample: slide the centre either way and the sum goes up. The true mean \(\mu\) is some other point, so measuring from \(\bar x\) gives a smaller sum than measuring from \(\mu\) would. A smaller sum means the variance comes out too low.</p>
+        <p><strong>Step 2: how much smaller, exactly.</strong> Take one sample of three of the five users: ₹0, ₹0 and ₹500. Its mean is \(\bar x = 166.67\); the true mean is \(\mu = 100\).</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Measure from</th><th>Squared distances</th><th>Sum</th></tr></thead>
+          <tbody>
+            <tr><td>the true mean, 100</td><td>10,000 + 10,000 + 160,000</td><td>180,000</td></tr>
+            <tr><td>the sample mean, 166.67</td><td>27,778 + 27,778 + 111,111</td><td>166,667</td></tr>
+          </tbody>
+        </table></div>
+        <p>The sum shrank by 13,333, and 13,333 is exactly \(3 \times (166.67 - 100)^2\): \(n\) times the squared miss of the sample mean. That holds for every sample:</p>
+        <div class="mj">\[ \begin{aligned} \sum_i (x_i - \bar x)^2 &amp;= \sum_i (x_i - \mu)^2 - n(\bar x - \mu)^2 \end{aligned} \]</div>
+        <p>In words: the sum of squares measured from the sample mean equals the sum measured from the true mean, minus \(n\) times the squared gap between the two means.</p>
+        <p><strong>Why it's exact.</strong> Split each distance from the true mean into two legs, point to sample mean and sample mean to true mean: \(x_i - \mu = (x_i - \bar x) + (\bar x - \mu)\). Square it with \((a + b)^2 = a^2 + 2ab + b^2\) and add up over the \(n\) points:</p>
+        <div class="mj">\[ \begin{aligned} \sum_i (x_i - \mu)^2 &amp;= \sum_i (x_i - \bar x)^2 + 2(\bar x - \mu)\sum_i (x_i - \bar x) + n(\bar x - \mu)^2 \\ &amp;= \sum_i (x_i - \bar x)^2 + 0 + n(\bar x - \mu)^2 \end{aligned} \]</div>
+        <p>In words: the middle term vanishes because distances from the sample mean always add up to zero (here −166.67 − 166.67 + 333.33 = 0), and the last term is the same number \((\bar x - \mu)^2\) added \(n\) times. Move it to the other side and you have the identity above.</p>
+        <p><strong>Step 3: average over all the samples you might draw.</strong> Take the expected value \(\mathbb E\) of both sides:</p>
+        <ul>
+          <li><strong>The sum from the true mean.</strong> Each \((x_i - \mu)^2\) averages \(\sigma^2\), which is just the definition of the variance, so the \(n\) of them average \(n\sigma^2\).</li>
+          <li><strong>The shortfall.</strong> \((\bar x - \mu)^2\) is the squared miss of the sample mean, and its average is the variance of the sample mean, \(\sigma^2/n\) (derived in <a href="#se">the standard error</a> below: averaging \(n\) values divides the variance by \(n\)). So \(n(\bar x - \mu)^2\) averages \(n \times \sigma^2/n = \sigma^2\): exactly one \(\sigma^2\).</li>
+        </ul>
+        <div class="mj">\[ \begin{aligned} \mathbb E\Big[\sum_i (x_i - \bar x)^2\Big] &amp;= n\sigma^2 - \sigma^2 = (n - 1)\,\sigma^2 \end{aligned} \]</div>
+        <p>In words: measuring from the sample mean loses, on average, exactly one \(\sigma^2\) of the \(n\). To get \(\sigma^2\) back on average, divide by \(n - 1\), not \(n\).</p>
+        <p><strong>Check on the five users</strong>, averaging over all 125 samples of three drawn with replacement (\(\sigma^2 = 40{,}000\)):</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Average over the 125 samples</th><th>Value</th><th>In units of \(\sigma^2\)</th></tr></thead>
+          <tbody>
+            <tr><td>Sum of squares from the true mean</td><td>120,000</td><td>\(3\sigma^2\)</td></tr>
+            <tr><td>Shortfall, \(n(\bar x - \mu)^2\)</td><td>40,000</td><td>\(\sigma^2\)</td></tr>
+            <tr><td>Sum of squares from the sample mean</td><td>80,000</td><td>\(2\sigma^2 = (n - 1)\sigma^2\)</td></tr>
+            <tr><td>… divided by \(n = 3\)</td><td>26,667</td><td>too low: two-thirds of \(\sigma^2\)</td></tr>
+            <tr><td>… divided by \(n - 1 = 2\)</td><td>40,000</td><td>exactly \(\sigma^2\)</td></tr>
+            <tr><td>… divided by \(n - 2 = 1\)</td><td>80,000</td><td>too high: \(2\sigma^2\)</td></tr>
+          </tbody>
+        </table></div>
+        <p><strong>Degrees of freedom</strong> are the same fact in words: the \(n\) distances from \(\bar x\) must add up to zero, so once you know \(n - 1\) of them the last is forced. With the three above, −166.67 and −166.67 force the third to be +333.33. Only \(n - 1\) of them carry independent information about the spread.</p>
+        <p><strong>What it doesn't mean.</strong></p>
+        <ul>
+          <li><strong>Right on average, not every time.</strong> A sample of ₹0, ₹0, ₹0 gives a variance of 0 whichever divisor you use; unbiased means the misses cancel out across many samples.</li>
+          <li><strong>Only because the mean was estimated.</strong> If you knew \(\mu\), you'd measure from it and divide by \(n\). The correction exists because the centre was fitted to the same points.</li>
+          <li><strong>The SD is still a little low.</strong> \(s = \sqrt{s^2}\) averages slightly below \(\sigma\), because the square root of an unbiased number isn't unbiased. The gap is small and shrinks as \(n\) grows; the likelihood note covers it, and the maximum-likelihood view, in <a href="./likelihood-mle-map.html#bias">why the variance MLE is biased</a>.</li>
+          <li><strong>It only matters for small samples.</strong> With thousands of users per arm, \(n\) and \(n - 1\) agree to many decimals.</li>
+        </ul>
+      </div>
+    </details>
 
     <h3 id="sampling">The sampling distribution: an average is random too</h3>
     <p>Treat the five users as the whole population. Pick two of them at random (each pick is any of the five, so the same user can come up twice) and average their spend. Which users you get is luck, so the average is luck too: it's a random number with a distribution of its own. All 5 × 5 = 25 pairs are equally likely, and only the whale matters:</p>
@@ -1883,6 +1931,78 @@ window.MathJax = {
     label();
   });
   label();
+})();
+</script>
+
+<script>
+/* deep dives: open a <details class="dive"> in a side panel instead of inline. ?dive=inline keeps them inline. */
+(function () {
+  var dives = document.querySelectorAll("details.dive");
+  if (!dives.length || /[?&]dive=inline\b/.test(location.search)) return;
+  document.documentElement.classList.add("dive-panel-mode");
+  var scrim = document.createElement("div");
+  scrim.className = "dive-scrim";
+  scrim.hidden = true;
+  var sheet = document.createElement("aside");
+  sheet.className = "dive-sheet";
+  sheet.hidden = true;
+  sheet.setAttribute("role", "dialog");
+  sheet.setAttribute("aria-modal", "true");
+  sheet.setAttribute("aria-labelledby", "dive-sheet-title");
+  sheet.innerHTML = '<div class="dive-head"><div><div class="dive-tag">deep dive</div><h2 id="dive-sheet-title"></h2></div>'
+    + '<button type="button" class="dive-close" aria-label="Close the deep dive">close \u2715</button></div><div class="dive-slot"></div>';
+  document.body.appendChild(scrim);
+  document.body.appendChild(sheet);
+  var slot = sheet.querySelector(".dive-slot"), title = sheet.querySelector("h2"), closeBtn = sheet.querySelector(".dive-close");
+  var current = null;
+  function open(d, focus) {
+    if (current) return;
+    current = d;
+    var s = d.querySelector("summary");
+    title.textContent = d.querySelector(".dive-title").textContent;
+    slot.appendChild(d.querySelector(".dive-body"));   /* move, so typeset maths comes along */
+    scrim.hidden = false; sheet.hidden = false; sheet.scrollTop = 0;
+    requestAnimationFrame(function () { scrim.classList.add("open"); sheet.classList.add("open"); });
+    document.body.classList.add("dive-lock");
+    s.setAttribute("aria-expanded", "true");
+    if (focus !== false) closeBtn.focus();
+    if (history.replaceState) history.replaceState(null, "", "#" + d.id);
+  }
+  function close() {
+    if (!current) return;
+    var d = current, s = d.querySelector("summary"), body = slot.firstElementChild;
+    current = null;
+    scrim.classList.remove("open"); sheet.classList.remove("open");
+    document.body.classList.remove("dive-lock");
+    s.setAttribute("aria-expanded", "false");
+    s.focus();
+    if (history.replaceState) history.replaceState(null, "", location.pathname + location.search);
+    setTimeout(function () { if (body) d.appendChild(body); scrim.hidden = true; sheet.hidden = true; }, 230);
+  }
+  Array.prototype.forEach.call(dives, function (d) {
+    var s = d.querySelector("summary");
+    s.setAttribute("aria-haspopup", "dialog");
+    s.setAttribute("aria-expanded", "false");
+    s.addEventListener("click", function (e) { e.preventDefault(); open(d); });
+  });
+  closeBtn.addEventListener("click", close);
+  scrim.addEventListener("click", close);
+  document.addEventListener("keydown", function (e) {
+    if (!current) return;
+    if (e.key === "Escape") { e.preventDefault(); close(); return; }
+    if (e.key !== "Tab") return;
+    var f = sheet.querySelectorAll('a[href], button, summary, [tabindex]:not([tabindex="-1"])');
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  function fromHash(focus) {
+    var h = location.hash && document.getElementById(location.hash.slice(1));
+    if (h && h.classList.contains("dive")) open(h, focus);
+  }
+  window.addEventListener("hashchange", function () { fromHash(true); });
+  fromHash(false);
 })();
 </script>
 <script src="palette.js?v=86dbe50016" defer></script>
