@@ -348,6 +348,73 @@
   api.openList = openList;
   refreshCount();
 
+  /* ---------- copying a passage: formulas come along as their TeX, tables as rows ---------- */
+  /* MathJax draws formulas as SVG, which has no text, so a plain copy drops them. When the
+     selection includes a formula, build the copied text ourselves: words as written, each formula
+     as $…$ (or $$…$$ on its own line), list items as "- ", table rows as "| a | b |". */
+  var BLOCK = /^(P|DIV|UL|OL|TABLE|PRE|BLOCKQUOTE|ASIDE|DETAILS|SUMMARY|FIGURE|SECTION|HEADER|FOOTER|H1|H2|H3|H4|H5|H6)$/;
+  function copiedText(range) {
+    var out = [], root = range.commonAncestorContainer;
+    if (root.nodeType === 3) root = root.parentNode;
+    var inside = root.closest && root.closest("mjx-container");
+    if (inside) return texOf.get(inside) || "";
+    function push(s) { out.push(s); }
+    (function walk(el, pre) {
+      for (var c = el.firstChild; c; c = c.nextSibling) {
+        if (!range.intersectsNode(c)) continue;
+        if (c.nodeType === 3) {
+          var t = c.nodeValue, a = c === range.startContainer ? range.startOffset : 0, b = c === range.endContainer ? range.endOffset : t.length;
+          t = t.slice(a, b);
+          push(pre ? t : t.replace(/\s+/g, " "));
+          continue;
+        }
+        if (c.nodeType !== 1 || SKIP.test(c.nodeName) || c.hidden || c.getAttribute("aria-hidden") === "true" && c.nodeName !== "MJX-CONTAINER") continue;
+        var tag = c.nodeName;
+        if (tag === "MJX-CONTAINER") {
+          var tex = texOf.get(c) || "$…$";
+          push(tex.indexOf("$$") === 0 ? "\n\n" + tex + "\n\n" : tex);
+        } else if (c.classList.contains("pn")) {
+          push(c.textContent.trim() + " ");
+        } else if (tag === "BR") {
+          push("\n");
+        } else if (tag === "LI") {
+          push("\n- "); walk(c, pre);
+        } else if (tag === "TR") {
+          push("\n|"); walk(c, pre);
+          if (c.parentNode.nodeName === "THEAD") push("\n|" + new Array(c.children.length + 1).join(" --- |"));
+        } else if (tag === "TD" || tag === "TH") {
+          push(" "); walk(c, pre); push(" |");
+        } else if (/^H[1-6]$/.test(tag)) {
+          push("\n\n" + "######".slice(0, +tag[1]) + " "); walk(c, pre); push("\n\n");
+        } else if (tag === "DETAILS" && !c.open) {
+          var sm = c.querySelector("summary");   /* a closed fold: only its visible line */
+          if (sm && range.intersectsNode(sm)) { push("\n"); walk(sm, pre); push("\n"); }
+        } else if (BLOCK.test(tag)) {
+          push(tag === "PRE" ? "\n\n```\n" : "\n"); walk(c, pre || tag === "PRE"); push(tag === "PRE" ? "\n```\n\n" : "\n");
+        } else {
+          walk(c, pre);
+        }
+      }
+    })(root, !!(root.closest && root.closest("pre")));
+    return out.join("")
+      .replace(/[ \t]+\n/g, "\n").replace(/\n[ \t]+(?=[^-|\s])/g, "\n")
+      .replace(/ {2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  }
+  document.addEventListener("copy", function (e) {
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount || !e.clipboardData) return;
+    var range = sel.getRangeAt(0), host = range.commonAncestorContainer;
+    if (host.nodeType === 3) host = host.parentNode;
+    var hasMath = (host.closest && host.closest("mjx-container")) ||
+      Array.prototype.some.call(host.querySelectorAll("mjx-container"), function (m) { return range.intersectsNode(m); });
+    if (!hasMath) return;   /* no formulas: the browser's own copy is fine */
+    readMath();
+    var text = copiedText(range);
+    if (!text) return;
+    e.clipboardData.setData("text/plain", text);
+    e.preventDefault();
+  });
+
   function start() { readMath(); notes.forEach(function (n) { n.lost = !anchor(n); }); }
   var ready = window.MathJax && MathJax.startup && MathJax.startup.promise;
   if (ready) ready.then(start, start); else window.addEventListener("load", start);
