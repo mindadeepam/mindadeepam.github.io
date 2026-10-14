@@ -324,7 +324,7 @@ footer .site-nav { display: block; margin-top: 10px; }
       <div class="tag">Notes · Data</div>
       <h1>Data preparation and feature engineering</h1>
       <p class="dek">What to do to a tabular dataset before a model sees it, and why each step exists: the first look, cleaning, honest splits, missing values, outliers, encoding categories, scaling, collinearity, building and selecting features, class imbalance, and telling overfitting from underfitting.</p>
-      <div class="meta">About 45 minutes · mechanisms, trade-offs, pseudocode and 25 questions</div>
+      <div class="meta">About 65 minutes, plus 31 questions · mechanisms, worked numbers, trade-offs and pseudocode</div>
     </header>
 
     <section class="tldr" id="tldr" aria-labelledby="tldr-h">
@@ -335,7 +335,7 @@ footer .site-nav { display: block; margin-top: 10px; }
         <li><strong>Encoding follows the model and the number of levels.</strong> One-hot for a few levels; out-of-fold, smoothed target encoding or count encoding for many; native categorical support in boosting libraries; embeddings in neural nets. Target encoding leaks because each row's own label sits inside its category's average.</li>
         <li><strong>Outliers: first decide whether a value is an error or a genuine extreme.</strong> Errors are fixed, or turned into missing values. Genuine extremes are capped or transformed, or handled by a robust loss or a tree. In fraud, the extremes are the signal.</li>
         <li><strong>Scaling matters for anything built on distances, penalties or gradient descent;</strong> trees ignore monotone transforms. Collinearity makes coefficients unstable but usually leaves predictions fine, and it splits a tree's feature importance between correlated features.</li>
-        <li><strong>Split the way the model will meet new data:</strong> by time for forecasting and credit, by group when new customers arrive, stratified when a class is rare. For imbalance, move the threshold first, reweight second, resample last.</li>
+        <li><strong>Split the way the model will meet new data:</strong> by time for forecasting and credit, by group when new customers arrive, stratified when a class is rare. Imbalance hurts through too few positives and a wrong threshold more than through the ratio itself, so move the threshold first, reweight second, resample last, and correct the probabilities afterwards.</li>
       </ol>
     </section>
 
@@ -689,19 +689,67 @@ footer .site-nav { display: block; margin-top: 10px; }
     <h3>Detecting them</h3>
     <p><strong>z-score.</strong> Flag values more than about 3 standard deviations from the mean:</p>
     <div class="mj">\[ z_i = \frac{x_i - \bar x}{s} \]</div>
-    <p>In words: how many standard deviations a value is from the average. It assumes a roughly normal shape, and it suffers from <strong>masking</strong>: the outliers inflate \(s\) and drag \(\bar x\) towards themselves, which shrinks their own z-scores. In a sample of \(n\) points no z-score can exceed \((n-1)/\sqrt n\), so with ten or fewer points a z above 3 is impossible, however wild the value.</p>
+    <p>In words: how many standard deviations a value is from the average. It assumes a roughly normal shape, and it suffers from <strong>masking</strong>: the outliers inflate \(s\) and drag \(\bar x\) towards themselves, which shrinks their own z-scores. In a sample of \(n\) points no z-score can exceed \((n-1)/\sqrt n\) (with \(s\) dividing by \(n - 1\); scipy's <code>zscore</code> divides by \(n\), giving a ceiling of \(\sqrt{n - 1}\)), so with ten or fewer points a z above 3 is impossible, however wild the value.</p>
     <p><strong>Robust z-score, with the MAD.</strong> Replace the mean with the median \(\tilde x\) and the standard deviation with the median absolute deviation:</p>
     <div class="mj">\[ \begin{aligned} \text{MAD} &amp;= \operatorname{median}_i \big\lvert x_i - \tilde x \big\rvert \\ z_i^{\text{robust}} &amp;= \frac{0.6745\,(x_i - \tilde x)}{\text{MAD}} \end{aligned} \]</div>
     <p>In words: the median and the MAD barely move when a few values are extreme, so the outliers can't hide themselves. The 0.6745 makes the score comparable to an ordinary z for normal data (the standard deviation is about 1.4826 MAD). A common flag is \(\lvert z^{\text{robust}} \rvert &gt; 3.5\).</p>
     <p><strong>IQR fences (Tukey).</strong></p>
     <div class="mj">\[ \begin{aligned} \text{IQR} &amp;= Q_3 - Q_1 \\ \text{lower fence} &amp;= Q_1 - 1.5\,\text{IQR} \\ \text{upper fence} &amp;= Q_3 + 1.5\,\text{IQR} \end{aligned} \]</div>
     <p>In words: the middle half of the data sets the scale, and anything more than one and a half middle-halves beyond it is flagged (3 IQR for “far out”). Quartiles are robust and assume no distribution, but on a right-skewed column such as income the fences flag a large part of the perfectly real long tail. Take the log first, then fence.</p>
-    <p><strong>Multivariate methods,</strong> for points that are normal on every column but odd in combination (a large amount at 3 a.m. from a new device):</p>
+
+    <h3 id="masking">Masking, worked on twelve values</h3>
+    <p>Twelve days of a customer's payments, in ₹k: ten ordinary days and two huge ones.</p>
+    <p><strong>10, 11, 12, 12, 13, 13, 14, 14, 15, 16, 150, 160</strong></p>
+    <p><strong>The ordinary z-score.</strong> The two extremes pull the mean up from 13 (the ten ordinary days) to 36.7, and the standard deviation from 1.8 to 55.3:</p>
+    <div class="mj">\[ \begin{aligned} \bar x &amp;= 36.7, \quad s = 55.3 \\ z_{160} &amp;= \frac{160 - 36.7}{55.3} = 2.23 \\ z_{150} &amp;= \frac{150 - 36.7}{55.3} = 2.05 \end{aligned} \]</div>
+    <p>In words: measured with a ruler they stretched themselves, the two extremes look only about two standard deviations out, and a “flag above 3” rule passes both. Each hides the other: remove the 150 and the 160's z-score jumps to 3.01. Against the ten ordinary days alone (mean 13, standard deviation 1.83), the 160 would sit 80 standard deviations out.</p>
+    <p><strong>The robust z-score.</strong> The median is 13.5. The absolute deviations from it, sorted, are 0.5, 0.5, 0.5, 0.5, 1.5, 1.5, 1.5, 2.5, 2.5, 3.5, 136.5 and 146.5; their median (the 6th and 7th of twelve) is the MAD, 1.5:</p>
+    <div class="mj">\[ \begin{aligned} \tilde x &amp;= 13.5, \quad \text{MAD} = 1.5 \\ z^{\text{robust}}_{160} &amp;= \frac{0.6745 \times (160 - 13.5)}{1.5} = 65.9 \\ z^{\text{robust}}_{150} &amp;= \frac{0.6745 \times (150 - 13.5)}{1.5} = 61.4 \end{aligned} \]</div>
+    <p>In words: the median and the MAD are set by the middle of the data, which the two extremes can't reach, so they keep the ruler the ordinary days imply.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Value</th><th>z (mean, SD)</th><th>Robust z (median, MAD)</th><th>IQR fences</th></tr></thead>
+      <tbody>
+        <tr><td>10</td><td>−0.48</td><td>−1.57</td><td>inside</td></tr>
+        <tr><td>13</td><td>−0.43</td><td>−0.22</td><td>inside</td></tr>
+        <tr><td>16</td><td>−0.37</td><td>1.12</td><td>inside</td></tr>
+        <tr><td>150</td><td>2.05: missed</td><td>61.4: flagged</td><td>flagged</td></tr>
+        <tr><td>160</td><td>2.23: missed</td><td>65.9: flagged</td><td>flagged</td></tr>
+      </tbody>
+    </table></div>
+    <p>The fences agree with the robust score: \(Q_1 = 12\) and \(Q_3 \approx 15.3\), so they sit near 7 and 20. Two lessons: detect with statistics the outliers can't move (median, MAD, quartiles), and with a small sample remember the ceiling on \(z\) from above: with twelve points no z-score can exceed 3.18.</p>
+
+    <h3>Odd combinations: multivariate methods</h3>
+    <p>Some points are normal on every column but odd in combination (a large amount at 3 a.m. from a new device). Single-column rules can't see them.</p>
     <ul>
-      <li><strong>Isolation forest:</strong> random trees with random splits. An outlier sits in a sparse region, so it's isolated in few splits; the score is the average path length. Fast and scalable; its expected-outlier-share setting fixes the threshold, and it struggles when anomalies form dense clusters of their own.</li>
-      <li><strong>Local outlier factor (LOF):</strong> compares a point's density with its neighbours', so it finds points that are odd <em>for their region</em>. Slow on big data and sensitive to the number of neighbours.</li>
-      <li><strong>Residual-based:</strong> rows with large standardized residuals from a model. In linear regression also check leverage (an unusual \(x\)) and Cook's distance (how much the fit moves without the row).</li>
+      <li><strong>Isolation forest:</strong> random trees with random splits. An outlier sits in a sparse region, so it's isolated in few splits; the score is the average path length. Fast and scalable; its expected-outlier-share setting fixes the threshold, and it struggles when anomalies form dense clusters of their own. The mechanics are in <a href="./random-forests.html#isolation">the random forest note</a>.</li>
+      <li><strong>Local outlier factor (LOF):</strong> compares a point's density with its neighbours', so it finds points that are odd <em>for their region</em>. Slow on big data and sensitive to the number of neighbours (more in <a href="./unsupervised-learning.html#anomaly">anomaly detection</a>).</li>
+      <li><strong>Residual-based:</strong> rows with large standardized residuals from a model. In linear regression also check leverage (an unusual \(x\)) and Cook's distance (how much the fit moves without the row); both are regression diagnostics, covered with <a href="./linear-logistic-regression.html#assumptions">the regression assumptions</a>.</li>
       <li><strong>Domain rules:</strong> limits no statistic needs to find, such as non-negative quantities and dates not in the future.</li>
+    </ul>
+
+    <h3 id="contextual">Contextual and time-series outliers</h3>
+    <p>A <strong>contextual outlier</strong> is a value that's normal for the column but wrong for its context: sales of ₹95k are an ordinary Monday and a very strange Sunday. Global rules look at the column as one pile of numbers, so they can't see it. Three weeks of one store's daily sales, in ₹k:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Day</th><th>Week 1</th><th>Week 2</th><th>Week 3</th></tr></thead>
+      <tbody>
+        <tr><td>Mon–Fri</td><td>100, 104, 98, 102, 110</td><td>97, 101, 103, 99, 112</td><td>103, 99, 100, 101, 108</td></tr>
+        <tr><td>Sat</td><td>60</td><td>62</td><td>58</td></tr>
+        <tr><td>Sun</td><td>20</td><td>22</td><td><strong>95</strong></td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Global rules get it backwards.</strong> All 21 values have mean 88.3 and standard deviation 27.2, so the 95 has \(z = 0.25\): perfectly ordinary. The robust z is −1.1. The IQR fences (83 and 115) flag the five ordinary weekend days and pass the 95, the one day that really is odd.</p>
+    <p><strong>Seasonality-aware detection compares each value with what its context predicts.</strong></p>
+    <ol>
+      <li><strong>Expected value from the context, using the past only:</strong> here, the median of the same weekday in earlier weeks. For the third Sunday, the median of 20 and 22 is 21.</li>
+      <li><strong>Residual = actual − expected:</strong> 95 − 21 = 74. The other 13 residuals of weeks 2 and 3 (each day against its own weekday's earlier median) lie between −3.5 and +5, with median −0.5 and MAD 2.5.</li>
+      <li><strong>Robust z on the residuals:</strong> the gap from the residuals' median is \(74 - (-0.5) = 74.5\), so \(0.6745 \times 74.5 / 2.5 = 20.1\). Flagged, by a mile.</li>
+    </ol>
+    <ul>
+      <li><strong>The expectation can be richer:</strong> a seasonal decomposition (trend plus weekly and yearly patterns, as in STL), or a forecasting model's prediction. A rolling median with a rolling MAD, applied to the series or its residuals, is the <strong>Hampel filter</strong>.</li>
+      <li><strong>Known events are context too.</strong> A festival-week spike or a month-end salary bump is expected; put a calendar of events into the expectation, or it gets flagged every year.</li>
+      <li><strong>Spike vs level shift.</strong> One odd day is a spike. If the new level persists (a new branch opened nearby), it's a new normal: re-baseline, or the detector flags every day from then on.</li>
+      <li><strong>Live detection uses only the past,</strong> for the same reason as lag features (section <a href="#lags">09</a>): a centred window that includes tomorrow can't run in production.</li>
+      <li><strong>Clean before building lags.</strong> A data-error spike left in the series contaminates a 28-day rolling mean for the next 28 days. Replace confirmed errors with a blank (then forward-fill or the expected value) before computing them.</li>
     </ul>
 
     <h3>What outliers do to statistics and models</h3>
@@ -724,7 +772,22 @@ footer .site-nav { display: block; margin-top: 10px; }
     <ul>
       <li><strong>Keep them when they are the signal.</strong> In fraud, anomaly detection or large insurance claims, the extremes are what the model exists to find; removing them removes the positives. And production will contain extremes anyway, so the model must behave sensibly on them.</li>
     </ul>
+
+    <h3 id="outlier-actions">Which outlier, which action</h3>
+    <p>“Remove outliers” is never the whole answer. The action depends on what the value is and where it sits:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>What it is</th><th>Example</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td><strong>A data error</strong></td><td>An age of 230; an amount in paise instead of rupees; 9999 meaning “unknown”</td><td>Fix it from the source; otherwise set it to missing and let the missing-value strategy take over (with an indicator if it happens often). Don't cap an error: a capped age of 230 is still a wrong age.</td></tr>
+        <tr><td><strong>A genuine extreme in a feature</strong></td><td>A ₹2 crore income among salaried applicants</td><td>Keep the row. For linear models, neural nets and distances, take a log or Box-Cox, or cap at training percentiles with a “was capped” flag. For trees, do nothing.</td></tr>
+        <tr><td><strong>An extreme target</strong></td><td>One ₹5 crore claim among ₹50k claims</td><td>Don't delete it: the business pays it. Use a robust loss (Huber, absolute or quantile), a log target with the back-transform correction (section <a href="#scaling">07</a>), or a separate model for the tail. RMSE is ruled by these rows and MAE isn't, so pick the metric that matches the cost (<a href="./evaluation.html#regression-metrics">regression metrics</a>).</td></tr>
+        <tr><td><strong>Outliers that are the signal</strong></td><td>Fraud, machine faults, account takeover</td><td>Keep them; they're the positives. Build features that make them stand out (this amount over the customer's usual amount). With very few labels, consider an anomaly-detection framing (section <a href="#imb-anomaly">11</a>).</td></tr>
+        <tr><td><strong>A contextual outlier</strong></td><td>Weekday-level sales on a Sunday</td><td>Find it with residuals from the seasonal pattern, then decide which of the rows above it is.</td></tr>
+        <tr><td><strong>An extreme at serving time</strong></td><td>An income beyond anything in training</td><td>Apply the training rule unchanged (same caps, same transform). Linear models and neural nets extrapolate beyond the training range, so clip inputs to it and count how often that happens; a tree just puts the row in its end leaf. Monitor the share of capped values.</td></tr>
+      </tbody>
+    </table></div>
     <aside class="note trap"><p class="nl">Trap</p><p>Removing outliers from the test set. It makes the score look better while the model meets the same extremes in production. Decide the outlier rule on training data, then apply it identically everywhere, including at serving time.</p></aside>
+    <p><strong>Say it in an interview:</strong> “First I decide whether a flagged value is an error or real. Errors become missing values. Real extremes stay, with their influence limited by a log, a cap learned on training data, or a robust loss, unless they're what the model is for, as in fraud. I detect with statistics the outliers can't move, the median and MAD or quartiles on a log scale, because the mean and standard deviation let outliers hide each other. In a time series I flag residuals from the seasonal pattern, not raw values.”</p>
 
     <!-- encoding -->
     <h2 id="encoding"><span class="pn">06</span>Encoding categorical features</h2>
@@ -917,8 +980,68 @@ footer .site-nav { display: block; margin-top: 10px; }
       </tbody>
     </table></div>
 
+    <h3 id="scaling-gd">Why gradient descent needs it, in numbers</h3>
+    <p>Fit a linear regression with squared loss by gradient descent. Two centred, uncorrelated features: income in ₹k (standard deviation 50) and credit utilisation as a fraction (standard deviation 0.2). The true effects are 0.04 per ₹k and 10 per unit of utilisation, so each feature moves \(y\) by 2 per standard deviation: equally important. 1,000 rows.</p>
+    <p><strong>How sharply the loss bends in each direction.</strong> With \(L = \frac{1}{2N} \sum_i (y_i - w_1 x_{i1} - w_2 x_{i2})^2\), the curvature along each weight, written \(\lambda_j\) here (no relation to Box-Cox's \(\lambda\)), is that feature's average square (its variance, since it's centred):</p>
+    <div class="mj">\[ \begin{aligned} \lambda_1 = \frac{\partial^2 L}{\partial w_1^2} &amp;= \frac{1}{N} \sum_i x_{i1}^2 = 50^2 = 2500 \\ \lambda_2 = \frac{\partial^2 L}{\partial w_2^2} &amp;= \frac{1}{N} \sum_i x_{i2}^2 = 0.2^2 = 0.04 \end{aligned} \]</div>
+    <p>In words: the loss bends 62,500 times more sharply along the income weight than along the utilisation weight. Its contours are ellipses \(\sqrt{62{,}500} = 250\) times longer than they are wide: the long, thin valley.</p>
+    <p><strong>What one learning rate does to each direction.</strong> On this bowl the slope along \(w_j\) is its curvature times the distance to the bottom, \(\lambda_j (w_j - w_j^\ast)\), and because the features are uncorrelated each weight moves on its own. So a step of \(\eta\) times the slope removes a share \(\eta \lambda_j\) of the gap: it multiplies each weight's distance from its best value by a fixed factor:</p>
+    <div class="mj">\[ \begin{aligned} w_j^{(t+1)} - w_j^\ast &amp;= \big(1 - \eta\, \lambda_j\big) \big(w_j^{(t)} - w_j^\ast\big) \end{aligned} \]</div>
+    <p>In words: \(\eta\) is the learning rate and \(w_j^\ast\) the best weight. The gap shrinks only if \(1 - \eta \lambda_j\) lies between −1 and 1, that is \(\eta \lt 2 / \lambda_j\), and it shrinks fast only if the factor is near 0.</p>
+    <ul>
+      <li><strong>The steep direction caps the learning rate:</strong> \(\eta \lt 2 / 2500 = 0.0008\). Try \(\eta = 25\) (that is \(1/0.04\), which would close the flat direction's gap in one step), and the income weight's gap is multiplied by \(1 - 25 \times 2500 = -62{,}499\) each step: it blows up.</li>
+      <li><strong>The flat direction then crawls:</strong> even at the best fixed rate, just under 0.0008, the utilisation weight's gap is multiplied by about \(1 - 0.0008 \times 0.04 = 0.999968\), so it closes 0.0032% of the gap per step.</li>
+      <li><strong>The count:</strong> at that rate, \(\eta = 2/(2500 + 0.04)\), starting from 0, getting both weights within 0.1% of their best values takes 215,868 steps. After standardizing, both curvatures are 1, so a learning rate of 1 lands on the answer in one step.</li>
+    </ul>
+    <p>The ratio of the largest to the smallest curvature is the <strong>condition number</strong> \(\kappa\), and it sets the step count. (Section <a href="#collinearity">08</a>'s collinearity check uses the condition number of the feature matrix itself, a ratio of singular values, which is \(\sqrt{\kappa}\): its “above about 30” means \(\kappa\) above about 900.)</p>
+    <div class="mj">\[ \begin{aligned} \kappa &amp;= \frac{\lambda_{\max}}{\lambda_{\min}} \\ \text{steps} &amp;\approx \frac{\kappa}{2} \ln \frac{1}{\varepsilon} \end{aligned} \]</div>
+    <p>In words: with the best fixed learning rate, \(\eta = 2/(\lambda_{\max} + \lambda_{\min})\), the slowest direction's gap shrinks by \((\kappa - 1)/(\kappa + 1) \approx 1 - 2/\kappa\) per step, so each step removes about a share \(2/\kappa\) of it, and reaching a fraction \(\varepsilon\) of the starting gap takes about \(\kappa/2\) times \(\ln(1/\varepsilon)\) steps. Here \(31{,}250 \times \ln 1000 = 215{,}867\) (the exact count, 215,868, is in the table).</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Features</th><th>Curvatures</th><th>Condition number</th><th>Steps to within 0.1%</th></tr></thead>
+      <tbody>
+        <tr><td>Raw units</td><td>2,500 and 0.04</td><td>62,500</td><td>215,868</td></tr>
+        <tr><td>Standardized, uncorrelated</td><td>1 and 1</td><td>1</td><td>1</td></tr>
+        <tr><td>Standardized, correlation 0.5</td><td>1.5 and 0.5</td><td>3</td><td>10</td></tr>
+        <tr><td>Standardized, correlation 0.9</td><td>1.9 and 0.1</td><td>19</td><td>66</td></tr>
+      </tbody>
+    </table></div>
+    <p>The last two rows show the other source of a thin valley: correlated features, the gradient-descent face of <a href="#collinearity">collinearity</a> (for two standardized features with correlation \(\rho\), the curvatures are \(1 + \rho\) along “both weights up together” and \(1 - \rho\) along “one up, one down”, so the thin direction is no longer a single weight). Scaling fixes the units; it can't fix the correlation. Adam and other adaptive optimizers rescale each weight's step from its own gradient history, which softens the unit problem but not the correlation one. For neural nets, centring matters as well as scale (<a href="./deep-learning-basics.html#standardize">standardizing the inputs</a>).</p>
+
+    <h3 id="scaling-penalty">Why a penalty needs it, in numbers</h3>
+    <p>Ridge (sklearn's <code>Ridge</code>) adds \(\alpha \sum_j \beta_j^2\) to the <em>sum</em> of squared errors. The penalty charges for a coefficient's size, and a coefficient's size depends on its feature's units: utilisation (standard deviation 0.2) needs a coefficient of 10 to do what income (standard deviation 50) does with 0.04. For a centred feature uncorrelated with the others, ridge shrinks the least-squares coefficient by a fixed factor:</p>
+    <div class="mj">\[ \begin{aligned} \hat\beta_j^{\text{ridge}} &amp;= \frac{S_j}{S_j + \alpha}\, \hat\beta_j^{\text{OLS}} \\ S_j &amp;= \sum_i x_{ij}^2 = N \operatorname{Var}(x_j) \end{aligned} \]</div>
+    <p>In words: \(S_j\) is how much the feature varies in total. A feature with little spread has a small \(S_j\), so the same \(\alpha\) shrinks it hard; one with a huge spread is barely touched. (Why: for one such feature, minimizing \(\sum_i (y_i - \beta x_{ij})^2 + \alpha \beta^2\) gives \(\beta = \sum_i x_{ij} y_i / (S_j + \alpha)\), where least squares divides by \(S_j\) alone.) Same data as above, \(N = 1{,}000\) and \(\alpha = 40\):</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Feature</th><th>\(S_j\) in raw units</th><th>Shrink factor, raw</th><th>Ridge coef., raw (least squares)</th><th>Shrink factor, standardized</th></tr></thead>
+      <tbody>
+        <tr><td>Income</td><td>2,500,000</td><td>1.00</td><td>0.039 (0.039)</td><td>0.96</td></tr>
+        <tr><td>Utilisation</td><td>40</td><td>0.50</td><td>5.02 (10.04)</td><td>0.96</td></tr>
+      </tbody>
+    </table></div>
+    <p>In raw units, ridge halves utilisation's effect and leaves income untouched, though the two matter equally. After standardizing, both have \(S_j = 1{,}000\) and lose the same 4%. Lasso is harsher: at a lasso penalty (sklearn's \(\alpha = 0.5\)) that trims both standardized coefficients by about a quarter, the raw-unit fit sets utilisation's coefficient to exactly 0: lasso subtracts a fixed amount, \(\alpha / \operatorname{Var}(x_j) = 0.5/0.04 = 12.5\), from a raw coefficient, more than utilisation's 10, while income loses only \(0.5/2500 = 0.0002\). Ridge and lasso themselves are explained in <a href="./linear-logistic-regression.html#regularization">the regularization section of the regression note</a>; the point here is only that their penalty is unfair unless the features share a scale. (The intercept isn't penalized, which is why centring doesn't matter for this.)</p>
+
+    <h3 id="scaling-sparse">Sparse data: scale, but don't centre</h3>
+    <p>One-hot columns, TF-IDF matrices and count features are stored <strong>sparse</strong>: only the non-zero entries are kept. Centring subtracts the column mean from every entry, so every 0 becomes \(-\mu_j\) and the matrix turns dense.</p>
+    <ul>
+      <li><strong>The size of the problem:</strong> 1,000,000 rows by 100,000 columns with 0.1% non-zero is 100 million non-zeros, about 1.2 GB in compressed sparse row format (an 8-byte value and a 4-byte column index each). Centred, it's \(10^{11}\) dense entries: 800 GB.</li>
+      <li><strong>Meaning is lost too:</strong> a 0 says “word absent” or “not this level”. After centring, absence becomes a different negative number in every column.</li>
+      <li><strong>What to do:</strong> divide only. <code>MaxAbsScaler</code> divides each column by its largest absolute value (range −1 to 1, zeros stay zero, signs kept); <code>StandardScaler(with_mean=False)</code> divides by the standard deviation. One-hot columns are usually left as 0/1, and TF-IDF vectors are usually normalized per row instead.</li>
+      <li><strong>Why skipping the centring is fine:</strong> a linear model's unpenalized intercept absorbs the column means.</li>
+    </ul>
+
+    <h3 id="scaling-target">Scaling the target for neural nets</h3>
+    <p>Trees and closed-form linear regression don't care about the target's units. A neural net trained by gradient descent does, because its outputs start near 0 and its learning rate was chosen for numbers of order 1.</p>
+    <ul>
+      <li><strong>Plain gradient descent:</strong> with a target like a price in rupees (mean ₹5,000,000), the first errors are in the millions, so squared-loss gradients are millions of times larger than for a standardized target, and a learning rate that works for one diverges or crawls for the other.</li>
+      <li><strong>Adam:</strong> each weight moves by roughly the learning rate per step, whatever the gradient's size. The output bias has to travel from 0 to 5,000,000; at a learning rate of 0.001 that's about 5 billion steps. Simulated on that bias alone, 10,000 Adam steps move it from 0 to 10.</li>
+      <li><strong>The recipe:</strong> fit \(\mu_y\) and \(\sigma_y\) on training targets, train on \((y - \mu_y)/\sigma_y\), and convert predictions back with \(\hat y = \mu_y + \sigma_y \hat z\). A loss in standardized units is the real MSE divided by \(\sigma_y^2\) (RMSE and MAE by \(\sigma_y\)), so convert before reporting.</li>
+      <li><strong>Several outputs:</strong> scale each one, or the output with the largest units dominates the summed loss.</li>
+      <li><strong>A skewed positive target:</strong> log it first (with the back-transform correction above), then standardize.</li>
+    </ul>
+
     <h3 id="fit-train">Fit on the training data only</h3>
     <p>The scaler's \(\mu\) and \(\sigma\) (or min and max, or quantiles) are learned on training rows and frozen, the rule from section <a href="#split">03</a>. At serving time there's often one row and nothing to compute statistics from. Re-fitting on test rows also hides shift: re-centring test incomes that run higher makes them look normal.</p>
+    <p><strong>Say it in an interview:</strong> “Scaling matters wherever the units enter the maths. In gradient descent, the ratio of the loss surface's steepest to flattest curvature, the condition number, sets how many steps it takes; with income in thousands of rupees next to utilisation as a fraction, that was over 200,000 steps instead of one. A ridge or lasso penalty shrinks a small-range feature far more for the same effect. Distances are dominated by the largest units. Trees don't care. Sparse data I scale without centring, and for neural nets I standardize the target too.”</p>
 
     <!-- collinearity -->
     <h2 id="collinearity"><span class="pn">08</span>Collinearity</h2>
@@ -933,11 +1056,37 @@ footer .site-nav { display: block; margin-top: 10px; }
       <li><strong>Interpretation breaks:</strong> “the effect of \(x_1\) holding \(x_2\) fixed” describes something the data never shows.</li>
       <li><strong>Predictions are usually fine</strong> while the correlation holds, because they depend on the combined effect, which the data pins down well. A new row that breaks the pattern asks about the one direction the data never covered, and its prediction swings.</li>
     </ul>
+
+    <h3 id="collin-worked">Worked: two near-duplicate features</h3>
+    <p>100 rows. \(x_2\) is \(x_1\) plus a little noise (standard deviation 1 for \(x_1\), 0.1 for the noise), so their correlation is 0.996. The target is \(y = 1 \cdot x_1 + 1 \cdot x_2 + \text{noise}\) (noise standard deviation 1): both true coefficients are 1.</p>
+    <p><strong>The VIF.</strong> Regress \(x_1\) on \(x_2\): \(R_1^2 = 0.9917\) (with a single other feature, \(R^2\) is just the squared correlation, \(0.9958^2\)).</p>
+    <div class="mj">\[ \begin{aligned} \text{VIF}_1 &amp;= \frac{1}{1 - 0.9917} \approx 121 \\ \sqrt{\text{VIF}_1} &amp;\approx 11 \end{aligned} \]</div>
+    <p>In words: the coefficient's variance is about 121 times what it would be if \(x_2\) were unrelated to \(x_1\), and its standard error about 11 times wider. The fit on all 100 rows confirms it: \(\hat\beta_1 = -0.55\) and \(\hat\beta_2 = 2.64\), each with a standard error of about 1.0. The true values are +1 and +1, so \(\hat\beta_1\) has the wrong sign. With an unrelated \(x_2\) of the same spread, the standard errors are 0.09.</p>
+    <p><strong>Five bootstrap resamples</strong> (draw 100 rows with replacement, refit). Two new rows are scored each time: one that follows the pattern (\(x_1 = x_2 = 1\), true value 2) and one that breaks it (\(x_1 = 1, x_2 = -1\), true value 0).</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Resample</th><th>\(\hat\beta_1\)</th><th>\(\hat\beta_2\)</th><th>Sum</th><th>Pattern row (truth 2)</th><th>Breaking row (truth 0)</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>−1.91</td><td>4.11</td><td>2.20</td><td>2.23</td><td>−6.00</td></tr>
+        <tr><td>2</td><td>0.16</td><td>1.86</td><td>2.03</td><td>2.19</td><td>−1.54</td></tr>
+        <tr><td>3</td><td>−1.75</td><td>3.78</td><td>2.03</td><td>1.97</td><td>−5.59</td></tr>
+        <tr><td>4</td><td>0.78</td><td>1.51</td><td>2.29</td><td>2.54</td><td>−0.48</td></tr>
+        <tr><td>5</td><td>−0.50</td><td>2.62</td><td>2.12</td><td>2.11</td><td>−3.13</td></tr>
+        <tr><td>SD over 2,000 resamples</td><td>0.90</td><td>0.89</td><td>0.08</td><td>0.14</td><td>1.82</td></tr>
+      </tbody>
+    </table></div>
+    <p>What the table says:</p>
+    <ul>
+      <li><strong>The split swings, the sum doesn't.</strong> \(\hat\beta_1\) moves between −1.9 and +0.8, but \(\hat\beta_1 + \hat\beta_2\) stays near 2. The data varies a lot along “both up together” (the direction \(x_1 + x_2\)), which pins down the sum, and hardly at all along “one up, one down” (\(x_1 - x_2\) has a standard deviation of only 0.1), which leaves the split almost free.</li>
+      <li><strong>Predictions on pattern-following rows are stable</strong> (1.97 to 2.54), because they only need the sum.</li>
+      <li><strong>Predictions on a pattern-breaking row are wild</strong> (−6.0 to −0.5, truth 0), because that row asks exactly about the split.</li>
+      <li><strong>Ridge stops the swinging.</strong> With \(\alpha = 10\) on the same five resamples, the coefficients stay between 0.87 and 1.17 and the breaking row's prediction between −0.28 and 0.19. Careful: ridge splits the weight evenly between twins whatever the truth is. Here the truth happens to be an even split; ridge makes the answer stable, not right.</li>
+    </ul>
+
     <h3>Detecting it</h3>
     <ul>
       <li><strong>Correlation matrix:</strong> quick but pairwise only; it misses a column that is the sum of three others.</li>
       <li><strong>VIF</strong> per feature (regress it on all the others): above 5 is worth a look, above 10 is serious.</li>
-      <li><strong>Condition number</strong> of the standardized feature matrix (largest over smallest singular value): above about 30 is strong collinearity. Eigenvectors of the correlation matrix with near-zero eigenvalues show which columns are involved.</li>
+      <li><strong>Condition number</strong> of the standardized feature matrix (largest over smallest singular value, the square root of section 07's curvature ratio \(\kappa\)): above about 30 is strong collinearity. Eigenvectors of the correlation matrix with near-zero eigenvalues show which columns are involved.</li>
     </ul>
     <h3>Remedies</h3>
     <ul>
@@ -949,6 +1098,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     </ul>
     <h3>Trees and feature importance</h3>
     <p>Trees predict fine with correlated features, but their <strong>importance is split</strong>. Whichever twin wins a split takes its credit, so impurity importance divides the credit arbitrarily and each twin looks weaker than the signal is. Permutation importance underestimates both, because with one twin shuffled the model still has the other (and the shuffled rows are unrealistic). Random forests, which sample features per split, spread credit evenly; boosting tends to lean on one twin. Measure correlated features as a group: permute them together, or drop the group and refit.</p>
+    <p><strong>Say it in an interview:</strong> “With near-duplicate features the data pins down their combined effect but not how to split it between them. In a 100-row example with correlation 0.996, one coefficient swung from −1.9 to +0.8 across bootstrap resamples while the sum stayed near 2 and predictions on normal rows barely moved. VIF measures the damage: 121 there, so standard errors about 11 times wider. If I need the coefficients, I drop or combine the twins or use ridge; if I only need predictions on data like the training data, I can leave them.”</p>
 
     <!-- features -->
     <h2 id="features"><span class="pn">09</span>Feature engineering</h2>
@@ -1009,36 +1159,202 @@ df["mean_28"] = g.transform(
         </ul>
       </li>
     </ul>
-    <p id="select-cv"><strong>The pitfall: select inside cross-validation, not before it.</strong> Take thousands of pure-noise features and random labels, keep the few most correlated with the labels on all the rows, then cross-validate a model on them: the accuracy comes out well above chance. The selection step saw the validation labels and picked features that happen to fit them.</p>
+
+    <h3 id="filter-maths">How each filter is computed</h3>
+    <p>Every filter turns one column and the target into one number, built from counts, means and sums of squares. Here they all are on one table of 8 loan applicants, small enough to redo with a pen:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Row</th><th>Region \(X\)</th><th>Missed payments \(x\)</th><th>Defaulted \(Y\)</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>A</td><td>2</td><td>yes</td></tr>
+        <tr><td>2</td><td>A</td><td>3</td><td>yes</td></tr>
+        <tr><td>3</td><td>A</td><td>3</td><td>yes</td></tr>
+        <tr><td>4</td><td>B</td><td>4</td><td>yes</td></tr>
+        <tr><td>5</td><td>A</td><td>0</td><td>no</td></tr>
+        <tr><td>6</td><td>B</td><td>1</td><td>no</td></tr>
+        <tr><td>7</td><td>B</td><td>1</td><td>no</td></tr>
+        <tr><td>8</td><td>B</td><td>2</td><td>no</td></tr>
+      </tbody>
+    </table></div>
+    <p>So region A has 3 defaults out of 4, region B 1 out of 4, and defaulters missed more payments. Capital \(X\) is the region (a category) and lowercase \(x\) the count of missed payments; \(Y\) is the target, written \(y\) when it's coded 1 for yes and 0 for no.</p>
+
+    <p><strong>Entropy of a column, from its counts.</strong> Entropy measures how unpredictable a column is. Count each value, turn the counts into shares \(p_k = n_k / n\), and add up:</p>
+    <div class="mj">\[ \begin{aligned} H(Y) &amp;= -\sum_k p_k \log_2 p_k \\ &amp;= -\tfrac48 \log_2 \tfrac48 - \tfrac48 \log_2 \tfrac48 = 1\ \text{bit} \end{aligned} \]</div>
+    <p>In words: a 50/50 column takes one yes/no question per row to pin down (1 bit); a constant column takes none (0 bits). Any categorical column works the same way: region has 4 A and 4 B, so \(H(X) = 1\) bit too. A numeric column has to be binned first, or handled by the estimator further down. Entropy, and how it compares with Gini, is explained in full with <a href="./decision-trees.html#impurity">decision-tree impurity</a>.</p>
+
+    <p><strong>Conditional entropy:</strong> how unpredictable \(Y\) still is once you know \(X\). Take the entropy of \(Y\) inside each group of \(X\), weighted by the group's share:</p>
+    <div class="mj">\[ \begin{aligned} H(Y \mid X) &amp;= \sum_x P(X = x)\, H(Y \mid X = x) \\ H(Y \mid A) &amp;= -\tfrac34 \log_2 \tfrac34 - \tfrac14 \log_2 \tfrac14 \\ &amp;= 0.311 + 0.5 = 0.811 \\ H(Y \mid B) &amp;= 0.811 \\ H(Y \mid X) &amp;= \tfrac12 (0.811) + \tfrac12 (0.811) = 0.811 \end{aligned} \]</div>
+    <p>In words: \(H(Y \mid A)\) is short for \(H(Y \mid X = A)\), the entropy of default among region A's rows. Three of four defaulted there, so guessing is easier (0.811 bits instead of 1); region B is the mirror image (one of four), so it's 0.811 too.</p>
+
+    <p><strong>Mutual information</strong> is the uncertainty that knowing \(X\) removes:</p>
+    <div class="mj">\[ \begin{aligned} I(X; Y) &amp;= H(Y) - H(Y \mid X) \\ &amp;= 1 - 0.811 = 0.189\ \text{bits} \end{aligned} \]</div>
+    <p>In words: knowing the region removes 0.189 of the 1 bit of uncertainty about default. It's 0 when \(X\) and \(Y\) are independent and reaches \(H(Y)\) when \(X\) determines \(Y\) completely. An equivalent form compares each cell's actual share with the share it would have under independence, \(P(x) P(y) = \tfrac12 \times \tfrac12 = \tfrac14\) here:</p>
+    <div class="mj">\[ \begin{aligned} I(X; Y) &amp;= \sum_{x, y} P(x, y) \log_2 \frac{P(x, y)}{P(x)\, P(y)} \\ &amp;= 2 \times \Big[ \tfrac38 \log_2 \frac{3/8}{1/4} + \tfrac18 \log_2 \frac{1/8}{1/4} \Big] \\ &amp;= 2 \times (0.219 - 0.125) = 0.189 \end{aligned} \]</div>
+    <p>In words: cells that occur more often than independence predicts (A with default, B without) add to the total; cells that occur less often subtract. The factor 2 is there because region B's two cells mirror region A's.</p>
+    <aside class="note trap"><p class="nl">Trap</p><p>Units. With \(\log_2\) the answer is in bits; with the natural log, in nats. sklearn's <code>mutual_info_classif</code> reports nats: 0.131 here, which is \(0.189 \times \ln 2\), as long as you pass <code>discrete_features=True</code>. Left at its default, it treats a 0/1-coded region as a numeric column and runs the nearest-neighbour estimator below, which on these 8 rows gives anything from 0 to 0.18 depending on <code>random_state</code>. Same quantity, different unit.</p></aside>
+    <p><strong>Information gain is the same quantity.</strong> When a decision tree scores a split, its information gain is the node's entropy minus the children's weighted entropy: the mutual information between “which child” and \(Y\), on the rows that reach that node. A filter computes it once per feature on all training rows; a tree recomputes it at every node (<a href="./decision-trees.html#impurity">decision trees</a>).</p>
+
+    <p><strong>Mutual information for a numeric feature.</strong> There's no count per value, so there are two options:</p>
+    <ul>
+      <li><strong>Binning:</strong> cut \(x\) into bins (quantile bins, say) and use the counts formula. Simple, but the answer depends on the bins, and fine bins on few rows invent dependence: each bin holds a handful of rows whose default share wobbles by chance, and the formula counts the wobble as information. In a simulation (balanced classes; \(x\) normal with standard deviation 1, centred at +1 for defaulters and −1 for the rest) where the true value is 0.337 nats, 200 rows gave 0.337 with 5 bins and 0.534 with 100 bins; on pure noise (true value 0), 100 bins gave 0.342, as large as the real signal (averages of 100 repeats).</li>
+      <li><strong>Nearest neighbours,</strong> which is what sklearn uses (the Kraskov–Stögbauer–Grassberger estimator for two numeric variables; Ross's version for a numeric feature and a class target). For each row, find the distance to its \(k\)-th nearest neighbour <em>of the same class</em> (\(k = 3\) by default), then count how many rows of any class lie within that distance; call the count \(m\). If the classes separate along \(x\), the nearest rows of the same class are also the nearest rows overall, so \(m\) stays close to \(k\): high MI. If the classes are mixed, that radius also takes in rows of the other classes, so \(m\) is large: MI near 0. In the same simulation: 0.349 on the signal and 0.011 on noise, with 200 rows.</li>
+    </ul>
+    <p>The estimator, for recognition only:</p>
+    <div class="mj">\[ \begin{aligned} \hat I &amp;= \psi(N) - \big\langle \psi(N_{y_i}) \big\rangle + \psi(k) - \big\langle \psi(m_i) \big\rangle \end{aligned} \]</div>
+    <p>In words: \(\psi\) (the digamma function) is close to a log, \(N_{y_i}\) is the size of row \(i\)'s class, and \(\langle\cdot\rangle\) averages over rows. So the estimate is roughly \(\log(N/N_y) + \log(k/m)\). With fully mixed classes, \(m \approx k N / N_y\) and the two cancel to 0; with perfectly separated, balanced classes, \(m = k\) and it's \(\ln 2\), the entropy of \(Y\) in nats (sklearn gives 0.692 on such data). The estimate has its own bias and noise (it depends on \(k\), and sklearn adds tiny random noise to break ties, so it shifts slightly with <code>random_state</code>), so read the values as scores for ranking features rather than exact amounts, and mark columns that are really categories with <code>discrete_features</code> so they're counted instead.</p>
+
+    <p><strong>Pearson correlation,</strong> for a straight-line relationship between two numeric columns:</p>
+    <div class="mj">\[ \begin{aligned} r &amp;= \frac{\sum_i (x_i - \bar x)(y_i - \bar y)}{\sqrt{\sum_i (x_i - \bar x)^2 \, \sum_i (y_i - \bar y)^2}} \\ &amp;= \frac{4}{\sqrt{12 \times 2}} = 0.816 \end{aligned} \]</div>
+    <p>In words: how much the two move together, divided by how much each moves on its own, so it's unit-free and between −1 and 1. On the table, with \(Y\) coded 1 and 0: \(\bar x = 2\), \(\bar y = 0.5\), the products sum to 4, and the squared deviations to 12 and 2. With a 0/1 target this is called the point-biserial correlation. It sees only straight lines: for \(y = x^2\) plus a little noise, with \(x\) spread evenly from −2 to 2 (2,000 points), \(r = -0.01\) while the nearest-neighbour MI estimate is 2.23 nats. Spearman's correlation (Pearson on ranks) catches any monotone curve, but not a U-shape.</p>
+
+    <p><strong>Chi-squared,</strong> for two categorical columns: compare the observed counts \(O\) with the counts \(E\) expected if the columns were independent.</p>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Default: observed (expected)</th><th>No default: observed (expected)</th><th>Row total</th></tr></thead>
+      <tbody>
+        <tr><td>Region A</td><td>3 (2)</td><td>1 (2)</td><td>4</td></tr>
+        <tr><td>Region B</td><td>1 (2)</td><td>3 (2)</td><td>4</td></tr>
+        <tr><td>Column total</td><td>4</td><td>4</td><td>8</td></tr>
+      </tbody>
+    </table></div>
+    <div class="mj">\[ \begin{aligned} E_{ij} &amp;= \frac{(\text{row } i \text{ total}) \times (\text{column } j \text{ total})}{N} \\ &amp;= \frac{4 \times 4}{8} = 2 \\ \chi^2 &amp;= \sum_{\text{cells}} \frac{(O - E)^2}{E} \\ &amp;= 4 \times \frac{1^2}{2} = 2.0 \end{aligned} \]</div>
+    <p>In words: under independence, region A's 4 rows would split by the overall default share (4 of 8), giving 2 and 2. Each cell's gap from that is squared and scaled by what was expected, then summed. Degrees of freedom are (rows − 1) × (columns − 1) = 1, and \(\chi^2 = 2.0\) gives \(p = 0.16\): 8 rows are too few to be sure. Chi-squared and mutual information measure the same departure from independence: the likelihood-ratio version of the test, \(G = 2 N \times \text{MI in nats} = 2 \times 8 \times 0.131 = 2.09\), is close to \(\chi^2\). (If you check with code: scipy's <code>chi2_contingency</code> applies a continuity correction to 2×2 tables by default and returns 0.5; pass <code>correction=False</code> to get 2.0. sklearn's <code>chi2</code> scores each one-hot column from its “present” cells only: 1.0 for the A column and 1.0 for the B column, which add up to the 2.0 above. For a single 0/1 column it returns (1 − share of 1s) × the full \(\chi^2\), so it can rank a common flag below a rare one that the full test ranks higher.)</p>
+
+    <p><strong>ANOVA F,</strong> for a numeric feature against a class target: do the groups' means differ by more than the spread inside the groups would explain?</p>
+    <div class="mj">\[ \begin{aligned} F &amp;= \frac{\text{between-group variance}}{\text{within-group variance}} \\ &amp;= \frac{\sum_g n_g (\bar x_g - \bar x)^2 / (G - 1)}{\sum_g \sum_{i \in g} (x_i - \bar x_g)^2 / (N - G)} \end{aligned} \]</div>
+    <p>In words: \(n_g\) and \(\bar x_g\) are group \(g\)'s size and mean, \(\bar x\) the overall mean. The top adds up how far each group's mean sits from the overall mean, once per row; the bottom adds up how far each row sits from its own group's mean. Each is divided by its degrees of freedom, \(G - 1\) and \(N - G\), so the two are comparable.</p>
+    <p>On the table: defaulters missed 2, 3, 3, 4 payments (mean 3), the others 0, 1, 1, 2 (mean 1), and the overall mean is 2, with \(G = 2\) groups and \(N = 8\) rows. Inside each group the squared distances from the group's mean are 1, 0, 0, 1, which sum to 2:</p>
+    <div class="mj">\[ \begin{aligned} \text{between} &amp;= \frac{4 (3 - 2)^2 + 4 (1 - 2)^2}{2 - 1} = 8 \\ \text{within} &amp;= \frac{2 + 2}{8 - 2} = 0.667 \\ F &amp;= \frac{8}{0.667} = 12 \end{aligned} \]</div>
+    <p>In words: the group means sit much further apart than the scatter inside each group would produce by chance (\(p = 0.013\)). With two groups, \(F\) is the two-sample t-statistic squared, and \(F = (N - 2)\, r^2 / (1 - r^2) = 6 \times 0.667 / 0.333 = 12\): the same information as the correlation above. It sees only differences in means; a feature whose spread differs between the classes but whose mean doesn't scores near 0.</p>
+
+    <p><strong>Variance threshold</strong> drops columns whose variance is below a cut-off. It never looks at the target. Variance 0 means a constant column, always safe to drop. For a 0/1 flag the variance is \(p(1 - p)\): 0.25 at a 50% share, 0.0475 at 5%, about 0.005 at 0.5%. Variance depends on units, so a threshold only compares columns on the same scale (flags with flags), and never after standardizing, when every variance is 1. A rare flag can be the most predictive column there is (a fraud marker), so use it for constants and near-constants only.</p>
+
+    <p><strong>Which filter for which pair of types:</strong></p>
+    <div class="tbl"><table>
+      <thead><tr><th>Feature</th><th>Target</th><th>Filter</th></tr></thead>
+      <tbody>
+        <tr><td>Numeric</td><td>Numeric</td><td>Pearson (straight line), Spearman (monotone), MI (any shape)</td></tr>
+        <tr><td>Numeric</td><td>Classes</td><td>ANOVA F (means differ), MI by nearest neighbours</td></tr>
+        <tr><td>Categorical</td><td>Classes</td><td>Chi-squared, MI from counts</td></tr>
+        <tr><td>Categorical</td><td>Numeric</td><td>ANOVA F with the roles swapped (the feature's levels are the groups), MI</td></tr>
+        <tr><td>Anything</td><td>None (unsupervised)</td><td>Variance threshold</td></tr>
+      </tbody>
+    </table></div>
+    <p>In sklearn these are <code>f_regression</code>, <code>f_classif</code>, <code>chi2</code> (non-negative features only), <code>mutual_info_regression</code>, <code>mutual_info_classif</code> and <code>VarianceThreshold</code>, used through <code>SelectKBest</code> inside a pipeline.</p>
+    <p><strong>Which formulas to know for interviews:</strong></p>
+    <ul>
+      <li><strong>Compute by hand:</strong> entropy from counts, conditional entropy as a weighted average, \(I = H(Y) - H(Y \mid X)\), Pearson's \(r\), and \(\chi^2\) with \(E = \text{row total} \times \text{column total} / N\).</li>
+      <li><strong>Know the idea and the ratio:</strong> \(F\) = between-group over within-group variance, and that with two groups it carries the same information as \(r\) and the t-test.</li>
+      <li><strong>Recognize only:</strong> the nearest-neighbour MI estimator (say “k nearest neighbours, as sklearn does it”), and p-values from the \(\chi^2\) and \(F\) distributions.</li>
+      <li><strong>Always add the limit:</strong> every filter scores one feature at a time. Two features that predict only together, like \(y = a \text{ XOR } b\), each score MI 0 on their own, while the pair determines \(y\) (MI 1 bit, or \(\ln 2\) nats). And two copies of one signal both score high.</li>
+    </ul>
+
+    <h3>Select inside cross-validation</h3>
+    <p id="select-cv"><strong>The pitfall: selecting before cross-validation.</strong> Take thousands of pure-noise features and random labels, keep the few most correlated with the labels on all the rows, then cross-validate a model on them: the accuracy comes out well above chance. The selection step saw the validation labels and picked features that happen to fit them.</p>
     <p>Selection is part of the training procedure, so it goes in the pipeline and is redone on each training fold, and the final estimate comes from data the selection never saw.</p>
+    <p><strong>Say it in an interview:</strong> “Filters score each feature against the target on its own: Pearson correlation for straight-line numeric relationships, ANOVA F for a numeric feature against classes, chi-squared for two categoricals, and mutual information, H(Y) minus H(Y given X), for any shape. I fit them on training folds only, inside the pipeline, and treat them as a first cut, since they miss features that only work together and keep duplicates; then I confirm with permutation importance or a model-based method.”</p>
 
     <!-- imbalance -->
     <h2 id="imbalance"><span class="pn">11</span>Class imbalance at the data level</h2>
-    <p><strong>First ask whether it's a problem.</strong> With a proper loss (log loss) and a few hundred positives, a model ranks well despite imbalance; what changes is where the threshold belongs and which metric to read. So: threshold first, then weights, then resampling.</p>
+    <p>One class is rare: 1% defaults, 0.1% frauds. The reflex is to rebalance the data. First work out whether the imbalance is hurting, and how, because the fix depends on which problem you actually have.</p>
+
+    <h3 id="imb-why">Why imbalance hurts, and when it doesn't</h3>
+    <p><strong>It often doesn't hurt the ranking.</strong> With a proper loss (log loss), the model learns that positives are rare, which is true, and still ranks them above negatives. A simulation: 400,000 rows, a 1% base rate, five informative features, plain logistic regression trained on half. On the other half its probabilities are calibrated (average 0.0100 against a real rate of 0.0098 in those rows) and its AUC is 0.87. Nothing there needs fixing. Three things do go wrong:</p>
+    <p><strong>1. Too few positives in absolute numbers.</strong> The count, not the ratio, decides how much can be learned about positives. 1% of 1,000,000 rows is 10,000 positives: plenty. 1% of 5,000 is 50: every pattern among positives rests on a handful of rows, and a tree leaf of 20 rows expects 0.2 of them. Rebalancing can't create information. The cures are more positives (a longer time window, pooling similar products), simpler models and stronger regularization.</p>
+    <p><strong>2. Easy negatives dominate the loss and its gradient.</strong> Take 10,000 negatives the model already handles (it says \(p = 0.02\) for each) and 100 positives it doesn't (\(p = 0.30\)):</p>
+    <div class="mj">\[ \begin{aligned} \text{neg. loss} &amp;= 10{,}000 \times \big({-\ln 0.98}\big) = 202 \\ \text{pos. loss} &amp;= 100 \times \big({-\ln 0.30}\big) = 120 \\ \text{neg. gradient} &amp;= 10{,}000 \times (0.02 - 0) = 200 \\ \text{pos. gradient} &amp;= 100 \times (0.30 - 1) = -70 \end{aligned} \]</div>
+    <p>In words: each easy negative contributes almost nothing, but together they make up 63% of the total loss, and their summed gradient (\(p - y\) per row, with respect to the model's log-odds) is about three times the positives'. Training spends much of its effort shaving already-small errors on negatives, which matters most for neural nets trained by SGD. Class weights scale the positives' terms up; <strong>focal loss</strong> scales every easy example's term down by \((1 - p_t)^\gamma\), where \(p_t\) is the probability given to the true class and \(\gamma\) (usually 2) sets how hard (<a href="./loss-functions.html#imbalance">focal loss and class weights</a>).</p>
+    <p><strong>3. The default threshold of 0.5 is wrong.</strong> A calibrated model at a 1% base rate rarely says more than 0.5. In the simulation:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Threshold</th><th>Rows flagged</th><th>Recall</th><th>Precision</th></tr></thead>
+      <tbody>
+        <tr><td>0.5</td><td>0.02%</td><td>1.1%</td><td>55%</td></tr>
+        <tr><td>0.2</td><td>0.32%</td><td>9.7%</td><td>29%</td></tr>
+        <tr><td>0.1</td><td>1.33%</td><td>22.7%</td><td>16.7%</td></tr>
+        <tr><td>0.05</td><td>3.84%</td><td>40.1%</td><td>10.2%</td></tr>
+      </tbody>
+    </table></div>
+    <p>The model is the same in every row; only the cut moves. At 0.5 it catches about 1 positive in 90 and looks useless. Many “imbalance problems” are this: a threshold problem dressed up as a data problem.</p>
+
+    <h3>The toolkit, in order</h3>
+    <p>Threshold first, then weights, then resampling. Weights and resampling touch training folds only; the threshold is chosen on validation or out-of-fold predictions, never on the rows the model was fitted on.</p>
     <ul>
       <li><strong>Move the threshold.</strong> With calibrated probabilities, choose it from the costs of the two mistakes, or from capacity (flag the top \(N\) a review team can handle). Flag when \(p &gt; t^*\):
         <div class="mj">\[ t^* = \frac{C_{FP}}{C_{FP} + C_{FN}} \]</div>
-        In words: with \(C_{FP}\) the cost of a false alarm and \(C_{FN}\) the cost of a miss, the threshold is the false alarm's share of the total cost. When a miss costs far more, the threshold is low.</li>
-      <li><strong>Class weights.</strong> Count each positive \(w\) times in the loss. It works with every model and discards nothing. But the model now believes positives are \(w\) times more likely in odds terms, so probabilities are inflated; at threshold 0.5 it decides about the same as the unweighted model at threshold \(1/(1 + w)\).</li>
+        In words: with \(C_{FP}\) the cost of a false alarm and \(C_{FN}\) the cost of a miss, the threshold is the false alarm's share of the total cost. When a miss costs far more, the threshold is low. Choosing it in practice is covered in <a href="./evaluation.html#threshold-choice">threshold choice</a> and, with business costs, in <a href="./ds-project-lifecycle.html#threshold">the project lifecycle</a>.</li>
+      <li><strong>Class weights.</strong> Count each positive \(w\) times in the loss. It works with every model and discards nothing. But the model now believes positives are \(w\) times more likely in odds terms, so probabilities are inflated; at threshold 0.5 it decides about the same as the unweighted model at threshold \(1/(1 + w)\) (worked below).</li>
       <li><strong>Undersample the majority.</strong> Keep a fraction \(q\) of negatives. Training gets much cheaper, at the cost of discarded information. Undo the probability inflation with the prior correction:
         <div class="mj">\[ \operatorname{logit} p = \operatorname{logit} p_s + \log q \]</div>
-        In words: \(p_s\) is the model's probability on the resampled data; adding \(\log q\) to its log-odds restores the real base rate. For class weights, use \(q = 1/w\).</li>
+        In words: \(p_s\) is the model's probability on the resampled data and \(\operatorname{logit} p = \log\big(p / (1 - p)\big)\); adding \(\log q\) to its log-odds restores the real base rate. For class weights, use \(q = 1/w\).</li>
       <li><strong>Oversample the minority</strong> by duplicating positives: the same effect as weights, but duplicates are easy to memorize, especially for trees.</li>
       <li><strong>SMOTE</strong> creates synthetic positives on the line between a positive and one of its positive nearest neighbours:
         <div class="mj">\[ \begin{aligned} x_{\text{new}} &amp;= x_i + u\,(x_{\text{nn}} - x_i) \\ u &amp;\sim \text{Uniform}(0, 1) \end{aligned} \]</div>
         Apply it only to training folds, after the split (imbalanced-learn's pipeline does this); before the split, synthetic near-copies of validation rows leak into training. Its points can be unrealistic (half-way values of integer or categorical columns, points between two separate fraud patterns), it amplifies label noise, it distorts probabilities, and with gradient boosting it rarely beats weights or a good threshold.</li>
     </ul>
-    <p><strong>The right metrics:</strong> not accuracy (flagging nobody scores 98% at 2% positives). Use PR-AUC (its random baseline is the positive rate), precision and recall at the operating threshold, or money saved; ROC-AUC ignores the base rate and can look excellent while precision is poor. Add log loss or a calibration plot when probabilities matter. <strong>Never resample the validation or test sets:</strong> they must reflect the real base rate.</p>
+
+    <h3 id="imb-weights">Weights and thresholds are the same lever</h3>
+    <p>A weight \(w\) on positives multiplies the odds the model predicts by \(w\) (the derivation is with <a href="./loss-functions.html#imbalance">the loss functions</a>). By hand, at a 1% base rate with “balanced” weights (\(w = 99\), the ratio of negatives to positives), for a row whose real risk is 5%:</p>
+    <div class="mj">\[ \begin{aligned} \text{odds} &amp;= \frac{0.05}{0.95} = 0.0526 \\ \text{weighted odds} &amp;= 99 \times 0.0526 = 5.21 \\ p_w &amp;= \frac{5.21}{1 + 5.21} = 0.839 \end{aligned} \]</div>
+    <p>In words: a 5% risk is reported as 84%. The weighted model's 0.5 cut means weighted odds of 1, which is real odds of 1/99, a real risk of \(1/(1 + 99) = 0.01\). So the weighted model at 0.5 and the unweighted model at 0.01 draw the line in the same place, and both flag this row. Same decisions, different numbers on the label.</p>
+    <p><strong>Fitted, on the 400,000-row simulation:</strong></p>
+    <ul>
+      <li>The weighted logistic regression's intercept rose by 4.593 (\(\ln 99 = 4.595\)); the slopes barely moved. Its average probability is 0.30, against a real 0.0098.</li>
+      <li>The weighted model at 0.5 flags 44,048 test rows; the unweighted model at 0.01 flags 44,375. They agree on 99.4% of all rows.</li>
+      <li>Dividing the odds back by \(w\) undoes the inflation:</li>
+    </ul>
+    <div class="mj">\[ \begin{aligned} p &amp;= \frac{p_w}{p_w + w\,(1 - p_w)} \\ &amp;= \frac{0.839}{0.839 + 99 \times 0.161} = 0.050 \end{aligned} \]</div>
+    <p>In words: this is the prior correction above with \(q = 1/w\). On the simulation it brings the average probability down to 0.0099 (real rate 0.0098) and the log loss from 0.451 to 0.0434, the unweighted model's value. So weights don't add information: they move the threshold and inflate the probabilities. They earn their place when they change the fitting itself: a tree picks different splits, a neural net gets more gradient from positives, early stopping stops at a different point.</p>
+
+    <h3 id="imb-undersample">Undersampling and the prior correction, in numbers</h3>
+    <p>Keep every positive and a share \(q\) of the negatives. At a 1% base rate with \(q = 0.1\), the training base rate becomes</p>
+    <div class="mj">\[ \frac{0.01}{0.01 + 0.99 \times 0.1} = 0.092 \]</div>
+    <p>In words: the negatives are ten times rarer in training than in reality, so the model's odds come out \(1/q = 10\) times too high, and the correction takes \(\log 10\) back off the log-odds. Two outputs by hand:</p>
+    <div class="mj">\[ \begin{aligned} \operatorname{logit} p &amp;= \operatorname{logit} 0.5 + \ln 0.1 \\ &amp;= 0 - 2.303 = -2.303 \\ p &amp;= 0.091 \\ \operatorname{logit} p &amp;= \operatorname{logit} 0.2 + \ln 0.1 \\ &amp;= -1.386 - 2.303 = -3.689 \\ p &amp;= 0.024 \end{aligned} \]</div>
+    <p>In words: a model trained on the undersampled data that says “50/50” means a 9% real risk; one that says 20% means 2.4%. The same in one step: \(p = q p_s / (q p_s + 1 - p_s)\).</p>
+    <p><strong>Fitted:</strong> training on 21,763 rows (all positives, 10% of negatives) instead of 200,000, the intercept rose by 2.318 (\(-\ln 0.1 = 2.303\)) and the AUC didn't move (0.869). The raw probabilities averaged 0.071 with log loss 0.0945; after the correction, 0.0099 and 0.0434, matching the model trained on all the rows (0.0100 and 0.0434). Dropping 90% of the negatives cost nothing here because the model is simple and about 2,000 positives remained; with a flexible model and fewer rows it costs information. The correction assumes the negatives were dropped at random.</p>
+
+    <h3 id="imb-ensembles">Undersampling plus ensembles</h3>
+    <p>One undersample throws most negatives away, and its model depends on which ones it happened to keep. Ensembles spend more of them:</p>
+    <ul>
+      <li><strong>Balanced bagging:</strong> train \(M\) models, each on all the positives plus a fresh random draw of an equal number of negatives, and average their predictions. Each model is cheap and balanced; averaging cancels the luck of each draw, the way bagging does.</li>
+      <li><strong>EasyEnsemble</strong> (Liu, Wu and Zhou, 2009) does the same with a boosted model on each balanced subset; a <strong>balanced random forest</strong> balances each tree's bootstrap sample.</li>
+      <li><strong>How much of the data they use.</strong> With 10,000 positives and 990,000 negatives, each model sees 10,000 negatives, about 1% of them. The share of negatives that at least one of \(M\) models sees is \(1 - (1 - 10{,}000 / 990{,}000)^M\): 10% with 10 models, 63% with 99, 95% with 300.</li>
+      <li><strong>Their probabilities are on the balanced scale</strong> (a 50% base rate), so apply the prior correction with \(q = n_{\text{pos}} / n_{\text{neg}}\) before treating them as probabilities.</li>
+      <li><strong>When:</strong> a huge negative class and a model too expensive to train on all of it, or a single undersample whose results vary from run to run. With gradient boosting on data that fits in memory, class weights or no rebalancing usually do as well.</li>
+    </ul>
+
+    <h3 id="imb-stratify">Stratified splits: count your positives</h3>
+    <p>With 10,000 rows, 1% positives and 5 random folds, each fold expects 20 positives, but the count wobbles (standard deviation about 4). Over 2,000 random splits, the emptiest fold had a median of 15 positives and the fullest 25; in 6% of splits some fold had 11 or fewer, and in 5% some fold had 30 or more. A PR-AUC computed on 11 positives and one computed on 30 are different-quality numbers. Stratified k-fold puts exactly 20 in each.</p>
+    <ul>
+      <li><strong>Stratify every split</strong> when a class is rare: the train–test split as well as the folds.</li>
+      <li><strong>Groups and rarity together:</strong> <code>StratifiedGroupKFold</code> keeps each group in one fold while balancing positives as well as the groups allow.</li>
+      <li><strong>Time splits can't be stratified.</strong> Report the positive count of each fold, and make validation windows long enough to hold a few dozen positives at least.</li>
+      <li><strong>Folds are chosen by the split scheme</strong> (<a href="./evaluation.html#cv-schemes">cross-validation schemes</a>); the data-level job is to know how many positives each score rests on.</li>
+    </ul>
+
+    <h3 id="imb-anomaly">When positives are extremely rare: an anomaly-detection framing</h3>
+    <p>Switch from “classify positives” to “model normal and flag what doesn't fit” when:</p>
+    <ul>
+      <li>positives number in the tens, too few to learn their patterns;</li>
+      <li>tomorrow's positives won't look like yesterday's (new fraud schemes, new failure modes), so learning past positives doesn't generalize;</li>
+      <li>labels are slow or missing (most fraud is never confirmed).</li>
+    </ul>
+    <p>Then fit a model of normal behaviour, such as an isolation forest (<a href="./random-forests.html#isolation">isolation forests</a>), a density or distance method, or an autoencoder's reconstruction error (<a href="./unsupervised-learning.html#anomaly">anomaly detection</a>). Use the few labels you have to choose the method and the threshold, and to measure precision among the flagged rows, not to train. The trade-off: an anomaly isn't a positive (a big legitimate purchase is unusual but fine), so precision is usually low and a person reviews the flags. A common middle way is to feed the anomaly score into a supervised model as one feature once labels accumulate.</p>
+
+    <h3 id="imb-label-noise">Label noise among the positives</h3>
+    <p>Wrong labels hurt more when a class is rare, because each one is a larger share of everything the model learns about that class.</p>
+    <ul>
+      <li><strong>Wrong positives:</strong> with 100 positives, 10 mislabelled ones are 10% of the class.</li>
+      <li><strong>Hidden positives among the negatives:</strong> if 0.1% of 10,000 “negatives” are undetected fraud, that's 10 hidden positives, 10% as many as the 100 known ones, and the model is trained to call them safe. Many negatives really mean “not caught yet” or “not yet due” (label maturity, section <a href="#cleaning">02</a>), so treat recent rows' negatives with suspicion.</li>
+      <li><strong>Rebalancing amplifies it:</strong> a weight of 99 multiplies each wrong positive's pull by 99, and SMOTE builds new synthetic points around wrong positives.</li>
+      <li><strong>What to do:</strong> review the positives by hand. There are few, so it's cheap, and the positives with the lowest out-of-fold scores are the first suspects. Check how the label is produced, and leave out the window where labels haven't matured. When the negatives are really unlabelled, positive–unlabelled (PU) learning methods model that directly.</li>
+    </ul>
+
+    <h3>Metrics, briefly</h3>
+    <p>Which metric to read is the evaluation note's job: PR-AUC rather than accuracy, and ROC-AUC with care (<a href="./evaluation.html#pr-auc">PR-AUC</a>), and how to pick the operating point (<a href="./evaluation.html#threshold-choice">threshold choice</a>). The data-level rules: <strong>never resample the validation or test sets</strong>, which must keep the real base rate or precision and PR-AUC mean nothing; compare PR-AUC only between sets with the same base rate, since its random baseline is the positive rate; and report how many positives each score rests on.</p>
+    <p><strong>Say it in an interview:</strong> “Imbalance alone doesn't break a model trained with log loss: it still ranks well and its probabilities are calibrated. What hurts is too few positives in absolute numbers, a loss dominated by easy negatives, and a 0.5 threshold that a calibrated model at a 1% base rate almost never crosses. So I move the threshold first, chosen on validation data, then use weights, then resample the training folds only, and correct the probabilities with logit p = logit p<sub>s</sub> + log q. I stratify the splits, keep evaluation sets at the real base rate, and check the positive labels by hand.”</p>
 
     <!-- fit -->
     <h2 id="fit"><span class="pn">12</span>Overfitting and underfitting</h2>
-    <p>Expected squared error on a new point splits into three parts:</p>
-    <div class="mj">\[ \begin{aligned} \mathbb E\big[(y - \hat f(x))^2\big] &amp;= \text{bias}^2 + \text{variance} + \sigma^2 \\ \text{bias} &amp;= \mathbb E[\hat f(x)] - f(x) \\ \text{variance} &amp;= \operatorname{Var}\big(\hat f(x)\big) \end{aligned} \]</div>
-    <p>In words: <strong>bias</strong> is how far the average model (over many training sets) is from the truth, so a model too simple for the pattern has high bias. <strong>Variance</strong> is how much the model changes from one training set to another, so a model flexible enough to fit noise has high variance. The noise can't be removed by any model.</p>
-    <ul>
-      <li><strong>Learning curve</strong> (both scores against training-set size): curves that meet low mean underfitting, and more data won't help; a gap that narrows as data grows means overfitting, and more data will.</li>
-      <li><strong>Validation curve</strong> (both scores against one complexity setting, such as tree depth): pick the validation peak, or the simplest setting near it.</li>
-    </ul>
+    <p>A model <strong>underfits</strong> when it misses real pattern: it's poor on training and validation data alike. It <strong>overfits</strong> when it learns the noise of its particular training set: good on training data, clearly worse on new data. In the usual language, expected squared error on new data is bias² + variance + noise: <strong>bias</strong> is the error of a model too simple for the pattern, <strong>variance</strong> how much the model changes from one training set to another. The decomposition, worked through, is in <a href="./linear-logistic-regression.html#bias-variance">the bias–variance section of the regression note</a>, and learning and validation curves, the main tools for telling the two apart, are in <a href="./evaluation.html">the evaluation note</a>. This section is about what the data shows and what data preparation can do about it.</p>
     <div class="tbl"><table>
       <thead><tr><th>What you see</th><th>Diagnosis</th><th>Fixes</th></tr></thead>
       <tbody>
@@ -1048,7 +1364,37 @@ df["mean_28"] = g.transform(
         <tr><td>Fold scores vary a lot</td><td>Small or mixed data</td><td>Repeated or grouped cross-validation; simpler model; report the spread, not just the mean</td></tr>
       </tbody>
     </table></div>
-    <p><strong>A gap isn't always overfitting.</strong> If a feature leaks only in training rows, or the validation period differs from the training period, the gap comes from the data, not the model's flexibility, and regularization won't close it.</p>
+    <p><strong>A gap isn't always overfitting.</strong> If a feature leaks only in training rows, or the validation period differs from the training period, the gap comes from the data, not the model's flexibility, and regularization won't close it. The reverse also happens: duplicates or the same customers on both sides of the split make validation look as good as training and hide real overfitting. Rule out leakage, shift and contamination (section <a href="#leak-types">03</a>) before reading a gap as variance.</p>
+
+    <h3 id="fit-data">What data preparation can do about it</h3>
+    <p><strong>Every useless column is another chance to fit noise.</strong> A logistic regression, almost unregularized, with five real features plus a number of pure-noise columns, trained on 500 or 5,000 rows and scored on 50,000 new rows (averages of 5 runs). The best possible validation AUC, from the true probabilities, is 0.813.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Training rows</th><th>Noise columns</th><th>Training AUC</th><th>Validation AUC</th></tr></thead>
+      <tbody>
+        <tr><td>500</td><td>0</td><td>0.818</td><td>0.808</td></tr>
+        <tr><td>500</td><td>50</td><td>0.866</td><td>0.767</td></tr>
+        <tr><td>500</td><td>300</td><td>1.000</td><td>0.631</td></tr>
+        <tr><td>5,000</td><td>0</td><td>0.817</td><td>0.813</td></tr>
+        <tr><td>5,000</td><td>50</td><td>0.819</td><td>0.808</td></tr>
+        <tr><td>5,000</td><td>300</td><td>0.839</td><td>0.784</td></tr>
+      </tbody>
+    </table></div>
+    <p>In words: with 500 rows and 300 junk columns, the model separates the training rows perfectly and loses most of its real skill. Ten times the rows shrinks the damage; dropping the junk removes it. The model didn't change between rows of the table, only the data it was given.</p>
+    <p><strong>Data levers against overfitting:</strong></p>
+    <ul>
+      <li><strong>More rows, and more varied rows:</strong> the 500 → 5,000 rows of the table. Varied matters as much as many: a thousand more rows from the same week can teach less than a hundred from a different season.</li>
+      <li><strong>Fewer, cleaner features:</strong> drop IDs, junk and near-duplicates, and select inside cross-validation (section <a href="#selection">10</a>).</li>
+      <li><strong>Coarser features where the detail is noise:</strong> group rare levels (<a href="#rare">rare categories</a>), smooth target encodings (<a href="#target-enc">target encoding</a>), cap extremes (<a href="#outliers">outliers</a>). A level seen three times, or a value seen once, is something to memorize, not learn from.</li>
+      <li><strong>Cleaner labels:</strong> a wrong label is pure noise, and a flexible model will fit it (label noise, section <a href="#cleaning">02</a>).</li>
+      <li><strong>No copies across the split:</strong> otherwise validation rewards memorization and the overfitting goes unseen.</li>
+    </ul>
+    <p><strong>Data levers against underfitting:</strong></p>
+    <ul>
+      <li><strong>Features the model can't build itself:</strong> ratios, aggregates, deviations from an entity's usual behaviour, interactions (section <a href="#features">09</a>).</li>
+      <li><strong>Encodings and transforms that suit the model:</strong> one-hot or target encoding instead of arbitrary integer codes in a linear model; a log for multiplicative relationships; missing indicators where blanks carry signal.</li>
+      <li><strong>A check on the target:</strong> if even the training score is poor, the label may be noisy or defined inconsistently, which caps every model.</li>
+    </ul>
+    <p><strong>Say it in an interview:</strong> “A train–validation gap means overfitting only if the validation data is honest, so I rule out leakage and shift first. Then the data levers come before the model knobs: more and more varied rows, fewer junk features, grouped rare levels and smoothed encodings against overfitting; better features and encodings that suit the model against underfitting.”</p>
 
     <!-- code -->
     <h2 id="code"><span class="pn">13</span>Pseudocode</h2>
@@ -1275,7 +1621,27 @@ df.groupby(blank)["target"].mean()</code></pre>
       <p><strong>Trap:</strong> removing outliers from the test set flatters the score. Decide the rule on training data and apply it identically everywhere, including at serving. (<a href="#outliers">05</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">13</span>How do you encode a high-cardinality categorical?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">13</span>Why can a z-score miss an obvious outlier? Show it.</summary><div class="ans">
+      <p><strong>The outliers set the ruler they're measured with: they pull the mean towards themselves and inflate the standard deviation, so their own z-scores shrink. This is masking. The median and the MAD can't be moved that way.</strong></p>
+      <ul>
+        <li><strong>The numbers:</strong> twelve values, ten between 10 and 16 plus 150 and 160. The mean is 36.7 and the standard deviation 55.3, so \(z_{160} = (160 - 36.7)/55.3 = 2.23\), under the usual cut of 3. Against the ten ordinary values alone (mean 13, standard deviation 1.83) it would be 80. Remove the 150 and the 160's z rises to 3.01: each extreme was hiding the other.</li>
+        <li><strong>The robust version:</strong> median 13.5 and MAD 1.5 (the median of the absolute deviations from the median), so \(z^{\text{robust}}_{160} = 0.6745 \times 146.5 / 1.5 = 65.9\). The middle of the data sets the scale, and two extremes can't reach it.</li>
+        <li><strong>A hard ceiling:</strong> in a sample of \(n\) points no z-score can exceed \((n - 1)/\sqrt n\): 3.18 for twelve points, and under 3 for ten or fewer, however wild the value.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> IQR fences (\(Q_1 - 1.5\,\text{IQR}\), \(Q_3 + 1.5\,\text{IQR}\)) are robust too, and flag both values here; on a right-skewed column they flag the real long tail, so take the log first. (<a href="#masking">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">14</span>How do you find outliers in a daily series with a weekly pattern?</summary><div class="ans">
+      <p><strong>Compare each value with what its context predicts and flag large residuals, not large values. A global rule misses a Sunday with weekday-level sales, and flags every ordinary weekend instead.</strong></p>
+      <ul>
+        <li><strong>The mechanism:</strong> the expected value is the median of the same weekday over recent weeks (or a seasonal decomposition such as STL, or a forecast), computed from past data only; the residual is actual minus expected; then a robust z-score (median and MAD) on the residuals, often over a rolling window (the Hampel filter).</li>
+        <li><strong>Worked:</strong> weekdays about 100, Saturdays about 60, Sundays about 20, and one Sunday reads 95. Over all 21 days its z is 0.25, and the IQR fences flag the five normal weekend days instead. Against past Sundays (median 21) its residual is 74, while the other days' residuals sit between −3.5 and +5 (MAD 2.5): a robust z of about 20.</li>
+        <li><strong>Details that matter:</strong> put holidays and known events into the expectation; tell a one-day spike from a level shift, and re-baseline after a shift; clean confirmed errors before building lag and rolling features, or one spike contaminates a month of them.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> once flagged, it's treated like any other outlier: an error becomes a blank, a real event stays. (<a href="#contextual">05</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">15</span>How do you encode a high-cardinality categorical?</summary><div class="ans">
       <p><strong>Not with one-hot. Use out-of-fold, smoothed target encoding or count encoding (often both), native categorical support in a boosting library, or a learned embedding in a neural net, with rare levels grouped.</strong></p>
       <ul>
         <li><strong>Why not one-hot:</strong> thousands of sparse columns; rare levels get noisy coefficients; a tree can peel off only one level per split, so the feature's signal is spread thin and barely used.</li>
@@ -1289,7 +1655,7 @@ df.groupby(blank)["target"].mean()</code></pre>
       <p><strong>Trade-offs:</strong> target encoding risks leakage and drifts as levels' rates change; counts collide (equal counts look identical); hashing collides; embeddings need data per level. In every case, group levels below a count threshold into “Other” and decide what an unseen level gets (the prior, 0, an “unknown” index). (<a href="#encoding">06</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">14</span>Why does target encoding leak, and how do you prevent it?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">16</span>Why does target encoding leak, and how do you prevent it?</summary><div class="ans">
       <p><strong>Each training row's own label is inside its category's average, so the feature partly is the label. Prevent it with out-of-fold encoding plus smoothing, fitted inside each cross-validation training fold.</strong></p>
       <p><strong>The mechanism:</strong> for a level with one row, the encoding equals that row's label. For a level with \(n_c\) rows, a positive raises its own encoding by about \(1/n_c\). The model learns “high encoding means positive”, which is true in training because of the rows' own labels and false for new rows. Even a category with no real relationship to the target looks predictive in training, most strongly for small levels.</p>
       <ul>
@@ -1303,7 +1669,7 @@ df.groupby(blank)["target"].mean()</code></pre>
       <p>Within one level the sum \(S_c\) and count \(n_c\) are fixed, so the encoding falls as \(y_i\) rises: every positive gets a slightly lower value than every negative in its level, and a deep enough tree can separate them, level by level. <strong>A quick check:</strong> compare the encoded feature's AUC on training rows with its AUC on validation rows; a big gap is leakage. (<a href="#te-leak">06</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">15</span>Frequency encoding: when?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">17</span>Frequency encoding: when?</summary><div class="ans">
       <p><strong>When how common a category is predicts the target, or when you need a one-column, leakage-free encoding for a high-cardinality feature in a tree model.</strong></p>
       <div class="mj">\[ \text{freq}(c) = \frac{n_c}{n} \]</div>
       <p>In words: a level seen in \(n_c\) of the \(n\) training rows is replaced by that share (or by the count itself).</p>
@@ -1315,7 +1681,7 @@ df.groupby(blank)["target"].mean()</code></pre>
       <p><strong>Trade-offs:</strong> levels with equal counts become identical even if they behave differently; counts depend on data volume and window, so use shares or a fixed trailing window (“transactions at this merchant in the last 30 days”) computed the same way at serving; an unseen level gets 0, which is usually meaningful. In a linear model it's weak on its own, since it assumes the effect grows linearly with popularity. (<a href="#freq-enc">06</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">16</span>A category appears at inference that wasn't in training. What happens?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">18</span>A category appears at inference that wasn't in training. What happens?</summary><div class="ans">
       <p><strong>Whatever the encoder does by default, which can be a crash or a silent wrong answer. Decide it on purpose for each encoder, and test it.</strong></p>
       <ul>
         <li><strong>One-hot:</strong> sklearn raises an error by default. With <code>handle_unknown="ignore"</code> the row is all zeros, which the model reads as “none of the known levels”; with rare-level grouping it goes to the “infrequent” column.</li>
@@ -1328,7 +1694,7 @@ df.groupby(blank)["target"].mean()</code></pre>
       <p><strong>Why it matters:</strong> a mismatch between training and serving codes is a classic silent production bug. <strong>The safeguard:</strong> group rare levels into “Other” in training, so the model has learned how to treat a rare or unknown level, and monitor the share of unseen levels in production. A jump means a new product, a renamed category or a broken upstream mapping. (<a href="#rare">06</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">17</span>Do trees need scaling or one-hot encoding?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">19</span>Do trees need scaling or one-hot encoding?</summary><div class="ans">
       <p><strong>Scaling, never. One-hot, sometimes: a tree needs numbers (unless its library handles categories natively), but for many levels other encodings work better.</strong></p>
       <ul>
         <li><strong>Scaling:</strong> a split is a threshold on one feature, “income below t”. Any monotone rescaling or transform (standardizing, a log) moves the threshold with the data and gives exactly the same partition of the rows.</li>
@@ -1339,7 +1705,7 @@ df.groupby(blank)["target"].mean()</code></pre>
       <p><strong>Follow-up, what trees do care about:</strong> extreme targets under squared loss (leaf means and boosting gradients get pulled; use Huber), leakage, and correlated features splitting importance. (<a href="#enc-table">06</a>, <a href="#scaling">07</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">18</span>Standardization vs normalization.</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">20</span>Standardization vs normalization.</summary><div class="ans">
       <p><strong>Standardization rescales a column to mean 0 and standard deviation 1. Normalization usually means min-max scaling to \([0, 1]\), and in sklearn's <code>Normalizer</code> it means rescaling each row to unit length.</strong></p>
       <div class="mj">\[ \begin{aligned} \text{standardize:}\quad \tilde x &amp;= \frac{x - \mu}{\sigma} \\ \text{min-max:}\quad \tilde x &amp;= \frac{x - x_{\min}}{x_{\max} - x_{\min}} \\ \text{robust:}\quad \tilde x &amp;= \frac{x - \operatorname{median}}{\text{IQR}} \end{aligned} \]</div>
       <ul>
@@ -1351,7 +1717,7 @@ df.groupby(blank)["target"].mean()</code></pre>
       <p><strong>Why scale at all:</strong> mixed units make gradient descent zig-zag through a stretched loss surface, let one feature dominate distances, and make a penalty punish features with small numeric ranges more. <strong>Trade-offs:</strong> min-max is fragile, since one outlier sets the range and new values fall outside \([0, 1]\); standardization isn't robust either; and neither changes the shape of a skewed column, which is a transform's job. Fit on training rows only. (<a href="#scaling">07</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">19</span>A feature is heavily right-skewed. What do you do, and does it matter for XGBoost?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">21</span>A feature is heavily right-skewed. What do you do, and does it matter for XGBoost?</summary><div class="ans">
       <p><strong>For linear models, distance-based methods and neural nets, transform it: a log, Box-Cox or Yeo-Johnson, or a quantile transform. For XGBoost it doesn't matter, because trees only use the order of values.</strong></p>
       <div class="mj">\[ x^{(\lambda)} = \begin{cases} \dfrac{x^{\lambda} - 1}{\lambda} &amp; \lambda \ne 0 \\ \log x &amp; \lambda = 0 \end{cases} \]</div>
       <p>In words: Box-Cox is a family of power transforms with the log at \(\lambda = 0\); \(\lambda\) is chosen by maximum likelihood on training data to make the column as close to normal as possible. It needs positive values; use \(\log(1 + x)\) for counts with zeros and Yeo-Johnson for negative values.</p>
@@ -1363,19 +1729,29 @@ df.groupby(blank)["target"].mean()</code></pre>
       <p><strong>Follow-up, a skewed target is different, even for XGBoost:</strong> with squared loss, the largest targets dominate the gradients. Options are a log target (which then predicts something close to the median, so totals come out low unless corrected) or a loss suited to the target, such as Huber, Poisson or Tweedie. (<a href="#scaling">07</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">20</span>Collinearity: why it's a problem, how to detect it, what to do.</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">22</span>Show with numbers why gradient descent and ridge need scaled features.</summary><div class="ans">
+      <p><strong>Gradient descent: mixed units make the loss bend very differently in different directions, and the ratio of the sharpest to the flattest bend, the condition number, sets the number of steps. Ridge: the penalty charges for a coefficient's size, and a feature with a small range needs a big coefficient.</strong></p>
+      <ul>
+        <li><strong>Gradient descent:</strong> income in ₹k (standard deviation 50) and utilisation as a fraction (0.2). For squared loss on centred, uncorrelated features the curvatures are the variances, 2,500 and 0.04, so the condition number \(\kappa\) is 62,500. The learning rate must stay below \(2/2500 = 0.0008\) or the income weight blows up, and even at the best such rate the utilisation weight closes only about 0.003% of its gap per step: 215,868 steps to get within 0.1%. Standardized, both curvatures are 1 and it takes one step.</li>
+        <li><strong>The rule of thumb:</strong> steps \(\approx (\kappa/2) \ln(1/\varepsilon)\). Correlation raises \(\kappa\) too: standardized features with correlation 0.9 give \(\kappa = 19\) and 66 steps.</li>
+        <li><strong>Ridge:</strong> for an uncorrelated feature it multiplies the least-squares coefficient by \(S/(S + \alpha)\), with \(S = \sum_i x_i^2\), which is \(N\) times the variance. With \(N = 1{,}000\) and \(\alpha = 40\), utilisation (\(S = 40\)) is halved, from 10.0 to 5.0, while income (\(S = 2{,}500{,}000\)) is untouched, though both move the target equally. Standardized, both lose 4%. Lasso at a comparable strength drops utilisation entirely.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> trees need neither. Adam softens the unit problem but not the correlation one. Sparse data is scaled without centring, and a neural net's target is standardized too. (<a href="#scaling-gd">07</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">23</span>Collinearity: why it's a problem, how to detect it, what to do.</summary><div class="ans">
       <p><strong>Highly correlated features make a linear model's individual coefficients unstable and hard to interpret, though predictions are usually fine. Detect it with VIF and the condition number; if you need the coefficients, drop, combine, use PCA, or use ridge.</strong></p>
       <div class="mj">\[ \begin{aligned} \operatorname{Var}(\hat\beta_j) &amp;= \frac{\sigma^2}{\sum_i (x_{ij} - \bar x_j)^2} \cdot \text{VIF}_j \\ \text{VIF}_j &amp;= \frac{1}{1 - R_j^2} \end{aligned} \]</div>
       <p>In words: \(\sigma^2\) is the noise variance and \(R_j^2\) is how well the other features predict feature \(j\). Only the part of \(x_j\) they can't predict helps estimate \(\beta_j\), so as \(R_j^2\) nears 1 the coefficient's variance blows up.</p>
       <ul>
-        <li><strong>Why it hurts:</strong> the data can't say which twin deserves the credit, so the coefficients slide along a flat valley: large standard errors, signs that flip, each feature insignificant alone while the pair is clearly significant together. Predictions depend on the combined effect, which is well pinned down, so they're fine while the correlation holds, and swing for rows that break it.</li>
+        <li><strong>Why it hurts:</strong> the data can't say which twin deserves the credit, so the coefficients slide along a flat valley: large standard errors, signs that flip, each feature insignificant alone while the pair is clearly significant together. Predictions depend on the combined effect, which is well pinned down, so they're fine while the correlation holds, and swing for rows that break it. In a 100-row example with correlation 0.996 (VIF 121), each coefficient's bootstrap standard deviation was about 0.9, while their sum's was 0.08.</li>
         <li><strong>Detect:</strong> correlation matrix (pairwise only, misses one column being a combination of several); VIF per feature (above 5 worth a look, above 10 serious); condition number of the standardized feature matrix (above about 30).</li>
         <li><strong>Fix:</strong> nothing, if only predictions matter and the pattern is stable; drop one twin; combine them (a sum, a ratio, an index); PCA; ridge, which shares the weight between twins (lasso keeps one arbitrarily, elastic net keeps the group).</li>
       </ul>
       <p><strong>Follow-up:</strong> trees predict fine, but correlated features split their importance (next question). (<a href="#collinearity">08</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">21</span>Two correlated features both show low importance in a random forest. Why?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">24</span>Two correlated features both show low importance in a random forest. Why?</summary><div class="ans">
       <p><strong>They share the credit. The forest uses one twin or the other at different splits, so impurity importance divides their joint importance between them, and permutation importance barely drops when one is shuffled, because the other covers for it.</strong></p>
       <ul>
         <li><strong>Impurity importance</strong> adds up the gain from every split on a feature. Whichever twin wins a given split takes that split's credit. A random forest samples features at each split, so both twins win some splits, and each ends up with roughly half of what one would get alone.</li>
@@ -1385,7 +1761,7 @@ df.groupby(blank)["target"].mean()</code></pre>
       <p><strong>Why it matters:</strong> you might drop both and lose the signal, or conclude the underlying concept doesn't matter. <strong>Fix:</strong> group correlated features (cluster them by correlation), then permute each group together, or drop the group and refit; for SHAP, sum the group's values. (<a href="#collinearity">08</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">22</span>You add “the merchant's fraud rate” as a feature. What can go wrong?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">25</span>You add “the merchant's fraud rate” as a feature. What can go wrong?</summary><div class="ans">
       <p><strong>It's target encoding in disguise, so it can leak in three ways: through the current row's own label, through future rows, and through test rows. It's also noisy for small merchants.</strong></p>
       <ul>
         <li><strong>The row's own label:</strong> if the rate includes the transaction being scored, a fraud raises its own feature. Compute it out-of-fold, or from earlier transactions only.</li>
@@ -1397,7 +1773,7 @@ df.groupby(blank)["target"].mean()</code></pre>
       <p><strong>Why it's worth the care:</strong> done right, entity-level risk rates are among the strongest features. <strong>Trade-off:</strong> they drift (fraudsters move to new merchants), and new merchants have no history, so the prior and the count carry the load at first. (<a href="#features">09</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">23</span>How do you do feature selection without leaking?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">26</span>How do you do feature selection without leaking?</summary><div class="ans">
       <p><strong>Treat selection as part of training: run it inside each cross-validation training fold, as a pipeline step, never on the full dataset before cross-validation.</strong></p>
       <p><strong>The mechanism:</strong> take thousands of pure-noise features and random labels, keep the few most correlated with the labels on all rows, then cross-validate: accuracy comes out well above chance. The selection saw the validation labels and kept features that happen to fit them. Inside the pipeline, each fold selects using its own training rows, so the validation score measures the whole procedure honestly.</p>
       <ul>
@@ -1408,7 +1784,19 @@ df.groupby(blank)["target"].mean()</code></pre>
       <p><strong>Trade-off:</strong> different folds may select different features; that's expected, since you're evaluating the procedure. The final model reruns selection on all training data, and the final number comes from an untouched test set, or from nested cross-validation (an inner loop selects, an outer loop scores). (<a href="#select-cv">10</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">24</span>SMOTE: before or after the split, and does it help?</summary><div class="ans">
+    <details class="qa"><summary><span class="qn">27</span>How is mutual information computed? Work it out by hand, and compare it with chi-squared.</summary><div class="ans">
+      <p><strong>From counts: MI is the target's entropy minus its average entropy inside the feature's groups, \(I = H(Y) - H(Y \mid X)\). Chi-squared measures the same departure from independence, as a test statistic.</strong></p>
+      <p><strong>Drill:</strong> 8 applicants, 4 defaults. Region A has 3 defaults out of 4, region B 1 out of 4.</p>
+      <ul>
+        <li>\(H(Y) = 1\) bit, since it's 50/50.</li>
+        <li>\(H(Y \mid X = A) = -0.75 \log_2 0.75 - 0.25 \log_2 0.25 = 0.811\), the same for B, so \(H(Y \mid X) = 0.811\).</li>
+        <li>\(I = 1 - 0.811 = 0.189\) bits, or 0.131 nats, which is the unit sklearn reports.</li>
+        <li>Chi-squared: each cell's expected count is \(4 \times 4 / 8 = 2\), so \(\chi^2 = \sum (O - E)^2 / E = 4 \times 1/2 = 2.0\), with 1 degree of freedom (\(p = 0.16\)). The likelihood-ratio version, \(G = 2N \times \text{MI in nats} = 2.09\), is nearly the same number.</li>
+      </ul>
+      <p><strong>Numeric features:</strong> bin and count (fine bins on few rows invent dependence: on pure noise with 200 rows, 100 bins gave 0.34 nats), or use the nearest-neighbour estimator sklearn uses. <strong>Follow-up:</strong> a decision tree's information gain is the same quantity, computed at each node; and like every filter, MI scores one feature at a time, so each half of an XOR scores 0. (<a href="#filter-maths">10</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">28</span>SMOTE: before or after the split, and does it help?</summary><div class="ans">
       <p><strong>After the split, on training folds only, inside cross-validation. And on tabular data with gradient boosting it rarely beats class weights or a well-chosen threshold.</strong></p>
       <div class="mj">\[ \begin{aligned} x_{\text{new}} &amp;= x_i + u\,(x_{\text{nn}} - x_i) \\ u &amp;\sim \text{Uniform}(0, 1) \end{aligned} \]</div>
       <p>In words: a synthetic positive is placed at a random point on the line between a real positive \(x_i\) and one of its nearest positive neighbours.</p>
@@ -1420,15 +1808,35 @@ df.groupby(blank)["target"].mean()</code></pre>
       <p><strong>Follow-up:</strong> judge any of these with PR-AUC and precision and recall at the operating threshold, not accuracy, and never resample the validation or test sets: they must keep the real base rate. (<a href="#imbalance">11</a>)</p>
     </div></details>
 
-    <details class="qa"><summary><span class="qn">25</span>Overfitting vs underfitting: how do you tell, and how do you fix each?</summary><div class="ans">
-      <p><strong>Compare training and validation performance. Both poor means underfitting (high bias); training good and validation poor means overfitting (high variance). Learning and validation curves confirm which.</strong></p>
-      <div class="mj">\[ \mathbb E\big[(y - \hat f)^2\big] = \text{bias}^2 + \text{variance} + \sigma^2 \]</div>
-      <p>In words: \(\hat f\) is the fitted model and \(f\) the true function. Bias is how far the average fitted model, over many training sets, is from \(f\) (too simple); variance is how much \(\hat f\) changes between training sets (too flexible); \(\sigma^2\) is noise no model can remove.</p>
+    <details class="qa"><summary><span class="qn">29</span>Is class imbalance actually a problem? When does it hurt?</summary><div class="ans">
+      <p><strong>Often not for ranking: with log loss, a model at a 1% base rate still ranks well and stays calibrated. It hurts through too few positives in absolute numbers, a loss dominated by easy negatives, and the default threshold of 0.5.</strong></p>
       <ul>
-        <li><strong>Learning curve</strong> (scores against training-set size): curves that meet low means underfitting, and more data won't help; a gap that narrows as data grows means overfitting, and more data will.</li>
-        <li><strong>Validation curve</strong> (scores against one complexity setting): pick the validation peak, or the simplest setting near it.</li>
-        <li><strong>Fix underfitting:</strong> better features (ratios, aggregates, interactions), more capacity, less regularization, longer training; check label noise.</li>
+        <li><strong>Few positives:</strong> 1% of 5,000 rows is 50 positives, and every pattern among them is fragile. Rebalancing can't add information; more positives, simpler models and regularization can.</li>
+        <li><strong>Easy negatives:</strong> 10,000 negatives at \(p = 0.02\) contribute 202 to the log loss and 100 positives at \(p = 0.30\) contribute 120; the summed gradients are 200 against 70. Class weights or focal loss rebalance that.</li>
+        <li><strong>The threshold:</strong> in a simulation with AUC 0.87, a cut of 0.5 flagged 0.02% of rows and caught 1.1% of the positives; a cut of 0.05 caught 40% at 10% precision. Same model.</li>
+      </ul>
+      <p><strong>Follow-up:</strong> when positives are extremely rare or keep changing shape, switch to an anomaly-detection framing and keep the labels for evaluation. And check the positive labels by hand, since each wrong one is a large share of the class. (<a href="#imb-why">11</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">30</span>You kept 10% of the negatives for training, and the model says 0.5 for a row. What's the real probability? What about class weights of 99?</summary><div class="ans">
+      <p><strong>About 9%. Undersampling made the negatives ten times rarer, so the model's odds are ten times too high; take that back off on the log-odds scale.</strong></p>
+      <div class="mj">\[ \begin{aligned} \operatorname{logit} p &amp;= \operatorname{logit} p_s + \log q \\ &amp;= 0 + \ln 0.1 = -2.303 \\ p &amp;= \frac{1}{1 + e^{2.303}} = 0.091 \end{aligned} \]</div>
+      <p>In words: \(p_s\) is the model's output and \(q\) the share of negatives kept. The logit of 0.5 is 0, and adding \(\ln 0.1\) lowers the log-odds by \(\ln 10\). In one step: \(p = q p_s / (q p_s + 1 - p_s) = 0.05/0.55\).</p>
+      <ul>
+        <li><strong>Class weights</strong> work the same way with \(q = 1/w\): a weight of 99 multiplies the odds by 99, so a real 5% risk is reported as 84%, and the weighted model at 0.5 decides like the unweighted one at 0.01 (in a simulation they agreed on 99.4% of rows).</li>
+        <li><strong>The ranking doesn't change</strong> (AUC 0.869 with and without undersampling, in the same simulation); only the probabilities, and so the meaning of any threshold, do.</li>
+        <li><strong>Balanced bagging</strong> (many models, each on all the positives and a different equal-sized draw of negatives) uses more of the negatives, 63% with 99 models at 1:99, but its averaged probabilities are on the balanced scale too, so apply the same correction with \(q = n_{\text{pos}}/n_{\text{neg}}\).</li>
+      </ul>
+      <p>(<a href="#imb-undersample">11</a>)</p>
+    </div></details>
+
+    <details class="qa"><summary><span class="qn">31</span>Overfitting vs underfitting: how do you tell, and how do you fix each?</summary><div class="ans">
+      <p><strong>Compare training and validation performance. Both poor means underfitting (high bias); training good and validation clearly worse means overfitting (high variance), as long as the validation data is honest.</strong></p>
+      <p>The error on new data splits into bias² + variance + noise (the decomposition is in <a href="./linear-logistic-regression.html#bias-variance">the regression note</a>). Learning curves, both scores plotted against training-set size, confirm which side you're on: curves that meet low mean underfitting, a gap that narrows with more data means overfitting (<a href="./evaluation.html">evaluation</a>).</p>
+      <ul>
+        <li><strong>Fix underfitting:</strong> better features (ratios, aggregates, interactions), encodings that suit the model, more capacity, less regularization, longer training; check for label noise.</li>
         <li><strong>Fix overfitting:</strong> more data, fewer or cleaner features, grouped rare levels and smoothed encodings, stronger regularization, shallower trees, early stopping, bagging.</li>
+        <li><strong>The data side, in numbers:</strong> in a simulation, 300 junk columns on 500 rows took the training AUC to 1.000 and the validation AUC to 0.631 (best possible 0.813). With 5,000 rows it recovered to 0.784, and with no junk columns even 500 rows reached 0.808.</li>
       </ul>
       <p><strong>Follow-up:</strong> a big gap isn't always overfitting. If a feature leaks only in training rows, or the validation period differs from the training period, the gap comes from the data; check with a time-based split and adversarial validation before adding regularization. (<a href="#fit">12</a>)</p>
     </div></details>
@@ -1452,7 +1860,7 @@ df.groupby(blank)["target"].mean()</code></pre>
       <h3>Outliers</h3>
       <p>z-score (flag above 3), robust z (flag above 3.5), IQR fences:</p>
       <div class="mj">\[ \begin{aligned} z &amp;= (x - \bar x)/s \\ z^{\text{robust}} &amp;= 0.6745\,(x - \tilde x)/\text{MAD} \\ \text{low fence} &amp;= Q_1 - 1.5\,\text{IQR} \\ \text{high fence} &amp;= Q_3 + 1.5\,\text{IQR} \end{aligned} \]</div>
-      <p>Error: fix it or set it missing. Genuine: cap, log, robust loss, or keep it (fraud).</p>
+      <p>Error: fix it or set it missing. Genuine: cap, log, robust loss, or keep it (fraud). Masking: extremes inflate \(s\) and hide each other, so detect with the median and MAD. Time series: robust z of the residual (actual minus the same weekday's past median), not of the raw value.</p>
       <h3>Encoding</h3>
       <p>Smoothed target encoding (out-of-fold), the leave-one-out version that leaks, frequency, and the hashing collision chance:</p>
       <div class="mj">\[ \begin{aligned} \text{enc}(c) &amp;= \frac{n_c \bar y_c + m \bar y}{n_c + m} \\ \text{enc}_{-i} &amp;= \frac{S_c - y_i}{n_c - 1} \\ \text{freq}(c) &amp;= n_c / n \\ P_{\text{collide}} &amp;\approx 1 - e^{-K/B} \end{aligned} \]</div>
@@ -1460,15 +1868,21 @@ df.groupby(blank)["target"].mean()</code></pre>
       <h3>Scaling and transforms</h3>
       <p>Standardize, min-max, robust, Box-Cox (log at \(\lambda = 0\)), cyclical hour:</p>
       <div class="mj">\[ \begin{aligned} \tilde x &amp;= (x - \mu)/\sigma \\ \tilde x &amp;= (x - x_{\min})/(x_{\max} - x_{\min}) \\ \tilde x &amp;= (x - \operatorname{median})/\text{IQR} \\ x^{(\lambda)} &amp;= (x^{\lambda} - 1)/\lambda \\ h_{\sin} &amp;= \sin(2\pi h/24) \\ h_{\cos} &amp;= \cos(2\pi h/24) \end{aligned} \]</div>
-      <p>Scale for distances, penalties, gradient descent and PCA. Trees: never.</p>
+      <p>Scale for distances, penalties, gradient descent and PCA. Trees: never. Gradient-descent steps grow with the condition number; ridge shrinks an uncorrelated feature by a factor set by its total spread \(S_j\):</p>
+      <div class="mj">\[ \begin{aligned} \kappa &amp;= \lambda_{\max} / \lambda_{\min} \\ \text{steps} &amp;\approx (\kappa / 2) \ln(1/\varepsilon) \\ \hat\beta_j^{\text{ridge}} &amp;= \frac{S_j}{S_j + \alpha}\, \hat\beta_j^{\text{OLS}} \end{aligned} \]</div>
+      <p>Sparse data: divide, don't centre. Neural nets: standardize the target too.</p>
       <h3>Collinearity</h3>
-      <p>VIF above 5 is worth a look, above 10 serious; condition number above about 30.</p>
+      <p>VIF above 5 is worth a look, above 10 serious; condition number of the standardized feature matrix (singular values) above about 30, i.e. a curvature ratio \(\kappa\) above about 900.</p>
       <div class="mj">\[ \begin{aligned} \text{VIF}_j &amp;= \frac{1}{1 - R_j^2} \\ \operatorname{Var}(\hat\beta_j) &amp;= \frac{\sigma^2 \cdot \text{VIF}_j}{\sum_i (x_{ij} - \bar x_j)^2} \end{aligned} \]</div>
-      <p>It hurts coefficients, not predictions. In trees, twins split the importance.</p>
+      <p>It hurts coefficients, not predictions: the sum of twin coefficients is pinned down, the split between them isn't, and rows that break the pattern get wild predictions. In trees, twins split the importance.</p>
+      <h3>Feature selection filters</h3>
+      <p>Entropy from counts, conditional entropy, mutual information, Pearson, chi-squared with expected counts, ANOVA F:</p>
+      <div class="mj">\[ \begin{aligned} H(Y) &amp;= -\textstyle\sum_k p_k \log_2 p_k \\ H(Y \mid X) &amp;= \textstyle\sum_x P(x)\, H(Y \mid X = x) \\ I(X; Y) &amp;= H(Y) - H(Y \mid X) \\ r &amp;= \frac{\sum (x - \bar x)(y - \bar y)}{\sqrt{\sum (x - \bar x)^2 \, \sum (y - \bar y)^2}} \\ \chi^2 &amp;= \textstyle\sum (O - E)^2 / E \\ E &amp;= \text{row} \times \text{col} / N \\ F &amp;= \frac{\text{between-group variance}}{\text{within-group variance}} \end{aligned} \]</div>
+      <p>8-row drill: 3 of 4 default in A, 1 of 4 in B gives \(H(Y) = 1\), \(H(Y \mid X) = 0.811\), MI 0.189 bits (0.131 nats), \(\chi^2 = 2\). Filters score one feature at a time.</p>
       <h3>Imbalance and fit</h3>
-      <p>Cost threshold, prior correction after resampling, SMOTE, bias–variance:</p>
-      <div class="mj">\[ \begin{aligned} t^* &amp;= \frac{C_{FP}}{C_{FP} + C_{FN}} \\ \operatorname{logit} p &amp;= \operatorname{logit} p_s + \log q \\ x_{\text{new}} &amp;= x_i + u\,(x_{\text{nn}} - x_i) \\ \mathbb E\big[(y - \hat f)^2\big] &amp;= \text{bias}^2 + \text{var} + \sigma^2 \end{aligned} \]</div>
-      <p>Threshold first, weights second, resampling last, and only on training folds. Metrics: PR-AUC, precision and recall at the threshold, cost.</p>
+      <p>Cost threshold, class weight undone, prior correction after undersampling, SMOTE:</p>
+      <div class="mj">\[ \begin{aligned} t^* &amp;= \frac{C_{FP}}{C_{FP} + C_{FN}} \\ p &amp;= \frac{p_w}{p_w + w\,(1 - p_w)} \\ \operatorname{logit} p &amp;= \operatorname{logit} p_s + \log q \\ x_{\text{new}} &amp;= x_i + u\,(x_{\text{nn}} - x_i) \end{aligned} \]</div>
+      <p>Imbalance hurts through few positives, easy negatives dominating the loss, and a 0.5 threshold. Threshold first (chosen on validation data), weights second, resampling last (training folds only); stratify splits; never resample evaluation sets. Overfitting from the data side: junk columns, few rows, rare levels, noisy labels; rule out leakage and shift before calling a gap variance.</p>
     </div>
 
     <footer><a href="./">More notes</a> · <a href="../">Deepam Minda</a></footer>
