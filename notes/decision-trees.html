@@ -865,8 +865,49 @@ leaves: late 0 → 0 of 3    late 1 → 1 of 3
       <li>Set together, every limit applies and whichever binds first stops that branch.</li>
     </ul>
     <p>Tuning depth and leaf size together by 5-fold cross-validation on log loss picks <code>max_depth=3</code>, <code>min_samples_leaf=30</code> (test AUC 0.809, log loss 0.218): it found the true depth. When the model will score future applicants, use folds split by time: train on earlier months, validate on later ones (<a href="./evaluation.html#time-cv">time-series splits</a>).</p>
-    <p><strong>Monotonic constraints.</strong> <code>monotonic_cst</code> forces predictions to only rise (or only fall) with a feature, for example “more late payments never lowers the risk”, which credit models often need. sklearn enforces it bluntly: at each split on a constrained feature it caps every leaf on the low side, and floors every leaf on the high side, at the midpoint of the two children's values.</p>
+    <p><strong>Monotonic constraints.</strong> <code>monotonic_cst</code> forces predictions to only rise (or only fall) with a feature, for example “more late payments never lowers the risk”, which credit models often need. sklearn enforces it bluntly: at each split on a constrained feature (rising, say) it caps every leaf on the low side, and floors every leaf on the high side, at the midpoint of the two children's values.</p>
     <p>Constraining <code>late</code> here caps the whole late ≤ 1 side at 18.2%, so the stressed applicant from <a href="#leaves">section 08</a> drops from 49.3% to 18.2%, though late payments were never their problem, and test AUC falls to 0.791.</p>
+    <details class="dive" id="dive-monotonic">
+      <summary><span class="dive-tag">deep dive</span><span class="dive-title">How sklearn enforces a monotonic constraint</span></summary>
+      <div class="dive-body">
+        <p><strong>What is promised.</strong> Take two applicants who are identical except that one has more late payments. The one with more late payments never gets a lower predicted risk. That's all “+1 on <code>late</code>” means. It says nothing about applicants who differ in other features too.</p>
+        <p><strong>The tool: a range per node.</strong> Every node carries an allowed range for its value, a lower and an upper bound. The root's range is unlimited. Children inherit their parent's range, and three rules use it.</p>
+        <ol>
+          <li><strong>A split on <code>late</code> must point the right way.</strong> The candidate split is only allowed if the left child (fewer late payments) has a default share no higher than the right child's, and both children fall inside the node's range. Otherwise that threshold is skipped, and the sweep moves on to the next candidate.</li>
+          <li><strong>Once a split on <code>late</code> is made, a fence goes up at the midpoint</strong> of the two children's default shares \(v_L\) and \(v_R\): \(\text{mid} = (v_L + v_R)/2\). It's the plain average, not weighted by rows; the row-weighted average would just be the parent's share, which sits close to the bigger child. The left subtree's upper bound becomes mid, and the right subtree's lower bound becomes mid. Every node below inherits these bounds, so no leaf on the left can go above mid and no leaf on the right can go below it.</li>
+          <li><strong>A split on any other feature is never refused.</strong> It's chosen by impurity as usual, and its children inherit the node's range unchanged. If a child's default share falls outside that range, its value is <strong>clipped</strong> to the nearest bound.</li>
+        </ol>
+        <p><strong>On the credit tree.</strong> The root still splits on <code>late</code> (5.9% vs 30.5%), so rule 1 passes and the fence goes up at \((5.9 + 30.5)/2 = 18.2\%\). The left side is capped at 18.2% and the right side floored there.</p>
+        <p>Below the root the constraint changes no split. Splits are still scored by impurity on the raw labels, and the only candidates it can remove are splits on <code>late</code>. Those lost at every node below the root anyway, so the same income, EMI and age splits win. Only the leaf values can change:</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Leaf</th><th>Share</th><th>Predicts</th></tr></thead>
+          <tbody>
+            <tr><td colspan="3"><strong>late ≤ 1: capped at 18.2%</strong></td></tr>
+            <tr><td>income ≤ 39.46, emi ≤ 0.50</td><td>3.7%</td><td>3.7%</td></tr>
+            <tr><td>income ≤ 39.46, emi &gt; 0.50</td><td>49.3%</td><td><strong>18.2%</strong></td></tr>
+            <tr><td>income 39.46 to 146.44</td><td>2.5%</td><td>2.5%</td></tr>
+            <tr><td>income &gt; 146.44</td><td>6.7%</td><td>6.7%</td></tr>
+            <tr><td colspan="3"><strong>late ≥ 2: floored at 18.2%</strong></td></tr>
+            <tr><td>all four leaves</td><td>25.2% to 90%</td><td>unchanged</td></tr>
+          </tbody>
+        </table></div>
+        <p>Only the stressed leaf moves, and it's the stressed applicant's leaf. It wanted 49.3% and is clipped to 18.2%, which is now below the 25.2% and 30.2% leaves on the late side. Stressed applicants with clean records now rank below people they're riskier than. That's where the AUC drop from 0.808 to 0.791 comes from.</p>
+        <p><strong>Why the fences guarantee the promise.</strong> Follow the two applicants from the promise down the tree.</p>
+        <ul>
+          <li>At every split on income, EMI or age they go the same way, because those values are identical.</li>
+          <li>So the first node where they part has to be a split on <code>late</code>. The one with fewer late payments goes left, the other goes right.</li>
+          <li>Ranges only shrink on the way down. A later fence on <code>late</code> is the midpoint of two children that rule 1 forced inside the current range, so it lands inside it too. Every other child is clipped into its range (rule 3).</li>
+          <li>So every leaf under the left child stays at most mid, and every leaf under the right child stays at least mid. The first applicant's prediction ≤ mid ≤ the second's.</li>
+        </ul>
+        <p>If they never part, they land in the same leaf and get the same prediction, which is allowed.</p>
+        <p><strong>Why it's called blunt.</strong> The fence is set from the two children's values at the moment of the split. It never looks at what the leaves further down turn out to be. Take an applicant identical to the stressed leaf but with 2+ late payments. Their income is at most 39.46, so on the late side they always take the income ≤ 40.51 branch and land in the 30.2% or 90% leaf. So the stressed leaf could have stayed as high as 30.2% without breaking the promise. The midpoint cut it to 18.2% anyway. That's stricter than monotonicity needs, and the extra loss comes from the method, not the data. LightGBM's <code>monotone_constraints_method</code> offers <code>basic</code> (this midpoint rule) plus <code>intermediate</code> and <code>advanced</code>, which set each leaf's bound from the leaves on the other side that an otherwise-identical applicant could actually reach, so they clip less.</p>
+        <ul>
+          <li><strong>Splits are still chosen by impurity.</strong> Clipping only changes the value a leaf stores, not which split won. So a clipped leaf can be badly wrong, like the 49.3% leaf here.</li>
+          <li><strong>Forests and boosting stay monotone:</strong> an average or a sum of non-decreasing functions is non-decreasing.</li>
+          <li><strong>In sklearn</strong> it's one value per feature: +1, −1 or 0. It works in trees, forests and HistGradientBoosting, for regression and binary classification (not multiclass or multi-output).</li>
+        </ul>
+      </div>
+    </details>
 
     <!-- pruning -->
     <h2 id="pruning"><span class="pn">11</span>Cost-complexity pruning</h2>
@@ -1625,6 +1666,78 @@ window.MathJax = {
     label();
   });
   label();
+})();
+</script>
+
+<script>
+/* deep dives: open a <details class="dive"> in a side panel instead of inline. ?dive=inline keeps them inline. */
+(function () {
+  var dives = document.querySelectorAll("details.dive");
+  if (!dives.length || /[?&]dive=inline\b/.test(location.search)) return;
+  document.documentElement.classList.add("dive-panel-mode");
+  var scrim = document.createElement("div");
+  scrim.className = "dive-scrim";
+  scrim.hidden = true;
+  var sheet = document.createElement("aside");
+  sheet.className = "dive-sheet";
+  sheet.hidden = true;
+  sheet.setAttribute("role", "dialog");
+  sheet.setAttribute("aria-modal", "true");
+  sheet.setAttribute("aria-labelledby", "dive-sheet-title");
+  sheet.innerHTML = '<div class="dive-head"><div><div class="dive-tag">deep dive</div><h2 id="dive-sheet-title"></h2></div>'
+    + '<button type="button" class="dive-close" aria-label="Close the deep dive">close \u2715</button></div><div class="dive-slot"></div>';
+  document.body.appendChild(scrim);
+  document.body.appendChild(sheet);
+  var slot = sheet.querySelector(".dive-slot"), title = sheet.querySelector("h2"), closeBtn = sheet.querySelector(".dive-close");
+  var current = null;
+  function open(d, focus) {
+    if (current) return;
+    current = d;
+    var s = d.querySelector("summary");
+    title.textContent = d.querySelector(".dive-title").textContent;
+    slot.appendChild(d.querySelector(".dive-body"));   /* move, so typeset maths comes along */
+    scrim.hidden = false; sheet.hidden = false; sheet.scrollTop = 0;
+    requestAnimationFrame(function () { scrim.classList.add("open"); sheet.classList.add("open"); });
+    document.body.classList.add("dive-lock");
+    s.setAttribute("aria-expanded", "true");
+    if (focus !== false) closeBtn.focus();
+    if (history.replaceState) history.replaceState(null, "", "#" + d.id);
+  }
+  function close() {
+    if (!current) return;
+    var d = current, s = d.querySelector("summary"), body = slot.firstElementChild;
+    current = null;
+    scrim.classList.remove("open"); sheet.classList.remove("open");
+    document.body.classList.remove("dive-lock");
+    s.setAttribute("aria-expanded", "false");
+    s.focus();
+    if (history.replaceState) history.replaceState(null, "", location.pathname + location.search);
+    setTimeout(function () { if (body) d.appendChild(body); scrim.hidden = true; sheet.hidden = true; }, 230);
+  }
+  Array.prototype.forEach.call(dives, function (d) {
+    var s = d.querySelector("summary");
+    s.setAttribute("aria-haspopup", "dialog");
+    s.setAttribute("aria-expanded", "false");
+    s.addEventListener("click", function (e) { e.preventDefault(); open(d); });
+  });
+  closeBtn.addEventListener("click", close);
+  scrim.addEventListener("click", close);
+  document.addEventListener("keydown", function (e) {
+    if (!current) return;
+    if (e.key === "Escape") { e.preventDefault(); close(); return; }
+    if (e.key !== "Tab") return;
+    var f = sheet.querySelectorAll('a[href], button, summary, [tabindex]:not([tabindex="-1"])');
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  function fromHash(focus) {
+    var h = location.hash && document.getElementById(location.hash.slice(1));
+    if (h && h.classList.contains("dive")) open(h, focus);
+  }
+  window.addEventListener("hashchange", function () { fromHash(true); });
+  fromHash(false);
 })();
 </script>
 <script src="palette.js?v=86dbe50016" defer></script>
