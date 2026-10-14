@@ -627,7 +627,7 @@ footer .site-nav { display: block; margin-top: 10px; }
     <p>A perfect ranking goes straight up to (0, 1) and then right: AUC 1. A random one hugs the diagonal: AUC 0.5. Here the area is \(1/16 + 3 \times 4/16 = 13/16 = 0.8125\).</p>
 
     <details class="dive" id="dive-roc-walk">
-      <summary><span class="dive-tag">deep dive</span><span class="dive-title">Drawing the ROC curve step by step, and why AUC is a probability</span></summary>
+      <summary><span class="dive-tag">deep dive</span><span class="dive-title">Drawing the ROC curve step by step</span></summary>
       <div class="dive-body">
         <p><strong>What a point on the curve is.</strong> Pick a threshold and flag every case scoring above it. Two numbers describe the result: the share of positives caught (TPR) and the share of negatives wrongly flagged (FPR). That pair is one point. The ROC curve is the points for every threshold, joined up.</p>
         <p><strong>“Walking down the ranking” means lowering the threshold one case at a time.</strong> Start above every score: nothing is flagged, point (0, 0). Each time the threshold drops past one more case, that case joins the flagged set. A positive adds a catch (TPR up by \(1/n_+\), a step up); a negative adds a false alarm (FPR up by \(1/n_-\), a step right). With the ranking A+ B− C+ D+ E+ F− G− H−:</p>
@@ -644,16 +644,7 @@ footer .site-nav { display: block; margin-top: 10px; }
           </tbody>
         </table></div>
         <p>Joining these points gives the staircase in the figure above: one step up for A, one right for B, three up for C–E, three right for F–H.</p>
-        <p><strong>Why the area is a probability.</strong> Cut the area into one column per negative (each negative is one step right). A column is \(1/n_-\) wide and as tall as the share of positives ranked above that negative, so its area is (positives above it) / \((n_+ n_-)\). Adding the columns counts every (positive, negative) pair the positive wins:</p>
-        <div class="tbl"><table>
-          <thead><tr><th>Negative</th><th>Positives ranked above it</th><th>Pairs won</th></tr></thead>
-          <tbody>
-            <tr><td>B</td><td>A only (C, D, E are below B)</td><td>1</td></tr>
-            <tr><td>F, G, H</td><td>A, C, D, E</td><td>4 each, 12</td></tr>
-            <tr><td><strong>Total</strong></td><td></td><td><strong>13 of 16</strong></td></tr>
-          </tbody>
-        </table></div>
-        <p>So AUC = 13/16 = 0.8125, the area. Picking one positive and one negative at random makes all 16 pairs equally likely, and the positive scores higher in 13 of them: that is “the chance a random positive outranks a random negative” (ties count half). The three lost pairs, C, D and E each below B, are the one dip in the staircase. Counting won pairs is the Mann–Whitney \(U\), so AUC = \(U/(n_+ n_-)\), and it depends only on the order of the scores, never their values.</p>
+        <p>Why the area under this staircase is the chance a random positive outranks a random negative: <a href="#auc-pairs">the next subsection</a>.</p>
       </div>
     </details>
 
