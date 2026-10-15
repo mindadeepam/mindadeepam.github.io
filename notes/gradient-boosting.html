@@ -662,6 +662,11 @@ predict(x) = F0 + eta * Σ (x's leaf values)</code></pre>
       <li><strong>On Tree 1's leaves:</strong> left, \(G = 1\), \(H = 1\), so \(w = -1\) (exact: −1.10); right, \(G = -1\), \(H = 0.5\), so \(w = +2\) (exact: ∞, but the shortcut gives a finite step).</li>
     </ul>
     <p><strong>Why divide by \(H\), not by the number of rows?</strong> \(g\) is an error in probability, while \(F\) is measured in log-odds. Near \(p = 0.5\), one unit of log-odds moves \(p\) by about 0.25. The left leaf is 0.25 too high on average, so it needs about 0.25 / 0.25 = 1 unit down. <strong>Dividing by \(h\) converts “wrong in probability” into “how far to move in log-odds”.</strong> In regression \(F\) and \(y\) share units, so \(h = 1\).</p>
+    <p><strong>Which parabola?</strong> The one from the second bullet above, written out. Nudge one row's score by \(w\). Near \(w = 0\), its real loss curve is swapped for the parabola with the same value, slope and bend there (a second-order Taylor expansion):</p>
+    <div class="mj">\[ \ell(F + w) \approx \ell(F) + g\,w + \tfrac12 h\,w^2 \]</div>
+    <p>At \(w = 0\) this equals \(\ell(F)\) and its slope is \(g\). The ½ makes its bend come out as exactly \(h\) (the second derivative of \(\tfrac12 h w^2\) is \(h\)), and unlike the real curve, that bend never changes. Every row in a leaf gets the same \(w\), so add up the leaf's parabolas and drop \(\sum \ell(F_i)\), which the leaf can't change. What's left is the change in the leaf's loss, again a parabola in \(w\):</p>
+    <div class="mj">\[ \Delta L(w) = G\,w + \tfrac12 H\,w^2 \]</div>
+    <p>Its bottom is at \(w = -G/H\), the Newton step. Putting that back in shows the leaf's loss drops by \(\tfrac12 G^2/H\) (step 5 in section 06, with \(\lambda = 0\)). That drop is what the split score compares, children against parent. For squared error this parabola is the loss itself (expand \(\tfrac12 (r - w)^2\) with \(g = -r\), \(h = 1\)).</p>
     <p><strong>The split score carries over unchanged</strong>: the same \(\tfrac12[G_L^2/H_L + G_R^2/H_R - G^2/H]\), now the loss a split removes under the parabola. It's Newton's method for logistic regression, one leaf at a time.</p>
 
     <h3>Tree 1 by hand</h3>
